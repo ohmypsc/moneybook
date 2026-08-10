@@ -9,7 +9,7 @@ const COOKIE_NAME =
   "__Host-moneybook_session";
 
 const SESSION_MAX_AGE =
-  60 * 60 * 24 * 90; // 90일
+  60 * 60 * 24 * 400; // 400일
 
 const encoder =
   new TextEncoder();
@@ -983,43 +983,50 @@ export default {
       /**
        * 세션 확인
        */
-      if (
-        request.method ===
-          "GET" &&
-        url.pathname ===
-          "/api/auth/session"
-      ) {
-        const session =
-          await getSession(
-            request,
-            env
-          );
+     /**
+ * 세션 확인 + 로그인 기간 자동 연장
+ */
+if (
+  request.method === "GET" &&
+  url.pathname === "/api/auth/session"
+) {
+  const session =
+    await getSession(
+      request,
+      env
+    );
 
-        if (!session) {
-          return unauthorized();
-        }
+  if (!session) {
+    return unauthorized();
+  }
 
-        return jsonResponse({
-          success:
-            true,
+  // 앱을 열 때마다 새로운 400일 세션을 발급
+  const refreshedToken =
+    await createSessionToken(
+      session.name,
+      env
+    );
 
-          loggedIn:
-            true,
+  return jsonResponse(
+    {
+      success: true,
+      loggedIn: true,
 
-          user: {
-            name:
-              session.name
-          },
-
-          expiresAt:
-            new Date(
-              session.exp *
-              1000
-            )
-              .toISOString()
-        });
+      user: {
+        name: session.name
       }
+    },
 
+    200,
+
+    {
+      "Set-Cookie":
+        createCookie(
+          refreshedToken
+        )
+    }
+  );
+}
 
       /**
        * 로그아웃
