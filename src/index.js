@@ -961,10 +961,11 @@ export default {
               true,
 
             user: {
-              name
-            },
+      name
+    }
+  },
 
-          200,
+  200,
 
           {
             "Set-Cookie":
