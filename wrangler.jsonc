@@ -2,10 +2,20 @@
   "name": "moneybook",
   "main": "./src/index.js",
   "compatibility_date": "2026-08-10",
+
   "assets": {
     "directory": "./public",
     "run_worker_first": [
       "/api/*"
+    ]
+  },
+
+  "secrets": {
+    "required": [
+      "APPS_SCRIPT_URL",
+      "LEDGER_API_SECRET",
+      "LOGIN_USERS",
+      "SESSION_SECRET"
     ]
   }
 }
