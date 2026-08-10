@@ -964,10 +964,6 @@ export default {
               name
             },
 
-            sessionDays:
-              90
-          },
-
           200,
 
           {
