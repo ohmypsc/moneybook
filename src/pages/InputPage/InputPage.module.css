@@ -1,0 +1,417 @@
+.page {
+  width: 100%;
+  max-width: var(--content-width);
+
+  min-height: 100vh;
+
+  margin: 0 auto;
+  padding: 24px 18px 110px;
+}
+
+
+/* =========================================================
+   상단
+   ========================================================= */
+
+.header {
+  margin-bottom: var(--space-6);
+}
+
+.eyebrow {
+  margin: 0 0 var(--space-1);
+
+  color: var(--color-text-secondary);
+
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.title {
+  margin: 0;
+
+  font-size: 28px;
+  line-height: 1.3;
+}
+
+.description {
+  margin: var(--space-2) 0 0;
+
+  color: var(--color-text-secondary);
+
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+
+/* =========================================================
+   거래 유형
+   ========================================================= */
+
+.typeTabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+
+  gap: 4px;
+
+  margin-bottom: var(--space-5);
+  padding: 4px;
+
+  background: var(--color-surface-soft);
+
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.typeButton {
+  min-height: 46px;
+
+  padding: 0 12px;
+
+  border: 0;
+  border-radius: var(--radius-sm);
+
+  background: transparent;
+
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+
+  cursor: pointer;
+
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.typeButton:hover {
+  background: var(--color-surface);
+}
+
+.typeButtonActive {
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+
+  box-shadow: var(--shadow-card);
+}
+
+.typeButtonActive:hover {
+  background: var(--color-primary-hover);
+}
+
+.typeButton:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+
+/* =========================================================
+   입력 폼
+   ========================================================= */
+
+.form {
+  display: grid;
+
+  gap: var(--space-4);
+}
+
+.card {
+  display: grid;
+
+  gap: var(--space-4);
+
+  padding: 20px;
+
+  background: var(--color-surface);
+
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+
+  box-shadow: var(--shadow-card);
+}
+
+.field {
+  display: grid;
+
+  gap: var(--space-2);
+}
+
+.fieldLabel {
+  display: flex;
+  align-items: center;
+
+  gap: 4px;
+
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.required {
+  color: var(--color-error);
+}
+
+
+/* =========================================================
+   공통 입력 요소
+   ========================================================= */
+
+.input,
+.select,
+.textarea {
+  width: 100%;
+
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+
+  background: var(--color-surface);
+
+  font: inherit;
+
+  outline: none;
+
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.input,
+.select {
+  min-height: 50px;
+
+  padding: 0 14px;
+}
+
+.textarea {
+  min-height: 96px;
+
+  padding: 13px 14px;
+
+  line-height: 1.6;
+
+  resize: vertical;
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  border-color: var(--color-primary);
+
+  box-shadow: 0 0 0 2px var(--color-surface-soft);
+}
+
+.input:disabled,
+.select:disabled,
+.textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+
+/* =========================================================
+   금액 입력
+   ========================================================= */
+
+.amountField {
+  display: grid;
+
+  gap: var(--space-2);
+}
+
+.amountWrap {
+  position: relative;
+}
+
+.amountInput {
+  width: 100%;
+  min-height: 62px;
+
+  padding: 0 52px 0 16px;
+
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+
+  background: var(--color-surface);
+
+  font: inherit;
+  font-size: 26px;
+  font-weight: 800;
+  text-align: right;
+
+  outline: none;
+
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.amountInput:focus {
+  border-color: var(--color-primary);
+
+  box-shadow: 0 0 0 2px var(--color-surface-soft);
+}
+
+.currency {
+  position: absolute;
+
+  top: 50%;
+  right: 16px;
+
+  transform: translateY(-50%);
+
+  color: var(--color-text-secondary);
+
+  font-size: 15px;
+  font-weight: 700;
+
+  pointer-events: none;
+}
+
+
+/* =========================================================
+   유형별 영역
+   ========================================================= */
+
+.conditionalSection {
+  display: grid;
+
+  gap: var(--space-4);
+}
+
+.sectionTitle {
+  margin: 0;
+
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.helper {
+  margin: 0;
+
+  color: var(--color-text-secondary);
+
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+
+/* =========================================================
+   두 항목 묶음
+   ========================================================= */
+
+.fieldPair {
+  display: grid;
+
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+
+  gap: var(--space-3);
+}
+
+
+/* =========================================================
+   로딩 / 오류
+   ========================================================= */
+
+.loading {
+  padding: 24px 18px;
+
+  background: var(--color-surface);
+
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+
+  color: var(--color-text-secondary);
+
+  font-size: 14px;
+  line-height: 1.6;
+
+  text-align: center;
+}
+
+.error {
+  margin: 0;
+
+  color: var(--color-error);
+
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+
+/* =========================================================
+   저장
+   ========================================================= */
+
+.submitArea {
+  margin-top: var(--space-2);
+}
+
+.submitButton {
+  width: 100%;
+  min-height: 54px;
+
+  padding: 0 18px;
+
+  border: 0;
+  border-radius: var(--radius-md);
+
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+
+  font: inherit;
+  font-size: 16px;
+  font-weight: 800;
+
+  cursor: pointer;
+
+  transition:
+    background 0.15s ease,
+    transform 0.1s ease,
+    opacity 0.15s ease;
+}
+
+.submitButton:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.submitButton:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.submitButton:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
+.submitButton:disabled {
+  opacity: 0.55;
+
+  cursor: not-allowed;
+}
+
+
+/* =========================================================
+   모바일
+   ========================================================= */
+
+@media (max-width: 480px) {
+  .page {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  .title {
+    font-size: 26px;
+  }
+
+  .card {
+    padding: 18px 16px;
+  }
+
+  .fieldPair {
+    grid-template-columns: 1fr;
+  }
+
+  .amountInput {
+    font-size: 24px;
+  }
+}
