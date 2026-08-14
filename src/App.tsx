@@ -10,15 +10,10 @@ import {
 } from "./api/auth";
 
 import {
-  getBootstrap
-} from "./api/ledger";
-
-import {
   ApiError
 } from "./api/client";
 
 import type {
-  BootstrapData,
   User
 } from "./types/api";
 
@@ -67,16 +62,6 @@ function App() {
     );
 
   const [
-    bootstrap,
-    setBootstrap
-  ] =
-    useState<
-      BootstrapData | null
-    >(
-      null
-    );
-
-  const [
     errorMessage,
     setErrorMessage
   ] =
@@ -105,9 +90,6 @@ function App() {
           const session =
             await getSession();
 
-          const bootstrapResponse =
-            await getBootstrap();
-
 
           if (cancelled) {
             return;
@@ -116,10 +98,6 @@ function App() {
 
           setUser(
             session.user
-          );
-
-          setBootstrap(
-            bootstrapResponse.data
           );
 
           setActiveNavigation(
@@ -198,16 +176,9 @@ function App() {
           password
         );
 
-      const bootstrapResponse =
-        await getBootstrap();
-
 
       setUser(
         loginResponse.user
-      );
-
-      setBootstrap(
-        bootstrapResponse.data
       );
 
       setActiveNavigation(
@@ -242,10 +213,6 @@ function App() {
     } finally {
 
       setUser(
-        null
-      );
-
-      setBootstrap(
         null
       );
 
@@ -284,8 +251,8 @@ function App() {
           </h1>
 
           <p>
-            가계부를 불러오는
-            중입니다.
+            로그인 상태를
+            확인하는 중입니다.
           </p>
         </section>
       </main>
@@ -321,8 +288,7 @@ function App() {
   if (
     status ===
       "error" ||
-    !user ||
-    !bootstrap
+    !user
   ) {
     return (
       <main
@@ -384,10 +350,6 @@ function App() {
       <HomePage
         user={
           user
-        }
-
-        bootstrap={
-          bootstrap
         }
 
         onLogout={
