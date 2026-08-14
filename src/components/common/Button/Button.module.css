@@ -1,207 +1,70 @@
-.nav {
-  position: fixed;
+.button {
+  min-height: 48px;
 
-  left: 0;
-  right: 0;
-  bottom: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 
-  z-index: 50;
+  gap: var(--space-2);
 
-  border-top:
-    1px solid
-    var(--color-border);
+  padding: 0 18px;
 
-  background:
-    var(--color-surface);
-
-  padding-bottom:
-    env(safe-area-inset-bottom);
-}
-
-
-.inner {
-  width: 100%;
-
-  max-width:
-    var(--content-width);
-
-  margin:
-    0 auto;
-
-  padding:
-    7px 10px 5px;
-
-  display: grid;
-
-  grid-template-columns:
-    repeat(
-      5,
-      minmax(0, 1fr)
-    );
-
-  align-items: end;
-}
-
-
-.item {
-  min-width: 0;
-  min-height: 54px;
-
-  display: grid;
-
-  place-items: center;
-  align-content: center;
-
-  gap: 4px;
-
-  padding:
-    5px 2px;
-
-  border: 0;
-
-  background:
-    transparent;
-
-  color:
-    var(--color-text-secondary);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
 
   font: inherit;
-
-  font-size: 11px;
+  font-size: 15px;
   font-weight: 700;
 
   cursor: pointer;
 
-  -webkit-tap-highlight-color:
-    transparent;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    opacity 0.15s ease,
+    transform 0.1s ease;
+
+  -webkit-tap-highlight-color: transparent;
 }
 
-
-.item:active {
-  transform:
-    scale(0.96);
+.button:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
-
-.active {
-  color:
-    var(--color-primary);
+.button:disabled {
+  cursor: default;
+  opacity: 0.5;
 }
 
-
-.icon {
-  width: 22px;
-  height: 22px;
-
-  display: block;
-
-  stroke:
-    currentColor;
+.primary {
+  background: var(--color-primary);
+  color: var(--color-primary-text);
 }
 
-
-.label {
-  max-width: 100%;
-
-  overflow: hidden;
-
-  text-overflow:
-    ellipsis;
-
-  white-space:
-    nowrap;
+.primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
 }
 
+.secondary {
+  border-color: var(--color-border);
 
-/*
- * 가운데 입력 버튼
- */
-
-.inputItem {
-  min-width: 0;
-  min-height: 62px;
-
-  display: grid;
-
-  place-items: center;
-  align-content: center;
-
-  gap: 3px;
-
-  padding: 0 2px 4px;
-
-  border: 0;
-
-  background:
-    transparent;
-
-  color:
-    var(--color-primary);
-
-  font: inherit;
-
-  font-size: 11px;
-  font-weight: 800;
-
-  cursor: pointer;
-
-  transform:
-    translateY(-7px);
-
-  -webkit-tap-highlight-color:
-    transparent;
+  background: var(--color-surface);
+  color: inherit;
 }
 
-
-.inputItem:active {
-  transform:
-    translateY(-7px)
-    scale(0.96);
+.secondary:hover:not(:disabled) {
+  background: var(--color-surface-soft);
 }
 
-
-.inputIconWrap {
-  width: 46px;
-  height: 46px;
-
-  display: grid;
-
-  place-items: center;
-
-  border-radius: 50%;
-
-  background:
-    var(--color-primary);
-
-  color:
-    var(--color-primary-text);
-
-  box-shadow:
-    var(--shadow-card);
+.ghost {
+  background: transparent;
+  color: var(--color-text-secondary);
 }
 
-
-.inputIcon {
-  width: 25px;
-  height: 25px;
-
-  display: block;
-
-  stroke:
-    currentColor;
+.ghost:hover:not(:disabled) {
+  background: var(--color-surface-soft);
 }
 
-
-.inputLabel {
-  line-height: 1.2;
-
-  white-space:
-    nowrap;
-}
-
-
-.inputActive
-.inputIconWrap {
-  background:
-    var(--color-primary-hover);
+.fullWidth {
+  width: 100%;
 }
