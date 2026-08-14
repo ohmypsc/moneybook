@@ -1,0 +1,8 @@
+.money {
+  white-space: nowrap;
+
+  font-variant-numeric:
+    tabular-nums;
+
+  letter-spacing: -0.02em;
+}
