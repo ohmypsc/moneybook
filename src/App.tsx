@@ -28,6 +28,14 @@ import LoginPage
 import HomePage
   from "./pages/HomePage/HomePage";
 
+import {
+  AppShell
+} from "./components/layout/AppShell/AppShell";
+
+import type {
+  NavigationKey
+} from "./components/layout/BottomNav/BottomNav";
+
 import styles
   from "./App.module.css";
 
@@ -74,6 +82,14 @@ function App() {
   ] =
     useState("");
 
+  const [
+    activeNavigation,
+    setActiveNavigation
+  ] =
+    useState<NavigationKey>(
+      "home"
+    );
+
 
   useEffect(
     () => {
@@ -104,6 +120,10 @@ function App() {
 
           setBootstrap(
             bootstrapResponse.data
+          );
+
+          setActiveNavigation(
+            "home"
           );
 
           setStatus(
@@ -190,6 +210,10 @@ function App() {
         bootstrapResponse.data
       );
 
+      setActiveNavigation(
+        "home"
+      );
+
       setStatus(
         "ready"
       );
@@ -223,6 +247,10 @@ function App() {
 
       setBootstrap(
         null
+      );
+
+      setActiveNavigation(
+        "home"
       );
 
       setErrorMessage(
@@ -344,20 +372,155 @@ function App() {
   }
 
 
+  let pageContent;
+
+
+  if (
+    activeNavigation ===
+      "home"
+  ) {
+
+    pageContent = (
+      <HomePage
+        user={
+          user
+        }
+
+        bootstrap={
+          bootstrap
+        }
+
+        onLogout={
+          handleLogout
+        }
+      />
+    );
+
+  } else if (
+    activeNavigation ===
+      "transactions"
+  ) {
+
+    pageContent = (
+      <div
+        className={
+          styles.center
+        }
+      >
+        <section
+          className={
+            styles.panel
+          }
+        >
+          <h1>
+            거래 내역
+          </h1>
+
+          <p>
+            거래 내역 화면을
+            준비하고 있습니다.
+          </p>
+        </section>
+      </div>
+    );
+
+  } else if (
+    activeNavigation ===
+      "assets"
+  ) {
+
+    pageContent = (
+      <div
+        className={
+          styles.center
+        }
+      >
+        <section
+          className={
+            styles.panel
+          }
+        >
+          <h1>
+            자산
+          </h1>
+
+          <p>
+            자산 현황 화면을
+            준비하고 있습니다.
+          </p>
+        </section>
+      </div>
+    );
+
+  } else if (
+    activeNavigation ===
+      "investments"
+  ) {
+
+    pageContent = (
+      <div
+        className={
+          styles.center
+        }
+      >
+        <section
+          className={
+            styles.panel
+          }
+        >
+          <h1>
+            투자
+          </h1>
+
+          <p>
+            투자 현황 화면을
+            준비하고 있습니다.
+          </p>
+        </section>
+      </div>
+    );
+
+  } else {
+
+    pageContent = (
+      <div
+        className={
+          styles.center
+        }
+      >
+        <section
+          className={
+            styles.panel
+          }
+        >
+          <h1>
+            설정
+          </h1>
+
+          <p>
+            가계부 설정 화면을
+            준비하고 있습니다.
+          </p>
+        </section>
+      </div>
+    );
+  }
+
+
   return (
-    <HomePage
-      user={
-        user
+    <AppShell
+      activeNavigation={
+        activeNavigation
       }
 
-      bootstrap={
-        bootstrap
+      onNavigate={
+        setActiveNavigation
       }
-
-      onLogout={
-        handleLogout
+    >
+      {
+        pageContent
       }
-    />
+    </AppShell>
   );
 }
 
