@@ -1,89 +1,65 @@
 import {
-  type ComponentType,
-  useCallback,
   useEffect,
   useState
 } from "react";
 
-import HomePage from "./pages/HomePage/HomePage";
-import InputPage from "./pages/InputPage/InputPage";
-import LoginPage from "./pages/LoginPage/LoginPage";
+import {
+  getSession,
+  login,
+  logout
+} from "./api/auth";
 
-import styles from "./App.module.css";
+import {
+  ApiError
+} from "./api/client";
 
+import type {
+  User
+} from "./types/api";
 
-type AppPage =
-  | "home"
-  | "input";
+import LoginPage
+  from "./pages/LoginPage/LoginPage";
 
+import HomePage
+  from "./pages/HomePage/HomePage";
 
-interface SessionUser {
-  name: string;
-}
+import {
+  AppShell
+} from "./components/layout/AppShell/AppShell";
 
+import type {
+  NavigationKey
+} from "./components/layout/BottomNav/BottomNav";
 
-interface SessionResponse {
-  success?: boolean;
-
-  loggedIn?: boolean;
-
-  user?: {
-    name?: string;
-  };
-
-  error?: {
-    code?: string;
-    message?: string;
-  };
-}
+import styles
+  from "./App.module.css";
 
 
 type AppStatus =
+  | "checking"
+  | "loggedOut"
   | "loading"
-  | "authenticated"
-  | "unauthenticated"
+  | "ready"
   | "error";
 
 
-interface LoginPageBridgeProps {
-  onLogin?: () => void;
-  onLoggedIn?: () => void;
-  onLoginSuccess?: () => void;
-}
+function App() {
 
-
-const LoginPageView =
-  LoginPage as unknown as
-    ComponentType<LoginPageBridgeProps>;
-
-
-export default function App() {
   const [
     status,
     setStatus
   ] =
     useState<AppStatus>(
-      "loading"
+      "checking"
     );
-
 
   const [
     user,
     setUser
   ] =
-    useState<SessionUser | null>(
+    useState<User | null>(
       null
     );
-
-
-  const [
-    page,
-    setPage
-  ] =
-    useState<AppPage>(
-      "home"
-    );
-
 
   const [
     errorMessage,
@@ -91,176 +67,173 @@ export default function App() {
   ] =
     useState("");
 
-
-  const loadSession =
-    useCallback(
-      async () => {
-        setStatus(
-          "loading"
-        );
-
-        setErrorMessage(
-          ""
-        );
-
-
-        try {
-          const response =
-            await fetch(
-              "/api/auth/session",
-              {
-                method:
-                  "GET",
-
-                credentials:
-                  "same-origin",
-
-                headers: {
-                  Accept:
-                    "application/json"
-                }
-              }
-            );
-
-
-          if (
-            response.status ===
-            401
-          ) {
-            setUser(
-              null
-            );
-
-            setStatus(
-              "unauthenticated"
-            );
-
-            return;
-          }
-
-
-          let data:
-            SessionResponse;
-
-
-          try {
-            data =
-              await response
-                .json() as
-                SessionResponse;
-
-          } catch {
-            throw new Error(
-              "로그인 상태 응답을 읽지 못했습니다."
-            );
-          }
-
-
-          if (
-            response.ok &&
-            data.loggedIn ===
-              true &&
-            data.user?.name
-          ) {
-            setUser({
-              name:
-                data.user.name
-            });
-
-            setStatus(
-              "authenticated"
-            );
-
-            return;
-          }
-
-
-          if (
-            response.ok &&
-            data.loggedIn !==
-              true
-          ) {
-            setUser(
-              null
-            );
-
-            setStatus(
-              "unauthenticated"
-            );
-
-            return;
-          }
-
-
-          throw new Error(
-            data.error?.message ||
-            "로그인 상태를 확인하지 못했습니다."
-          );
-
-        } catch (
-          error
-        ) {
-          setUser(
-            null
-          );
-
-          setStatus(
-            "error"
-          );
-
-          setErrorMessage(
-            error instanceof Error
-              ? error.message
-              : "로그인 상태를 확인하지 못했습니다."
-          );
-        }
-      },
-      []
+  const [
+    activeNavigation,
+    setActiveNavigation
+  ] =
+    useState<NavigationKey>(
+      "home"
     );
 
 
   useEffect(
     () => {
-      void loadSession();
+
+      let cancelled =
+        false;
+
+
+      async function start() {
+
+        try {
+
+          const session =
+            await getSession();
+
+
+          if (cancelled) {
+            return;
+          }
+
+
+          setUser(
+            session.user
+          );
+
+          setActiveNavigation(
+            "home"
+          );
+
+          setStatus(
+            "ready"
+          );
+
+        } catch (error) {
+
+          if (cancelled) {
+            return;
+          }
+
+
+          if (
+            error instanceof
+              ApiError &&
+            error.status === 401
+          ) {
+            setStatus(
+              "loggedOut"
+            );
+
+            return;
+          }
+
+
+          setErrorMessage(
+            error instanceof Error
+              ? error.message
+              : "가계부를 불러오지 못했습니다."
+          );
+
+          setStatus(
+            "error"
+          );
+        }
+      }
+
+
+      void start();
+
+
+      return () => {
+        cancelled =
+          true;
+      };
     },
-    [
-      loadSession
-    ]
+
+    []
   );
 
 
-  function handleLoginSuccess() {
-    void loadSession();
+  async function handleLogin(
+    name: string,
+    password: string
+  ) {
+
+    setStatus(
+      "loading"
+    );
+
+    setErrorMessage(
+      ""
+    );
+
+
+    try {
+
+      const loginResponse =
+        await login(
+          name,
+          password
+        );
+
+
+      setUser(
+        loginResponse.user
+      );
+
+      setActiveNavigation(
+        "home"
+      );
+
+      setStatus(
+        "ready"
+      );
+
+    } catch (error) {
+
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "로그인하지 못했습니다."
+      );
+
+      setStatus(
+        "loggedOut"
+      );
+    }
   }
 
 
-  function openInput() {
-    setPage(
-      "input"
-    );
+  async function handleLogout() {
 
-    window.scrollTo({
-      top: 0,
-      behavior: "auto"
-    });
-  }
+    try {
 
+      await logout();
 
-  function openHome() {
-    setPage(
-      "home"
-    );
+    } finally {
 
-    window.scrollTo({
-      top: 0,
-      behavior: "auto"
-    });
+      setUser(
+        null
+      );
+
+      setActiveNavigation(
+        "home"
+      );
+
+      setErrorMessage(
+        ""
+      );
+
+      setStatus(
+        "loggedOut"
+      );
+    }
   }
 
 
   if (
     status ===
-    "loading"
+      "checking"
   ) {
     return (
       <main
@@ -273,20 +246,13 @@ export default function App() {
             styles.panel
           }
         >
-          <p
-            className={
-              styles.loadingLabel
-            }
-          >
-            우리 가계부
-          </p>
-
           <h1>
-            불러오는 중
+            우리 가계부
           </h1>
 
           <p>
-            로그인 상태를 확인하고 있습니다.
+            로그인 상태를
+            확인하는 중입니다.
           </p>
         </section>
       </main>
@@ -296,7 +262,33 @@ export default function App() {
 
   if (
     status ===
-    "error"
+      "loggedOut" ||
+    status ===
+      "loading"
+  ) {
+    return (
+      <LoginPage
+        loading={
+          status ===
+            "loading"
+        }
+
+        errorMessage={
+          errorMessage
+        }
+
+        onLogin={
+          handleLogin
+        }
+      />
+    );
+  }
+
+
+  if (
+    status ===
+      "error" ||
+    !user
   ) {
     return (
       <main
@@ -309,16 +301,8 @@ export default function App() {
             styles.panel
           }
         >
-          <p
-            className={
-              styles.loadingLabel
-            }
-          >
-            우리 가계부
-          </p>
-
           <h1>
-            연결을 확인해주세요
+            우리 가계부
           </h1>
 
           <p
@@ -327,18 +311,23 @@ export default function App() {
             }
           >
             {
-              errorMessage
+              errorMessage ||
+              "가계부를 불러오지 못했습니다."
             }
           </p>
 
           <button
             type="button"
+
             className={
               styles.retry
             }
+
             onClick={
               () =>
-                void loadSession()
+                window
+                  .location
+                  .reload()
             }
           >
             다시 시도
@@ -349,118 +338,158 @@ export default function App() {
   }
 
 
+  let pageContent;
+
+
   if (
-    status ===
-    "unauthenticated"
+    activeNavigation ===
+      "home"
   ) {
-    return (
-      <LoginPageView
-        onLogin={
-          handleLoginSuccess
+
+    pageContent = (
+      <HomePage
+        user={
+          user
         }
-        onLoggedIn={
-          handleLoginSuccess
-        }
-        onLoginSuccess={
-          handleLoginSuccess
+
+        onLogout={
+          handleLogout
         }
       />
     );
-  }
 
-
-  if (
-    page ===
-    "input"
+  } else if (
+    activeNavigation ===
+      "calendar"
   ) {
-    return (
+
+    pageContent = (
       <div
         className={
-          styles.inputShell
+          styles.center
         }
       >
-        <div
+        <section
           className={
-            styles.inputToolbar
+            styles.panel
           }
         >
-          <div
-            className={
-              styles.inputToolbarInner
-            }
-          >
-            <button
-              type="button"
-              className={
-                styles.backButton
-              }
-              onClick={
-                openHome
-              }
-            >
-              <span
-                aria-hidden="true"
-              >
-                ←
-              </span>
+          <h1>
+            달력
+          </h1>
 
-              홈
-            </button>
-          </div>
-        </div>
+          <p>
+            날짜별 수입과 지출을
+            한눈에 볼 수 있는
+            월간 달력을 만들 예정입니다.
+          </p>
+        </section>
+      </div>
+    );
 
-        <InputPage />
+  } else if (
+    activeNavigation ===
+      "input"
+  ) {
+
+    pageContent = (
+      <div
+        className={
+          styles.center
+        }
+      >
+        <section
+          className={
+            styles.panel
+          }
+        >
+          <h1>
+            거래 입력
+          </h1>
+
+          <p>
+            지출을 기본으로
+            수입 및 이체를 빠르게
+            입력할 수 있는 화면을
+            만들 예정입니다.
+          </p>
+        </section>
+      </div>
+    );
+
+  } else if (
+    activeNavigation ===
+      "assets"
+  ) {
+
+    pageContent = (
+      <div
+        className={
+          styles.center
+        }
+      >
+        <section
+          className={
+            styles.panel
+          }
+        >
+          <h1>
+            자산
+          </h1>
+
+          <p>
+            계좌와 투자자산 및 부채를
+            한곳에서 확인하는 화면을
+            만들 예정입니다.
+          </p>
+        </section>
+      </div>
+    );
+
+  } else {
+
+    pageContent = (
+      <div
+        className={
+          styles.center
+        }
+      >
+        <section
+          className={
+            styles.panel
+          }
+        >
+          <h1>
+            설정
+          </h1>
+
+          <p>
+            계좌와 카테고리 및
+            가계부 설정을 관리하는
+            화면을 만들 예정입니다.
+          </p>
+        </section>
       </div>
     );
   }
 
 
   return (
-    <div
-      className={
-        styles.homeShell
+    <AppShell
+      activeNavigation={
+        activeNavigation
+      }
+
+      onNavigate={
+        setActiveNavigation
       }
     >
-      <HomePage />
-
-
-      <div
-        className={
-          styles.homeActionBar
-        }
-      >
-        <div
-          className={
-            styles.homeActionInner
-          }
-        >
-          <button
-            type="button"
-            className={
-              styles.openInputButton
-            }
-            onClick={
-              openInput
-            }
-            aria-label={
-              `${user?.name ?? ""} 거래 입력`
-            }
-          >
-            <span
-              className={
-                styles.openInputIcon
-              }
-              aria-hidden="true"
-            >
-              +
-            </span>
-
-            <span>
-              거래 입력
-            </span>
-          </button>
-        </div>
-      </div>
-    </div>
+      {
+        pageContent
+      }
+    </AppShell>
   );
 }
+
+
+export default App;
