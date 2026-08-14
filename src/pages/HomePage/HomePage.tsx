@@ -41,7 +41,13 @@ type DashboardLoadStatus =
 type HomePageProps = {
   user: User;
 
-  bootstrap:
+  /*
+   * App.tsx를 다음 커밋에서 변경할 때
+   * 중간 빌드가 깨지지 않도록 잠시 optional로 유지함.
+   *
+   * 실제 HomePage에서는 bootstrap을 사용하지 않음.
+   */
+  bootstrap?:
     BootstrapData;
 
   onLogout:
