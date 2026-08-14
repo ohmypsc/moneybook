@@ -47,7 +47,8 @@ export interface DashboardAccount {
 
   balanceMethod: string;
 
-  sheetCurrentBalance: number;
+  sheetCurrentBalance:
+    number | null;
 
   paymentAccountId:
     string | null;
@@ -102,6 +103,55 @@ export interface DashboardMonthlyTrend {
 }
 
 
+export type DashboardTransactionType =
+  | "수입"
+  | "지출"
+  | "이체";
+
+
+export interface DashboardRecentTransaction {
+  transactionId: string;
+
+  date: string;
+
+  type:
+    DashboardTransactionType;
+
+  categoryId:
+    string | null;
+
+  category: string;
+
+  amount: number;
+
+  fromAccountId:
+    string | null;
+
+  fromAccount:
+    string | null;
+
+  toAccountId:
+    string | null;
+
+  toAccount:
+    string | null;
+
+  paymentMethodId:
+    string | null;
+
+  paymentMethod:
+    string | null;
+
+  spendingTarget:
+    string | null;
+
+  memo: string;
+
+  reversalOf:
+    string | null;
+}
+
+
 export interface DashboardInvestmentAccount {
   accountId: string;
   accountName: string;
@@ -143,8 +193,11 @@ export interface DashboardInvestmentAccount {
 export interface DashboardHolding {
   holdingId: string;
 
-  accountId: string;
-  accountName: string;
+  accountId:
+    string | null;
+
+  accountName:
+    string | null;
 
   stockCode: string;
   stockName: string;
@@ -163,12 +216,14 @@ export interface DashboardHolding {
   currentPrice:
     number | null;
 
-  fx: number;
+  fx:
+    number | null;
 
   valueKrw: number;
   costKrw: number;
 
-  returnRate: number;
+  returnRate:
+    number | null;
 
   owner: string;
 
@@ -271,6 +326,9 @@ export interface DashboardData {
 
   monthlyTrend:
     DashboardMonthlyTrend[];
+
+  recentTransactions:
+    DashboardRecentTransaction[];
 
   investments:
     DashboardInvestments;
