@@ -1,62 +1,93 @@
 .nav {
   position: fixed;
+
   left: 0;
   right: 0;
   bottom: 0;
 
   z-index: 50;
 
-  border-top: 1px solid var(--color-border);
+  border-top:
+    1px solid
+    var(--color-border);
 
-  background: var(--color-surface);
+  background:
+    var(--color-surface);
 
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom:
+    env(safe-area-inset-bottom);
 }
+
 
 .inner {
   width: 100%;
-  max-width: var(--content-width);
 
-  margin: 0 auto;
-  padding: 7px 10px 5px;
+  max-width:
+    var(--content-width);
+
+  margin:
+    0 auto;
+
+  padding:
+    7px 10px 5px;
 
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+
+  grid-template-columns:
+    repeat(
+      5,
+      minmax(0, 1fr)
+    );
+
+  align-items: end;
 }
+
 
 .item {
   min-width: 0;
   min-height: 54px;
 
   display: grid;
+
   place-items: center;
   align-content: center;
 
   gap: 4px;
 
-  padding: 5px 2px;
+  padding:
+    5px 2px;
 
   border: 0;
-  background: transparent;
 
-  color: var(--color-text-secondary);
+  background:
+    transparent;
+
+  color:
+    var(--color-text-secondary);
 
   font: inherit;
+
   font-size: 11px;
   font-weight: 700;
 
   cursor: pointer;
 
-  -webkit-tap-highlight-color: transparent;
+  -webkit-tap-highlight-color:
+    transparent;
 }
+
 
 .item:active {
-  transform: scale(0.96);
+  transform:
+    scale(0.96);
 }
 
+
 .active {
-  color: var(--color-primary);
+  color:
+    var(--color-primary);
 }
+
 
 .icon {
   width: 22px;
@@ -64,13 +95,113 @@
 
   display: block;
 
-  stroke: currentColor;
+  stroke:
+    currentColor;
 }
+
 
 .label {
   max-width: 100%;
 
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+
+  text-overflow:
+    ellipsis;
+
+  white-space:
+    nowrap;
+}
+
+
+/*
+ * 가운데 입력 버튼
+ */
+
+.inputItem {
+  min-width: 0;
+  min-height: 62px;
+
+  display: grid;
+
+  place-items: center;
+  align-content: center;
+
+  gap: 3px;
+
+  padding: 0 2px 4px;
+
+  border: 0;
+
+  background:
+    transparent;
+
+  color:
+    var(--color-primary);
+
+  font: inherit;
+
+  font-size: 11px;
+  font-weight: 800;
+
+  cursor: pointer;
+
+  transform:
+    translateY(-7px);
+
+  -webkit-tap-highlight-color:
+    transparent;
+}
+
+
+.inputItem:active {
+  transform:
+    translateY(-7px)
+    scale(0.96);
+}
+
+
+.inputIconWrap {
+  width: 46px;
+  height: 46px;
+
+  display: grid;
+
+  place-items: center;
+
+  border-radius: 50%;
+
+  background:
+    var(--color-primary);
+
+  color:
+    var(--color-primary-text);
+
+  box-shadow:
+    var(--shadow-card);
+}
+
+
+.inputIcon {
+  width: 25px;
+  height: 25px;
+
+  display: block;
+
+  stroke:
+    currentColor;
+}
+
+
+.inputLabel {
+  line-height: 1.2;
+
+  white-space:
+    nowrap;
+}
+
+
+.inputActive
+.inputIconWrap {
+  background:
+    var(--color-primary-hover);
 }
