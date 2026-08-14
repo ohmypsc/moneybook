@@ -77,6 +77,91 @@ interface DashboardResponse {
 }
 
 
+let dashboardMemoryCache:
+  DashboardData | null =
+    null;
+
+
+let dashboardRequest:
+  Promise<DashboardData> | null =
+    null;
+
+
+async function requestDashboard() {
+  if (
+    dashboardRequest
+  ) {
+    return dashboardRequest;
+  }
+
+
+  dashboardRequest =
+    (async () => {
+      const response =
+        await fetch(
+          "/api/dashboard",
+          {
+            method:
+              "GET",
+
+            credentials:
+              "same-origin",
+
+            headers: {
+              Accept:
+                "application/json"
+            }
+          }
+        );
+
+
+      let body:
+        DashboardResponse;
+
+
+      try {
+        body =
+          await response
+            .json() as
+              DashboardResponse;
+
+      } catch {
+        throw new Error(
+          "가계부 데이터를 읽지 못했습니다."
+        );
+      }
+
+
+      if (
+        !response.ok ||
+        body.success !== true ||
+        !body.data
+      ) {
+        throw new Error(
+          body.error?.message ||
+          "가계부 데이터를 불러오지 못했습니다."
+        );
+      }
+
+
+      dashboardMemoryCache =
+        body.data;
+
+
+      return body.data;
+    })();
+
+
+  try {
+    return await dashboardRequest;
+
+  } finally {
+    dashboardRequest =
+      null;
+  }
+}
+
+
 type HomePageProps =
   Record<string, unknown>;
 
@@ -168,7 +253,8 @@ export default function HomePage(
     setDashboard
   ] =
     useState<DashboardData | null>(
-      null
+      () =>
+        dashboardMemoryCache
     );
 
 
@@ -176,7 +262,10 @@ export default function HomePage(
     loading,
     setLoading
   ] =
-    useState(true);
+    useState(
+      dashboardMemoryCache ===
+        null
+    );
 
 
   const [
@@ -187,77 +276,63 @@ export default function HomePage(
 
 
   async function loadDashboard() {
-    setLoading(
-      true
-    );
+    const cachedDashboard =
+      dashboardMemoryCache;
+
+
+    if (
+      cachedDashboard
+    ) {
+      setDashboard(
+        cachedDashboard
+      );
+
+      setLoading(
+        false
+      );
+
+    } else {
+      setLoading(
+        true
+      );
+    }
+
 
     setErrorMessage(
       ""
     );
 
+
     try {
-      const response =
-        await fetch(
-          "/api/dashboard",
-          {
-            method:
-              "GET",
-
-            credentials:
-              "same-origin",
-
-            headers: {
-              Accept:
-                "application/json"
-            }
-          }
-        );
-
-
-      let body:
-        DashboardResponse;
-
-      try {
-        body =
-          await response
-            .json() as
-              DashboardResponse;
-
-      } catch {
-        throw new Error(
-          "가계부 데이터를 읽지 못했습니다."
-        );
-      }
-
-
-      if (
-        !response.ok ||
-        body.success !== true ||
-        !body.data
-      ) {
-        throw new Error(
-          body.error?.message ||
-          "가계부 데이터를 불러오지 못했습니다."
-        );
-      }
+      const data =
+        await requestDashboard();
 
 
       setDashboard(
-        body.data
+        data
       );
 
     } catch (
       error
     ) {
-      setDashboard(
-        null
-      );
+      if (
+        dashboardMemoryCache
+      ) {
+        setDashboard(
+          dashboardMemoryCache
+        );
 
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "가계부 데이터를 불러오지 못했습니다."
-      );
+      } else {
+        setDashboard(
+          null
+        );
+
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "가계부 데이터를 불러오지 못했습니다."
+        );
+      }
 
     } finally {
       setLoading(
@@ -269,7 +344,98 @@ export default function HomePage(
 
   useEffect(
     () => {
-      void loadDashboard();
+      let cancelled =
+        false;
+
+
+      async function refreshDashboard() {
+        const cachedDashboard =
+          dashboardMemoryCache;
+
+
+        if (
+          cachedDashboard
+        ) {
+          setDashboard(
+            cachedDashboard
+          );
+
+          setLoading(
+            false
+          );
+        }
+
+
+        try {
+          const data =
+            await requestDashboard();
+
+
+          if (
+            cancelled
+          ) {
+            return;
+          }
+
+
+          setDashboard(
+            data
+          );
+
+          setErrorMessage(
+            ""
+          );
+
+        } catch (
+          error
+        ) {
+          if (
+            cancelled
+          ) {
+            return;
+          }
+
+
+          if (
+            dashboardMemoryCache
+          ) {
+            setDashboard(
+              dashboardMemoryCache
+            );
+
+            return;
+          }
+
+
+          setDashboard(
+            null
+          );
+
+          setErrorMessage(
+            error instanceof Error
+              ? error.message
+              : "가계부 데이터를 불러오지 못했습니다."
+          );
+
+        } finally {
+          if (
+            !cancelled
+          ) {
+            setLoading(
+              false
+            );
+          }
+        }
+      }
+
+
+      void refreshDashboard();
+
+
+      return () => {
+        cancelled =
+          true;
+      };
     },
     []
   );
