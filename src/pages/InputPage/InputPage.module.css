@@ -44,7 +44,7 @@
 
 
 /* =========================================================
-   거래 유형
+   일반 거래 유형
    ========================================================= */
 
 .typeTabs {
@@ -53,7 +53,6 @@
 
   gap: 4px;
 
-  margin-bottom: var(--space-5);
   padding: 4px;
 
   background: var(--color-surface-soft);
@@ -71,6 +70,8 @@
   border-radius: var(--radius-sm);
 
   background: transparent;
+
+  color: inherit;
 
   font: inherit;
   font-size: 14px;
@@ -102,6 +103,138 @@
 .typeButton:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
+}
+
+
+/* =========================================================
+   카드 빠른 입력
+   ========================================================= */
+
+.quickSection {
+  margin-top: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.quickHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: var(--space-3);
+
+  margin-bottom: var(--space-2);
+}
+
+.quickTitle {
+  margin: 0;
+
+  color: var(--color-text-secondary);
+
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.quickActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+
+  gap: var(--space-2);
+}
+
+.quickActionButton {
+  width: 100%;
+  min-height: 70px;
+
+  display: flex;
+  align-items: center;
+
+  gap: 12px;
+
+  padding: 12px 14px;
+
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+
+  background: var(--color-surface);
+
+  color: inherit;
+
+  font: inherit;
+  text-align: left;
+
+  cursor: pointer;
+
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.1s ease;
+}
+
+.quickActionButton:hover {
+  border-color: var(--color-primary);
+
+  background: var(--color-surface-soft);
+}
+
+.quickActionButton:active {
+  transform: translateY(1px);
+}
+
+.quickActionButton:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.quickActionSelected {
+  border-color: var(--color-primary);
+
+  background: var(--color-surface-soft);
+
+  box-shadow: var(--shadow-card);
+}
+
+.quickActionIcon {
+  flex: 0 0 auto;
+
+  width: 38px;
+  height: 38px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: var(--radius-sm);
+
+  background: var(--color-surface-soft);
+
+  font-size: 20px;
+}
+
+.quickActionSelected .quickActionIcon {
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+}
+
+.quickActionText {
+  min-width: 0;
+
+  display: grid;
+
+  gap: 2px;
+}
+
+.quickActionLabel {
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.quickActionHint {
+  color: var(--color-text-secondary);
+
+  font-size: 11px;
+  line-height: 1.35;
 }
 
 
@@ -165,6 +298,8 @@
 
   background: var(--color-surface);
 
+  color: inherit;
+
   font: inherit;
 
   outline: none;
@@ -203,12 +338,13 @@
 .select:disabled,
 .textarea:disabled {
   opacity: 0.6;
+
   cursor: not-allowed;
 }
 
 
 /* =========================================================
-   금액 입력
+   금액
    ========================================================= */
 
 .amountField {
@@ -231,6 +367,8 @@
   border-radius: var(--radius-md);
 
   background: var(--color-surface);
+
+  color: inherit;
 
   font: inherit;
   font-size: 26px;
@@ -268,7 +406,7 @@
 
 
 /* =========================================================
-   유형별 영역
+   유형별 입력 영역
    ========================================================= */
 
 .conditionalSection {
@@ -293,14 +431,8 @@
   line-height: 1.5;
 }
 
-
-/* =========================================================
-   두 항목 묶음
-   ========================================================= */
-
 .fieldPair {
   display: grid;
-
   grid-template-columns: repeat(2, minmax(0, 1fr));
 
   gap: var(--space-3);
@@ -308,7 +440,48 @@
 
 
 /* =========================================================
-   로딩 / 오류
+   카드 결제 전용 안내
+   ========================================================= */
+
+.cardPaymentNotice {
+  display: flex;
+  align-items: flex-start;
+
+  gap: 10px;
+
+  padding: 12px 14px;
+
+  background: var(--color-surface-soft);
+
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.cardPaymentNoticeIcon {
+  flex: 0 0 auto;
+
+  font-size: 17px;
+  line-height: 1.4;
+}
+
+.cardPaymentNoticeText {
+  margin: 0;
+
+  color: var(--color-text-secondary);
+
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.cardPaymentNoticeText strong {
+  color: inherit;
+
+  font-weight: 800;
+}
+
+
+/* =========================================================
+   로딩 / 오류 / 성공
    ========================================================= */
 
 .loading {
@@ -333,6 +506,16 @@
   color: var(--color-error);
 
   font-size: 13px;
+  line-height: 1.5;
+}
+
+.success {
+  margin: 0;
+
+  color: var(--color-primary);
+
+  font-size: 13px;
+  font-weight: 700;
   line-height: 1.5;
 }
 
@@ -413,5 +596,13 @@
 
   .amountInput {
     font-size: 24px;
+  }
+}
+
+
+/* 아주 좁은 화면 */
+@media (max-width: 360px) {
+  .quickActions {
+    grid-template-columns: 1fr;
   }
 }
