@@ -102,7 +102,7 @@ export default function App() {
 
       async function restoreSession() {
         try {
-          const sessionUser =
+          const session =
             await getSession();
 
 
@@ -113,12 +113,28 @@ export default function App() {
           }
 
 
+          if (
+            session.loggedIn &&
+            session.user
+          ) {
+            setUser(
+              session.user
+            );
+
+            setStatus(
+              "authenticated"
+            );
+
+            return;
+          }
+
+
           setUser(
-            sessionUser
+            null
           );
 
           setStatus(
-            "authenticated"
+            "guest"
           );
 
         } catch (
@@ -174,7 +190,8 @@ export default function App() {
 
 
   async function handleLogin(
-    name: string
+    name: string,
+    password: string
   ) {
     setLoginLoading(
       true
@@ -186,14 +203,15 @@ export default function App() {
 
 
     try {
-      const nextUser =
+      const result =
         await login(
-          name
+          name,
+          password
         );
 
 
       setUser(
-        nextUser
+        result.user
       );
 
       setStatus(
