@@ -31,6 +31,12 @@ type InputMode =
   | "card-prepayment";
 
 
+type CreateTransactionPayload =
+  Parameters<
+    typeof createTransaction
+  >[0];
+
+
 interface Account {
   accountId: string;
   accountName?: string;
@@ -106,10 +112,6 @@ let bootstrapPromise:
     null;
 
 
-/**
- * InputPage가 처음 열렸을 때만 bootstrap을 가져옵니다.
- * 이후 다시 열면 같은 Promise를 재사용합니다.
- */
 async function loadBootstrap():
   Promise<BootstrapData> {
 
@@ -125,7 +127,8 @@ async function loadBootstrap():
               !response.data
             ) {
               throw new Error(
-                response.error?.message ||
+                response.error
+                  ?.message ||
                 "입력 정보를 불러오지 못했습니다."
               );
             }
@@ -223,11 +226,17 @@ function getBackendType(
     return "이체";
   }
 
-  if (mode === "income") {
+  if (
+    mode ===
+    "income"
+  ) {
     return "수입";
   }
 
-  if (mode === "transfer") {
+  if (
+    mode ===
+    "transfer"
+  ) {
     return "이체";
   }
 
@@ -398,10 +407,6 @@ export default function InputPage() {
     useState("");
 
 
-  /*
-   * 같은 내용으로 재시도할 때
-   * 동일한 requestId를 사용하기 위한 메모리입니다.
-   */
   const requestMemory =
     useRef<RequestMemory | null>(
       null
@@ -413,6 +418,12 @@ export default function InputPage() {
       "card-payment" ||
     mode ===
       "card-prepayment";
+
+
+  const backendType =
+    getBackendType(
+      mode
+    );
 
 
   useEffect(
@@ -470,16 +481,6 @@ export default function InputPage() {
   );
 
 
-  const backendType =
-    getBackendType(
-      mode
-    );
-
-
-  /*
-   * 일반 이체 화면에서는
-   * 카드대금 전용 카테고리를 숨깁니다.
-   */
   const categories =
     useMemo(
       () => {
@@ -518,14 +519,10 @@ export default function InputPage() {
 
 
   const accounts =
-    bootstrap?.accounts ||
+    bootstrap?.accounts ??
     [];
 
 
-  /*
-   * 카드값 결제 및 선결제 대상은
-   * 신용카드만 보여줍니다.
-   */
   const creditCards =
     useMemo(
       () =>
@@ -547,7 +544,7 @@ export default function InputPage() {
           account =>
             account.accountId ===
             toAccountId
-        ) ||
+        ) ??
         null,
       [
         creditCards,
@@ -556,13 +553,6 @@ export default function InputPage() {
     );
 
 
-  /*
-   * 카드대금 출금계좌는 기본적으로
-   * 자산 계좌에서 선택합니다.
-   *
-   * 카드에 연결된 paymentAccountId는
-   * 반드시 목록에 포함되도록 합니다.
-   */
   const cardSourceAccounts =
     useMemo(
       () => {
@@ -627,11 +617,6 @@ export default function InputPage() {
       nextMode
     );
 
-    /*
-     * 날짜, 금액, 메모는 유지합니다.
-     * 입력 유형을 잘못 눌렀다가 바꿔도
-     * 다시 입력하지 않도록 합니다.
-     */
     setCategoryId("");
     setPaymentMethodId("");
     setSpendingTarget("");
@@ -672,11 +657,6 @@ export default function InputPage() {
       value
     );
 
-    /*
-     * 카드 입력에서 사용자가 청구월을
-     * 별도로 바꾸지 않았다면
-     * 거래 날짜 변경에 맞춰 자동 변경합니다.
-     */
     if (
       isCardMode &&
       (
@@ -734,11 +714,6 @@ export default function InputPage() {
           accountId
       );
 
-    /*
-     * 카드에 등록된 결제계좌가 있으면
-     * 자동으로 출금계좌 기본값으로 사용합니다.
-     * 사용자는 아래 Select에서 변경할 수 있습니다.
-     */
     setFromAccountId(
       card?.paymentAccountId ||
       ""
@@ -779,14 +754,17 @@ export default function InputPage() {
       return "입력 정보를 불러오지 못했습니다.";
     }
 
+
     if (!date) {
       return "날짜를 선택해주세요.";
     }
+
 
     const numericAmount =
       Number(
         amount
       );
+
 
     if (
       !Number.isFinite(
@@ -799,7 +777,9 @@ export default function InputPage() {
     }
 
 
-    if (isCardMode) {
+    if (
+      isCardMode
+    ) {
       if (
         !getCardCategory()
       ) {
@@ -809,17 +789,27 @@ export default function InputPage() {
           : "카드정기결제 카테고리를 찾을 수 없습니다.";
       }
 
-      if (!toAccountId) {
+
+      if (
+        !toAccountId
+      ) {
         return "결제할 카드를 선택해주세요.";
       }
 
-      if (!fromAccountId) {
+
+      if (
+        !fromAccountId
+      ) {
         return "돈이 나갈 계좌를 선택해주세요.";
       }
 
-      if (!billingMonth) {
+
+      if (
+        !billingMonth
+      ) {
         return "대상 청구월을 선택해주세요.";
       }
+
 
       if (
         fromAccountId ===
@@ -828,11 +818,14 @@ export default function InputPage() {
         return "출금계좌와 카드는 같을 수 없습니다.";
       }
 
+
       return null;
     }
 
 
-    if (!categoryId) {
+    if (
+      !categoryId
+    ) {
       return "카테고리를 선택해주세요.";
     }
 
@@ -847,6 +840,7 @@ export default function InputPage() {
         return "결제수단을 선택해주세요.";
       }
 
+
       if (
         !spendingTarget
       ) {
@@ -857,13 +851,10 @@ export default function InputPage() {
 
     if (
       mode ===
-      "income"
+        "income" &&
+      !toAccountId
     ) {
-      if (
-        !toAccountId
-      ) {
-        return "입금수단을 선택해주세요.";
-      }
+      return "입금수단을 선택해주세요.";
     }
 
 
@@ -877,11 +868,13 @@ export default function InputPage() {
         return "보내는 수단을 선택해주세요.";
       }
 
+
       if (
         !toAccountId
       ) {
         return "받는 수단을 선택해주세요.";
       }
+
 
       if (
         fromAccountId ===
@@ -896,10 +889,84 @@ export default function InputPage() {
   }
 
 
+  function buildPayload(
+    resolvedCategoryId:
+      string,
+    requestId:
+      string
+  ):
+    CreateTransactionPayload {
+
+    const base = {
+      date,
+      type:
+        backendType,
+      categoryId:
+        resolvedCategoryId,
+      amount:
+        Number(
+          amount
+        ),
+      memo:
+        memo.trim(),
+      requestId
+    };
+
+
+    if (
+      mode ===
+      "expense"
+    ) {
+      return {
+        ...base,
+
+        paymentMethodId,
+        spendingTarget
+      };
+    }
+
+
+    if (
+      mode ===
+      "income"
+    ) {
+      return {
+        ...base,
+
+        toAccountId
+      };
+    }
+
+
+    if (
+      mode ===
+      "transfer"
+    ) {
+      return {
+        ...base,
+
+        fromAccountId,
+        toAccountId
+      };
+    }
+
+
+    return {
+      ...base,
+
+      fromAccountId,
+      toAccountId,
+      billingMonth
+    };
+  }
+
+
   async function handleSubmit(
-    event: FormEvent<HTMLFormElement>
+    event:
+      FormEvent<HTMLFormElement>
   ) {
     event.preventDefault();
+
 
     if (
       submitting
@@ -907,11 +974,13 @@ export default function InputPage() {
       return;
     }
 
+
     clearFeedback();
 
 
     const validationError =
       validate();
+
 
     if (
       validationError
@@ -924,7 +993,9 @@ export default function InputPage() {
     }
 
 
-    if (!bootstrap) {
+    if (
+      !bootstrap
+    ) {
       return;
     }
 
@@ -953,98 +1024,57 @@ export default function InputPage() {
     }
 
 
-    const payload:
-      Record<
-        string,
-        unknown
-      > = {
+    const fingerprint =
+      JSON.stringify({
         date,
+
         type:
           backendType,
+
         categoryId:
           resolvedCategoryId,
+
         amount:
           Number(
             amount
           ),
+
+        paymentMethodId:
+          mode ===
+            "expense"
+            ? paymentMethodId
+            : undefined,
+
+        spendingTarget:
+          mode ===
+            "expense"
+            ? spendingTarget
+            : undefined,
+
+        fromAccountId:
+          mode ===
+            "transfer" ||
+          isCardMode
+            ? fromAccountId
+            : undefined,
+
+        toAccountId:
+          mode ===
+            "income" ||
+          mode ===
+            "transfer" ||
+          isCardMode
+            ? toAccountId
+            : undefined,
+
+        billingMonth:
+          isCardMode
+            ? billingMonth
+            : undefined,
+
         memo:
           memo.trim()
-      };
-
-
-    /*
-     * 지출
-     */
-    if (
-      mode ===
-      "expense"
-    ) {
-      payload.paymentMethodId =
-        paymentMethodId;
-
-      payload.spendingTarget =
-        spendingTarget;
-    }
-
-
-    /*
-     * 수입
-     */
-    if (
-      mode ===
-      "income"
-    ) {
-      payload.toAccountId =
-        toAccountId;
-    }
-
-
-    /*
-     * 일반 이체
-     */
-    if (
-      mode ===
-      "transfer"
-    ) {
-      payload.fromAccountId =
-        fromAccountId;
-
-      payload.toAccountId =
-        toAccountId;
-    }
-
-
-    /*
-     * 카드값 결제 / 카드 선결제
-     *
-     * 프론트에서는 별도 모드지만
-     * 백엔드에는 이체로 저장합니다.
-     */
-    if (
-      isCardMode
-    ) {
-      payload.fromAccountId =
-        fromAccountId;
-
-      payload.toAccountId =
-        toAccountId;
-
-      payload.billingMonth =
-        billingMonth;
-    }
-
-
-    /*
-     * 전송할 실제 내용으로 fingerprint를 만듭니다.
-     *
-     * 저장 결과를 못 받은 상태에서
-     * 같은 내용을 다시 누르면
-     * 같은 requestId를 재사용합니다.
-     */
-    const fingerprint =
-      JSON.stringify(
-        payload
-      );
+      });
 
 
     let requestId:
@@ -1052,14 +1082,14 @@ export default function InputPage() {
 
 
     if (
-      requestMemory.current &&
       requestMemory.current
-        .fingerprint ===
-        fingerprint
+        ?.fingerprint ===
+      fingerprint
     ) {
       requestId =
         requestMemory.current
           .requestId;
+
     } else {
       requestId =
         createRequestId();
@@ -1071,8 +1101,11 @@ export default function InputPage() {
     }
 
 
-    payload.requestId =
-      requestId;
+    const payload =
+      buildPayload(
+        resolvedCategoryId,
+        requestId
+      );
 
 
     setSubmitting(
@@ -1083,27 +1116,18 @@ export default function InputPage() {
     try {
       const result =
         await createTransaction(
-          payload as
-            Parameters<
-              typeof createTransaction
-            >[0]
+          payload
         );
 
 
-      /*
-       * Worker가 Apps Script의
-       * success:false 응답을 그대로 반환하는
-       * 경우까지 한 번 더 확인합니다.
-       */
       const apiResult =
-        result as
-          ApiResult;
+        result as ApiResult;
 
 
       if (
-        apiResult &&
-        apiResult.success ===
-          false
+        apiResult
+          ?.success ===
+        false
       ) {
         throw new Error(
           apiResult.error
@@ -1120,10 +1144,6 @@ export default function InputPage() {
       );
 
 
-      /*
-       * 성공 후 날짜와 현재 입력 모드는 유지합니다.
-       * 연속 입력하기 편하게 하기 위함입니다.
-       */
       setAmount("");
       setCategoryId("");
       setPaymentMethodId("");
@@ -1151,11 +1171,6 @@ export default function InputPage() {
     } catch (
       submitError
     ) {
-      /*
-       * 실패 시 requestMemory를 지우지 않습니다.
-       * 같은 폼으로 다시 저장하면
-       * 동일 requestId를 사용합니다.
-       */
       setError(
         getErrorMessage(
           submitError
@@ -1279,7 +1294,6 @@ export default function InputPage() {
       </header>
 
 
-      {/* 일반 거래 유형 */}
       <div
         className={
           styles.typeTabs
@@ -1290,6 +1304,7 @@ export default function InputPage() {
           type="button"
           className={[
             styles.typeButton,
+
             mode ===
               "expense"
               ? styles
@@ -1315,6 +1330,7 @@ export default function InputPage() {
           type="button"
           className={[
             styles.typeButton,
+
             mode ===
               "income"
               ? styles
@@ -1340,6 +1356,7 @@ export default function InputPage() {
           type="button"
           className={[
             styles.typeButton,
+
             mode ===
               "transfer"
               ? styles
@@ -1362,7 +1379,6 @@ export default function InputPage() {
       </div>
 
 
-      {/* 카드대금 전용 입력 */}
       <section
         className={
           styles.quickSection
@@ -1393,6 +1409,7 @@ export default function InputPage() {
             className={[
               styles
                 .quickActionButton,
+
               mode ===
                 "card-payment"
                 ? styles
@@ -1452,6 +1469,7 @@ export default function InputPage() {
             className={[
               styles
                 .quickActionButton,
+
               mode ===
                 "card-prepayment"
                 ? styles
@@ -1521,7 +1539,6 @@ export default function InputPage() {
             styles.card
           }
         >
-          {/* 날짜 */}
           <label
             className={
               styles.field
@@ -1565,7 +1582,6 @@ export default function InputPage() {
           </label>
 
 
-          {/* 금액 */}
           <label
             className={
               styles.amountField
@@ -1626,7 +1642,6 @@ export default function InputPage() {
           </label>
 
 
-          {/* 일반 거래 카테고리 */}
           {!isCardMode && (
             <label
               className={
@@ -1699,7 +1714,6 @@ export default function InputPage() {
           )}
 
 
-          {/* 지출 */}
           {mode ===
             "expense" && (
             <div
@@ -1715,6 +1729,7 @@ export default function InputPage() {
               >
                 지출 정보
               </h2>
+
 
               <label
                 className={
@@ -1869,7 +1884,6 @@ export default function InputPage() {
           )}
 
 
-          {/* 수입 */}
           {mode ===
             "income" && (
             <div
@@ -1960,7 +1974,6 @@ export default function InputPage() {
           )}
 
 
-          {/* 일반 이체 */}
           {mode ===
             "transfer" && (
             <div
@@ -2129,7 +2142,6 @@ export default function InputPage() {
           )}
 
 
-          {/* 카드값 결제 / 선결제 */}
           {isCardMode && (
             <div
               className={
@@ -2181,7 +2193,7 @@ export default function InputPage() {
                     }
                   </strong>
                   로 자동 기록됩니다.
-                  일반 이체에서 별도로
+                  일반 이체에서 따로
                   카테고리를 찾을 필요가
                   없습니다.
                 </p>
@@ -2404,7 +2416,6 @@ export default function InputPage() {
           )}
 
 
-          {/* 메모 */}
           <label
             className={
               styles.field
@@ -2481,11 +2492,13 @@ export default function InputPage() {
                 submitting
               }
             >
-              {submitting
-                ? "저장 중..."
-                : `${getModeLabel(
-                    mode
-                  )} 저장`}
+              {
+                submitting
+                  ? "저장 중..."
+                  : `${getModeLabel(
+                      mode
+                    )} 저장`
+              }
             </button>
           </div>
         </section>
