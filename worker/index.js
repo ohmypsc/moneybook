@@ -756,6 +756,80 @@ async function appsScriptGet(
 
 /**
  * =========================================================
+ * Apps Script POST
+ * =========================================================
+ */
+
+async function appsScriptPost(
+  env,
+  action,
+  payload = {}
+) {
+  if (
+    !env.APPS_SCRIPT_URL
+  ) {
+    throw new Error(
+      "APPS_SCRIPT_URL Secret이 설정되지 않았습니다."
+    );
+  }
+
+  if (
+    !env.LEDGER_API_SECRET
+  ) {
+    throw new Error(
+      "LEDGER_API_SECRET Secret이 설정되지 않았습니다."
+    );
+  }
+
+  const body = {
+    ...payload,
+
+    action,
+
+    apiSecret:
+      env.LEDGER_API_SECRET
+  };
+
+  const response =
+    await fetch(
+      env.APPS_SCRIPT_URL,
+      {
+        method:
+          "POST",
+
+        headers: {
+          "Content-Type":
+            "application/json"
+        },
+
+        body:
+          JSON.stringify(
+            body
+          ),
+
+        redirect:
+          "follow"
+      }
+    );
+
+  const text =
+    await response.text();
+
+  try {
+    return JSON.parse(
+      text
+    );
+
+  } catch (error) {
+    throw new Error(
+      "Apps Script가 JSON이 아닌 응답을 반환했습니다."
+    );
+  }
+}
+
+
+/**
+ * =========================================================
  * Worker
  * =========================================================
  */
@@ -841,7 +915,6 @@ export default {
                   "허용되지 않은 요청입니다."
               }
             },
-
             403
           );
         }
@@ -866,7 +939,6 @@ export default {
                   "로그인 요청 형식이 올바르지 않습니다."
               }
             },
-
             400
           );
         }
@@ -902,7 +974,6 @@ export default {
                   "이름 또는 비밀번호를 확인해주세요."
               }
             },
-
             401
           );
         }
@@ -945,7 +1016,6 @@ export default {
                   "이름 또는 비밀번호를 확인해주세요."
               }
             },
-
             401
           );
         }
@@ -965,11 +1035,11 @@ export default {
               true,
 
             user: {
-              name
-            }
-          },
+      name
+    }
+  },
 
-          200,
+  200,
 
           {
             "Set-Cookie":
@@ -982,56 +1052,52 @@ export default {
 
 
       /**
-       * 세션 확인 + 로그인 기간 자동 연장
+       * 세션 확인
        */
-      if (
-        request.method ===
-          "GET" &&
-        url.pathname ===
-          "/api/auth/session"
-      ) {
-        const session =
-          await getSession(
-            request,
-            env
-          );
+     /**
+ * 세션 확인 + 로그인 기간 자동 연장
+ */
+if (
+  request.method === "GET" &&
+  url.pathname === "/api/auth/session"
+) {
+  const session =
+    await getSession(
+      request,
+      env
+    );
 
-        if (!session) {
-          return unauthorized();
-        }
+  if (!session) {
+    return unauthorized();
+  }
 
-        // 앱을 열 때마다 새로운 400일 세션을 발급
-        const refreshedToken =
-          await createSessionToken(
-            session.name,
-            env
-          );
+  // 앱을 열 때마다 새로운 400일 세션을 발급
+  const refreshedToken =
+    await createSessionToken(
+      session.name,
+      env
+    );
 
-        return jsonResponse(
-          {
-            success:
-              true,
+  return jsonResponse(
+    {
+      success: true,
+      loggedIn: true,
 
-            loggedIn:
-              true,
-
-            user: {
-              name:
-                session.name
-            }
-          },
-
-          200,
-
-          {
-            "Set-Cookie":
-              createCookie(
-                refreshedToken
-              )
-          }
-        );
+      user: {
+        name: session.name
       }
+    },
 
+    200,
+
+    {
+      "Set-Cookie":
+        createCookie(
+          refreshedToken
+        )
+    }
+  );
+}
 
       /**
        * 로그아웃
@@ -1207,6 +1273,7 @@ export default {
 
 
         /**
+         * 프론트엔드가 곧 사용할
          * Bootstrap API
          */
         if (
@@ -1228,11 +1295,7 @@ export default {
 
 
         /**
-         * Dashboard API
-         *
-         * 사용 예:
-         * /api/dashboard
-         * /api/dashboard?month=2026-08
+         * 대시보드
          */
         if (
           request.method ===
@@ -1240,19 +1303,193 @@ export default {
           url.pathname ===
             "/api/dashboard"
         ) {
-          const month =
-            url.searchParams
-              .get(
-                "month"
-              ) ||
-            "";
-
           const data =
             await appsScriptGet(
               env,
               "dashboard",
               {
-                month
+                month:
+                  url.searchParams.get(
+                    "month"
+                  ) ||
+                  ""
+              }
+            );
+
+          return jsonResponse(
+            data
+          );
+        }
+
+
+        /**
+         * 거래 조회
+         */
+        if (
+          request.method ===
+            "GET" &&
+          url.pathname ===
+            "/api/transactions"
+        ) {
+          const data =
+            await appsScriptGet(
+              env,
+              "transactions",
+              {
+                dateFrom:
+                  url.searchParams.get(
+                    "dateFrom"
+                  ) ||
+                  "",
+
+                dateTo:
+                  url.searchParams.get(
+                    "dateTo"
+                  ) ||
+                  "",
+
+                type:
+                  url.searchParams.get(
+                    "type"
+                  ) ||
+                  "",
+
+                categoryId:
+                  url.searchParams.get(
+                    "categoryId"
+                  ) ||
+                  "",
+
+                accountId:
+                  url.searchParams.get(
+                    "accountId"
+                  ) ||
+                  "",
+
+                spendingTarget:
+                  url.searchParams.get(
+                    "spendingTarget"
+                  ) ||
+                  "",
+
+                q:
+                  url.searchParams.get(
+                    "q"
+                  ) ||
+                  "",
+
+                limit:
+                  url.searchParams.get(
+                    "limit"
+                  ) ||
+                  "",
+
+                offset:
+                  url.searchParams.get(
+                    "offset"
+                  ) ||
+                  ""
+              }
+            );
+
+          return jsonResponse(
+            data
+          );
+        }
+
+
+        /**
+         * 거래 생성
+         */
+        if (
+          request.method ===
+            "POST" &&
+          url.pathname ===
+            "/api/transactions"
+        ) {
+          if (
+            !isSameOrigin(
+              request
+            )
+          ) {
+            return jsonResponse(
+              {
+                success:
+                  false,
+
+                error: {
+                  code:
+                    "INVALID_ORIGIN",
+
+                  message:
+                    "허용되지 않은 요청입니다."
+                }
+              },
+
+              403
+            );
+          }
+
+          let body;
+
+          try {
+            body =
+              await request.json();
+
+          } catch (error) {
+            return jsonResponse(
+              {
+                success:
+                  false,
+
+                error: {
+                  code:
+                    "INVALID_JSON",
+
+                  message:
+                    "거래 입력 형식이 올바르지 않습니다."
+                }
+              },
+
+              400
+            );
+          }
+
+          if (
+            !body ||
+            typeof body !==
+              "object" ||
+            Array.isArray(
+              body
+            )
+          ) {
+            return jsonResponse(
+              {
+                success:
+                  false,
+
+                error: {
+                  code:
+                    "INVALID_TRANSACTION",
+
+                  message:
+                    "거래 입력 형식이 올바르지 않습니다."
+                }
+              },
+
+              400
+            );
+          }
+
+          const data =
+            await appsScriptPost(
+              env,
+              "createTransaction",
+              {
+                ...body,
+
+                actor:
+                  session.name
               }
             );
 
