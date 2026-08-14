@@ -5,8 +5,9 @@ import {
   useState
 } from "react";
 
-import LoginPage from "./pages/LoginPage/LoginPage";
+import HomePage from "./pages/HomePage/HomePage";
 import InputPage from "./pages/InputPage/InputPage";
+import LoginPage from "./pages/LoginPage/LoginPage";
 
 import styles from "./App.module.css";
 
@@ -23,6 +24,7 @@ interface SessionUser {
 
 interface SessionResponse {
   success?: boolean;
+
   loggedIn?: boolean;
 
   user?: {
@@ -284,7 +286,7 @@ export default function App() {
           </h1>
 
           <p>
-            잠시만 기다려주세요.
+            로그인 상태를 확인하고 있습니다.
           </p>
         </section>
       </main>
@@ -316,7 +318,7 @@ export default function App() {
           </p>
 
           <h1>
-            연결 오류
+            연결을 확인해주세요
           </h1>
 
           <p
@@ -416,59 +418,49 @@ export default function App() {
   return (
     <div
       className={
-        styles.appShell
+        styles.homeShell
       }
     >
-      <main
+      <HomePage />
+
+
+      <div
         className={
-          styles.home
+          styles.homeActionBar
         }
       >
-        <header
+        <div
           className={
-            styles.homeHeader
+            styles.homeActionInner
           }
         >
-          <p
+          <button
+            type="button"
             className={
-              styles.eyebrow
+              styles.openInputButton
+            }
+            onClick={
+              openInput
+            }
+            aria-label={
+              `${user?.name ?? ""} 거래 입력`
             }
           >
-            우리 가계부
-          </p>
+            <span
+              className={
+                styles.openInputIcon
+              }
+              aria-hidden="true"
+            >
+              +
+            </span>
 
-          <h1>
-            {
-              user?.name
-            }
-            님, 안녕하세요.
-          </h1>
-        </header>
-
-
-        <button
-          type="button"
-          className={
-            styles.inputButton
-          }
-          onClick={
-            openInput
-          }
-        >
-          <span
-            className={
-              styles.inputButtonIcon
-            }
-            aria-hidden="true"
-          >
-            +
-          </span>
-
-          <span>
-            거래 입력
-          </span>
-        </button>
-      </main>
+            <span>
+              거래 입력
+            </span>
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
