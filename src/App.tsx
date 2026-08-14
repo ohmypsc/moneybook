@@ -360,7 +360,7 @@ function App() {
 
   } else if (
     activeNavigation ===
-      "transactions"
+      "calendar"
   ) {
 
     pageContent = (
@@ -375,12 +375,43 @@ function App() {
           }
         >
           <h1>
-            거래 내역
+            달력
           </h1>
 
           <p>
-            거래 내역 화면을
-            준비하고 있습니다.
+            날짜별 수입과 지출을
+            한눈에 볼 수 있는
+            월간 달력을 만들 예정입니다.
+          </p>
+        </section>
+      </div>
+    );
+
+  } else if (
+    activeNavigation ===
+      "input"
+  ) {
+
+    pageContent = (
+      <div
+        className={
+          styles.center
+        }
+      >
+        <section
+          className={
+            styles.panel
+          }
+        >
+          <h1>
+            거래 입력
+          </h1>
+
+          <p>
+            지출을 기본으로
+            수입 및 이체를 빠르게
+            입력할 수 있는 화면을
+            만들 예정입니다.
           </p>
         </section>
       </div>
@@ -407,36 +438,9 @@ function App() {
           </h1>
 
           <p>
-            자산 현황 화면을
-            준비하고 있습니다.
-          </p>
-        </section>
-      </div>
-    );
-
-  } else if (
-    activeNavigation ===
-      "investments"
-  ) {
-
-    pageContent = (
-      <div
-        className={
-          styles.center
-        }
-      >
-        <section
-          className={
-            styles.panel
-          }
-        >
-          <h1>
-            투자
-          </h1>
-
-          <p>
-            투자 현황 화면을
-            준비하고 있습니다.
+            계좌와 투자자산 및 부채를
+            한곳에서 확인하는 화면을
+            만들 예정입니다.
           </p>
         </section>
       </div>
@@ -460,8 +464,9 @@ function App() {
           </h1>
 
           <p>
-            가계부 설정 화면을
-            준비하고 있습니다.
+            계좌와 카테고리 및
+            가계부 설정을 관리하는
+            화면을 만들 예정입니다.
           </p>
         </section>
       </div>
