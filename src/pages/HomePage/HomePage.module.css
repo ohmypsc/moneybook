@@ -1,334 +1,746 @@
+/* =========================================================
+ * HomePage
+ * =========================================================
+ */
+
 .page {
   width: 100%;
   max-width: var(--content-width);
 
+  min-height: 100vh;
+  min-height: 100dvh;
+
   margin: 0 auto;
-  padding: 24px 18px 32px;
+
+  padding:
+    28px
+    18px
+    calc(
+      110px +
+      env(safe-area-inset-bottom)
+    );
 }
+
+
+/* =========================================================
+ * 헤더
+ * =========================================================
+ */
 
 .header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-
-  gap: var(--space-4);
-
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--space-5);
 }
 
-.brand {
-  min-width: 0;
-}
 
-.eyebrow {
-  margin: 0 0 var(--space-1);
+.monthLabel {
+  margin:
+    0
+    0
+    var(--space-1);
 
-  color: var(--color-text-secondary);
+  color:
+    var(
+      --color-text-secondary
+    );
 
   font-size: 13px;
   font-weight: 700;
 }
 
+
 .header h1 {
   margin: 0;
 
-  font-size: 26px;
+  font-size: 28px;
   line-height: 1.25;
 
   letter-spacing: -0.03em;
 }
 
-.logoutButton {
-  flex-shrink: 0;
+
+/* =========================================================
+ * 월간 요약
+ * =========================================================
+ */
+
+.summaryCard {
+  padding: 22px;
+
+  background:
+    var(
+      --color-surface
+    );
+
+  border:
+    1px
+    solid
+    var(
+      --color-border
+    );
+
+  border-radius:
+    var(
+      --radius-lg
+    );
+
+  box-shadow:
+    var(
+      --shadow-card
+    );
 }
 
-.stateCard {
-  text-align: center;
+
+.primarySummary {
+  display: flex;
+  flex-direction: column;
+
+  gap: var(--space-2);
 }
 
-.stateTitle {
-  margin: 0 0 var(--space-2);
 
-  font-size: 18px;
-}
-
-.stateMessage {
-  margin: 0;
-
-  color: var(--color-text-secondary);
+.summaryLabel {
+  color:
+    var(
+      --color-text-secondary
+    );
 
   font-size: 14px;
-  line-height: 1.6;
-}
-
-.retryButton {
-  margin-top: var(--space-5);
-}
-
-.content {
-  display: grid;
-
-  gap: var(--space-6);
-}
-
-.monthBlock {
-  display: grid;
-
-  gap: 2px;
-}
-
-.monthLabel {
-  margin: 0;
-
-  color: var(--color-text-secondary);
-
-  font-size: 13px;
   font-weight: 700;
 }
 
-.monthTitle {
-  margin: 0;
 
-  font-size: 22px;
-  line-height: 1.3;
+.expenseAmount {
+  font-size: 30px;
+  line-height: 1.2;
 
-  letter-spacing: -0.03em;
+  letter-spacing: -0.04em;
+
+  font-variant-numeric:
+    tabular-nums;
 }
 
-.section {
+
+.summaryDivider {
+  width: 100%;
+  height: 1px;
+
+  margin:
+    var(--space-5)
+    0;
+
+  background:
+    var(
+      --color-border
+    );
+}
+
+
+.summaryGrid {
   display: grid;
 
-  gap: var(--space-3);
+  grid-template-columns:
+    repeat(
+      2,
+      minmax(
+        0,
+        1fr
+      )
+    );
+
+  gap: var(--space-4);
 }
 
+
+.summaryItem {
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: var(--space-2);
+}
+
+
+.summaryItem span {
+  color:
+    var(
+      --color-text-secondary
+    );
+
+  font-size: 13px;
+  font-weight: 600;
+}
+
+
+.summaryItem strong {
+  overflow: hidden;
+
+  font-size: 16px;
+  line-height: 1.35;
+
+  letter-spacing: -0.02em;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  font-variant-numeric:
+    tabular-nums;
+}
+
+
+/* =========================================================
+ * 공통 섹션
+ * =========================================================
+ */
+
+.section {
+  margin-top: 28px;
+}
+
+
 .sectionHeader {
+  min-height: 28px;
+
   display: flex;
   align-items: center;
   justify-content: space-between;
 
   gap: var(--space-3);
+
+  margin-bottom: var(--space-3);
+
+  padding:
+    0
+    2px;
 }
+
 
 .sectionHeader h2 {
   margin: 0;
 
   font-size: 17px;
   line-height: 1.4;
+
+  letter-spacing: -0.02em;
 }
 
-.summaryCard {
-  padding: 0;
 
+.sectionTotal {
+  font-size: 15px;
+
+  font-variant-numeric:
+    tabular-nums;
+}
+
+
+/* =========================================================
+ * 카드 결제 예정
+ * =========================================================
+ */
+
+.cardList {
   overflow: hidden;
-}
 
-.summaryGrid {
-  display: grid;
-  grid-template-columns:
-    repeat(
-      2,
-      minmax(0, 1fr)
+  background:
+    var(
+      --color-surface
+    );
+
+  border:
+    1px
+    solid
+    var(
+      --color-border
+    );
+
+  border-radius:
+    var(
+      --radius-lg
     );
 }
 
-.metric {
-  min-width: 0;
 
-  padding: 20px 18px;
-}
+.cardRow {
+  min-height: 68px;
 
-.metric:nth-child(2) {
-  border-left:
-    1px solid
-    var(--color-border);
-}
-
-.netMetric {
-  grid-column:
-    1 / -1;
-
-  border-top:
-    1px solid
-    var(--color-border);
-
-  background:
-    var(--color-surface-soft);
-}
-
-.metricLabel {
-  display: block;
-
-  margin-bottom: var(--space-2);
-
-  color: var(--color-text-secondary);
-
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.metricValue {
-  display: block;
-
-  overflow: hidden;
-  text-overflow: ellipsis;
-
-  font-size: clamp(
-    20px,
-    5.5vw,
-    27px
-  );
-
-  font-weight: 800;
-
-  letter-spacing: -0.04em;
-}
-
-.positiveValue {
-  color: var(--color-primary);
-}
-
-.negativeValue {
-  color: var(--color-error);
-}
-
-.netWorthCard {
-  display: grid;
-
-  gap: var(--space-5);
-
-  border-color: transparent;
-
-  background:
-    var(--color-primary);
-
-  color:
-    var(--color-primary-text);
-}
-
-.netWorthLabel {
-  display: block;
-
-  margin-bottom: var(--space-2);
-
-  font-size: 13px;
-  font-weight: 700;
-
-  opacity: 0.75;
-}
-
-.netWorthValue {
-  display: block;
-
-  overflow: hidden;
-  text-overflow: ellipsis;
-
-  font-size: clamp(
-    28px,
-    7vw,
-    38px
-  );
-
-  font-weight: 800;
-
-  letter-spacing: -0.05em;
-}
-
-.netWorthDetails {
-  display: grid;
-  grid-template-columns:
-    repeat(
-      2,
-      minmax(0, 1fr)
-    );
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 
   gap: var(--space-4);
-}
 
-.netWorthDetail {
-  min-width: 0;
-}
+  padding:
+    14px
+    16px;
 
-.detailLabel {
-  display: block;
-
-  margin-bottom: var(--space-1);
-
-  font-size: 12px;
-  font-weight: 700;
-
-  opacity: 0.7;
-}
-
-.detailValue {
-  display: block;
-
-  overflow: hidden;
-  text-overflow: ellipsis;
-
-  font-size: 16px;
-  font-weight: 700;
-
-  letter-spacing: -0.03em;
-}
-
-.assetGrid {
-  display: grid;
-  grid-template-columns:
-    repeat(
-      2,
-      minmax(0, 1fr)
+  border-bottom:
+    1px
+    solid
+    var(
+      --color-border
     );
+}
+
+
+.cardRow:last-child {
+  border-bottom: 0;
+}
+
+
+.cardName {
+  min-width: 0;
+
+  display: flex;
+  align-items: center;
 
   gap: var(--space-3);
 }
 
-.assetCard {
-  min-width: 0;
+
+.cardIcon {
+  width: 34px;
+  height: 34px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  flex:
+    0
+    0
+    34px;
+
+  border-radius: 50%;
+
+  background:
+    var(
+      --color-surface-soft
+    );
+
+  color:
+    var(
+      --color-text-secondary
+    );
+
+  font-size: 14px;
+  font-weight: 800;
 }
 
-.assetLabel {
-  display: block;
 
-  margin-bottom: var(--space-2);
+.cardName div {
+  min-width: 0;
 
-  color: var(--color-text-secondary);
+  display: flex;
+  flex-direction: column;
+
+  gap: 3px;
+}
+
+
+.cardName strong {
+  overflow: hidden;
+
+  font-size: 14px;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+
+.cardName div > span {
+  color:
+    var(
+      --color-text-secondary
+    );
 
   font-size: 12px;
-  font-weight: 700;
 }
 
-.assetValue {
-  display: block;
+
+.cardAmount {
+  flex:
+    0
+    0
+    auto;
+
+  font-size: 14px;
+
+  font-variant-numeric:
+    tabular-nums;
+}
+
+
+/* =========================================================
+ * 지출대상
+ * =========================================================
+ */
+
+.targetCard {
+  display: grid;
+
+  gap: 20px;
+
+  padding:
+    18px
+    16px;
+
+  background:
+    var(
+      --color-surface
+    );
+
+  border:
+    1px
+    solid
+    var(
+      --color-border
+    );
+
+  border-radius:
+    var(
+      --radius-lg
+    );
+}
+
+
+.targetRow {
+  display: grid;
+
+  gap: 9px;
+}
+
+
+.targetTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: var(--space-3);
+}
+
+
+.targetTop > strong {
+  min-width: 0;
 
   overflow: hidden;
+
+  font-size: 14px;
+
   text-overflow: ellipsis;
-
-  font-size: clamp(
-    17px,
-    4.5vw,
-    21px
-  );
-
-  font-weight: 800;
-
-  letter-spacing: -0.03em;
+  white-space: nowrap;
 }
 
+
+.targetNumbers {
+  flex:
+    0
+    0
+    auto;
+
+  display: flex;
+  align-items: baseline;
+
+  gap: var(--space-2);
+}
+
+
+.targetNumbers span {
+  color:
+    var(
+      --color-text-secondary
+    );
+
+  font-size: 12px;
+
+  font-variant-numeric:
+    tabular-nums;
+}
+
+
+.targetNumbers strong {
+  font-size: 14px;
+
+  font-variant-numeric:
+    tabular-nums;
+}
+
+
+.progressTrack {
+  width: 100%;
+  height: 8px;
+
+  overflow: hidden;
+
+  border-radius: 999px;
+
+  background:
+    var(
+      --color-surface-soft
+    );
+}
+
+
+.progressBar {
+  height: 100%;
+
+  border-radius: inherit;
+
+  background:
+    var(
+      --color-primary
+    );
+
+  transition:
+    width
+    0.25s
+    ease;
+}
+
+
+/* =========================================================
+ * 빈 상태
+ * =========================================================
+ */
+
+.emptyText {
+  margin: 0;
+
+  padding:
+    20px
+    16px;
+
+  color:
+    var(
+      --color-text-secondary
+    );
+
+  font-size: 13px;
+  line-height: 1.5;
+
+  text-align: center;
+}
+
+
+/* =========================================================
+ * 로딩
+ * =========================================================
+ */
+
+.loadingCard {
+  padding: 22px;
+
+  background:
+    var(
+      --color-surface
+    );
+
+  border:
+    1px
+    solid
+    var(
+      --color-border
+    );
+
+  border-radius:
+    var(
+      --radius-lg
+    );
+}
+
+
+.loadingLineShort,
+.loadingLineLong,
+.loadingGrid div {
+  border-radius:
+    var(
+      --radius-sm
+    );
+
+  background:
+    var(
+      --color-surface-soft
+    );
+}
+
+
+.loadingLineShort {
+  width: 72px;
+  height: 14px;
+}
+
+
+.loadingLineLong {
+  width: 180px;
+  max-width: 70%;
+  height: 30px;
+
+  margin-top:
+    var(
+      --space-3
+    );
+}
+
+
+.loadingGrid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      2,
+      minmax(
+        0,
+        1fr
+      )
+    );
+
+  gap: var(--space-4);
+
+  margin-top:
+    var(
+      --space-6
+    );
+}
+
+
+.loadingGrid div {
+  height: 48px;
+}
+
+
+/* =========================================================
+ * 오류
+ * =========================================================
+ */
+
+.errorCard {
+  padding: 20px;
+
+  background:
+    var(
+      --color-surface
+    );
+
+  border:
+    1px
+    solid
+    var(
+      --color-border
+    );
+
+  border-radius:
+    var(
+      --radius-lg
+    );
+}
+
+
+.errorCard p {
+  margin: 0;
+
+  color:
+    var(
+      --color-error
+    );
+
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+
+.retryButton {
+  width: 100%;
+  min-height: 46px;
+
+  margin-top:
+    var(
+      --space-4
+    );
+
+  padding:
+    0
+    16px;
+
+  border: 0;
+
+  border-radius:
+    var(
+      --radius-md
+    );
+
+  background:
+    var(
+      --color-primary
+    );
+
+  color:
+    var(
+      --color-primary-text
+    );
+
+  font: inherit;
+  font-weight: 700;
+
+  cursor: pointer;
+}
+
+
+.retryButton:hover {
+  background:
+    var(
+      --color-primary-hover
+    );
+}
+
+
+.retryButton:focus-visible {
+  outline:
+    2px
+    solid
+    var(
+      --color-primary
+    );
+
+  outline-offset: 3px;
+}
+
+
+/* =========================================================
+ * 모바일
+ * =========================================================
+ */
+
 @media (
-  max-width: 360px
+  max-width: 480px
 ) {
   .page {
-    padding-left: 14px;
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+
+  .header h1 {
+    font-size: 26px;
+  }
+
+
+  .summaryCard {
+    padding: 20px 18px;
+  }
+
+
+  .expenseAmount {
+    font-size: 28px;
+  }
+
+
+  .cardRow {
     padding-right: 14px;
+    padding-left: 14px;
   }
 
-  .metric {
-    padding:
-      18px 14px;
-  }
 
-  .assetGrid {
-    grid-template-columns:
-      1fr;
+  .targetCard {
+    padding-right: 14px;
+    padding-left: 14px;
   }
 }
