@@ -3,6 +3,10 @@ import {
   useState
 } from "react";
 
+import type {
+  ReactNode
+} from "react";
+
 import {
   getSession,
   login,
@@ -23,6 +27,9 @@ import LoginPage
 import HomePage
   from "./pages/HomePage/HomePage";
 
+import InputPage
+  from "./pages/InputPage/InputPage";
+
 import {
   AppShell
 } from "./components/layout/AppShell/AppShell";
@@ -37,14 +44,11 @@ import styles
 
 type AppStatus =
   | "checking"
-  | "loggedOut"
-  | "loading"
-  | "ready"
-  | "error";
+  | "authenticated"
+  | "guest";
 
 
-function App() {
-
+export default function App() {
   const [
     status,
     setStatus
@@ -52,6 +56,7 @@ function App() {
     useState<AppStatus>(
       "checking"
     );
+
 
   const [
     user,
@@ -61,11 +66,24 @@ function App() {
       null
     );
 
+
   const [
-    errorMessage,
-    setErrorMessage
+    loginLoading,
+    setLoginLoading
   ] =
-    useState("");
+    useState(
+      false
+    );
+
+
+  const [
+    loginError,
+    setLoginError
+  ] =
+    useState(
+      ""
+    );
+
 
   const [
     activeNavigation,
@@ -78,70 +96,72 @@ function App() {
 
   useEffect(
     () => {
-
       let cancelled =
         false;
 
 
-      async function start() {
-
+      async function restoreSession() {
         try {
-
-          const session =
+          const sessionUser =
             await getSession();
 
 
-          if (cancelled) {
+          if (
+            cancelled
+          ) {
             return;
           }
 
 
           setUser(
-            session.user
-          );
-
-          setActiveNavigation(
-            "home"
+            sessionUser
           );
 
           setStatus(
-            "ready"
+            "authenticated"
           );
 
-        } catch (error) {
-
-          if (cancelled) {
+        } catch (
+          error
+        ) {
+          if (
+            cancelled
+          ) {
             return;
           }
 
 
+          setUser(
+            null
+          );
+
+          setStatus(
+            "guest"
+          );
+
+
           if (
-            error instanceof
-              ApiError &&
+            error instanceof ApiError &&
             error.status === 401
           ) {
-            setStatus(
-              "loggedOut"
+            setLoginError(
+              ""
             );
 
             return;
           }
 
 
-          setErrorMessage(
+          setLoginError(
             error instanceof Error
               ? error.message
-              : "가계부를 불러오지 못했습니다."
-          );
-
-          setStatus(
-            "error"
+              : "로그인 상태를 확인하지 못했습니다."
           );
         }
       }
 
 
-      void start();
+      void restoreSession();
 
 
       return () => {
@@ -149,83 +169,77 @@ function App() {
           true;
       };
     },
-
     []
   );
 
 
   async function handleLogin(
-    name: string,
-    password: string
+    name: string
   ) {
-
-    setStatus(
-      "loading"
+    setLoginLoading(
+      true
     );
 
-    setErrorMessage(
+    setLoginError(
       ""
     );
 
 
     try {
-
-      const loginResponse =
+      const nextUser =
         await login(
-          name,
-          password
+          name
         );
 
 
       setUser(
-        loginResponse.user
+        nextUser
+      );
+
+      setStatus(
+        "authenticated"
       );
 
       setActiveNavigation(
         "home"
       );
 
-      setStatus(
-        "ready"
-      );
-
-    } catch (error) {
-
-      setErrorMessage(
+    } catch (
+      error
+    ) {
+      setLoginError(
         error instanceof Error
           ? error.message
-          : "로그인하지 못했습니다."
+          : "로그인에 실패했습니다."
       );
 
-      setStatus(
-        "loggedOut"
+    } finally {
+      setLoginLoading(
+        false
       );
     }
   }
 
 
   async function handleLogout() {
-
     try {
-
       await logout();
 
     } finally {
-
       setUser(
         null
+      );
+
+      setStatus(
+        "guest"
       );
 
       setActiveNavigation(
         "home"
       );
 
-      setErrorMessage(
+      setLoginError(
         ""
-      );
-
-      setStatus(
-        "loggedOut"
       );
     }
   }
@@ -233,7 +247,7 @@ function App() {
 
   if (
     status ===
-      "checking"
+    "checking"
   ) {
     return (
       <main
@@ -251,8 +265,7 @@ function App() {
           </h1>
 
           <p>
-            로그인 상태를
-            확인하는 중입니다.
+            로그인 상태를 확인하고 있습니다.
           </p>
         </section>
       </main>
@@ -261,22 +274,17 @@ function App() {
 
 
   if (
-    status ===
-      "loggedOut" ||
-    status ===
-      "loading"
+    status === "guest" ||
+    !user
   ) {
     return (
       <LoginPage
         loading={
-          status ===
-            "loading"
+          loginLoading
         }
-
         errorMessage={
-          errorMessage
+          loginError
         }
-
         onLogin={
           handleLogin
         }
@@ -285,12 +293,30 @@ function App() {
   }
 
 
+  let pageContent:
+    ReactNode;
+
+
   if (
-    status ===
-      "error" ||
-    !user
+    activeNavigation ===
+    "home"
   ) {
-    return (
+    pageContent = (
+      <HomePage
+        user={
+          user
+        }
+        onLogout={
+          handleLogout
+        }
+      />
+    );
+
+  } else if (
+    activeNavigation ===
+    "calendar"
+  ) {
+    pageContent = (
       <main
         className={
           styles.center
@@ -302,128 +328,30 @@ function App() {
           }
         >
           <h1>
-            우리 가계부
+            거래 내역
           </h1>
 
-          <p
-            className={
-              styles.error
-            }
-          >
-            {
-              errorMessage ||
-              "가계부를 불러오지 못했습니다."
-            }
+          <p>
+            거래 내역 화면은 다음 단계에서 연결합니다.
           </p>
-
-          <button
-            type="button"
-
-            className={
-              styles.retry
-            }
-
-            onClick={
-              () =>
-                window
-                  .location
-                  .reload()
-            }
-          >
-            다시 시도
-          </button>
         </section>
       </main>
     );
-  }
 
-
-  let pageContent;
-
-
-  if (
+  } else if (
     activeNavigation ===
-      "home"
+    "input"
   ) {
-
     pageContent = (
-      <HomePage
-        user={
-          user
-        }
-
-        onLogout={
-          handleLogout
-        }
-      />
+      <InputPage />
     );
 
   } else if (
     activeNavigation ===
-      "calendar"
+    "assets"
   ) {
-
     pageContent = (
-      <div
-        className={
-          styles.center
-        }
-      >
-        <section
-          className={
-            styles.panel
-          }
-        >
-          <h1>
-            달력
-          </h1>
-
-          <p>
-            날짜별 수입과 지출을
-            한눈에 볼 수 있는
-            월간 달력을 만들 예정입니다.
-          </p>
-        </section>
-      </div>
-    );
-
-  } else if (
-    activeNavigation ===
-      "input"
-  ) {
-
-    pageContent = (
-      <div
-        className={
-          styles.center
-        }
-      >
-        <section
-          className={
-            styles.panel
-          }
-        >
-          <h1>
-            거래 입력
-          </h1>
-
-          <p>
-            지출을 기본으로
-            수입 및 이체를 빠르게
-            입력할 수 있는 화면을
-            만들 예정입니다.
-          </p>
-        </section>
-      </div>
-    );
-
-  } else if (
-    activeNavigation ===
-      "assets"
-  ) {
-
-    pageContent = (
-      <div
+      <main
         className={
           styles.center
         }
@@ -438,18 +366,15 @@ function App() {
           </h1>
 
           <p>
-            계좌와 투자자산 및 부채를
-            한곳에서 확인하는 화면을
-            만들 예정입니다.
+            자산 화면은 다음 단계에서 연결합니다.
           </p>
         </section>
-      </div>
+      </main>
     );
 
   } else {
-
     pageContent = (
-      <div
+      <main
         className={
           styles.center
         }
@@ -464,12 +389,10 @@ function App() {
           </h1>
 
           <p>
-            계좌와 카테고리 및
-            가계부 설정을 관리하는
-            화면을 만들 예정입니다.
+            설정 화면은 다음 단계에서 연결합니다.
           </p>
         </section>
-      </div>
+      </main>
     );
   }
 
@@ -479,7 +402,6 @@ function App() {
       activeNavigation={
         activeNavigation
       }
-
       onNavigate={
         setActiveNavigation
       }
@@ -490,6 +412,3 @@ function App() {
     </AppShell>
   );
 }
-
-
-export default App;
