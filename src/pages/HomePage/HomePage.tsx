@@ -1,110 +1,168 @@
 import {
   useEffect,
+  useMemo,
   useState
 } from "react";
 
-import {
-  getDashboard
-} from "../../api/dashboard";
-
-import {
-  Button
-} from "../../components/common/Button/Button";
-
-import {
-  Card
-} from "../../components/common/Card/Card";
-
-import {
-  Money
-} from "../../components/common/Money/Money";
-
-import type {
-  BootstrapData,
-  User
-} from "../../types/api";
-
-import type {
-  DashboardData
-} from "../../types/dashboard";
-
-import styles
-  from "./HomePage.module.css";
+import styles from "./HomePage.module.css";
 
 
-type DashboardLoadStatus =
-  | "loading"
-  | "ready"
-  | "error";
+interface DashboardSummary {
+  assets: number;
+  liabilities: number;
+  netWorth: number;
+  investmentValue: number;
+  cashLikeValue: number;
+  monthIncome: number;
+  monthExpense: number;
+  monthNetCashFlow: number;
+}
 
 
-type HomePageProps = {
-  user: User;
-
-  /*
-   * App.tsx를 다음 커밋에서 변경할 때
-   * 중간 빌드가 깨지지 않도록 잠시 optional로 유지함.
-   *
-   * 실제 HomePage에서는 bootstrap을 사용하지 않음.
-   */
-  bootstrap?:
-    BootstrapData;
-
-  onLogout:
-    () => Promise<void>;
-};
+interface DashboardCard {
+  accountId: string;
+  name: string;
+  balance: number;
+  unpaidAmount: number;
+  billingCutoffDay: number | null;
+  paymentDay: number | null;
+  paymentAccountId: string | null;
+  billingMonth: string;
+  estimatedUsage: number;
+  payments: number;
+  estimatedRemaining: number;
+}
 
 
-function formatMonth(
-  value: string
+interface SpendingSummary {
+  name: string;
+  amount: number;
+}
+
+
+interface DashboardData {
+  asOf: string;
+  month: string;
+
+  summary: DashboardSummary;
+
+  cards: DashboardCard[];
+
+  spending: {
+    byCategory: SpendingSummary[];
+    byTarget: SpendingSummary[];
+  };
+}
+
+
+interface DashboardResponse {
+  success: boolean;
+  apiVersion?: string;
+
+  data?: DashboardData;
+
+  error?: {
+    code?: string;
+    message?: string;
+  };
+}
+
+
+/*
+ * 현재 App / AppShell이 HomePage에 props를 전달하고 있어도
+ * 홈 대시보드 자체는 해당 값에 의존하지 않도록 둡니다.
+ */
+type HomePageProps =
+  Record<string, unknown>;
+
+
+function formatWon(
+  value: number
 ) {
-  const [
-    year,
-    month
-  ] =
-    value.split("-");
-
-  const monthNumber =
-    Number(month);
-
-  if (
-    !year ||
-    !Number.isFinite(
-      monthNumber
-    )
-  ) {
-    return value;
-  }
-
   return (
-    `${year}년 ` +
-    `${monthNumber}월`
+    new Intl.NumberFormat(
+      "ko-KR"
+    ).format(
+      Math.round(
+        Math.abs(
+          value
+        )
+      )
+    ) +
+    "원"
   );
 }
 
 
-function HomePage({
-  user,
-  onLogout
-}: HomePageProps) {
-
-  const [
-    dashboardStatus,
-    setDashboardStatus
-  ] =
-    useState<DashboardLoadStatus>(
-      "loading"
+function formatSignedWon(
+  value: number
+) {
+  if (
+    value > 0
+  ) {
+    return (
+      "+" +
+      formatWon(
+        value
+      )
     );
+  }
 
+  if (
+    value < 0
+  ) {
+    return (
+      "-" +
+      formatWon(
+        value
+      )
+    );
+  }
+
+  return "0원";
+}
+
+
+function formatMonth(
+  month: string
+) {
+  const match =
+    /^(\d{4})-(\d{2})$/
+      .exec(
+        month
+      );
+
+  if (
+    !match
+  ) {
+    return month;
+  }
+
+  return (
+    `${match[1]}년 ` +
+    `${Number(match[2])}월`
+  );
+}
+
+
+export default function HomePage(
+  _props: HomePageProps
+) {
   const [
     dashboard,
     setDashboard
   ] =
-    useState<
-      DashboardData | null
-    >(
+    useState<DashboardData | null>(
       null
     );
+
+
+  const [
+    loading,
+    setLoading
+  ] =
+    useState(true);
+
 
   const [
     errorMessage,
@@ -112,91 +170,349 @@ function HomePage({
   ] =
     useState("");
 
-  const [
-    reloadKey,
-    setReloadKey
-  ] =
-    useState(0);
+
+  async function loadDashboard() {
+    setLoading(
+      true
+    );
+
+    setErrorMessage(
+      ""
+    );
+
+
+    try {
+      const response =
+        await fetch(
+          "/api/dashboard",
+          {
+            method:
+              "GET",
+
+            credentials:
+              "same-origin",
+
+            headers: {
+              Accept:
+                "application/json"
+            }
+          }
+        );
+
+
+      let body:
+        DashboardResponse;
+
+
+      try {
+        body =
+          await response
+            .json() as
+              DashboardResponse;
+
+      } catch {
+        throw new Error(
+          "가계부 데이터를 읽지 못했습니다."
+        );
+      }
+
+
+      if (
+        !response.ok ||
+        body.success !== true ||
+        !body.data
+      ) {
+        throw new Error(
+          body.error?.message ||
+          "가계부 데이터를 불러오지 못했습니다."
+        );
+      }
+
+
+      setDashboard(
+        body.data
+      );
+
+    } catch (
+      error
+    ) {
+      setDashboard(
+        null
+      );
+
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "가계부 데이터를 불러오지 못했습니다."
+      );
+
+    } finally {
+      setLoading(
+        false
+      );
+    }
+  }
 
 
   useEffect(
     () => {
-
-      let cancelled =
-        false;
-
-
-      async function load() {
-
-        setDashboardStatus(
-          "loading"
-        );
-
-        setErrorMessage(
-          ""
-        );
-
-
-        try {
-
-          const response =
-            await getDashboard();
-
-
-          if (cancelled) {
-            return;
-          }
-
-
-          setDashboard(
-            response.data
-          );
-
-          setDashboardStatus(
-            "ready"
-          );
-
-        } catch (error) {
-
-          if (cancelled) {
-            return;
-          }
-
-
-          setDashboard(
-            null
-          );
-
-          setErrorMessage(
-            error instanceof Error
-              ? error.message
-              : "가계부 현황을 불러오지 못했습니다."
-          );
-
-          setDashboardStatus(
-            "error"
-          );
-        }
-      }
-
-
-      void load();
-
-
-      return () => {
-        cancelled =
-          true;
-      };
+      void loadDashboard();
     },
-
-    [
-      reloadKey
-    ]
+    []
   );
 
 
+  const cardSummary =
+    useMemo(
+      () => {
+        if (
+          !dashboard
+        ) {
+          return {
+            total: 0,
+            cards: [] as
+              DashboardCard[]
+          };
+        }
+
+
+        const cards =
+          dashboard.cards
+            .filter(
+              card =>
+                card
+                  .estimatedRemaining >
+                0
+            )
+            .slice()
+            .sort(
+              (
+                first,
+                second
+              ) =>
+                (
+                  first.paymentDay ??
+                  99
+                ) -
+                (
+                  second.paymentDay ??
+                  99
+                )
+            );
+
+
+        const total =
+          cards.reduce(
+            (
+              sum,
+              card
+            ) =>
+              sum +
+              Math.max(
+                0,
+                card
+                  .estimatedRemaining
+              ),
+            0
+          );
+
+
+        return {
+          total,
+          cards
+        };
+      },
+      [
+        dashboard
+      ]
+    );
+
+
+  const spendingTargets =
+    useMemo(
+      () => {
+        if (
+          !dashboard
+        ) {
+          return [];
+        }
+
+
+        const rows =
+          dashboard
+            .spending
+            .byTarget
+            .filter(
+              item =>
+                item.amount >
+                0
+            );
+
+
+        const total =
+          rows.reduce(
+            (
+              sum,
+              item
+            ) =>
+              sum +
+              item.amount,
+            0
+          );
+
+
+        return rows.map(
+          item => ({
+            ...item,
+
+            ratio:
+              total > 0
+                ? Math.min(
+                    100,
+                    (
+                      item.amount /
+                      total
+                    ) *
+                      100
+                  )
+                : 0
+          })
+        );
+      },
+      [
+        dashboard
+      ]
+    );
+
+
+  if (
+    loading
+  ) {
+    return (
+      <main
+        className={
+          styles.page
+        }
+      >
+        <header
+          className={
+            styles.header
+          }
+        >
+          <p
+            className={
+              styles.monthLabel
+            }
+          >
+            가계부
+          </p>
+
+          <h1>
+            불러오는 중
+          </h1>
+        </header>
+
+
+        <section
+          className={
+            styles.loadingCard
+          }
+        >
+          <div
+            className={
+              styles.loadingLineShort
+            }
+          />
+
+          <div
+            className={
+              styles.loadingLineLong
+            }
+          />
+
+          <div
+            className={
+              styles.loadingGrid
+            }
+          >
+            <div />
+
+            <div />
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+
+  if (
+    errorMessage ||
+    !dashboard
+  ) {
+    return (
+      <main
+        className={
+          styles.page
+        }
+      >
+        <header
+          className={
+            styles.header
+          }
+        >
+          <p
+            className={
+              styles.monthLabel
+            }
+          >
+            가계부
+          </p>
+
+          <h1>
+            데이터를 불러오지 못했어요
+          </h1>
+        </header>
+
+
+        <section
+          className={
+            styles.errorCard
+          }
+        >
+          <p>
+            {
+              errorMessage
+            }
+          </p>
+
+          <button
+            type="button"
+            className={
+              styles.retryButton
+            }
+            onClick={
+              () =>
+                void loadDashboard()
+            }
+          >
+            다시 불러오기
+          </button>
+        </section>
+      </main>
+    );
+  }
+
+
+  const {
+    monthIncome,
+    monthExpense,
+    monthNetCashFlow
+  } =
+    dashboard.summary;
+
+
   return (
-    <div
+    <main
       className={
         styles.page
       }
@@ -206,471 +522,323 @@ function HomePage({
           styles.header
         }
       >
-        <div
+        <p
           className={
-            styles.brand
+            styles.monthLabel
           }
         >
-          <p
-            className={
-              styles.eyebrow
-            }
-          >
-            우리 가계부
-          </p>
+          이번 달
+        </p>
 
-          <h1>
-            {
-              user.name
-            }님
-          </h1>
-        </div>
-
-        <Button
-          variant="ghost"
-
-          className={
-            styles.logoutButton
+        <h1>
+          {
+            formatMonth(
+              dashboard.month
+            )
           }
-
-          onClick={
-            () => {
-              void onLogout();
-            }
-          }
-        >
-          로그아웃
-        </Button>
+        </h1>
       </header>
 
 
-      {
-        dashboardStatus ===
-          "loading" && (
-          <Card
+      <section
+        className={
+          styles.summaryCard
+        }
+      >
+        <div
+          className={
+            styles.primarySummary
+          }
+        >
+          <span
             className={
-              styles.stateCard
+              styles.summaryLabel
             }
           >
-            <h2
-              className={
-                styles.stateTitle
-              }
-            >
-              가계부를 불러오는 중
-            </h2>
+            지출
+          </span>
 
-            <p
-              className={
-                styles.stateMessage
-              }
-            >
-              이번 달 현황을
-              불러오고 있습니다.
-            </p>
-          </Card>
-        )
-      }
-
-
-      {
-        dashboardStatus ===
-          "error" && (
-          <Card
+          <strong
             className={
-              styles.stateCard
+              styles.expenseAmount
             }
           >
-            <h2
-              className={
-                styles.stateTitle
-              }
-            >
-              현황을 불러오지 못했습니다
-            </h2>
-
-            <p
-              className={
-                styles.stateMessage
-              }
-            >
-              {
-                errorMessage
-              }
-            </p>
-
-            <Button
-              fullWidth
-
-              className={
-                styles.retryButton
-              }
-
-              onClick={
-                () =>
-                  setReloadKey(
-                    value =>
-                      value + 1
-                  )
-              }
-            >
-              다시 불러오기
-            </Button>
-          </Card>
-        )
-      }
+            {
+              formatWon(
+                monthExpense
+              )
+            }
+          </strong>
+        </div>
 
 
-      {
-        dashboardStatus ===
-          "ready" &&
-        dashboard && (
+        <div
+          className={
+            styles.summaryDivider
+          }
+        />
+
+
+        <div
+          className={
+            styles.summaryGrid
+          }
+        >
           <div
             className={
-              styles.content
+              styles.summaryItem
             }
           >
-            <div
-              className={
-                styles.monthBlock
+            <span>
+              수입
+            </span>
+
+            <strong>
+              {
+                formatWon(
+                  monthIncome
+                )
               }
-            >
-              <p
-                className={
-                  styles.monthLabel
-                }
-              >
-                이번 달
-              </p>
-
-              <h2
-                className={
-                  styles.monthTitle
-                }
-              >
-                {
-                  formatMonth(
-                    dashboard.month
-                  )
-                }
-              </h2>
-            </div>
-
-
-            <section
-              className={
-                styles.section
-              }
-
-              aria-labelledby={
-                "monthly-summary-title"
-              }
-            >
-              <div
-                className={
-                  styles.sectionHeader
-                }
-              >
-                <h2
-                  id={
-                    "monthly-summary-title"
-                  }
-                >
-                  월간 요약
-                </h2>
-              </div>
-
-              <Card
-                className={
-                  styles.summaryCard
-                }
-              >
-                <div
-                  className={
-                    styles.summaryGrid
-                  }
-                >
-                  <div
-                    className={
-                      styles.metric
-                    }
-                  >
-                    <span
-                      className={
-                        styles.metricLabel
-                      }
-                    >
-                      수입
-                    </span>
-
-                    <Money
-                      amount={
-                        dashboard
-                          .summary
-                          .monthIncome
-                      }
-
-                      className={[
-                        styles.metricValue,
-                        styles.positiveValue
-                      ].join(" ")}
-                    />
-                  </div>
-
-
-                  <div
-                    className={
-                      styles.metric
-                    }
-                  >
-                    <span
-                      className={
-                        styles.metricLabel
-                      }
-                    >
-                      지출
-                    </span>
-
-                    <Money
-                      amount={
-                        dashboard
-                          .summary
-                          .monthExpense
-                      }
-
-                      className={[
-                        styles.metricValue,
-                        styles.negativeValue
-                      ].join(" ")}
-                    />
-                  </div>
-
-
-                  <div
-                    className={[
-                      styles.metric,
-                      styles.netMetric
-                    ].join(" ")}
-                  >
-                    <span
-                      className={
-                        styles.metricLabel
-                      }
-                    >
-                      순현금흐름
-                    </span>
-
-                    <Money
-                      amount={
-                        dashboard
-                          .summary
-                          .monthNetCashFlow
-                      }
-
-                      showPlus
-
-                      className={[
-                        styles.metricValue,
-
-                        dashboard
-                          .summary
-                          .monthNetCashFlow <
-                        0
-                          ? styles
-                              .negativeValue
-                          : styles
-                              .positiveValue
-                      ].join(" ")}
-                    />
-                  </div>
-                </div>
-              </Card>
-            </section>
-
-
-            <section
-              className={
-                styles.section
-              }
-
-              aria-labelledby={
-                "asset-summary-title"
-              }
-            >
-              <div
-                className={
-                  styles.sectionHeader
-                }
-              >
-                <h2
-                  id={
-                    "asset-summary-title"
-                  }
-                >
-                  자산 요약
-                </h2>
-              </div>
-
-              <Card
-                className={
-                  styles.netWorthCard
-                }
-              >
-                <div>
-                  <span
-                    className={
-                      styles.netWorthLabel
-                    }
-                  >
-                    순자산
-                  </span>
-
-                  <Money
-                    amount={
-                      dashboard
-                        .summary
-                        .netWorth
-                    }
-
-                    className={
-                      styles.netWorthValue
-                    }
-                  />
-                </div>
-
-
-                <div
-                  className={
-                    styles.netWorthDetails
-                  }
-                >
-                  <div
-                    className={
-                      styles.netWorthDetail
-                    }
-                  >
-                    <span
-                      className={
-                        styles.detailLabel
-                      }
-                    >
-                      총자산
-                    </span>
-
-                    <Money
-                      amount={
-                        dashboard
-                          .summary
-                          .assets
-                      }
-
-                      className={
-                        styles.detailValue
-                      }
-                    />
-                  </div>
-
-
-                  <div
-                    className={
-                      styles.netWorthDetail
-                    }
-                  >
-                    <span
-                      className={
-                        styles.detailLabel
-                      }
-                    >
-                      부채
-                    </span>
-
-                    <Money
-                      amount={
-                        dashboard
-                          .summary
-                          .liabilities
-                      }
-
-                      className={
-                        styles.detailValue
-                      }
-                    />
-                  </div>
-                </div>
-              </Card>
-
-
-              <div
-                className={
-                  styles.assetGrid
-                }
-              >
-                <Card
-                  compact
-                  flat
-
-                  className={
-                    styles.assetCard
-                  }
-                >
-                  <span
-                    className={
-                      styles.assetLabel
-                    }
-                  >
-                    현금성 자산
-                  </span>
-
-                  <Money
-                    amount={
-                      dashboard
-                        .summary
-                        .cashLikeValue
-                    }
-
-                    className={
-                      styles.assetValue
-                    }
-                  />
-                </Card>
-
-
-                <Card
-                  compact
-                  flat
-
-                  className={
-                    styles.assetCard
-                  }
-                >
-                  <span
-                    className={
-                      styles.assetLabel
-                    }
-                  >
-                    투자자산
-                  </span>
-
-                  <Money
-                    amount={
-                      dashboard
-                        .summary
-                        .investmentValue
-                    }
-
-                    className={
-                      styles.assetValue
-                    }
-                  />
-                </Card>
-              </div>
-            </section>
+            </strong>
           </div>
-        )
-      }
-    </div>
+
+
+          <div
+            className={
+              styles.summaryItem
+            }
+          >
+            <span>
+              차액
+            </span>
+
+            <strong>
+              {
+                formatSignedWon(
+                  monthNetCashFlow
+                )
+              }
+            </strong>
+          </div>
+        </div>
+      </section>
+
+
+      <section
+        className={
+          styles.section
+        }
+      >
+        <div
+          className={
+            styles.sectionHeader
+          }
+        >
+          <h2>
+            카드 결제 예정
+          </h2>
+
+          <strong
+            className={
+              styles.sectionTotal
+            }
+          >
+            {
+              formatWon(
+                cardSummary.total
+              )
+            }
+          </strong>
+        </div>
+
+
+        <div
+          className={
+            styles.cardList
+          }
+        >
+          {
+            cardSummary.cards
+              .length >
+            0
+              ? (
+                  cardSummary.cards
+                    .map(
+                      card => (
+                        <div
+                          key={
+                            card.accountId
+                          }
+                          className={
+                            styles.cardRow
+                          }
+                        >
+                          <div
+                            className={
+                              styles.cardName
+                            }
+                          >
+                            <span
+                              className={
+                                styles.cardIcon
+                              }
+                              aria-hidden="true"
+                            >
+                              ₩
+                            </span>
+
+                            <div>
+                              <strong>
+                                {
+                                  card.name
+                                }
+                              </strong>
+
+                              <span>
+                                {
+                                  card.paymentDay
+                                    ? `${card.paymentDay}일 결제`
+                                    : "결제일 미설정"
+                                }
+                              </span>
+                            </div>
+                          </div>
+
+                          <strong
+                            className={
+                              styles.cardAmount
+                            }
+                          >
+                            {
+                              formatWon(
+                                card
+                                  .estimatedRemaining
+                              )
+                            }
+                          </strong>
+                        </div>
+                      )
+                    )
+                )
+              : (
+                  <p
+                    className={
+                      styles.emptyText
+                    }
+                  >
+                    이번 달 결제 예정액이 없습니다.
+                  </p>
+                )
+          }
+        </div>
+      </section>
+
+
+      <section
+        className={
+          styles.section
+        }
+      >
+        <div
+          className={
+            styles.sectionHeader
+          }
+        >
+          <h2>
+            지출대상
+          </h2>
+        </div>
+
+
+        <div
+          className={
+            styles.targetCard
+          }
+        >
+          {
+            spendingTargets
+              .length >
+            0
+              ? (
+                  spendingTargets
+                    .map(
+                      target => (
+                        <div
+                          key={
+                            target.name
+                          }
+                          className={
+                            styles.targetRow
+                          }
+                        >
+                          <div
+                            className={
+                              styles.targetTop
+                            }
+                          >
+                            <strong>
+                              {
+                                target.name
+                              }
+                            </strong>
+
+                            <div
+                              className={
+                                styles.targetNumbers
+                              }
+                            >
+                              <span>
+                                {
+                                  Math.round(
+                                    target.ratio
+                                  )
+                                }
+                                %
+                              </span>
+
+                              <strong>
+                                {
+                                  formatWon(
+                                    target.amount
+                                  )
+                                }
+                              </strong>
+                            </div>
+                          </div>
+
+
+                          <div
+                            className={
+                              styles.progressTrack
+                            }
+                            aria-hidden="true"
+                          >
+                            <div
+                              className={
+                                styles.progressBar
+                              }
+                              style={{
+                                width:
+                                  `${target.ratio}%`
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )
+                    )
+                )
+              : (
+                  <p
+                    className={
+                      styles.emptyText
+                    }
+                  >
+                    이번 달 지출 기록이 없습니다.
+                  </p>
+                )
+          }
+        </div>
+      </section>
+    </main>
   );
 }
-
-
-export default HomePage;
