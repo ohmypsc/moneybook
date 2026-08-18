@@ -1,37 +1,8 @@
-import {
-  apiRequest
-} from "./client";
+import { apiRequest } from "./client";
+import type { DashboardData } from "../types/dashboard";
 
-import type {
-  DashboardResponse
-} from "../types/dashboard";
+export function getDashboard(month?: string) {
+  const query = month ? `?month=${encodeURIComponent(month)}` : "";
 
-
-export async function getDashboard(
-  month?: string
-): Promise<DashboardResponse> {
-
-  const params =
-    new URLSearchParams();
-
-  if (month) {
-    params.set(
-      "month",
-      month
-    );
-  }
-
-
-  const query =
-    params.toString();
-
-  const url =
-    query
-      ? `/api/dashboard?${query}`
-      : "/api/dashboard";
-
-
-  return apiRequest<DashboardResponse>(
-    url
-  );
+  return apiRequest<DashboardData>(`/api/dashboard${query}`);
 }
