@@ -7,14 +7,19 @@ import type {
   SetInvestmentCashBaselinePayload,
   CreateInvestmentTradePayload
 } from "../types/investment";
+import { unwrapEnvelope } from "./envelope";
+import type { ApiEnvelope } from "./envelope";
 
-export function getInvestmentAccounts() {
-  return apiRequest<InvestmentAccountsResponse>(
-    "/api/investments/accounts"
-  );
+export async function getInvestmentAccounts() {
+  const raw = await apiRequest<
+    ApiEnvelope<InvestmentAccountsResponse>
+    | InvestmentAccountsResponse
+  >("/api/investments/accounts");
+
+  return unwrapEnvelope<InvestmentAccountsResponse>(raw);
 }
 
-export function getHoldings(
+export async function getHoldings(
   params: {
     accountId?: string;
     market?: string;
@@ -41,17 +46,25 @@ export function getHoldings(
     ? `/api/investments/holdings?${query}`
     : "/api/investments/holdings";
 
-  return apiRequest<HoldingsResponse>(url);
+  const raw = await apiRequest<
+    ApiEnvelope<HoldingsResponse> | HoldingsResponse
+  >(url);
+
+  return unwrapEnvelope<HoldingsResponse>(raw);
 }
 
-export function getInvestmentCash(accountId: string) {
+export async function getInvestmentCash(accountId: string) {
   const query = accountId
     ? `?accountId=${encodeURIComponent(accountId)}`
     : "";
 
-  return apiRequest<InvestmentCash | InvestmentCash[]>(
-    `/api/investments/cash${query}`
-  );
+  const raw = await apiRequest<
+    | ApiEnvelope<InvestmentCash | InvestmentCash[]>
+    | InvestmentCash
+    | InvestmentCash[]
+  >(`/api/investments/cash${query}`);
+
+  return unwrapEnvelope<InvestmentCash | InvestmentCash[]>(raw);
 }
 
 export function setInvestmentCashBaseline(
@@ -66,7 +79,7 @@ export function setInvestmentCashBaseline(
   });
 }
 
-export function getInvestmentTrades(
+export async function getInvestmentTrades(
   params: {
     accountId?: string;
     holdingId?: string;
@@ -93,7 +106,12 @@ export function getInvestmentTrades(
     ? `/api/investments/trades?${query}`
     : "/api/investments/trades";
 
-  return apiRequest<InvestmentTradesResponse>(url);
+  const raw = await apiRequest<
+    ApiEnvelope<InvestmentTradesResponse>
+    | InvestmentTradesResponse
+  >(url);
+
+  return unwrapEnvelope<InvestmentTradesResponse>(raw);
 }
 
 export function createInvestmentTrade(
