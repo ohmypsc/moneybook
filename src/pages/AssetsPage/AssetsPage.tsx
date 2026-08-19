@@ -37,6 +37,7 @@ export default function AssetsPage() {
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [dashboardError, setDashboardError] = useState("");
+  const [showDebug, setShowDebug] = useState(false);
 
   const [accounts, setAccounts] = useState<InvestmentAccount[]>([]);
   const [accountsLoading, setAccountsLoading] = useState(false);
@@ -231,6 +232,14 @@ export default function AssetsPage() {
     0
   );
 
+  const dashboardLooksEmpty =
+    !dashboardLoading &&
+    !dashboardError &&
+    dashboard !== null &&
+    dashboard.assets === undefined &&
+    dashboard.liabilities === undefined &&
+    dashboard.netWorth === undefined;
+
   return (
     <main className={styles.page}>
       <header className={styles.header}>
@@ -267,6 +276,44 @@ export default function AssetsPage() {
                 {formatCurrency(dashboard.netWorth)}
               </strong>
             </div>
+          </div>
+        )}
+
+        {dashboardLooksEmpty && (
+          <div style={{ marginTop: 12 }}>
+            <button
+              type="button"
+              onClick={() => setShowDebug(previous => !previous)}
+              style={{
+                fontSize: 12,
+                color: "var(--color-text-secondary)",
+                background: "transparent",
+                border: "1px solid var(--color-border)",
+                borderRadius: 6,
+                padding: "4px 8px",
+                cursor: "pointer"
+              }}
+            >
+              {showDebug ? "디버그 정보 숨기기" : "왜 값이 안 나오는지 보기"}
+            </button>
+
+            {showDebug && (
+              <pre
+                style={{
+                  marginTop: 8,
+                  fontSize: 11,
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-all",
+                  background: "var(--color-surface-soft)",
+                  padding: 8,
+                  borderRadius: 6,
+                  maxHeight: 200,
+                  overflow: "auto"
+                }}
+              >
+                {JSON.stringify(dashboard, null, 2)}
+              </pre>
+            )}
           </div>
         )}
       </section>
