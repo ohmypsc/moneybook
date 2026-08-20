@@ -46,8 +46,7 @@
 }
 
 
-.history[open]
-.summary::after {
+.history[open] .summary::after {
   transform: rotate(180deg);
 }
 
@@ -74,7 +73,6 @@
 
 .state {
   margin: 0;
-
   padding: 14px 0;
 
   color: var(--color-text-secondary);
@@ -85,10 +83,12 @@
 
 
 .error {
-  margin: 0;
+  margin: 0 0 var(--space-3);
+  padding: 10px 12px;
 
-  padding: 14px 0;
+  border-radius: var(--radius-md);
 
+  background: var(--color-surface-soft);
   color: var(--color-error);
 
   font-size: 13px;
@@ -189,10 +189,7 @@
 
 
 .meta {
-  margin:
-    var(--space-1)
-    0
-    0;
+  margin: var(--space-1) 0 0;
 
   color: var(--color-text-secondary);
 
@@ -202,10 +199,7 @@
 
 
 .pnl {
-  margin:
-    var(--space-1)
-    0
-    0;
+  margin: var(--space-1) 0 0;
 
   color: var(--color-text-primary);
 
@@ -215,10 +209,7 @@
 
 
 .memo {
-  margin:
-    var(--space-2)
-    0
-    0;
+  margin: var(--space-2) 0 0;
 
   padding: 8px 10px;
 
@@ -232,16 +223,205 @@
 }
 
 
+.rowActions {
+  display: flex;
+
+  justify-content: flex-end;
+
+  gap: var(--space-2);
+
+  margin-top: var(--space-3);
+}
+
+
+.editButton,
+.deleteButton,
+.cancelButton,
+.saveButton {
+  min-height: 36px;
+
+  padding: 0 12px;
+
+  border-radius: var(--radius-md);
+
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+
+  cursor: pointer;
+}
+
+
+.editButton,
+.cancelButton {
+  border: 1px solid var(--color-border);
+
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+}
+
+
+.deleteButton {
+  border: 1px solid var(--color-border);
+
+  background: var(--color-surface);
+  color: var(--color-error);
+}
+
+
+.saveButton {
+  border: 0;
+
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+}
+
+
+.editButton:disabled,
+.deleteButton:disabled,
+.cancelButton:disabled,
+.saveButton:disabled {
+  opacity: 0.5;
+
+  cursor: not-allowed;
+}
+
+
+.editPanel {
+  display: flex;
+  flex-direction: column;
+
+  gap: var(--space-3);
+
+  margin-top: var(--space-3);
+
+  padding: 14px;
+
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+
+  background: var(--color-surface-soft);
+}
+
+
+.editGrid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      2,
+      minmax(0, 1fr)
+    );
+
+  gap: var(--space-3);
+}
+
+
+.editField {
+  display: flex;
+  flex-direction: column;
+
+  gap: var(--space-2);
+}
+
+
+.editLabel {
+  color: var(--color-text-primary);
+
+  font-size: 12px;
+  font-weight: 800;
+}
+
+
+.optional {
+  margin-left: 4px;
+
+  color: var(--color-text-secondary);
+
+  font-size: 10px;
+  font-weight: 700;
+}
+
+
+.input,
+.textarea {
+  width: 100%;
+
+  box-sizing: border-box;
+
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+
+  font: inherit;
+  font-size: 14px;
+}
+
+
+.input {
+  min-height: 42px;
+
+  padding: 0 10px;
+}
+
+
+.textarea {
+  padding: 10px 12px;
+
+  resize: vertical;
+}
+
+
+.input:focus,
+.textarea:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+
+.editHelper {
+  margin: 0;
+
+  color: var(--color-text-secondary);
+
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+
+.editActions {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      2,
+      minmax(0, 1fr)
+    );
+
+  gap: var(--space-2);
+}
+
+
 @media (max-width: 480px) {
   .rowTop {
     gap: var(--space-2);
   }
 
+
   .stockName {
     max-width: 150px;
   }
 
+
   .settlement {
     font-size: 13px;
+  }
+
+
+  .editGrid {
+    grid-template-columns:
+      1fr;
   }
 }
