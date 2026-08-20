@@ -242,6 +242,13 @@ export default function InvestmentTradeForm({
 
 
   const [
+    settlementKrwInput,
+    setSettlementKrwInput
+  ] =
+    useState("");
+
+
+  const [
     memo,
     setMemo
   ] =
@@ -312,6 +319,14 @@ export default function InvestmentTradeForm({
 
       setQuantity("");
       setUnitPrice("");
+
+      setSettlementKrwInput("");
+      setFeeKrw(
+        "0"
+      );
+      setTaxKrw(
+        "0"
+      );
 
       setMemo("");
       setError("");
@@ -494,6 +509,14 @@ export default function InvestmentTradeForm({
         );
       }
 
+      setSettlementKrwInput("");
+      setFeeKrw(
+        "0"
+      );
+      setTaxKrw(
+        "0"
+      );
+
       setError("");
       setSuccess("");
     },
@@ -548,6 +571,16 @@ export default function InvestmentTradeForm({
     Number(
       taxKrw || 0
     );
+
+
+  const parsedSettlementKrw =
+    settlementKrwInput
+      .trim() ===
+    ""
+      ? null
+      : Number(
+          settlementKrwInput
+        );
 
 
   const estimatedSettlement =
@@ -630,6 +663,29 @@ export default function InvestmentTradeForm({
     );
 
 
+  const hasManualSettlement =
+    parsedSettlementKrw !==
+      null &&
+    Number.isFinite(
+      parsedSettlementKrw
+    ) &&
+    parsedSettlementKrw >
+      0;
+
+
+  const displayedSettlement =
+    hasManualSettlement
+      ? parsedSettlementKrw
+      : estimatedSettlement;
+
+
+  const settlementForCashCheck =
+    parsedSettlementKrw !==
+    null
+      ? parsedSettlementKrw
+      : estimatedSettlement;
+
+
   function resetTradeFields() {
     setQuantity("");
     setUnitPrice("");
@@ -641,6 +697,8 @@ export default function InvestmentTradeForm({
     setTaxKrw(
       "0"
     );
+
+    setSettlementKrwInput("");
 
     setMemo("");
 
@@ -817,6 +875,28 @@ export default function InvestmentTradeForm({
 
 
     if (
+      parsedSettlementKrw !==
+        null &&
+      (
+        !Number.isFinite(
+          parsedSettlementKrw
+        ) ||
+        parsedSettlementKrw <=
+          0
+      )
+    ) {
+      setError(
+        tradeType ===
+          "매수"
+          ? "실제 결제금액은 0보다 큰 숫자로 입력해주세요."
+          : "실제 입금금액은 0보다 큰 숫자로 입력해주세요."
+      );
+
+      return;
+    }
+
+
+    if (
       tradeType ===
         "매도" &&
       selectedHolding &&
@@ -834,11 +914,11 @@ export default function InvestmentTradeForm({
     if (
       tradeType ===
         "매수" &&
-      estimatedSettlement !==
+      settlementForCashCheck !==
         null &&
       account.currentCashKrw !==
         null &&
-      estimatedSettlement >
+      settlementForCashCheck >
         account.currentCashKrw
     ) {
       setError(
@@ -923,6 +1003,16 @@ export default function InvestmentTradeForm({
 
         taxKrw:
           parsedTax,
+
+        ...(
+          parsedSettlementKrw !==
+            null
+            ? {
+                settlementKrw:
+                  parsedSettlementKrw
+              }
+            : {}
+        ),
 
         memo:
           memo.trim(),
@@ -1734,82 +1824,192 @@ export default function InvestmentTradeForm({
 
       <div
         className={
-          styles.grid2
+          styles.field
         }
       >
-        <div
+        <label
           className={
-            styles.field
+            styles.label
+          }
+          htmlFor="investment-settlement"
+        >
+          {tradeType ===
+          "매수"
+            ? "실제 결제금액"
+            : "실제 입금금액"}
+
+          <span
+            className={
+              styles.optional
+            }
+          >
+            선택
+          </span>
+        </label>
+
+        <input
+          id="investment-settlement"
+          className={
+            styles.input
+          }
+          type="number"
+          inputMode="decimal"
+          min="0"
+          step="any"
+          value={
+            settlementKrwInput
+          }
+          onChange={
+            event =>
+              setSettlementKrwInput(
+                event.target
+                  .value
+              )
+          }
+          placeholder={
+            tradeType ===
+            "매수"
+              ? "증권사 앱의 실제 출금액"
+              : "증권사 앱의 실제 입금액"
+          }
+        />
+
+        <p
+          className={
+            styles.helper
           }
         >
-          <label
-            className={
-              styles.label
-            }
-            htmlFor="investment-fee"
-          >
-            수수료
-          </label>
-
-          <input
-            id="investment-fee"
-            className={
-              styles.input
-            }
-            type="number"
-            inputMode="decimal"
-            min="0"
-            step="any"
-            value={
-              feeKrw
-            }
-            onChange={
-              event =>
-                setFeeKrw(
-                  event.target
-                    .value
-                )
-            }
-          />
-        </div>
-
-
-        <div
-          className={
-            styles.field
-          }
-        >
-          <label
-            className={
-              styles.label
-            }
-            htmlFor="investment-tax"
-          >
-            세금
-          </label>
-
-          <input
-            id="investment-tax"
-            className={
-              styles.input
-            }
-            type="number"
-            inputMode="decimal"
-            min="0"
-            step="any"
-            value={
-              taxKrw
-            }
-            onChange={
-              event =>
-                setTaxKrw(
-                  event.target
-                    .value
-                )
-            }
-          />
-        </div>
+          증권사 앱에 표시된 실제 원화
+          금액을 알고 있을 때만 입력하세요.
+          비워두면 수량, 체결단가,
+          환율과 상세 입력값으로 자동
+          계산합니다.
+        </p>
       </div>
+
+
+      <details
+        className={
+          styles.details
+        }
+      >
+        <summary
+          className={
+            styles.detailsSummary
+          }
+        >
+          <span>
+            상세 입력
+          </span>
+
+          <span
+            className={
+              styles.detailsHint
+            }
+          >
+            수수료 및 세금
+          </span>
+        </summary>
+
+        <div
+          className={
+            styles.detailsBody
+          }
+        >
+          <div
+            className={
+              styles.grid2
+            }
+          >
+            <div
+              className={
+                styles.field
+              }
+            >
+              <label
+                className={
+                  styles.label
+                }
+                htmlFor="investment-fee"
+              >
+                수수료
+              </label>
+
+              <input
+                id="investment-fee"
+                className={
+                  styles.input
+                }
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="any"
+                value={
+                  feeKrw
+                }
+                onChange={
+                  event =>
+                    setFeeKrw(
+                      event.target
+                        .value
+                    )
+                }
+                placeholder="0"
+              />
+            </div>
+
+
+            <div
+              className={
+                styles.field
+              }
+            >
+              <label
+                className={
+                  styles.label
+                }
+                htmlFor="investment-tax"
+              >
+                세금
+              </label>
+
+              <input
+                id="investment-tax"
+                className={
+                  styles.input
+                }
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="any"
+                value={
+                  taxKrw
+                }
+                onChange={
+                  event =>
+                    setTaxKrw(
+                      event.target
+                        .value
+                    )
+                }
+                placeholder="0"
+              />
+            </div>
+          </div>
+
+          <p
+            className={
+              styles.helper
+            }
+          >
+            수수료와 세금을 모르면
+            0으로 두면 됩니다. 실제
+            결제금액 또는 입금금액을
+            입력했다면 백엔드는 그
+            금액을 우선 사용합니다.
+          </p>
+        </div>
+      </details>
 
 
       <div
@@ -1847,7 +2047,7 @@ export default function InvestmentTradeForm({
       </div>
 
 
-      {estimatedSettlement !==
+      {displayedSettlement !==
         null && (
         <div
           className={
@@ -1860,10 +2060,19 @@ export default function InvestmentTradeForm({
                 .estimateLabel
             }
           >
-            {tradeType ===
-              "매수"
-              ? "예상 결제금액"
-              : "예상 입금금액"}
+            {hasManualSettlement
+              ? (
+                  tradeType ===
+                  "매수"
+                    ? "실제 결제금액"
+                    : "실제 입금금액"
+                )
+              : (
+                  tradeType ===
+                  "매수"
+                    ? "예상 결제금액"
+                    : "예상 입금금액"
+                )}
           </span>
 
           <strong
@@ -1873,7 +2082,7 @@ export default function InvestmentTradeForm({
             }
           >
             {formatCurrency(
-              estimatedSettlement
+              displayedSettlement
             )}
           </strong>
         </div>
