@@ -18,13 +18,21 @@ import type {
 
 
 type MutationResponse =
-  Record<string, unknown>;
+  Record<
+    string,
+    unknown
+  >;
 
 
 async function postInvestmentMutation(
-  path: string,
+  path:
+    string,
+
   payload:
-    Record<string, unknown>
+    Record<
+      string,
+      unknown
+    >
 ) {
   const raw =
     await apiRequest<
@@ -33,7 +41,8 @@ async function postInvestmentMutation(
     >(
       path,
       {
-        method: "POST",
+        method:
+          "POST",
 
         headers: {
           "Content-Type":
@@ -47,11 +56,18 @@ async function postInvestmentMutation(
       }
     );
 
+
   return unwrapEnvelope<
     MutationResponse
   >(raw);
 }
 
+
+/*
+ * =========================================================
+ * 예수금
+ * =========================================================
+ */
 
 export async function setInvestmentCashBaseline(
   payload:
@@ -66,12 +82,59 @@ export async function setInvestmentCashBaseline(
 }
 
 
+/*
+ * =========================================================
+ * 수동시세
+ * =========================================================
+ */
+
+export async function updateHoldingManualPrice(
+  input: {
+    holdingId:
+      string;
+
+    manualPrice:
+      number;
+
+    lastUpdated:
+      string;
+  }
+) {
+  return postInvestmentMutation(
+    "/api/investments/holdings/update",
+    {
+      holdingId:
+        input.holdingId,
+
+      manualPrice:
+        input.manualPrice,
+
+      lastUpdated:
+        input.lastUpdated
+    }
+  );
+}
+
+
+/*
+ * =========================================================
+ * 투자거래 조회
+ * =========================================================
+ */
+
 export async function getInvestmentTrades(
   params: {
-    accountId?: string;
-    holdingId?: string;
-    tradeType?: string;
-    includeDeleted?: boolean;
+    accountId?:
+      string;
+
+    holdingId?:
+      string;
+
+    tradeType?:
+      string;
+
+    includeDeleted?:
+      boolean;
   } = {}
 ) {
   const searchParams =
@@ -132,14 +195,24 @@ export async function getInvestmentTrades(
     await apiRequest<
       | ApiEnvelope<InvestmentTradesResponse>
       | InvestmentTradesResponse
-    >(url);
+    >(
+      url
+    );
 
 
   return unwrapEnvelope<
     InvestmentTradesResponse
-  >(raw);
+  >(
+    raw
+  );
 }
 
+
+/*
+ * =========================================================
+ * 투자거래 생성
+ * =========================================================
+ */
 
 export async function createInvestmentTrade(
   payload:
@@ -154,27 +227,43 @@ export async function createInvestmentTrade(
 }
 
 
+/*
+ * =========================================================
+ * 투자거래 수정
+ * =========================================================
+ */
+
 export async function updateInvestmentTrade(
   input: {
-    investmentTradeId: string;
+    investmentTradeId:
+      string;
 
-    date?: string;
+    date?:
+      string;
 
-    quantity?: number;
+    quantity?:
+      number;
 
-    unitPrice?: number;
+    unitPrice?:
+      number;
 
-    currency?: string;
+    currency?:
+      string;
 
-    fxRate?: number;
+    fxRate?:
+      number;
 
-    feeKrw?: number;
+    feeKrw?:
+      number;
 
-    taxKrw?: number;
+    taxKrw?:
+      number;
 
-    settlementKrw?: number;
+    settlementKrw?:
+      number;
 
-    memo?: string;
+    memo?:
+      string;
   }
 ) {
   return postInvestmentMutation(
@@ -185,6 +274,12 @@ export async function updateInvestmentTrade(
   );
 }
 
+
+/*
+ * =========================================================
+ * 투자거래 삭제
+ * =========================================================
+ */
 
 export async function deleteInvestmentTrade(
   investmentTradeId:
@@ -198,6 +293,12 @@ export async function deleteInvestmentTrade(
   );
 }
 
+
+/*
+ * =========================================================
+ * 투자거래 복원
+ * =========================================================
+ */
 
 export async function restoreInvestmentTrade(
   investmentTradeId:
