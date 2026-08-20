@@ -7,6 +7,7 @@ import {
 import {
   deleteInvestmentTrade,
   getInvestmentTrades,
+  restoreInvestmentTrade,
   updateInvestmentTrade
 } from "../../../api/investments";
 
@@ -19,14 +20,23 @@ import styles
 
 
 interface InvestmentTradeHistoryProps {
-  accountId: string;
-  refreshKey?: number;
+  accountId:
+    string;
+
+  refreshKey?:
+    number;
 
   onChanged?:
     () =>
       void |
       Promise<void>;
 }
+
+
+type TradeFilter =
+  | "전체"
+  | "매수"
+  | "매도";
 
 
 function formatCurrency(
@@ -38,14 +48,20 @@ function formatCurrency(
   if (
     value === null ||
     value === undefined ||
-    !Number.isFinite(value)
+    !Number.isFinite(
+      value
+    )
   ) {
     return "-";
   }
 
   return (
-    Math.round(value)
-      .toLocaleString("ko-KR") +
+    Math.round(
+      value
+    )
+      .toLocaleString(
+        "ko-KR"
+      ) +
     "원"
   );
 }
@@ -60,7 +76,9 @@ function formatSignedCurrency(
   if (
     value === null ||
     value === undefined ||
-    !Number.isFinite(value)
+    !Number.isFinite(
+      value
+    )
   ) {
     return "-";
   }
@@ -72,20 +90,26 @@ function formatSignedCurrency(
 
   return (
     sign +
-    Math.round(value)
-      .toLocaleString("ko-KR") +
+    Math.round(
+      value
+    )
+      .toLocaleString(
+        "ko-KR"
+      ) +
     "원"
   );
 }
 
 
 function formatQuantity(
-  value: number
+  value:
+    number
 ) {
   return value.toLocaleString(
     "ko-KR",
     {
-      maximumFractionDigits: 8
+      maximumFractionDigits:
+        8
     }
   );
 }
@@ -99,15 +123,19 @@ function formatUnitPrice(
     trade.unitPrice.toLocaleString(
       "ko-KR",
       {
-        maximumFractionDigits: 8
+        maximumFractionDigits:
+          8
       }
     );
 
   if (
     !trade.currency ||
-    trade.currency === "KRW"
+    trade.currency ===
+      "KRW"
   ) {
-    return `${formatted}원`;
+    return (
+      `${formatted}원`
+    );
   }
 
   return (
@@ -133,13 +161,31 @@ export default function InvestmentTradeHistory({
     loading,
     setLoading
   ] =
-    useState(false);
+    useState(
+      false
+    );
 
   const [
     error,
     setError
   ] =
     useState("");
+
+  const [
+    tradeFilter,
+    setTradeFilter
+  ] =
+    useState<TradeFilter>(
+      "전체"
+    );
+
+  const [
+    showDeleted,
+    setShowDeleted
+  ] =
+    useState(
+      false
+    );
 
   const [
     editingTradeId,
@@ -204,16 +250,34 @@ export default function InvestmentTradeHistory({
       null
     >(null);
 
+  const [
+    restoringId,
+    setRestoringId
+  ] =
+    useState<
+      string |
+      null
+    >(null);
+
 
   async function loadTrades() {
-    setLoading(true);
-    setError("");
+    setLoading(
+      true
+    );
+
+    setError(
+      ""
+    );
 
     try {
       const data =
         await getInvestmentTrades({
-          accountId
+          accountId,
+
+          includeDeleted:
+            showDeleted
         });
+
 
       setTrades(
         Array.isArray(
@@ -222,16 +286,22 @@ export default function InvestmentTradeHistory({
           ? data.items
           : []
       );
-    } catch (err) {
+    } catch (
+      err
+    ) {
       setError(
         err instanceof Error
           ? err.message
           : "투자 거래내역을 불러오지 못했습니다."
       );
 
-      setTrades([]);
+      setTrades(
+        []
+      );
     } finally {
-      setLoading(false);
+      setLoading(
+        false
+      );
     }
   }
 
@@ -242,13 +312,16 @@ export default function InvestmentTradeHistory({
         null
       );
 
-      setActionError("");
+      setActionError(
+        ""
+      );
 
       void loadTrades();
     },
     [
       accountId,
-      refreshKey
+      refreshKey,
+      showDeleted
     ]
   );
 
@@ -256,7 +329,9 @@ export default function InvestmentTradeHistory({
   const orderedTrades =
     useMemo(
       () =>
-        [...trades].sort(
+        [
+          ...trades
+        ].sort(
           (
             a,
             b
@@ -266,11 +341,14 @@ export default function InvestmentTradeHistory({
                 a.date
               );
 
+
             if (
-              dateCompare !== 0
+              dateCompare !==
+              0
             ) {
               return dateCompare;
             }
+
 
             return (
               (
@@ -289,11 +367,44 @@ export default function InvestmentTradeHistory({
     );
 
 
+  const visibleTrades =
+    useMemo(
+      () => {
+        if (
+          tradeFilter ===
+          "전체"
+        ) {
+          return orderedTrades;
+        }
+
+
+        return orderedTrades.filter(
+          trade =>
+            trade.tradeType ===
+            tradeFilter
+        );
+      },
+      [
+        orderedTrades,
+        tradeFilter
+      ]
+    );
+
+
   function beginEdit(
     trade:
       InvestmentTrade
   ) {
-    setActionError("");
+    if (
+      trade.isDeleted
+    ) {
+      return;
+    }
+
+
+    setActionError(
+      ""
+    );
 
     setEditingTradeId(
       trade.investmentTradeId
@@ -333,7 +444,9 @@ export default function InvestmentTradeHistory({
       null
     );
 
-    setActionError("");
+    setActionError(
+      ""
+    );
   }
 
 
@@ -342,8 +455,10 @@ export default function InvestmentTradeHistory({
       onChanged
     ) {
       await onChanged();
+
       return;
     }
+
 
     await loadTrades();
   }
@@ -353,7 +468,10 @@ export default function InvestmentTradeHistory({
     trade:
       InvestmentTrade
   ) {
-    setActionError("");
+    setActionError(
+      ""
+    );
+
 
     if (
       !editDate
@@ -365,16 +483,19 @@ export default function InvestmentTradeHistory({
       return;
     }
 
+
     const quantity =
       Number(
         editQuantity
       );
 
+
     if (
       !Number.isFinite(
         quantity
       ) ||
-      quantity <= 0
+      quantity <=
+        0
     ) {
       setActionError(
         "수량은 0보다 큰 숫자로 입력해주세요."
@@ -383,16 +504,19 @@ export default function InvestmentTradeHistory({
       return;
     }
 
+
     const unitPrice =
       Number(
         editUnitPrice
       );
 
+
     if (
       !Number.isFinite(
         unitPrice
       ) ||
-      unitPrice <= 0
+      unitPrice <=
+        0
     ) {
       setActionError(
         "체결단가는 0보다 큰 숫자로 입력해주세요."
@@ -405,12 +529,15 @@ export default function InvestmentTradeHistory({
     const settlementText =
       editSettlementKrw.trim();
 
+
     const settlementKrw =
-      settlementText === ""
+      settlementText ===
+      ""
         ? null
         : Number(
             settlementText
           );
+
 
     if (
       settlementKrw !==
@@ -419,7 +546,8 @@ export default function InvestmentTradeHistory({
         !Number.isFinite(
           settlementKrw
         ) ||
-        settlementKrw <= 0
+        settlementKrw <=
+          0
       )
     ) {
       setActionError(
@@ -433,11 +561,32 @@ export default function InvestmentTradeHistory({
     }
 
 
+    const dateChanged =
+      editDate !==
+      trade.date;
+
+    const quantityChanged =
+      quantity !==
+      trade.quantity;
+
+    const unitPriceChanged =
+      unitPrice !==
+      trade.unitPrice;
+
+    const memoChanged =
+      editMemo.trim() !==
+      (
+        trade.memo ??
+        ""
+      );
+
+
     const payload: {
       investmentTradeId:
         string;
 
-      date?: string;
+      date?:
+        string;
 
       quantity?:
         number;
@@ -448,7 +597,8 @@ export default function InvestmentTradeHistory({
       settlementKrw?:
         number;
 
-      memo?: string;
+      memo?:
+        string;
     } = {
       investmentTradeId:
         trade.investmentTradeId
@@ -456,8 +606,7 @@ export default function InvestmentTradeHistory({
 
 
     if (
-      editDate !==
-      trade.date
+      dateChanged
     ) {
       payload.date =
         editDate;
@@ -465,8 +614,7 @@ export default function InvestmentTradeHistory({
 
 
     if (
-      quantity !==
-      trade.quantity
+      quantityChanged
     ) {
       payload.quantity =
         quantity;
@@ -474,41 +622,49 @@ export default function InvestmentTradeHistory({
 
 
     if (
-      unitPrice !==
-      trade.unitPrice
+      unitPriceChanged
     ) {
       payload.unitPrice =
         unitPrice;
     }
 
 
+    /*
+     * 수량 또는 단가를 변경했는데
+     * 실제 결제금액을 비워두었다면
+     * settlementKrw를 보내지 않습니다.
+     *
+     * 그러면 서버가 수량 × 단가 × 환율을
+     * 기준으로 다시 계산합니다.
+     */
     if (
       settlementKrw !==
-        null &&
-      settlementKrw !==
-        trade.settlementKrw
+      null &&
+      (
+        settlementKrw !==
+          trade.settlementKrw ||
+        quantityChanged ||
+        unitPriceChanged
+      )
     ) {
       payload.settlementKrw =
         settlementKrw;
     }
 
 
-    const trimmedMemo =
-      editMemo.trim();
-
     if (
-      trimmedMemo !==
-      (trade.memo ?? "")
+      memoChanged
     ) {
       payload.memo =
-        trimmedMemo;
+        editMemo.trim();
     }
 
 
     if (
       Object.keys(
         payload
-      ).length === 1
+      ).length ===
+      1
     ) {
       setEditingTradeId(
         null
@@ -522,17 +678,22 @@ export default function InvestmentTradeHistory({
       trade.investmentTradeId
     );
 
+
     try {
       await updateInvestmentTrade(
         payload
       );
 
+
       setEditingTradeId(
         null
       );
 
+
       await notifyChanged();
-    } catch (err) {
+    } catch (
+      err
+    ) {
       setActionError(
         err instanceof Error
           ? err.message
@@ -550,11 +711,15 @@ export default function InvestmentTradeHistory({
     trade:
       InvestmentTrade
   ) {
-    setActionError("");
+    setActionError(
+      ""
+    );
+
 
     const label =
       trade.stockName ||
       trade.stockCode;
+
 
     const confirmed =
       window.confirm(
@@ -562,8 +727,11 @@ export default function InvestmentTradeHistory({
           `${label} ${trade.tradeType} 거래를 삭제할까요?`,
           "",
           "삭제하면 보유수량, 평단 및 예수금이 다시 계산됩니다."
-        ].join("\n")
+        ].join(
+          "\n"
+        )
       );
+
 
     if (
       !confirmed
@@ -576,10 +744,12 @@ export default function InvestmentTradeHistory({
       trade.investmentTradeId
     );
 
+
     try {
       await deleteInvestmentTrade(
         trade.investmentTradeId
       );
+
 
       if (
         editingTradeId ===
@@ -590,8 +760,11 @@ export default function InvestmentTradeHistory({
         );
       }
 
+
       await notifyChanged();
-    } catch (err) {
+    } catch (
+      err
+    ) {
       setActionError(
         err instanceof Error
           ? err.message
@@ -599,6 +772,67 @@ export default function InvestmentTradeHistory({
       );
     } finally {
       setDeletingId(
+        null
+      );
+    }
+  }
+
+
+  async function handleRestore(
+    trade:
+      InvestmentTrade
+  ) {
+    setActionError(
+      ""
+    );
+
+
+    const label =
+      trade.stockName ||
+      trade.stockCode;
+
+
+    const confirmed =
+      window.confirm(
+        [
+          `${label} ${trade.tradeType} 거래를 복원할까요?`,
+          "",
+          "복원하면 보유수량, 평단 및 예수금이 다시 계산됩니다."
+        ].join(
+          "\n"
+        )
+      );
+
+
+    if (
+      !confirmed
+    ) {
+      return;
+    }
+
+
+    setRestoringId(
+      trade.investmentTradeId
+    );
+
+
+    try {
+      await restoreInvestmentTrade(
+        trade.investmentTradeId
+      );
+
+
+      await notifyChanged();
+    } catch (
+      err
+    ) {
+      setActionError(
+        err instanceof Error
+          ? err.message
+          : "투자거래 복원에 실패했습니다."
+      );
+    } finally {
+      setRestoringId(
         null
       );
     }
@@ -624,6 +858,7 @@ export default function InvestmentTradeHistory({
           거래내역
         </span>
 
+
         <span
           className={
             styles.summaryCount
@@ -631,7 +866,10 @@ export default function InvestmentTradeHistory({
         >
           {loading
             ? "불러오는 중"
-            : `${orderedTrades.length}건`}
+            : tradeFilter ===
+                "전체"
+              ? `${visibleTrades.length}건`
+              : `${visibleTrades.length}/${orderedTrades.length}건`}
         </span>
       </summary>
 
@@ -641,6 +879,87 @@ export default function InvestmentTradeHistory({
           styles.body
         }
       >
+        <div
+          className={
+            styles.controls
+          }
+        >
+          <div
+            className={
+              styles.filters
+            }
+          >
+            {(
+              [
+                "전체",
+                "매수",
+                "매도"
+              ] as TradeFilter[]
+            ).map(
+              value => (
+                <button
+                  key={
+                    value
+                  }
+                  type="button"
+                  className={[
+                    styles.filterButton,
+
+                    tradeFilter ===
+                    value
+                      ? styles.filterButtonActive
+                      : ""
+                  ]
+                    .filter(
+                      Boolean
+                    )
+                    .join(
+                      " "
+                    )}
+                  onClick={
+                    () =>
+                      setTradeFilter(
+                        value
+                      )
+                  }
+                >
+                  {value}
+                </button>
+              )
+            )}
+          </div>
+
+
+          <label
+            className={
+              styles.deletedToggle
+            }
+          >
+            <input
+              type="checkbox"
+              checked={
+                showDeleted
+              }
+              onChange={
+                event => {
+                  setActionError(
+                    ""
+                  );
+
+                  setShowDeleted(
+                    event.target.checked
+                  );
+                }
+              }
+            />
+
+            <span>
+              삭제된 거래 포함
+            </span>
+          </label>
+        </div>
+
+
         {actionError && (
           <p
             className={
@@ -677,43 +996,51 @@ export default function InvestmentTradeHistory({
 
         {!loading &&
           !error &&
-          orderedTrades.length ===
+          visibleTrades.length ===
             0 && (
             <p
               className={
                 styles.state
               }
             >
-              아직 등록된 투자 거래가 없습니다.
+              표시할 투자 거래가 없습니다.
             </p>
           )}
 
 
         {!loading &&
           !error &&
-          orderedTrades.length >
+          visibleTrades.length >
             0 && (
             <ul
               className={
                 styles.list
               }
             >
-              {orderedTrades.map(
+              {visibleTrades.map(
                 trade => {
                   const isBuy =
                     trade.tradeType ===
                     "매수";
 
+
                   const isEditing =
                     editingTradeId ===
                     trade.investmentTradeId;
+
 
                   const isSaving =
                     savingId ===
                     trade.investmentTradeId;
 
+
                   const isDeleting =
                     deletingId ===
+                    trade.investmentTradeId;
+
+
+                  const isRestoring =
+                    restoringId ===
                     trade.investmentTradeId;
 
 
@@ -722,9 +1049,19 @@ export default function InvestmentTradeHistory({
                       key={
                         trade.investmentTradeId
                       }
-                      className={
-                        styles.row
-                      }
+                      className={[
+                        styles.row,
+
+                        trade.isDeleted
+                          ? styles.deletedRow
+                          : ""
+                      ]
+                        .filter(
+                          Boolean
+                        )
+                        .join(
+                          " "
+                        )}
                     >
                       <div
                         className={
@@ -745,9 +1082,11 @@ export default function InvestmentTradeHistory({
                               trade.stockCode}
                           </strong>
 
+
                           <span
                             className={[
                               styles.tradeType,
+
                               isBuy
                                 ? styles.buy
                                 : styles.sell
@@ -763,6 +1102,17 @@ export default function InvestmentTradeHistory({
                               trade.tradeType
                             }
                           </span>
+
+
+                          {trade.isDeleted && (
+                            <span
+                              className={
+                                styles.deletedBadge
+                              }
+                            >
+                              삭제됨
+                            </span>
+                          )}
                         </div>
 
 
@@ -829,7 +1179,56 @@ export default function InvestmentTradeHistory({
                         )}
 
 
-                      {!isEditing && (
+                      {!isEditing &&
+                        !trade.isDeleted && (
+                          <div
+                            className={
+                              styles.rowActions
+                            }
+                          >
+                            <button
+                              type="button"
+                              className={
+                                styles.editButton
+                              }
+                              onClick={
+                                () =>
+                                  beginEdit(
+                                    trade
+                                  )
+                              }
+                              disabled={
+                                isDeleting
+                              }
+                            >
+                              수정
+                            </button>
+
+
+                            <button
+                              type="button"
+                              className={
+                                styles.deleteButton
+                              }
+                              onClick={
+                                () =>
+                                  void handleDelete(
+                                    trade
+                                  )
+                              }
+                              disabled={
+                                isDeleting
+                              }
+                            >
+                              {isDeleting
+                                ? "삭제 중..."
+                                : "삭제"}
+                            </button>
+                          </div>
+                        )}
+
+
+                      {trade.isDeleted && (
                         <div
                           className={
                             styles.rowActions
@@ -838,316 +1237,300 @@ export default function InvestmentTradeHistory({
                           <button
                             type="button"
                             className={
-                              styles.editButton
+                              styles.restoreButton
                             }
                             onClick={
                               () =>
-                                beginEdit(
+                                void handleRestore(
                                   trade
                                 )
                             }
                             disabled={
-                              isDeleting
+                              isRestoring
                             }
                           >
-                            수정
-                          </button>
-
-                          <button
-                            type="button"
-                            className={
-                              styles.deleteButton
-                            }
-                            onClick={
-                              () =>
-                                void handleDelete(
-                                  trade
-                                )
-                            }
-                            disabled={
-                              isDeleting
-                            }
-                          >
-                            {isDeleting
-                              ? "삭제 중..."
-                              : "삭제"}
+                            {isRestoring
+                              ? "복원 중..."
+                              : "거래 복원"}
                           </button>
                         </div>
                       )}
 
 
-                      {isEditing && (
-                        <div
-                          className={
-                            styles.editPanel
-                          }
-                        >
+                      {isEditing &&
+                        !trade.isDeleted && (
                           <div
                             className={
-                              styles.editGrid
+                              styles.editPanel
                             }
                           >
-                            <label
+                            <div
                               className={
-                                styles.editField
+                                styles.editGrid
                               }
                             >
-                              <span
+                              <label
                                 className={
-                                  styles.editLabel
+                                  styles.editField
                                 }
                               >
-                                거래일
-                              </span>
-
-                              <input
-                                className={
-                                  styles.input
-                                }
-                                type="date"
-                                value={
-                                  editDate
-                                }
-                                onChange={
-                                  event =>
-                                    setEditDate(
-                                      event.target.value
-                                    )
-                                }
-                              />
-                            </label>
-
-
-                            <label
-                              className={
-                                styles.editField
-                              }
-                            >
-                              <span
-                                className={
-                                  styles.editLabel
-                                }
-                              >
-                                수량
-                              </span>
-
-                              <input
-                                className={
-                                  styles.input
-                                }
-                                type="number"
-                                inputMode="decimal"
-                                min="0"
-                                step="any"
-                                value={
-                                  editQuantity
-                                }
-                                onChange={
-                                  event => {
-                                    const value =
-                                      event.target.value;
-
-                                    setEditQuantity(
-                                      value
-                                    );
-
-                                    if (
-                                      value !==
-                                      String(
-                                        trade.quantity
-                                      )
-                                    ) {
-                                      setEditSettlementKrw(
-                                        ""
-                                      );
-                                    }
-                                  }
-                                }
-                              />
-                            </label>
-
-
-                            <label
-                              className={
-                                styles.editField
-                              }
-                            >
-                              <span
-                                className={
-                                  styles.editLabel
-                                }
-                              >
-                                체결단가
-                              </span>
-
-                              <input
-                                className={
-                                  styles.input
-                                }
-                                type="number"
-                                inputMode="decimal"
-                                min="0"
-                                step="any"
-                                value={
-                                  editUnitPrice
-                                }
-                                onChange={
-                                  event => {
-                                    const value =
-                                      event.target.value;
-
-                                    setEditUnitPrice(
-                                      value
-                                    );
-
-                                    if (
-                                      value !==
-                                      String(
-                                        trade.unitPrice
-                                      )
-                                    ) {
-                                      setEditSettlementKrw(
-                                        ""
-                                      );
-                                    }
-                                  }
-                                }
-                              />
-                            </label>
-
-
-                            <label
-                              className={
-                                styles.editField
-                              }
-                            >
-                              <span
-                                className={
-                                  styles.editLabel
-                                }
-                              >
-                                {isBuy
-                                  ? "실제 결제금액"
-                                  : "실제 입금금액"}
-                                {" "}
                                 <span
                                   className={
-                                    styles.optional
+                                    styles.editLabel
                                   }
                                 >
-                                  선택
+                                  거래일
                                 </span>
+
+                                <input
+                                  className={
+                                    styles.input
+                                  }
+                                  type="date"
+                                  value={
+                                    editDate
+                                  }
+                                  onChange={
+                                    event =>
+                                      setEditDate(
+                                        event.target.value
+                                      )
+                                  }
+                                />
+                              </label>
+
+
+                              <label
+                                className={
+                                  styles.editField
+                                }
+                              >
+                                <span
+                                  className={
+                                    styles.editLabel
+                                  }
+                                >
+                                  수량
+                                </span>
+
+                                <input
+                                  className={
+                                    styles.input
+                                  }
+                                  type="number"
+                                  inputMode="decimal"
+                                  min="0"
+                                  step="any"
+                                  value={
+                                    editQuantity
+                                  }
+                                  onChange={
+                                    event => {
+                                      const value =
+                                        event.target.value;
+
+                                      setEditQuantity(
+                                        value
+                                      );
+
+                                      if (
+                                        value !==
+                                        String(
+                                          trade.quantity
+                                        )
+                                      ) {
+                                        setEditSettlementKrw(
+                                          ""
+                                        );
+                                      }
+                                    }
+                                  }
+                                />
+                              </label>
+
+
+                              <label
+                                className={
+                                  styles.editField
+                                }
+                              >
+                                <span
+                                  className={
+                                    styles.editLabel
+                                  }
+                                >
+                                  체결단가
+                                </span>
+
+                                <input
+                                  className={
+                                    styles.input
+                                  }
+                                  type="number"
+                                  inputMode="decimal"
+                                  min="0"
+                                  step="any"
+                                  value={
+                                    editUnitPrice
+                                  }
+                                  onChange={
+                                    event => {
+                                      const value =
+                                        event.target.value;
+
+                                      setEditUnitPrice(
+                                        value
+                                      );
+
+                                      if (
+                                        value !==
+                                        String(
+                                          trade.unitPrice
+                                        )
+                                      ) {
+                                        setEditSettlementKrw(
+                                          ""
+                                        );
+                                      }
+                                    }
+                                  }
+                                />
+                              </label>
+
+
+                              <label
+                                className={
+                                  styles.editField
+                                }
+                              >
+                                <span
+                                  className={
+                                    styles.editLabel
+                                  }
+                                >
+                                  {isBuy
+                                    ? "실제 결제금액"
+                                    : "실제 입금금액"}
+
+                                  <span
+                                    className={
+                                      styles.optional
+                                    }
+                                  >
+                                    선택
+                                  </span>
+                                </span>
+
+                                <input
+                                  className={
+                                    styles.input
+                                  }
+                                  type="number"
+                                  inputMode="decimal"
+                                  min="0"
+                                  step="any"
+                                  value={
+                                    editSettlementKrw
+                                  }
+                                  onChange={
+                                    event =>
+                                      setEditSettlementKrw(
+                                        event.target.value
+                                      )
+                                  }
+                                  placeholder="비워두면 자동 계산"
+                                />
+                              </label>
+                            </div>
+
+
+                            <label
+                              className={
+                                styles.editField
+                              }
+                            >
+                              <span
+                                className={
+                                  styles.editLabel
+                                }
+                              >
+                                메모
                               </span>
 
-                              <input
+                              <textarea
                                 className={
-                                  styles.input
+                                  styles.textarea
                                 }
-                                type="number"
-                                inputMode="decimal"
-                                min="0"
-                                step="any"
                                 value={
-                                  editSettlementKrw
+                                  editMemo
                                 }
                                 onChange={
                                   event =>
-                                    setEditSettlementKrw(
+                                    setEditMemo(
                                       event.target.value
                                     )
                                 }
-                                placeholder="비워두면 자동 계산"
+                                rows={
+                                  2
+                                }
                               />
                             </label>
+
+
+                            <p
+                              className={
+                                styles.editHelper
+                              }
+                            >
+                              수량이나 체결단가를 변경하면 실제 결제금액은
+                              비워집니다. 실제 금액을 모르면 그대로 두면
+                              자동으로 다시 계산됩니다.
+                            </p>
+
+
+                            <div
+                              className={
+                                styles.editActions
+                              }
+                            >
+                              <button
+                                type="button"
+                                className={
+                                  styles.cancelButton
+                                }
+                                onClick={
+                                  cancelEdit
+                                }
+                                disabled={
+                                  isSaving
+                                }
+                              >
+                                취소
+                              </button>
+
+
+                              <button
+                                type="button"
+                                className={
+                                  styles.saveButton
+                                }
+                                onClick={
+                                  () =>
+                                    void handleSaveEdit(
+                                      trade
+                                    )
+                                }
+                                disabled={
+                                  isSaving
+                                }
+                              >
+                                {isSaving
+                                  ? "저장 중..."
+                                  : "수정 저장"}
+                              </button>
+                            </div>
                           </div>
-
-
-                          <label
-                            className={
-                              styles.editField
-                            }
-                          >
-                            <span
-                              className={
-                                styles.editLabel
-                              }
-                            >
-                              메모
-                            </span>
-
-                            <textarea
-                              className={
-                                styles.textarea
-                              }
-                              value={
-                                editMemo
-                              }
-                              onChange={
-                                event =>
-                                  setEditMemo(
-                                    event.target.value
-                                  )
-                              }
-                              rows={
-                                2
-                              }
-                            />
-                          </label>
-
-
-                          <p
-                            className={
-                              styles.editHelper
-                            }
-                          >
-                            수량이나 체결단가를 바꾸면 기존 실제 결제금액은
-                            자동으로 비워집니다. 실제 금액을 모르면 그대로
-                            비워두면 서버에서 다시 계산합니다.
-                          </p>
-
-
-                          <div
-                            className={
-                              styles.editActions
-                            }
-                          >
-                            <button
-                              type="button"
-                              className={
-                                styles.cancelButton
-                              }
-                              onClick={
-                                cancelEdit
-                              }
-                              disabled={
-                                isSaving
-                              }
-                            >
-                              취소
-                            </button>
-
-                            <button
-                              type="button"
-                              className={
-                                styles.saveButton
-                              }
-                              onClick={
-                                () =>
-                                  void handleSaveEdit(
-                                    trade
-                                  )
-                              }
-                              disabled={
-                                isSaving
-                              }
-                            >
-                              {isSaving
-                                ? "저장 중..."
-                                : "수정 저장"}
-                            </button>
-                          </div>
-                        </div>
-                      )}
+                        )}
                     </li>
                   );
                 }
