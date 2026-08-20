@@ -15,6 +15,9 @@ import {
 import InvestmentTradeForm
   from "../../components/investment/InvestmentTradeForm/InvestmentTradeForm";
 
+import InvestmentTradeHistory
+  from "../../components/investment/InvestmentTradeHistory/InvestmentTradeHistory";
+
 import type {
   DashboardData
 } from "../../types/dashboard";
@@ -125,6 +128,12 @@ export default function AssetsPage() {
   ] =
     useState("");
 
+  const [
+    tradeHistoryRefreshKey,
+    setTradeHistoryRefreshKey
+  ] =
+    useState(0);
+
 
   async function loadDashboard() {
     setLoading(true);
@@ -144,6 +153,16 @@ export default function AssetsPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+
+  async function handleInvestmentSaved() {
+    setTradeHistoryRefreshKey(
+      current =>
+        current + 1
+    );
+
+    await loadDashboard();
   }
 
 
@@ -317,8 +336,7 @@ export default function AssetsPage() {
               styles.loading
             }
           >
-            순자산 요약을
-            불러오는 중입니다.
+            순자산 요약을 불러오는 중입니다.
           </p>
         )}
 
@@ -433,7 +451,6 @@ export default function AssetsPage() {
           type="button"
           className={[
             styles.tabButton,
-
             activeTab ===
             "cash"
               ? styles
@@ -456,7 +473,6 @@ export default function AssetsPage() {
           type="button"
           className={[
             styles.tabButton,
-
             activeTab ===
             "investment"
               ? styles
@@ -539,8 +555,7 @@ export default function AssetsPage() {
                   styles.emptyState
                 }
               >
-                표시할 현금성 계좌가
-                없습니다.
+                표시할 현금성 계좌가 없습니다.
               </p>
             )}
 
@@ -557,8 +572,7 @@ export default function AssetsPage() {
                   account => (
                     <li
                       key={
-                        account
-                          .accountId
+                        account.accountId
                       }
                       className={
                         styles.holdingRow
@@ -575,8 +589,7 @@ export default function AssetsPage() {
                           }
                         >
                           {
-                            account
-                              .displayName
+                            account.displayName
                           }
                         </span>
 
@@ -586,8 +599,7 @@ export default function AssetsPage() {
                           }
                         >
                           {
-                            account
-                              .subType
+                            account.subType
                           }
                         </span>
                       </div>
@@ -598,8 +610,7 @@ export default function AssetsPage() {
                         }
                       >
                         {formatCurrency(
-                          account
-                            .currentBalance
+                          account.currentBalance
                         )}
                       </strong>
                     </li>
@@ -647,8 +658,7 @@ export default function AssetsPage() {
                   }
                 >
                   {formatCurrency(
-                    summary
-                      .investmentValue
+                    summary.investmentValue
                   )}
                 </strong>
               </div>
@@ -660,8 +670,7 @@ export default function AssetsPage() {
                 styles.loading
               }
             >
-              투자계좌를 불러오는
-              중입니다.
+              투자계좌를 불러오는 중입니다.
             </p>
           )}
 
@@ -674,8 +683,7 @@ export default function AssetsPage() {
                   styles.emptyState
                 }
               >
-                등록된 투자계좌가
-                없습니다.
+                등록된 투자계좌가 없습니다.
               </p>
             )}
 
@@ -705,7 +713,6 @@ export default function AssetsPage() {
                           type="button"
                           className={[
                             styles.accountCard,
-
                             isSelected
                               ? styles
                                   .accountCardActive
@@ -737,8 +744,7 @@ export default function AssetsPage() {
                             }
                           >
                             {
-                              account
-                                .accountName
+                              account.accountName
                             }
                           </span>
 
@@ -748,8 +754,7 @@ export default function AssetsPage() {
                             }
                           >
                             {formatCurrency(
-                              account
-                                .accountValueKrw
+                              account.accountValueKrw
                             )}
 
                             {!account
@@ -772,8 +777,7 @@ export default function AssetsPage() {
                                 }
                               >
                                 {
-                                  selectedAccount
-                                    .accountName
+                                  selectedAccount.accountName
                                 }
                               </h3>
 
@@ -797,8 +801,7 @@ export default function AssetsPage() {
                                   }
                                 >
                                   {formatCurrency(
-                                    selectedAccount
-                                      .holdingValueKrw
+                                    selectedAccount.holdingValueKrw
                                   )}
                                 </strong>
                               </div>
@@ -823,16 +826,14 @@ export default function AssetsPage() {
                                   }
                                   style={{
                                     color:
-                                      selectedAccount
-                                        .realizedPnlKrw <
+                                      selectedAccount.realizedPnlKrw <
                                       0
                                         ? "var(--color-error)"
                                         : undefined
                                   }}
                                 >
                                   {formatCurrency(
-                                    selectedAccount
-                                      .realizedPnlKrw
+                                    selectedAccount.realizedPnlKrw
                                   )}
                                 </strong>
                               </div>
@@ -863,9 +864,7 @@ export default function AssetsPage() {
                                   onChange={
                                     event =>
                                       setCashInput(
-                                        event
-                                          .target
-                                          .value
+                                        event.target.value
                                       )
                                   }
                                   placeholder="예: 327500"
@@ -908,12 +907,9 @@ export default function AssetsPage() {
                                     styles.helperText
                                   }
                                 >
-                                  아직 예수금
-                                  기준값이 설정되지
-                                  않았습니다.
-                                  증권사 앱에서 현재
-                                  예수금을 확인해 한
-                                  번만 입력해주세요.
+                                  아직 예수금 기준값이 설정되지 않았습니다.
+                                  증권사 앱에서 현재 예수금을 확인해 한 번만
+                                  입력해주세요.
                                 </p>
                               )}
 
@@ -926,8 +922,7 @@ export default function AssetsPage() {
                                     styles.emptyState
                                   }
                                 >
-                                  보유 중인 종목이
-                                  없습니다.
+                                  보유 중인 종목이 없습니다.
                                 </p>
                               )}
 
@@ -944,8 +939,7 @@ export default function AssetsPage() {
                                     holding => (
                                       <li
                                         key={
-                                          holding
-                                            .holdingId
+                                          holding.holdingId
                                         }
                                         className={
                                           styles.holdingRow
@@ -962,8 +956,7 @@ export default function AssetsPage() {
                                             }
                                           >
                                             {
-                                              holding
-                                                .stockName
+                                              holding.stockName
                                             }
                                           </span>
 
@@ -973,13 +966,11 @@ export default function AssetsPage() {
                                             }
                                           >
                                             {
-                                              holding
-                                                .quantity
+                                              holding.quantity
                                             }
                                             주 ·{" "}
                                             {formatPercent(
-                                              holding
-                                                .returnRate
+                                              holding.returnRate
                                             )}
                                           </span>
                                         </div>
@@ -990,16 +981,14 @@ export default function AssetsPage() {
                                           }
                                           style={{
                                             color:
-                                              holding
-                                                .returnRate <
+                                              holding.returnRate <
                                               0
                                                 ? "var(--color-error)"
                                                 : undefined
                                           }}
                                         >
                                           {formatCurrency(
-                                            holding
-                                              .valueKrw
+                                            holding.valueKrw
                                           )}
                                         </strong>
                                       </li>
@@ -1017,7 +1006,17 @@ export default function AssetsPage() {
                                   holdingsForSelected
                                 }
                                 onSaved={
-                                  loadDashboard
+                                  handleInvestmentSaved
+                                }
+                              />
+
+
+                              <InvestmentTradeHistory
+                                accountId={
+                                  selectedAccount.accountId
+                                }
+                                refreshKey={
+                                  tradeHistoryRefreshKey
                                 }
                               />
                             </div>
