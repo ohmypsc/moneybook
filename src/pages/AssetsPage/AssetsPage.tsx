@@ -1012,13 +1012,16 @@ export default function AssetsPage() {
 
 
                               <InvestmentTradeHistory
-                                accountId={
-                                  selectedAccount.accountId
-                                }
-                                refreshKey={
-                                  tradeHistoryRefreshKey
-                                }
-                              />
+  accountId={
+    selectedAccount.accountId
+  }
+  refreshKey={
+    tradeHistoryRefreshKey
+  }
+  onChanged={
+    handleInvestmentSaved
+  }
+/>
                             </div>
                           )}
                       </Fragment>
