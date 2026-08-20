@@ -40,13 +40,42 @@ function formatCurrency(
   if (
     value === undefined ||
     value === null ||
-    Number.isNaN(value)
+    !Number.isFinite(value)
   ) {
     return "-";
   }
 
   return (
-    value.toLocaleString("ko-KR") +
+    Math.round(value)
+      .toLocaleString("ko-KR") +
+    "원"
+  );
+}
+
+
+function formatSignedCurrency(
+  value:
+    number |
+    undefined |
+    null
+) {
+  if (
+    value === undefined ||
+    value === null ||
+    !Number.isFinite(value)
+  ) {
+    return "-";
+  }
+
+  const sign =
+    value > 0
+      ? "+"
+      : "";
+
+  return (
+    sign +
+    Math.round(value)
+      .toLocaleString("ko-KR") +
     "원"
   );
 }
@@ -61,15 +90,80 @@ function formatPercent(
   if (
     value === undefined ||
     value === null ||
-    Number.isNaN(value)
+    !Number.isFinite(value)
   ) {
     return "-";
   }
 
+  const sign =
+    value > 0
+      ? "+"
+      : "";
+
   return (
-    (value * 100).toFixed(2) +
+    sign +
+    (
+      value *
+      100
+    ).toFixed(2) +
     "%"
   );
+}
+
+
+function formatQuantity(
+  value:
+    number |
+    undefined |
+    null
+) {
+  if (
+    value === undefined ||
+    value === null ||
+    !Number.isFinite(value)
+  ) {
+    return "-";
+  }
+
+  return value.toLocaleString(
+    "ko-KR",
+    {
+      maximumFractionDigits:
+        8
+    }
+  );
+}
+
+
+function formatPrice(
+  value:
+    number |
+    undefined |
+    null,
+  market:
+    string
+) {
+  if (
+    value === undefined ||
+    value === null ||
+    !Number.isFinite(value)
+  ) {
+    return "-";
+  }
+
+  const formatted =
+    value.toLocaleString(
+      "ko-KR",
+      {
+        maximumFractionDigits:
+          8
+      }
+    );
+
+  return market ===
+    "국내"
+    ? `${formatted}원`
+    : formatted;
 }
 
 
@@ -86,15 +180,18 @@ export default function AssetsPage() {
     dashboard,
     setDashboard
   ] =
-    useState<DashboardData | null>(
+    useState<
+      DashboardData |
       null
-    );
+    >(null);
 
   const [
     loading,
     setLoading
   ] =
-    useState(true);
+    useState(
+      true
+    );
 
   const [
     error,
@@ -106,9 +203,10 @@ export default function AssetsPage() {
     selectedAccountId,
     setSelectedAccountId
   ] =
-    useState<string | null>(
+    useState<
+      string |
       null
-    );
+    >(null);
 
   const [
     cashInput,
@@ -120,7 +218,9 @@ export default function AssetsPage() {
     cashSaving,
     setCashSaving
   ] =
-    useState(false);
+    useState(
+      false
+    );
 
   const [
     cashError,
@@ -132,26 +232,39 @@ export default function AssetsPage() {
     tradeHistoryRefreshKey,
     setTradeHistoryRefreshKey
   ] =
-    useState(0);
+    useState(
+      0
+    );
 
 
   async function loadDashboard() {
-    setLoading(true);
-    setError("");
+    setLoading(
+      true
+    );
+
+    setError(
+      ""
+    );
 
     try {
       const data =
         await getDashboard();
 
-      setDashboard(data);
-    } catch (err) {
+      setDashboard(
+        data
+      );
+    } catch (
+      err
+    ) {
       setError(
         err instanceof Error
           ? err.message
           : "자산 정보를 불러오지 못했습니다."
       );
     } finally {
-      setLoading(false);
+      setLoading(
+        false
+      );
     }
   }
 
@@ -159,7 +272,8 @@ export default function AssetsPage() {
   async function handleInvestmentSaved() {
     setTradeHistoryRefreshKey(
       current =>
-        current + 1
+        current +
+        1
     );
 
     await loadDashboard();
@@ -195,6 +309,13 @@ export default function AssetsPage() {
     [];
 
 
+  const investmentHoldings =
+    dashboard
+      ?.investments
+      .holdings ||
+    [];
+
+
   const selectedAccount =
     investmentAccounts.find(
       account =>
@@ -204,15 +325,11 @@ export default function AssetsPage() {
 
 
   const holdingsForSelected =
-    dashboard
-      ?.investments
-      .holdings
-      .filter(
-        holding =>
-          holding.accountId ===
-          selectedAccountId
-      ) ||
-    [];
+    investmentHoldings.filter(
+      holding =>
+        holding.accountId ===
+        selectedAccountId
+    );
 
 
   useEffect(
@@ -220,7 +337,10 @@ export default function AssetsPage() {
       if (
         !selectedAccount
       ) {
-        setCashInput("");
+        setCashInput(
+          ""
+        );
+
         return;
       }
 
@@ -250,16 +370,19 @@ export default function AssetsPage() {
       return;
     }
 
+
     const parsed =
       Number(
         cashInput
       );
 
+
     if (
       !Number.isFinite(
         parsed
       ) ||
-      parsed < 0
+      parsed <
+        0
     ) {
       setCashError(
         "올바른 금액을 입력해주세요."
@@ -268,8 +391,15 @@ export default function AssetsPage() {
       return;
     }
 
-    setCashSaving(true);
-    setCashError("");
+
+    setCashSaving(
+      true
+    );
+
+    setCashError(
+      ""
+    );
+
 
     try {
       await setInvestmentCashBaseline({
@@ -283,15 +413,20 @@ export default function AssetsPage() {
           true
       });
 
+
       await loadDashboard();
-    } catch (err) {
+    } catch (
+      err
+    ) {
       setCashError(
         err instanceof Error
           ? err.message
-          : "예수금 저장에 실패했습니다."
+          : "예수금 기준값 저장에 실패했습니다."
       );
     } finally {
-      setCashSaving(false);
+      setCashSaving(
+        false
+      );
     }
   }
 
@@ -340,6 +475,7 @@ export default function AssetsPage() {
           </p>
         )}
 
+
         {!loading &&
           error && (
             <p
@@ -350,6 +486,7 @@ export default function AssetsPage() {
               {error}
             </p>
           )}
+
 
         {!loading &&
           !error &&
@@ -383,6 +520,7 @@ export default function AssetsPage() {
                 </strong>
               </div>
 
+
               <div
                 className={
                   styles.summaryItem
@@ -406,6 +544,7 @@ export default function AssetsPage() {
                   )}
                 </strong>
               </div>
+
 
               <div
                 className={
@@ -451,14 +590,19 @@ export default function AssetsPage() {
           type="button"
           className={[
             styles.tabButton,
+
             activeTab ===
             "cash"
               ? styles
                   .tabButtonActive
               : ""
           ]
-            .filter(Boolean)
-            .join(" ")}
+            .filter(
+              Boolean
+            )
+            .join(
+              " "
+            )}
           onClick={
             () =>
               setActiveTab(
@@ -469,18 +613,24 @@ export default function AssetsPage() {
           현금성자산
         </button>
 
+
         <button
           type="button"
           className={[
             styles.tabButton,
+
             activeTab ===
             "investment"
               ? styles
                   .tabButtonActive
               : ""
           ]
-            .filter(Boolean)
-            .join(" ")}
+            .filter(
+              Boolean
+            )
+            .join(
+              " "
+            )}
           onClick={
             () =>
               setActiveTab(
@@ -507,6 +657,7 @@ export default function AssetsPage() {
           >
             현금성자산
           </h2>
+
 
           {!loading &&
             summary && (
@@ -536,6 +687,7 @@ export default function AssetsPage() {
               </div>
             )}
 
+
           {loading && (
             <p
               className={
@@ -545,6 +697,7 @@ export default function AssetsPage() {
               불러오는 중입니다.
             </p>
           )}
+
 
           {!loading &&
             cashLikeAccounts
@@ -559,13 +712,14 @@ export default function AssetsPage() {
               </p>
             )}
 
+
           {!loading &&
             cashLikeAccounts
               .length >
               0 && (
               <ul
                 className={
-                  styles.holdingsList
+                  styles.cashAccountList
                 }
               >
                 {cashLikeAccounts.map(
@@ -575,27 +729,27 @@ export default function AssetsPage() {
                         account.accountId
                       }
                       className={
-                        styles.holdingRow
+                        styles.cashAccountRow
                       }
                     >
                       <div
                         className={
-                          styles.holdingInfo
+                          styles.cashAccountInfo
                         }
                       >
-                        <span
+                        <strong
                           className={
-                            styles.holdingName
+                            styles.cashAccountName
                           }
                         >
                           {
                             account.displayName
                           }
-                        </span>
+                        </strong>
 
                         <span
                           className={
-                            styles.holdingMeta
+                            styles.cashAccountMeta
                           }
                         >
                           {
@@ -604,9 +758,10 @@ export default function AssetsPage() {
                         </span>
                       </div>
 
+
                       <strong
                         className={
-                          styles.holdingValue
+                          styles.cashAccountValue
                         }
                       >
                         {formatCurrency(
@@ -629,40 +784,110 @@ export default function AssetsPage() {
             styles.section
           }
         >
-          <h2
+          <div
             className={
-              styles.sectionTitle
+              styles.sectionHeading
             }
           >
-            투자자산
-          </h2>
+            <h2
+              className={
+                styles.sectionTitle
+              }
+            >
+              투자자산
+            </h2>
+
+            {!loading &&
+              investmentAccounts
+                .length >
+                0 && (
+                <span
+                  className={
+                    styles.sectionCount
+                  }
+                >
+                  {
+                    investmentAccounts
+                      .length
+                  }
+                  개 계좌
+                </span>
+              )}
+          </div>
+
 
           {!loading &&
             summary && (
               <div
                 className={
-                  styles.cashSummary
+                  styles.investmentSummary
                 }
               >
-                <span
-                  className={
-                    styles.summaryLabel
-                  }
-                >
-                  투자자산 합계
-                </span>
+                <div>
+                  <span
+                    className={
+                      styles.summaryLabel
+                    }
+                  >
+                    투자자산 합계
+                  </span>
 
-                <strong
+                  <strong
+                    className={
+                      styles.investmentSummaryValue
+                    }
+                  >
+                    {formatCurrency(
+                      summary
+                        .investmentValue
+                    )}
+                  </strong>
+                </div>
+
+
+                <div
                   className={
-                    styles.summaryValue
+                    styles.investmentSummarySub
                   }
                 >
-                  {formatCurrency(
-                    summary.investmentValue
-                  )}
-                </strong>
+                  <span>
+                    예수금{" "}
+                    <strong>
+                      {formatCurrency(
+                        dashboard
+                          ?.investments
+                          .cashTotal
+                      )}
+                    </strong>
+                  </span>
+
+                  <span>
+                    실현손익{" "}
+                    <strong
+                      style={{
+                        color:
+                          (
+                            dashboard
+                              ?.investments
+                              .realizedPnlTotal ??
+                            0
+                          ) <
+                          0
+                            ? "var(--color-error)"
+                            : undefined
+                      }}
+                    >
+                      {formatSignedCurrency(
+                        dashboard
+                          ?.investments
+                          .realizedPnlTotal
+                      )}
+                    </strong>
+                  </span>
+                </div>
               </div>
             )}
+
 
           {loading && (
             <p
@@ -673,6 +898,7 @@ export default function AssetsPage() {
               투자계좌를 불러오는 중입니다.
             </p>
           )}
+
 
           {!loading &&
             investmentAccounts
@@ -703,6 +929,15 @@ export default function AssetsPage() {
                       selectedAccountId ===
                       account.accountId;
 
+
+                    const holdingCount =
+                      investmentHoldings.filter(
+                        holding =>
+                          holding.accountId ===
+                          account.accountId
+                      ).length;
+
+
                     return (
                       <Fragment
                         key={
@@ -713,6 +948,7 @@ export default function AssetsPage() {
                           type="button"
                           className={[
                             styles.accountCard,
+
                             isSelected
                               ? styles
                                   .accountCardActive
@@ -738,29 +974,109 @@ export default function AssetsPage() {
                             }
                           }
                         >
-                          <span
+                          <div
                             className={
-                              styles.accountName
+                              styles.accountCardTop
                             }
                           >
-                            {
-                              account.accountName
-                            }
-                          </span>
+                            <div
+                              className={
+                                styles.accountIdentity
+                              }
+                            >
+                              <strong
+                                className={
+                                  styles.accountName
+                                }
+                              >
+                                {
+                                  account.accountName
+                                }
+                              </strong>
 
-                          <span
+                              <span
+                                className={
+                                  styles.accountSub
+                                }
+                              >
+                                {
+                                  account.subType
+                                }
+                                {" · "}
+                                {
+                                  holdingCount
+                                }
+                                종목
+                              </span>
+                            </div>
+
+
+                            <div
+                              className={
+                                styles.accountTotal
+                              }
+                            >
+                              <strong>
+                                {formatCurrency(
+                                  account.accountValueKrw
+                                )}
+                              </strong>
+
+                              <span>
+                                총 평가
+                              </span>
+                            </div>
+                          </div>
+
+
+                          <div
                             className={
-                              styles.holdingMeta
+                              styles.accountMetrics
                             }
                           >
-                            {formatCurrency(
-                              account.accountValueKrw
-                            )}
+                            <div
+                              className={
+                                styles.accountMetric
+                              }
+                            >
+                              <span>
+                                예수금
+                              </span>
 
-                            {!account
-                              .cashBaselineConfigured &&
-                              " · 예수금 미설정"}
-                          </span>
+                              <strong>
+                                {account.cashBaselineConfigured
+                                  ? formatCurrency(
+                                      account.currentCashKrw
+                                    )
+                                  : "미설정"}
+                              </strong>
+                            </div>
+
+
+                            <div
+                              className={
+                                styles.accountMetric
+                              }
+                            >
+                              <span>
+                                실현손익
+                              </span>
+
+                              <strong
+                                style={{
+                                  color:
+                                    account.realizedPnlKrw <
+                                    0
+                                      ? "var(--color-error)"
+                                      : undefined
+                                }}
+                              >
+                                {formatSignedCurrency(
+                                  account.realizedPnlKrw
+                                )}
+                              </strong>
+                            </div>
+                          </div>
                         </button>
 
 
@@ -771,37 +1087,39 @@ export default function AssetsPage() {
                                 styles.detailCard
                               }
                             >
-                              <h3
-                                className={
-                                  styles.detailTitle
-                                }
-                              >
-                                {
-                                  selectedAccount.accountName
-                                }
-                              </h3>
-
-
                               <div
                                 className={
-                                  styles.holdingsTotal
+                                  styles.detailHeader
                                 }
                               >
-                                <span
-                                  className={
-                                    styles.summaryLabel
-                                  }
-                                >
-                                  보유종목 평가액
-                                </span>
+                                <div>
+                                  <span
+                                    className={
+                                      styles.detailEyebrow
+                                    }
+                                  >
+                                    투자계좌
+                                  </span>
+
+                                  <h3
+                                    className={
+                                      styles.detailTitle
+                                    }
+                                  >
+                                    {
+                                      selectedAccount.accountName
+                                    }
+                                  </h3>
+                                </div>
+
 
                                 <strong
                                   className={
-                                    styles.summaryValue
+                                    styles.detailTotal
                                   }
                                 >
                                   {formatCurrency(
-                                    selectedAccount.holdingValueKrw
+                                    selectedAccount.accountValueKrw
                                   )}
                                 </strong>
                               </div>
@@ -809,84 +1127,212 @@ export default function AssetsPage() {
 
                               <div
                                 className={
-                                  styles.holdingsTotal
+                                  styles.detailMetrics
                                 }
                               >
-                                <span
+                                <div
                                   className={
-                                    styles.summaryLabel
+                                    styles.detailMetric
                                   }
                                 >
-                                  실현손익
-                                </span>
+                                  <span>
+                                    현재 예수금
+                                  </span>
 
-                                <strong
+                                  <strong>
+                                    {selectedAccount.cashBaselineConfigured
+                                      ? formatCurrency(
+                                          selectedAccount.currentCashKrw
+                                        )
+                                      : "미설정"}
+                                  </strong>
+                                </div>
+
+
+                                <div
                                   className={
-                                    styles.summaryValue
+                                    styles.detailMetric
                                   }
-                                  style={{
-                                    color:
-                                      selectedAccount.realizedPnlKrw <
-                                      0
-                                        ? "var(--color-error)"
-                                        : undefined
-                                  }}
                                 >
-                                  {formatCurrency(
-                                    selectedAccount.realizedPnlKrw
-                                  )}
-                                </strong>
+                                  <span>
+                                    보유종목
+                                  </span>
+
+                                  <strong>
+                                    {formatCurrency(
+                                      selectedAccount.holdingValueKrw
+                                    )}
+                                  </strong>
+                                </div>
+
+
+                                <div
+                                  className={
+                                    styles.detailMetric
+                                  }
+                                >
+                                  <span>
+                                    실현손익
+                                  </span>
+
+                                  <strong
+                                    style={{
+                                      color:
+                                        selectedAccount.realizedPnlKrw <
+                                        0
+                                          ? "var(--color-error)"
+                                          : undefined
+                                    }}
+                                  >
+                                    {formatSignedCurrency(
+                                      selectedAccount.realizedPnlKrw
+                                    )}
+                                  </strong>
+                                </div>
                               </div>
 
 
-                              <div
-                                className={
-                                  styles.cashForm
-                                }
-                              >
-                                <span
+                              {!selectedAccount
+                                .cashBaselineConfigured && (
+                                <div
                                   className={
-                                    styles.summaryLabel
+                                    styles.cashSetupCard
                                   }
                                 >
-                                  현재 예수금
-                                </span>
+                                  <div
+                                    className={
+                                      styles.cashSetupHeading
+                                    }
+                                  >
+                                    <strong>
+                                      예수금 설정
+                                    </strong>
 
-                                <input
-                                  className={
-                                    styles.cashInput
-                                  }
-                                  type="number"
-                                  inputMode="numeric"
-                                  value={
-                                    cashInput
-                                  }
-                                  onChange={
-                                    event =>
-                                      setCashInput(
-                                        event.target.value
-                                      )
-                                  }
-                                  placeholder="예: 327500"
-                                />
+                                    <span>
+                                      증권사 앱의 현재 예수금을 한 번 입력해주세요.
+                                    </span>
+                                  </div>
 
-                                <button
-                                  type="button"
+
+                                  <div
+                                    className={
+                                      styles.cashForm
+                                    }
+                                  >
+                                    <input
+                                      className={
+                                        styles.cashInput
+                                      }
+                                      type="number"
+                                      inputMode="numeric"
+                                      min="0"
+                                      value={
+                                        cashInput
+                                      }
+                                      onChange={
+                                        event =>
+                                          setCashInput(
+                                            event.target.value
+                                          )
+                                      }
+                                      placeholder="예: 327500"
+                                    />
+
+                                    <button
+                                      type="button"
+                                      className={
+                                        styles.cashButton
+                                      }
+                                      onClick={
+                                        handleSaveCashBaseline
+                                      }
+                                      disabled={
+                                        cashSaving
+                                      }
+                                    >
+                                      {cashSaving
+                                        ? "저장 중..."
+                                        : "설정"}
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+
+
+                              {selectedAccount
+                                .cashBaselineConfigured && (
+                                <details
                                   className={
-                                    styles.cashButton
-                                  }
-                                  onClick={
-                                    handleSaveCashBaseline
-                                  }
-                                  disabled={
-                                    cashSaving
+                                    styles.baselineDetails
                                   }
                                 >
-                                  {cashSaving
-                                    ? "저장 중..."
-                                    : "저장"}
-                                </button>
-                              </div>
+                                  <summary
+                                    className={
+                                      styles.baselineSummary
+                                    }
+                                  >
+                                    예수금 기준값 다시 설정
+                                  </summary>
+
+
+                                  <div
+                                    className={
+                                      styles.baselineBody
+                                    }
+                                  >
+                                    <p
+                                      className={
+                                        styles.helperText
+                                      }
+                                    >
+                                      현재 예수금과 다른 값입니다.
+                                      투자거래 계산의 시작점이 되는 기준값입니다.
+                                    </p>
+
+
+                                    <div
+                                      className={
+                                        styles.cashForm
+                                      }
+                                    >
+                                      <input
+                                        className={
+                                          styles.cashInput
+                                        }
+                                        type="number"
+                                        inputMode="numeric"
+                                        min="0"
+                                        value={
+                                          cashInput
+                                        }
+                                        onChange={
+                                          event =>
+                                            setCashInput(
+                                              event.target.value
+                                            )
+                                        }
+                                      />
+
+                                      <button
+                                        type="button"
+                                        className={
+                                          styles.cashButton
+                                        }
+                                        onClick={
+                                          handleSaveCashBaseline
+                                        }
+                                        disabled={
+                                          cashSaving
+                                        }
+                                      >
+                                        {cashSaving
+                                          ? "저장 중..."
+                                          : "저장"}
+                                      </button>
+                                    </div>
+                                  </div>
+                                </details>
+                              )}
 
 
                               {cashError && (
@@ -900,18 +1346,30 @@ export default function AssetsPage() {
                               )}
 
 
-                              {!selectedAccount
-                                .cashBaselineConfigured && (
-                                <p
+                              <div
+                                className={
+                                  styles.holdingsHeader
+                                }
+                              >
+                                <h4
                                   className={
-                                    styles.helperText
+                                    styles.holdingsTitle
                                   }
                                 >
-                                  아직 예수금 기준값이 설정되지 않았습니다.
-                                  증권사 앱에서 현재 예수금을 확인해 한 번만
-                                  입력해주세요.
-                                </p>
-                              )}
+                                  보유종목
+                                </h4>
+
+                                <span
+                                  className={
+                                    styles.holdingsCount
+                                  }
+                                >
+                                  {
+                                    holdingsForSelected.length
+                                  }
+                                  종목
+                                </span>
+                              </div>
 
 
                               {holdingsForSelected
@@ -932,67 +1390,205 @@ export default function AssetsPage() {
                                 0 && (
                                 <ul
                                   className={
-                                    styles.holdingsList
+                                    styles.investmentHoldingList
                                   }
                                 >
                                   {holdingsForSelected.map(
-                                    holding => (
-                                      <li
-                                        key={
-                                          holding.holdingId
-                                        }
-                                        className={
-                                          styles.holdingRow
-                                        }
-                                      >
-                                        <div
+                                    holding => {
+                                      const evaluationPnl =
+                                        holding.valueKrw -
+                                        holding.costKrw;
+
+
+                                      return (
+                                        <li
+                                          key={
+                                            holding.holdingId
+                                          }
                                           className={
-                                            styles.holdingInfo
+                                            styles.investmentHoldingRow
                                           }
                                         >
-                                          <span
+                                          <div
                                             className={
-                                              styles.holdingName
+                                              styles.investmentHoldingTop
                                             }
                                           >
-                                            {
-                                              holding.stockName
-                                            }
-                                          </span>
+                                            <div
+                                              className={
+                                                styles.investmentHoldingIdentity
+                                              }
+                                            >
+                                              <div
+                                                className={
+                                                  styles.stockNameRow
+                                                }
+                                              >
+                                                <strong
+                                                  className={
+                                                    styles.holdingName
+                                                  }
+                                                >
+                                                  {
+                                                    holding.stockName
+                                                  }
+                                                </strong>
 
-                                          <span
+
+                                                {holding.quoteMode ===
+                                                  "수동" && (
+                                                  <span
+                                                    className={
+                                                      styles.manualBadge
+                                                    }
+                                                  >
+                                                    수동시세
+                                                  </span>
+                                                )}
+                                              </div>
+
+
+                                              <span
+                                                className={
+                                                  styles.holdingMeta
+                                                }
+                                              >
+                                                {
+                                                  holding.stockCode
+                                                }
+                                                {" · "}
+                                                {
+                                                  holding.market
+                                                }
+                                                {" · "}
+                                                {formatQuantity(
+                                                  holding.quantity
+                                                )}
+                                                주
+                                              </span>
+                                            </div>
+
+
+                                            <div
+                                              className={
+                                                styles.holdingResult
+                                              }
+                                            >
+                                              <strong
+                                                className={
+                                                  styles.holdingValue
+                                                }
+                                              >
+                                                {formatCurrency(
+                                                  holding.valueKrw
+                                                )}
+                                              </strong>
+
+                                              <span
+                                                className={
+                                                  styles.holdingReturn
+                                                }
+                                                style={{
+                                                  color:
+                                                    holding.returnRate <
+                                                    0
+                                                      ? "var(--color-error)"
+                                                      : undefined
+                                                }}
+                                              >
+                                                {formatPercent(
+                                                  holding.returnRate
+                                                )}
+                                              </span>
+                                            </div>
+                                          </div>
+
+
+                                          <div
                                             className={
-                                              styles.holdingMeta
+                                              styles.holdingDetails
                                             }
                                           >
-                                            {
-                                              holding.quantity
-                                            }
-                                            주 ·{" "}
-                                            {formatPercent(
-                                              holding.returnRate
+                                            <div
+                                              className={
+                                                styles.holdingDetailItem
+                                              }
+                                            >
+                                              <span>
+                                                평단
+                                              </span>
+
+                                              <strong>
+                                                {formatPrice(
+                                                  holding.avgBuyPrice,
+                                                  holding.market
+                                                )}
+                                              </strong>
+                                            </div>
+
+
+                                            <div
+                                              className={
+                                                styles.holdingDetailItem
+                                              }
+                                            >
+                                              <span>
+                                                현재가
+                                              </span>
+
+                                              <strong>
+                                                {formatPrice(
+                                                  holding.currentPrice,
+                                                  holding.market
+                                                )}
+                                              </strong>
+                                            </div>
+
+
+                                            <div
+                                              className={
+                                                styles.holdingDetailItem
+                                              }
+                                            >
+                                              <span>
+                                                평가손익
+                                              </span>
+
+                                              <strong
+                                                style={{
+                                                  color:
+                                                    evaluationPnl <
+                                                    0
+                                                      ? "var(--color-error)"
+                                                      : undefined
+                                                }}
+                                              >
+                                                {formatSignedCurrency(
+                                                  evaluationPnl
+                                                )}
+                                              </strong>
+                                            </div>
+                                          </div>
+
+
+                                          {holding.market ===
+                                            "해외" &&
+                                            holding.fx >
+                                              0 && (
+                                              <p
+                                                className={
+                                                  styles.fxMeta
+                                                }
+                                              >
+                                                적용환율{" "}
+                                                {formatCurrency(
+                                                  holding.fx
+                                                )}
+                                              </p>
                                             )}
-                                          </span>
-                                        </div>
-
-                                        <strong
-                                          className={
-                                            styles.holdingValue
-                                          }
-                                          style={{
-                                            color:
-                                              holding.returnRate <
-                                              0
-                                                ? "var(--color-error)"
-                                                : undefined
-                                          }}
-                                        >
-                                          {formatCurrency(
-                                            holding.valueKrw
-                                          )}
-                                        </strong>
-                                      </li>
-                                    )
+                                        </li>
+                                      );
+                                    }
                                   )}
                                 </ul>
                               )}
@@ -1012,16 +1608,16 @@ export default function AssetsPage() {
 
 
                               <InvestmentTradeHistory
-  accountId={
-    selectedAccount.accountId
-  }
-  refreshKey={
-    tradeHistoryRefreshKey
-  }
-  onChanged={
-    handleInvestmentSaved
-  }
-/>
+                                accountId={
+                                  selectedAccount.accountId
+                                }
+                                refreshKey={
+                                  tradeHistoryRefreshKey
+                                }
+                                onChanged={
+                                  handleInvestmentSaved
+                                }
+                              />
                             </div>
                           )}
                       </Fragment>
