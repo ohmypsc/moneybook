@@ -1,26 +1,35 @@
 .history {
-  margin-top: var(--space-5);
-  padding-top: var(--space-5);
+  margin-top:
+    var(--space-5);
 
-  border-top: 1px solid var(--color-border);
+  padding-top:
+    var(--space-5);
+
+  border-top:
+    1px solid
+    var(--color-border);
 }
 
 
 .summary {
   display: flex;
+
   align-items: center;
   justify-content: space-between;
 
-  gap: var(--space-3);
+  gap:
+    var(--space-3);
 
   min-height: 44px;
 
-  color: var(--color-text-primary);
+  color:
+    var(--color-text-primary);
 
   font-size: 15px;
   font-weight: 800;
 
   cursor: pointer;
+
   list-style: none;
 }
 
@@ -37,17 +46,25 @@
 
   margin-left: 2px;
 
-  color: var(--color-text-secondary);
+  color:
+    var(--color-text-secondary);
 
   font-size: 16px;
   line-height: 1;
 
-  transition: transform 0.15s ease;
+  transition:
+    transform
+    0.15s
+    ease;
 }
 
 
-.history[open] .summary::after {
-  transform: rotate(180deg);
+.history[open]
+.summary::after {
+  transform:
+    rotate(
+      180deg
+    );
 }
 
 
@@ -59,7 +76,8 @@
 .summaryCount {
   margin-left: auto;
 
-  color: var(--color-text-secondary);
+  color:
+    var(--color-text-secondary);
 
   font-size: 12px;
   font-weight: 700;
@@ -67,38 +85,169 @@
 
 
 .body {
-  padding-top: var(--space-2);
+  padding-top:
+    var(--space-2);
+}
+
+
+.controls {
+  display: flex;
+
+  flex-direction: column;
+
+  gap:
+    var(--space-3);
+
+  margin-bottom:
+    var(--space-3);
+}
+
+
+.filters {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      3,
+      minmax(
+        0,
+        1fr
+      )
+    );
+
+  gap: 4px;
+
+  padding: 4px;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius:
+    var(--radius-md);
+
+  background:
+    var(--color-surface-soft);
+}
+
+
+.filterButton {
+  min-height: 36px;
+
+  padding:
+    0
+    10px;
+
+  border: 0;
+
+  border-radius:
+    calc(
+      var(--radius-md) -
+      4px
+    );
+
+  background:
+    transparent;
+
+  color:
+    var(--color-text-secondary);
+
+  font: inherit;
+
+  font-size: 12px;
+  font-weight: 800;
+
+  cursor: pointer;
+}
+
+
+.filterButtonActive {
+  background:
+    var(--color-surface);
+
+  color:
+    var(--color-text-primary);
+
+  box-shadow:
+    var(--shadow-card);
+}
+
+
+.deletedToggle {
+  display: flex;
+
+  align-items: center;
+
+  width: fit-content;
+
+  gap: 8px;
+
+  color:
+    var(--color-text-secondary);
+
+  font-size: 12px;
+  font-weight: 700;
+
+  cursor: pointer;
+}
+
+
+.deletedToggle input {
+  width: 16px;
+  height: 16px;
+
+  margin: 0;
+
+  accent-color:
+    var(--color-primary);
 }
 
 
 .state {
   margin: 0;
-  padding: 14px 0;
 
-  color: var(--color-text-secondary);
+  padding:
+    14px
+    0;
+
+  color:
+    var(--color-text-secondary);
 
   font-size: 13px;
+
   line-height: 1.5;
 }
 
 
 .error {
-  margin: 0 0 var(--space-3);
-  padding: 10px 12px;
+  margin:
+    0
+    0
+    var(--space-3);
 
-  border-radius: var(--radius-md);
+  padding:
+    10px
+    12px;
 
-  background: var(--color-surface-soft);
-  color: var(--color-error);
+  border-radius:
+    var(--radius-md);
+
+  background:
+    var(--color-surface-soft);
+
+  color:
+    var(--color-error);
 
   font-size: 13px;
   font-weight: 700;
+
   line-height: 1.5;
 }
 
 
 .list {
   display: flex;
+
   flex-direction: column;
 
   margin: 0;
@@ -109,9 +258,13 @@
 
 
 .row {
-  padding: 14px 0;
+  padding:
+    14px
+    0;
 
-  border-top: 1px solid var(--color-border);
+  border-top:
+    1px solid
+    var(--color-border);
 }
 
 
@@ -120,17 +273,25 @@
 }
 
 
+.deletedRow {
+  opacity: 0.62;
+}
+
+
 .rowTop {
   display: flex;
+
   align-items: flex-start;
   justify-content: space-between;
 
-  gap: var(--space-3);
+  gap:
+    var(--space-3);
 }
 
 
 .stockGroup {
   display: flex;
+
   align-items: center;
 
   min-width: 0;
@@ -144,24 +305,35 @@
 
   overflow: hidden;
 
-  color: var(--color-text-primary);
+  color:
+    var(--color-text-primary);
 
   font-size: 14px;
 
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  text-overflow:
+    ellipsis;
+
+  white-space:
+    nowrap;
 }
 
 
 .tradeType {
   flex-shrink: 0;
 
-  padding: 3px 7px;
+  padding:
+    3px
+    7px;
 
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
+  border:
+    1px solid
+    var(--color-border);
 
-  background: var(--color-surface-soft);
+  border-radius:
+    999px;
+
+  background:
+    var(--color-surface-soft);
 
   font-size: 11px;
   font-weight: 800;
@@ -169,39 +341,77 @@
 
 
 .buy {
-  color: var(--color-text-primary);
+  color:
+    var(--color-text-primary);
 }
 
 
 .sell {
-  color: var(--color-primary);
+  color:
+    var(--color-primary);
+}
+
+
+.deletedBadge {
+  flex-shrink: 0;
+
+  padding:
+    3px
+    7px;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius:
+    999px;
+
+  background:
+    var(--color-surface-soft);
+
+  color:
+    var(--color-text-secondary);
+
+  font-size: 10px;
+  font-weight: 800;
 }
 
 
 .settlement {
   flex-shrink: 0;
 
-  color: var(--color-text-primary);
+  color:
+    var(--color-text-primary);
 
   font-size: 14px;
+
   text-align: right;
 }
 
 
 .meta {
-  margin: var(--space-1) 0 0;
+  margin:
+    var(--space-1)
+    0
+    0;
 
-  color: var(--color-text-secondary);
+  color:
+    var(--color-text-secondary);
 
   font-size: 12px;
+
   line-height: 1.5;
 }
 
 
 .pnl {
-  margin: var(--space-1) 0 0;
+  margin:
+    var(--space-1)
+    0
+    0;
 
-  color: var(--color-text-primary);
+  color:
+    var(--color-text-primary);
 
   font-size: 12px;
   font-weight: 700;
@@ -209,16 +419,26 @@
 
 
 .memo {
-  margin: var(--space-2) 0 0;
+  margin:
+    var(--space-2)
+    0
+    0;
 
-  padding: 8px 10px;
+  padding:
+    8px
+    10px;
 
-  border-radius: var(--radius-md);
+  border-radius:
+    var(--radius-md);
 
-  background: var(--color-surface-soft);
-  color: var(--color-text-secondary);
+  background:
+    var(--color-surface-soft);
+
+  color:
+    var(--color-text-secondary);
 
   font-size: 12px;
+
   line-height: 1.5;
 }
 
@@ -228,23 +448,30 @@
 
   justify-content: flex-end;
 
-  gap: var(--space-2);
+  gap:
+    var(--space-2);
 
-  margin-top: var(--space-3);
+  margin-top:
+    var(--space-3);
 }
 
 
 .editButton,
 .deleteButton,
+.restoreButton,
 .cancelButton,
 .saveButton {
   min-height: 36px;
 
-  padding: 0 12px;
+  padding:
+    0
+    12px;
 
-  border-radius: var(--radius-md);
+  border-radius:
+    var(--radius-md);
 
   font: inherit;
+
   font-size: 12px;
   font-weight: 800;
 
@@ -254,31 +481,58 @@
 
 .editButton,
 .cancelButton {
-  border: 1px solid var(--color-border);
+  border:
+    1px solid
+    var(--color-border);
 
-  background: var(--color-surface);
-  color: var(--color-text-primary);
+  background:
+    var(--color-surface);
+
+  color:
+    var(--color-text-primary);
 }
 
 
 .deleteButton {
-  border: 1px solid var(--color-border);
+  border:
+    1px solid
+    var(--color-border);
 
-  background: var(--color-surface);
-  color: var(--color-error);
+  background:
+    var(--color-surface);
+
+  color:
+    var(--color-error);
+}
+
+
+.restoreButton {
+  border:
+    1px solid
+    var(--color-border);
+
+  background:
+    var(--color-surface);
+
+  color:
+    var(--color-primary);
 }
 
 
 .saveButton {
   border: 0;
 
-  background: var(--color-primary);
-  color: var(--color-primary-text);
+  background:
+    var(--color-primary);
+
+  color:
+    var(--color-primary-text);
 }
 
 
 .editButton:disabled,
 .deleteButton:disabled,
+.restoreButton:disabled,
 .cancelButton:disabled,
 .saveButton:disabled {
   opacity: 0.5;
@@ -289,18 +543,26 @@
 
 .editPanel {
   display: flex;
+
   flex-direction: column;
 
-  gap: var(--space-3);
+  gap:
+    var(--space-3);
 
-  margin-top: var(--space-3);
+  margin-top:
+    var(--space-3);
 
   padding: 14px;
 
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border:
+    1px solid
+    var(--color-border);
 
-  background: var(--color-surface-soft);
+  border-radius:
+    var(--radius-md);
+
+  background:
+    var(--color-surface-soft);
 }
 
 
@@ -310,23 +572,30 @@
   grid-template-columns:
     repeat(
       2,
-      minmax(0, 1fr)
+      minmax(
+        0,
+        1fr
+      )
     );
 
-  gap: var(--space-3);
+  gap:
+    var(--space-3);
 }
 
 
 .editField {
   display: flex;
+
   flex-direction: column;
 
-  gap: var(--space-2);
+  gap:
+    var(--space-2);
 }
 
 
 .editLabel {
-  color: var(--color-text-primary);
+  color:
+    var(--color-text-primary);
 
   font-size: 12px;
   font-weight: 800;
@@ -336,7 +605,8 @@
 .optional {
   margin-left: 4px;
 
-  color: var(--color-text-secondary);
+  color:
+    var(--color-text-secondary);
 
   font-size: 10px;
   font-weight: 700;
@@ -347,15 +617,24 @@
 .textarea {
   width: 100%;
 
-  box-sizing: border-box;
+  box-sizing:
+    border-box;
 
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border:
+    1px solid
+    var(--color-border);
 
-  background: var(--color-surface);
-  color: var(--color-text-primary);
+  border-radius:
+    var(--radius-md);
+
+  background:
+    var(--color-surface);
+
+  color:
+    var(--color-text-primary);
 
   font: inherit;
+
   font-size: 14px;
 }
 
@@ -363,12 +642,16 @@
 .input {
   min-height: 42px;
 
-  padding: 0 10px;
+  padding:
+    0
+    10px;
 }
 
 
 .textarea {
-  padding: 10px 12px;
+  padding:
+    10px
+    12px;
 
   resize: vertical;
 }
@@ -376,17 +659,23 @@
 
 .input:focus,
 .textarea:focus {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 1px;
+  outline:
+    2px solid
+    var(--color-primary);
+
+  outline-offset:
+    1px;
 }
 
 
 .editHelper {
   margin: 0;
 
-  color: var(--color-text-secondary);
+  color:
+    var(--color-text-secondary);
 
   font-size: 11px;
+
   line-height: 1.5;
 }
 
@@ -397,26 +686,36 @@
   grid-template-columns:
     repeat(
       2,
-      minmax(0, 1fr)
+      minmax(
+        0,
+        1fr
+      )
     );
 
-  gap: var(--space-2);
+  gap:
+    var(--space-2);
 }
 
 
-@media (max-width: 480px) {
+@media (
+  max-width:
+    480px
+) {
   .rowTop {
-    gap: var(--space-2);
+    gap:
+      var(--space-2);
   }
 
 
   .stockName {
-    max-width: 150px;
+    max-width:
+      145px;
   }
 
 
   .settlement {
-    font-size: 13px;
+    font-size:
+      13px;
   }
 
 
