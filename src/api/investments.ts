@@ -116,3 +116,51 @@ export function createInvestmentTrade(
     body: JSON.stringify(payload)
   });
 }
+
+export function updateInvestmentTrade(
+  input: {
+    investmentTradeId: string;
+    date?: string;
+    quantity?: number;
+    unitPrice?: number;
+    currency?: string;
+    fxRate?: number;
+    feeKrw?: number;
+    taxKrw?: number;
+    settlementKrw?: number;
+    memo?: string;
+  }
+) {
+  return apiRequest(
+    "/api/investments/trades/update",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type":
+          "application/json"
+      },
+      body: JSON.stringify(
+        input
+      )
+    }
+  );
+}
+
+
+export function deleteInvestmentTrade(
+  investmentTradeId: string
+) {
+  return apiRequest(
+    "/api/investments/trades/delete",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type":
+          "application/json"
+      },
+      body: JSON.stringify({
+        investmentTradeId
+      })
+    }
+  );
+}
