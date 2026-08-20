@@ -13,30 +13,46 @@ export type InvestmentTradeType =
 
 export interface InvestmentTrade {
   investmentTradeId: string;
+
+  date: string;
+  tradeType: InvestmentTradeType;
+
   accountId: string;
+  accountName: string;
+
   holdingId: string;
 
-  tradeType:
-    InvestmentTradeType;
+  stockCode: string;
+  stockName: string;
 
-  tradeDate: string;
+  market: Market;
 
   quantity: number;
   unitPrice: number;
 
+  currency: string;
+  fxRate: number;
+
+  feeKrw: number;
+  taxKrw: number;
+
   settlementKrw: number;
+  realizedPnlKrw: number;
 
-  realizedPnlKrw?: number;
+  memo: string;
 
-  memo?: string;
+  requestId: string | null;
+
+  createdAt: string | null;
+  updatedAt: string | null;
+
+  isDeleted: boolean;
 }
 
 
 export interface InvestmentTradesResponse {
   total: number;
-
-  items:
-    InvestmentTrade[];
+  items: InvestmentTrade[];
 }
 
 
@@ -65,15 +81,8 @@ export interface CreateInvestmentTradePayload {
   feeKrw?: number;
   taxKrw?: number;
 
-  /*
-   * 증권사에 실제로 표시된
-   * 원화 출금/입금액을 직접 입력한 경우 사용
-   */
   settlementKrw?: number;
 
-  /*
-   * 신규 종목이 수동 시세 방식일 때 사용
-   */
   manualPrice?: number;
 
   memo?: string;
