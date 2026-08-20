@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useEffect,
   useState
 } from "react";
@@ -42,9 +43,7 @@ function formatCurrency(
   }
 
   return (
-    value.toLocaleString(
-      "ko-KR"
-    ) +
+    value.toLocaleString("ko-KR") +
     "원"
   );
 }
@@ -65,10 +64,7 @@ function formatPercent(
   }
 
   return (
-    (
-      value *
-      100
-    ).toFixed(2) +
+    (value * 100).toFixed(2) +
     "%"
   );
 }
@@ -83,110 +79,70 @@ export default function AssetsPage() {
       "cash"
     );
 
-
   const [
     dashboard,
     setDashboard
   ] =
-    useState<
-      DashboardData |
-      null
-    >(
+    useState<DashboardData | null>(
       null
     );
-
 
   const [
     loading,
     setLoading
   ] =
-    useState(
-      true
-    );
-
+    useState(true);
 
   const [
     error,
     setError
   ] =
-    useState(
-      ""
-    );
-
+    useState("");
 
   const [
     selectedAccountId,
     setSelectedAccountId
   ] =
-    useState<
-      string |
-      null
-    >(
+    useState<string | null>(
       null
     );
-
 
   const [
     cashInput,
     setCashInput
   ] =
-    useState(
-      ""
-    );
-
+    useState("");
 
   const [
     cashSaving,
     setCashSaving
   ] =
-    useState(
-      false
-    );
-
+    useState(false);
 
   const [
     cashError,
     setCashError
   ] =
-    useState(
-      ""
-    );
+    useState("");
 
 
-  /**
-   * =========================================================
-   * 대시보드 데이터
-   * =========================================================
-   */
   async function loadDashboard() {
-    setLoading(
-      true
-    );
-
-    setError(
-      ""
-    );
-
+    setLoading(true);
+    setError("");
 
     try {
       const data =
         await getDashboard();
 
-      setDashboard(
-        data
-      );
-    } catch (
-      err
-    ) {
+      setDashboard(data);
+    } catch (err) {
       setError(
         err instanceof Error
           ? err.message
           : "자산 정보를 불러오지 못했습니다."
       );
     } finally {
-      setLoading(
-        false
-      );
+      setLoading(false);
     }
   }
 
@@ -199,35 +155,20 @@ export default function AssetsPage() {
   );
 
 
-  /**
-   * =========================================================
-   * 기본 데이터
-   * =========================================================
-   */
   const summary =
-    dashboard
-      ?.summary;
+    dashboard?.summary;
 
 
-  /**
-   * 현금성 자산
-   */
   const cashLikeAccounts =
-    dashboard
-      ?.accounts
-      .filter(
-        account =>
-          account.accountType ===
-            "자산" &&
-          account.balanceMethod !==
-            "평가입력"
-      ) ||
-    [];
+    dashboard?.accounts.filter(
+      account =>
+        account.accountType ===
+          "자산" &&
+        account.balanceMethod !==
+          "평가입력"
+    ) || [];
 
 
-  /**
-   * 투자계좌
-   */
   const investmentAccounts =
     dashboard
       ?.investments
@@ -235,9 +176,6 @@ export default function AssetsPage() {
     [];
 
 
-  /**
-   * 현재 선택한 투자계좌
-   */
   const selectedAccount =
     investmentAccounts.find(
       account =>
@@ -246,9 +184,6 @@ export default function AssetsPage() {
     );
 
 
-  /**
-   * 선택한 계좌의 보유종목
-   */
   const holdingsForSelected =
     dashboard
       ?.investments
@@ -261,28 +196,14 @@ export default function AssetsPage() {
     [];
 
 
-  /**
-   * =========================================================
-   * 투자계좌 선택 시 예수금 입력값 동기화
-   * =========================================================
-   */
   useEffect(
     () => {
-      setCashError(
-        ""
-      );
-
-
       if (
         !selectedAccount
       ) {
-        setCashInput(
-          ""
-        );
-
+        setCashInput("");
         return;
       }
-
 
       setCashInput(
         selectedAccount
@@ -303,11 +224,6 @@ export default function AssetsPage() {
   );
 
 
-  /**
-   * =========================================================
-   * 예수금 저장
-   * =========================================================
-   */
   async function handleSaveCashBaseline() {
     if (
       !selectedAccountId
@@ -315,19 +231,16 @@ export default function AssetsPage() {
       return;
     }
 
-
     const parsed =
       Number(
         cashInput
       );
 
-
     if (
       !Number.isFinite(
         parsed
       ) ||
-      parsed <
-        0
+      parsed < 0
     ) {
       setCashError(
         "올바른 금액을 입력해주세요."
@@ -336,15 +249,8 @@ export default function AssetsPage() {
       return;
     }
 
-
-    setCashSaving(
-      true
-    );
-
-    setCashError(
-      ""
-    );
-
+    setCashSaving(true);
+    setCashError("");
 
     try {
       await setInvestmentCashBaseline({
@@ -358,34 +264,19 @@ export default function AssetsPage() {
           true
       });
 
-
-      /**
-       * 저장 후
-       * 예수금 / 계좌가치 / 투자합계를
-       * 서버에서 다시 받아옴
-       */
       await loadDashboard();
-    } catch (
-      err
-    ) {
+    } catch (err) {
       setCashError(
         err instanceof Error
           ? err.message
           : "예수금 저장에 실패했습니다."
       );
     } finally {
-      setCashSaving(
-        false
-      );
+      setCashSaving(false);
     }
   }
 
 
-  /**
-   * =========================================================
-   * 화면
-   * =========================================================
-   */
   return (
     <main
       className={
@@ -415,9 +306,6 @@ export default function AssetsPage() {
       </header>
 
 
-      {/* =====================================================
-          순자산 요약
-          ===================================================== */}
       <section
         className={
           styles.summaryCard
@@ -434,115 +322,108 @@ export default function AssetsPage() {
           </p>
         )}
 
-
         {!loading &&
           error && (
-          <p
-            className={
-              styles.error
-            }
-          >
-            {error}
-          </p>
-        )}
-
+            <p
+              className={
+                styles.error
+              }
+            >
+              {error}
+            </p>
+          )}
 
         {!loading &&
           !error &&
           summary && (
-          <div
-            className={
-              styles.summaryGrid
-            }
-          >
             <div
               className={
-                styles.summaryItem
+                styles.summaryGrid
               }
             >
-              <span
+              <div
                 className={
-                  styles.summaryLabel
+                  styles.summaryItem
                 }
               >
-                총자산
-              </span>
+                <span
+                  className={
+                    styles.summaryLabel
+                  }
+                >
+                  총자산
+                </span>
 
-              <strong
+                <strong
+                  className={
+                    styles.summaryValue
+                  }
+                >
+                  {formatCurrency(
+                    summary.assets
+                  )}
+                </strong>
+              </div>
+
+              <div
                 className={
-                  styles.summaryValue
+                  styles.summaryItem
                 }
               >
-                {formatCurrency(
-                  summary.assets
-                )}
-              </strong>
+                <span
+                  className={
+                    styles.summaryLabel
+                  }
+                >
+                  총부채
+                </span>
+
+                <strong
+                  className={
+                    styles.summaryValue
+                  }
+                >
+                  {formatCurrency(
+                    summary.liabilities
+                  )}
+                </strong>
+              </div>
+
+              <div
+                className={
+                  styles.summaryItem
+                }
+              >
+                <span
+                  className={
+                    styles.summaryLabel
+                  }
+                >
+                  순자산
+                </span>
+
+                <strong
+                  className={
+                    styles.summaryValue
+                  }
+                  style={{
+                    color:
+                      summary.netWorth <
+                      0
+                        ? "var(--color-error)"
+                        : undefined
+                  }}
+                >
+                  {formatCurrency(
+                    summary.netWorth
+                  )}
+                </strong>
+              </div>
             </div>
-
-
-            <div
-              className={
-                styles.summaryItem
-              }
-            >
-              <span
-                className={
-                  styles.summaryLabel
-                }
-              >
-                총부채
-              </span>
-
-              <strong
-                className={
-                  styles.summaryValue
-                }
-              >
-                {formatCurrency(
-                  summary.liabilities
-                )}
-              </strong>
-            </div>
-
-
-            <div
-              className={
-                styles.summaryItem
-              }
-            >
-              <span
-                className={
-                  styles.summaryLabel
-                }
-              >
-                순자산
-              </span>
-
-              <strong
-                className={
-                  styles.summaryValue
-                }
-                style={{
-                  color:
-                    summary.netWorth <
-                    0
-                      ? "var(--color-error)"
-                      : undefined
-                }}
-              >
-                {formatCurrency(
-                  summary.netWorth
-                )}
-              </strong>
-            </div>
-          </div>
-        )}
+          )}
       </section>
 
 
-      {/* =====================================================
-          자산 유형 탭
-          ===================================================== */}
       <div
         className={
           styles.tabs
@@ -554,17 +435,13 @@ export default function AssetsPage() {
             styles.tabButton,
 
             activeTab ===
-              "cash"
+            "cash"
               ? styles
                   .tabButtonActive
               : ""
           ]
-            .filter(
-              Boolean
-            )
-            .join(
-              " "
-            )}
+            .filter(Boolean)
+            .join(" ")}
           onClick={
             () =>
               setActiveTab(
@@ -575,24 +452,19 @@ export default function AssetsPage() {
           현금성자산
         </button>
 
-
         <button
           type="button"
           className={[
             styles.tabButton,
 
             activeTab ===
-              "investment"
+            "investment"
               ? styles
                   .tabButtonActive
               : ""
           ]
-            .filter(
-              Boolean
-            )
-            .join(
-              " "
-            )}
+            .filter(Boolean)
+            .join(" ")}
           onClick={
             () =>
               setActiveTab(
@@ -605,9 +477,6 @@ export default function AssetsPage() {
       </div>
 
 
-      {/* =====================================================
-          현금성자산
-          ===================================================== */}
       {activeTab ===
         "cash" && (
         <section
@@ -623,34 +492,33 @@ export default function AssetsPage() {
             현금성자산
           </h2>
 
-
           {!loading &&
             summary && (
-            <div
-              className={
-                styles.cashSummary
-              }
-            >
-              <span
+              <div
                 className={
-                  styles.summaryLabel
+                  styles.cashSummary
                 }
               >
-                현금성자산 합계
-              </span>
+                <span
+                  className={
+                    styles.summaryLabel
+                  }
+                >
+                  현금성자산 합계
+                </span>
 
-              <strong
-                className={
-                  styles.summaryValue
-                }
-              >
-                {formatCurrency(
-                  summary.cashLikeValue
-                )}
-              </strong>
-            </div>
-          )}
-
+                <strong
+                  className={
+                    styles.summaryValue
+                  }
+                >
+                  {formatCurrency(
+                    summary
+                      .cashLikeValue
+                  )}
+                </strong>
+              </div>
+            )}
 
           {loading && (
             <p
@@ -662,88 +530,87 @@ export default function AssetsPage() {
             </p>
           )}
 
-
           {!loading &&
             cashLikeAccounts
               .length ===
               0 && (
-            <p
-              className={
-                styles.emptyState
-              }
-            >
-              표시할 현금성 계좌가
-              없습니다.
-            </p>
-          )}
-
+              <p
+                className={
+                  styles.emptyState
+                }
+              >
+                표시할 현금성 계좌가
+                없습니다.
+              </p>
+            )}
 
           {!loading &&
             cashLikeAccounts
               .length >
               0 && (
-            <ul
-              className={
-                styles.holdingsList
-              }
-            >
-              {cashLikeAccounts.map(
-                account => (
-                  <li
-                    key={
-                      account.accountId
-                    }
-                    className={
-                      styles.holdingRow
-                    }
-                  >
-                    <div
+              <ul
+                className={
+                  styles.holdingsList
+                }
+              >
+                {cashLikeAccounts.map(
+                  account => (
+                    <li
+                      key={
+                        account
+                          .accountId
+                      }
                       className={
-                        styles.holdingInfo
+                        styles.holdingRow
                       }
                     >
-                      <span
+                      <div
                         className={
-                          styles.holdingName
+                          styles.holdingInfo
                         }
                       >
-                        {
-                          account.displayName
-                        }
-                      </span>
+                        <span
+                          className={
+                            styles.holdingName
+                          }
+                        >
+                          {
+                            account
+                              .displayName
+                          }
+                        </span>
 
-                      <span
+                        <span
+                          className={
+                            styles.holdingMeta
+                          }
+                        >
+                          {
+                            account
+                              .subType
+                          }
+                        </span>
+                      </div>
+
+                      <strong
                         className={
-                          styles.holdingMeta
+                          styles.holdingValue
                         }
                       >
-                        {
-                          account.subType
-                        }
-                      </span>
-                    </div>
-
-                    <strong
-                      className={
-                        styles.holdingValue
-                      }
-                    >
-                      {formatCurrency(
-                        account.currentBalance
-                      )}
-                    </strong>
-                  </li>
-                )
-              )}
-            </ul>
-          )}
+                        {formatCurrency(
+                          account
+                            .currentBalance
+                        )}
+                      </strong>
+                    </li>
+                  )
+                )}
+              </ul>
+            )}
         </section>
       )}
 
 
-      {/* =====================================================
-          투자자산
-          ===================================================== */}
       {activeTab ===
         "investment" && (
         <section
@@ -759,34 +626,33 @@ export default function AssetsPage() {
             투자자산
           </h2>
 
-
           {!loading &&
             summary && (
-            <div
-              className={
-                styles.cashSummary
-              }
-            >
-              <span
+              <div
                 className={
-                  styles.summaryLabel
+                  styles.cashSummary
                 }
               >
-                투자자산 합계
-              </span>
+                <span
+                  className={
+                    styles.summaryLabel
+                  }
+                >
+                  투자자산 합계
+                </span>
 
-              <strong
-                className={
-                  styles.summaryValue
-                }
-              >
-                {formatCurrency(
-                  summary.investmentValue
-                )}
-              </strong>
-            </div>
-          )}
-
+                <strong
+                  className={
+                    styles.summaryValue
+                  }
+                >
+                  {formatCurrency(
+                    summary
+                      .investmentValue
+                  )}
+                </strong>
+              </div>
+            )}
 
           {loading && (
             <p
@@ -794,312 +660,85 @@ export default function AssetsPage() {
                 styles.loading
               }
             >
-              투자계좌를
-              불러오는 중입니다.
+              투자계좌를 불러오는
+              중입니다.
             </p>
           )}
-
 
           {!loading &&
             investmentAccounts
               .length ===
               0 && (
-            <p
-              className={
-                styles.emptyState
-              }
-            >
-              등록된 투자계좌가
-              없습니다.
-            </p>
-          )}
+              <p
+                className={
+                  styles.emptyState
+                }
+              >
+                등록된 투자계좌가
+                없습니다.
+              </p>
+            )}
 
 
-          {/* =================================================
-              투자계좌 목록
-              ================================================= */}
           {!loading &&
             investmentAccounts
               .length >
               0 && (
-            <div
-              className={
-                styles.accountList
-              }
-            >
-              {investmentAccounts.map(
-                account => (
-                  <button
-                    type="button"
-                    key={
-                      account.accountId
-                    }
-                    className={[
-                      styles.accountCard,
-
+              <div
+                className={
+                  styles.accountList
+                }
+              >
+                {investmentAccounts.map(
+                  account => {
+                    const isSelected =
                       selectedAccountId ===
-                        account.accountId
-                        ? styles
-                            .accountCardActive
-                        : ""
-                    ]
-                      .filter(
-                        Boolean
-                      )
-                      .join(
-                        " "
-                      )}
-                    onClick={
-                      () =>
-                        setSelectedAccountId(
-                          selectedAccountId ===
-                            account.accountId
-                            ? null
-                            : account.accountId
-                        )
-                    }
-                  >
-                    <span
-                      className={
-                        styles.accountName
-                      }
-                    >
-                      {
-                        account.accountName
-                      }
-                    </span>
+                      account.accountId;
 
-                    <span
-                      className={
-                        styles.holdingMeta
-                      }
-                    >
-                      {formatCurrency(
-                        account.accountValueKrw
-                      )}
-
-                      {!account
-                        .cashBaselineConfigured &&
-                        " · 예수금 미설정"}
-                    </span>
-                  </button>
-                )
-              )}
-            </div>
-          )}
-
-
-          {/* =================================================
-              선택한 투자계좌 상세
-              ================================================= */}
-          {selectedAccount && (
-            <div
-              className={
-                styles.detailCard
-              }
-            >
-              <h3
-                className={
-                  styles.detailTitle
-                }
-              >
-                {
-                  selectedAccount
-                    .accountName
-                }
-              </h3>
-
-
-              {/* 보유종목 평가액 */}
-              <div
-                className={
-                  styles.holdingsTotal
-                }
-              >
-                <span
-                  className={
-                    styles.summaryLabel
-                  }
-                >
-                  보유종목 평가액
-                </span>
-
-                <strong
-                  className={
-                    styles.summaryValue
-                  }
-                >
-                  {formatCurrency(
-                    selectedAccount
-                      .holdingValueKrw
-                  )}
-                </strong>
-              </div>
-
-
-              {/* 실현손익 */}
-              <div
-                className={
-                  styles.holdingsTotal
-                }
-              >
-                <span
-                  className={
-                    styles.summaryLabel
-                  }
-                >
-                  실현손익
-                </span>
-
-                <strong
-                  className={
-                    styles.summaryValue
-                  }
-                  style={{
-                    color:
-                      selectedAccount
-                        .realizedPnlKrw <
-                      0
-                        ? "var(--color-error)"
-                        : undefined
-                  }}
-                >
-                  {formatCurrency(
-                    selectedAccount
-                      .realizedPnlKrw
-                  )}
-                </strong>
-              </div>
-
-
-              {/* =================================================
-                  예수금
-                  ================================================= */}
-              <div
-                className={
-                  styles.cashForm
-                }
-              >
-                <span
-                  className={
-                    styles.summaryLabel
-                  }
-                >
-                  현재 예수금
-                </span>
-
-                <input
-                  className={
-                    styles.cashInput
-                  }
-                  type="number"
-                  inputMode="numeric"
-                  value={
-                    cashInput
-                  }
-                  onChange={
-                    event =>
-                      setCashInput(
-                        event.target
-                          .value
-                      )
-                  }
-                  placeholder="예: 327500"
-                />
-
-                <button
-                  type="button"
-                  className={
-                    styles.cashButton
-                  }
-                  onClick={
-                    handleSaveCashBaseline
-                  }
-                  disabled={
-                    cashSaving
-                  }
-                >
-                  {cashSaving
-                    ? "저장 중..."
-                    : "저장"}
-                </button>
-              </div>
-
-
-              {cashError && (
-                <p
-                  className={
-                    styles.error
-                  }
-                >
-                  {cashError}
-                </p>
-              )}
-
-
-              {!selectedAccount
-                .cashBaselineConfigured && (
-                <p
-                  className={
-                    styles.helperText
-                  }
-                >
-                  아직 예수금 기준값이
-                  설정되지 않았습니다.
-                  증권사 앱에서 현재
-                  예수금을 확인해 한 번만
-                  입력해주세요.
-                </p>
-              )}
-
-
-              {/* =================================================
-                  보유종목
-                  ================================================= */}
-              {holdingsForSelected
-                .length ===
-                0 && (
-                <p
-                  className={
-                    styles.emptyState
-                  }
-                >
-                  보유 중인 종목이
-                  없습니다.
-                </p>
-              )}
-
-
-              {holdingsForSelected
-                .length >
-                0 && (
-                <ul
-                  className={
-                    styles.holdingsList
-                  }
-                >
-                  {holdingsForSelected.map(
-                    holding => (
-                      <li
+                    return (
+                      <Fragment
                         key={
-                          holding.holdingId
-                        }
-                        className={
-                          styles.holdingRow
+                          account.accountId
                         }
                       >
-                        <div
-                          className={
-                            styles.holdingInfo
+                        <button
+                          type="button"
+                          className={[
+                            styles.accountCard,
+
+                            isSelected
+                              ? styles
+                                  .accountCardActive
+                              : ""
+                          ]
+                            .filter(
+                              Boolean
+                            )
+                            .join(
+                              " "
+                            )}
+                          onClick={
+                            () => {
+                              setCashError(
+                                ""
+                              );
+
+                              setSelectedAccountId(
+                                isSelected
+                                  ? null
+                                  : account.accountId
+                              );
+                            }
                           }
                         >
                           <span
                             className={
-                              styles.holdingName
+                              styles.accountName
                             }
                           >
                             {
-                              holding.stockName
+                              account
+                                .accountName
                             }
                           </span>
 
@@ -1108,61 +747,287 @@ export default function AssetsPage() {
                               styles.holdingMeta
                             }
                           >
-                            {
-                              holding.quantity
-                            }
-                            주
-                            {" · "}
-                            {formatPercent(
-                              holding.returnRate
+                            {formatCurrency(
+                              account
+                                .accountValueKrw
                             )}
+
+                            {!account
+                              .cashBaselineConfigured &&
+                              " · 예수금 미설정"}
                           </span>
-                        </div>
+                        </button>
 
 
-                        <strong
-                          className={
-                            styles.holdingValue
-                          }
-                          style={{
-                            color:
-                              holding.returnRate <
-                              0
-                                ? "var(--color-error)"
-                                : undefined
-                          }}
-                        >
-                          {formatCurrency(
-                            holding.valueKrw
+                        {isSelected &&
+                          selectedAccount && (
+                            <div
+                              className={
+                                styles.detailCard
+                              }
+                            >
+                              <h3
+                                className={
+                                  styles.detailTitle
+                                }
+                              >
+                                {
+                                  selectedAccount
+                                    .accountName
+                                }
+                              </h3>
+
+
+                              <div
+                                className={
+                                  styles.holdingsTotal
+                                }
+                              >
+                                <span
+                                  className={
+                                    styles.summaryLabel
+                                  }
+                                >
+                                  보유종목 평가액
+                                </span>
+
+                                <strong
+                                  className={
+                                    styles.summaryValue
+                                  }
+                                >
+                                  {formatCurrency(
+                                    selectedAccount
+                                      .holdingValueKrw
+                                  )}
+                                </strong>
+                              </div>
+
+
+                              <div
+                                className={
+                                  styles.holdingsTotal
+                                }
+                              >
+                                <span
+                                  className={
+                                    styles.summaryLabel
+                                  }
+                                >
+                                  실현손익
+                                </span>
+
+                                <strong
+                                  className={
+                                    styles.summaryValue
+                                  }
+                                  style={{
+                                    color:
+                                      selectedAccount
+                                        .realizedPnlKrw <
+                                      0
+                                        ? "var(--color-error)"
+                                        : undefined
+                                  }}
+                                >
+                                  {formatCurrency(
+                                    selectedAccount
+                                      .realizedPnlKrw
+                                  )}
+                                </strong>
+                              </div>
+
+
+                              <div
+                                className={
+                                  styles.cashForm
+                                }
+                              >
+                                <span
+                                  className={
+                                    styles.summaryLabel
+                                  }
+                                >
+                                  현재 예수금
+                                </span>
+
+                                <input
+                                  className={
+                                    styles.cashInput
+                                  }
+                                  type="number"
+                                  inputMode="numeric"
+                                  value={
+                                    cashInput
+                                  }
+                                  onChange={
+                                    event =>
+                                      setCashInput(
+                                        event
+                                          .target
+                                          .value
+                                      )
+                                  }
+                                  placeholder="예: 327500"
+                                />
+
+                                <button
+                                  type="button"
+                                  className={
+                                    styles.cashButton
+                                  }
+                                  onClick={
+                                    handleSaveCashBaseline
+                                  }
+                                  disabled={
+                                    cashSaving
+                                  }
+                                >
+                                  {cashSaving
+                                    ? "저장 중..."
+                                    : "저장"}
+                                </button>
+                              </div>
+
+
+                              {cashError && (
+                                <p
+                                  className={
+                                    styles.error
+                                  }
+                                >
+                                  {cashError}
+                                </p>
+                              )}
+
+
+                              {!selectedAccount
+                                .cashBaselineConfigured && (
+                                <p
+                                  className={
+                                    styles.helperText
+                                  }
+                                >
+                                  아직 예수금
+                                  기준값이 설정되지
+                                  않았습니다.
+                                  증권사 앱에서 현재
+                                  예수금을 확인해 한
+                                  번만 입력해주세요.
+                                </p>
+                              )}
+
+
+                              {holdingsForSelected
+                                .length ===
+                                0 && (
+                                <p
+                                  className={
+                                    styles.emptyState
+                                  }
+                                >
+                                  보유 중인 종목이
+                                  없습니다.
+                                </p>
+                              )}
+
+
+                              {holdingsForSelected
+                                .length >
+                                0 && (
+                                <ul
+                                  className={
+                                    styles.holdingsList
+                                  }
+                                >
+                                  {holdingsForSelected.map(
+                                    holding => (
+                                      <li
+                                        key={
+                                          holding
+                                            .holdingId
+                                        }
+                                        className={
+                                          styles.holdingRow
+                                        }
+                                      >
+                                        <div
+                                          className={
+                                            styles.holdingInfo
+                                          }
+                                        >
+                                          <span
+                                            className={
+                                              styles.holdingName
+                                            }
+                                          >
+                                            {
+                                              holding
+                                                .stockName
+                                            }
+                                          </span>
+
+                                          <span
+                                            className={
+                                              styles.holdingMeta
+                                            }
+                                          >
+                                            {
+                                              holding
+                                                .quantity
+                                            }
+                                            주 ·{" "}
+                                            {formatPercent(
+                                              holding
+                                                .returnRate
+                                            )}
+                                          </span>
+                                        </div>
+
+                                        <strong
+                                          className={
+                                            styles.holdingValue
+                                          }
+                                          style={{
+                                            color:
+                                              holding
+                                                .returnRate <
+                                              0
+                                                ? "var(--color-error)"
+                                                : undefined
+                                          }}
+                                        >
+                                          {formatCurrency(
+                                            holding
+                                              .valueKrw
+                                          )}
+                                        </strong>
+                                      </li>
+                                    )
+                                  )}
+                                </ul>
+                              )}
+
+
+                              <InvestmentTradeForm
+                                account={
+                                  selectedAccount
+                                }
+                                holdings={
+                                  holdingsForSelected
+                                }
+                                onSaved={
+                                  loadDashboard
+                                }
+                              />
+                            </div>
                           )}
-                        </strong>
-                      </li>
-                    )
-                  )}
-                </ul>
-              )}
-
-
-              {/* =================================================
-                  매수 / 매도 입력
-                  ================================================= */}
-              <InvestmentTradeForm
-                key={
-                  selectedAccount
-                    .accountId
-                }
-                account={
-                  selectedAccount
-                }
-                holdings={
-                  holdingsForSelected
-                }
-                onSaved={
-                  loadDashboard
-                }
-              />
-            </div>
-          )}
+                      </Fragment>
+                    );
+                  }
+                )}
+              </div>
+            )}
         </section>
       )}
     </main>
