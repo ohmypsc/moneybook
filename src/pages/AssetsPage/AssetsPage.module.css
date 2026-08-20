@@ -5,21 +5,33 @@
   min-height: 100vh;
 
   margin: 0 auto;
-  padding: 24px 18px 110px;
+
+  padding:
+    24px
+    18px
+    110px;
 }
+
 
 .header {
-  margin-bottom: var(--space-6);
+  margin-bottom:
+    var(--space-6);
 }
 
-.eyebrow {
-  margin: 0 0 var(--space-1);
 
-  color: var(--color-text-secondary);
+.eyebrow {
+  margin:
+    0
+    0
+    var(--space-1);
+
+  color:
+    var(--color-text-secondary);
 
   font-size: 13px;
   font-weight: 700;
 }
+
 
 .title {
   margin: 0;
@@ -28,24 +40,44 @@
   line-height: 1.3;
 }
 
+
 .summaryCard {
   padding: 20px;
-  margin-bottom: var(--space-5);
 
-  background: var(--color-surface);
+  margin-bottom:
+    var(--space-5);
 
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  background:
+    var(--color-surface);
 
-  box-shadow: var(--shadow-card);
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius:
+    var(--radius-lg);
+
+  box-shadow:
+    var(--shadow-card);
 }
+
 
 .summaryGrid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
 
-  gap: var(--space-3);
+  grid-template-columns:
+    repeat(
+      3,
+      minmax(
+        0,
+        1fr
+      )
+    );
+
+  gap:
+    var(--space-3);
 }
+
 
 .summaryItem {
   display: grid;
@@ -53,64 +85,123 @@
   gap: 4px;
 }
 
+
 .summaryLabel {
-  color: var(--color-text-secondary);
+  color:
+    var(--color-text-secondary);
 
   font-size: 13px;
   font-weight: 600;
 }
+
 
 .summaryValue {
   font-size: 17px;
   font-weight: 800;
 }
 
+
 .tabs {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+
+  grid-template-columns:
+    repeat(
+      2,
+      minmax(
+        0,
+        1fr
+      )
+    );
 
   gap: 4px;
 
-  margin-bottom: var(--space-5);
+  margin-bottom:
+    var(--space-5);
+
   padding: 4px;
 
-  background: var(--color-surface-soft);
+  background:
+    var(--color-surface-soft);
 
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius:
+    var(--radius-md);
 }
+
 
 .tabButton {
   min-height: 42px;
 
   border: 0;
-  border-radius: var(--radius-sm);
 
-  background: transparent;
-  color: var(--color-text-secondary);
+  border-radius:
+    var(--radius-sm);
 
-  font-weight: 700;
+  background:
+    transparent;
+
+  color:
+    var(--color-text-secondary);
+
+  font: inherit;
+
   font-size: 14px;
+  font-weight: 700;
 
   cursor: pointer;
 }
 
-.tabButtonActive {
-  background: var(--color-surface);
-  color: var(--color-primary);
 
-  box-shadow: var(--shadow-card);
+.tabButtonActive {
+  background:
+    var(--color-surface);
+
+  color:
+    var(--color-primary);
+
+  box-shadow:
+    var(--shadow-card);
 }
+
 
 .section {
-  margin-bottom: var(--space-6);
+  margin-bottom:
+    var(--space-6);
 }
 
+
+.sectionHeading {
+  display: flex;
+
+  align-items: center;
+  justify-content: space-between;
+
+  gap:
+    var(--space-3);
+
+  margin-bottom:
+    var(--space-3);
+}
+
+
 .sectionTitle {
-  margin: 0 0 var(--space-3);
+  margin: 0;
 
   font-size: 18px;
 }
+
+
+.sectionCount {
+  color:
+    var(--color-text-secondary);
+
+  font-size: 12px;
+  font-weight: 700;
+}
+
 
 .cashSummary {
   display: flex;
@@ -119,160 +210,1010 @@
   justify-content: space-between;
 
   padding: 16px;
-  margin-bottom: var(--space-4);
 
-  background: var(--color-surface);
+  margin-bottom:
+    var(--space-4);
 
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  background:
+    var(--color-surface);
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius:
+    var(--radius-md);
 }
+
+
+/*
+ * 현금성자산
+ */
+
+.cashAccountList {
+  display: grid;
+
+  gap:
+    var(--space-2);
+
+  margin: 0;
+  padding: 0;
+
+  list-style: none;
+}
+
+
+.cashAccountRow {
+  display: flex;
+
+  align-items: center;
+  justify-content: space-between;
+
+  gap:
+    var(--space-3);
+
+  padding:
+    13px
+    14px;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius:
+    var(--radius-md);
+
+  background:
+    var(--color-surface);
+}
+
+
+.cashAccountInfo {
+  display: grid;
+
+  min-width: 0;
+
+  gap: 3px;
+}
+
+
+.cashAccountName {
+  overflow: hidden;
+
+  font-size: 14px;
+
+  text-overflow:
+    ellipsis;
+
+  white-space:
+    nowrap;
+}
+
+
+.cashAccountMeta {
+  color:
+    var(--color-text-secondary);
+
+  font-size: 12px;
+}
+
+
+.cashAccountValue {
+  flex-shrink: 0;
+
+  font-size: 14px;
+}
+
+
+/*
+ * 투자 전체 요약
+ */
+
+.investmentSummary {
+  display: grid;
+
+  gap:
+    var(--space-3);
+
+  padding: 17px;
+
+  margin-bottom:
+    var(--space-4);
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius:
+    var(--radius-md);
+
+  background:
+    var(--color-surface);
+}
+
+
+.investmentSummaryValue {
+  display: block;
+
+  margin-top: 4px;
+
+  font-size: 20px;
+  font-weight: 800;
+}
+
+
+.investmentSummarySub {
+  display: flex;
+
+  flex-wrap: wrap;
+
+  gap:
+    8px
+    16px;
+
+  color:
+    var(--color-text-secondary);
+
+  font-size: 12px;
+}
+
+
+.investmentSummarySub strong {
+  color:
+    var(--color-text-primary);
+
+  font-weight: 800;
+}
+
+
+/*
+ * 투자계좌 목록
+ */
 
 .accountList {
   display: grid;
 
-  gap: var(--space-2);
+  gap:
+    var(--space-2);
 
-  margin-bottom: var(--space-4);
+  margin-bottom:
+    var(--space-4);
 }
 
+
 .accountCard {
-  padding: 14px 16px;
+  display: grid;
+
+  width: 100%;
+
+  gap:
+    var(--space-3);
+
+  padding:
+    15px
+    16px;
 
   text-align: left;
 
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border:
+    1px solid
+    var(--color-border);
 
-  background: var(--color-surface);
+  border-radius:
+    var(--radius-md);
+
+  background:
+    var(--color-surface);
+
+  color:
+    var(--color-text-primary);
+
+  font: inherit;
 
   cursor: pointer;
+
+  -webkit-tap-highlight-color:
+    transparent;
 }
+
+
+.accountCard:active {
+  transform:
+    scale(
+      0.995
+    );
+}
+
 
 .accountCardActive {
-  border-color: var(--color-primary);
+  border-color:
+    var(--color-primary);
 }
 
-.accountName {
-  font-weight: 700;
+
+.accountCardTop {
+  display: flex;
+
+  align-items: flex-start;
+  justify-content: space-between;
+
+  gap:
+    var(--space-3);
 }
+
+
+.accountIdentity {
+  display: grid;
+
+  min-width: 0;
+
+  gap: 3px;
+}
+
+
+.accountName {
+  overflow: hidden;
+
+  font-size: 15px;
+  font-weight: 800;
+
+  text-overflow:
+    ellipsis;
+
+  white-space:
+    nowrap;
+}
+
+
+.accountSub {
+  color:
+    var(--color-text-secondary);
+
+  font-size: 12px;
+}
+
+
+.accountTotal {
+  display: grid;
+
+  flex-shrink: 0;
+
+  gap: 2px;
+
+  text-align: right;
+}
+
+
+.accountTotal strong {
+  font-size: 15px;
+}
+
+
+.accountTotal span {
+  color:
+    var(--color-text-secondary);
+
+  font-size: 10px;
+}
+
+
+.accountMetrics {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      2,
+      minmax(
+        0,
+        1fr
+      )
+    );
+
+  gap:
+    var(--space-2);
+
+  padding-top:
+    var(--space-2);
+
+  border-top:
+    1px solid
+    var(--color-border);
+}
+
+
+.accountMetric {
+  display: flex;
+
+  align-items: center;
+  justify-content: space-between;
+
+  min-width: 0;
+
+  gap: 8px;
+
+  color:
+    var(--color-text-secondary);
+
+  font-size: 11px;
+}
+
+
+.accountMetric strong {
+  overflow: hidden;
+
+  color:
+    var(--color-text-primary);
+
+  font-size: 12px;
+
+  text-overflow:
+    ellipsis;
+
+  white-space:
+    nowrap;
+}
+
+
+/*
+ * 선택된 투자계좌 상세
+ */
 
 .detailCard {
   padding: 18px;
 
-  background: var(--color-surface);
+  background:
+    var(--color-surface);
 
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  border:
+    1px solid
+    var(--color-border);
 
-  box-shadow: var(--shadow-card);
+  border-radius:
+    var(--radius-lg);
+
+  box-shadow:
+    var(--shadow-card);
 }
 
+
+.detailHeader {
+  display: flex;
+
+  align-items: flex-start;
+  justify-content: space-between;
+
+  gap:
+    var(--space-3);
+
+  margin-bottom:
+    var(--space-4);
+}
+
+
+.detailEyebrow {
+  display: block;
+
+  margin-bottom: 3px;
+
+  color:
+    var(--color-text-secondary);
+
+  font-size: 11px;
+  font-weight: 700;
+}
+
+
 .detailTitle {
-  margin: 0 0 var(--space-4);
+  margin: 0;
 
   font-size: 17px;
 }
 
-.cashForm {
+
+.detailTotal {
+  flex-shrink: 0;
+
+  font-size: 16px;
+}
+
+
+.detailMetrics {
   display: grid;
-  grid-template-columns: 1fr auto;
 
-  gap: var(--space-2);
+  grid-template-columns:
+    repeat(
+      3,
+      minmax(
+        0,
+        1fr
+      )
+    );
 
-  align-items: center;
+  gap:
+    var(--space-2);
 
-  margin-bottom: var(--space-2);
+  margin-bottom:
+    var(--space-4);
 }
 
-.cashInput {
-  min-height: 44px;
 
-  padding: 0 12px;
+.detailMetric {
+  display: grid;
 
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  gap: 4px;
 
-  background: var(--color-surface);
+  padding:
+    11px
+    10px;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius:
+    var(--radius-md);
+
+  background:
+    var(--color-surface-soft);
 }
 
-.cashButton {
-  min-height: 44px;
-  padding: 0 16px;
 
-  border: 0;
-  border-radius: var(--radius-md);
+.detailMetric span {
+  color:
+    var(--color-text-secondary);
 
-  background: var(--color-primary);
-  color: var(--color-primary-text);
-
+  font-size: 10px;
   font-weight: 700;
 }
 
-.cashButton:disabled {
-  opacity: 0.55;
+
+.detailMetric strong {
+  overflow: hidden;
+
+  font-size: 12px;
+
+  text-overflow:
+    ellipsis;
+
+  white-space:
+    nowrap;
 }
 
-.holdingsTotal {
-  display: flex;
 
-  align-items: center;
-  justify-content: space-between;
+/*
+ * 예수금
+ */
 
-  margin: var(--space-4) 0 var(--space-3);
-}
-
-.holdingsList {
+.cashSetupCard {
   display: grid;
 
-  gap: var(--space-2);
+  gap:
+    var(--space-3);
 
-  list-style: none;
-  margin: 0;
-  padding: 0;
+  margin-bottom:
+    var(--space-4);
+
+  padding: 14px;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius:
+    var(--radius-md);
+
+  background:
+    var(--color-surface-soft);
 }
 
-.holdingRow {
-  display: flex;
 
-  align-items: center;
-  justify-content: space-between;
-
-  padding: 12px;
-
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-}
-
-.holdingInfo {
+.cashSetupHeading {
   display: grid;
 
-  gap: 2px;
+  gap: 3px;
 }
 
-.holdingName {
-  font-weight: 700;
-}
 
-.holdingMeta {
-  color: var(--color-text-secondary);
-
+.cashSetupHeading strong {
   font-size: 13px;
 }
 
-.holdingValue {
+
+.cashSetupHeading span {
+  color:
+    var(--color-text-secondary);
+
+  font-size: 11px;
+
+  line-height: 1.5;
+}
+
+
+.cashForm {
+  display: grid;
+
+  grid-template-columns:
+    minmax(
+      0,
+      1fr
+    )
+    auto;
+
+  gap:
+    var(--space-2);
+
+  align-items: center;
+}
+
+
+.cashInput {
+  width: 100%;
+
+  min-height: 44px;
+
+  box-sizing:
+    border-box;
+
+  padding:
+    0
+    12px;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius:
+    var(--radius-md);
+
+  background:
+    var(--color-surface);
+
+  color:
+    var(--color-text-primary);
+
+  font: inherit;
+}
+
+
+.cashInput:focus {
+  outline:
+    2px solid
+    var(--color-primary);
+
+  outline-offset:
+    1px;
+}
+
+
+.cashButton {
+  min-height: 44px;
+
+  padding:
+    0
+    16px;
+
+  border: 0;
+
+  border-radius:
+    var(--radius-md);
+
+  background:
+    var(--color-primary);
+
+  color:
+    var(--color-primary-text);
+
+  font: inherit;
+
+  font-size: 13px;
+  font-weight: 800;
+
+  cursor: pointer;
+}
+
+
+.cashButton:disabled {
+  opacity: 0.55;
+
+  cursor:
+    not-allowed;
+}
+
+
+.baselineDetails {
+  margin-bottom:
+    var(--space-4);
+
+  border-top:
+    1px solid
+    var(--color-border);
+
+  border-bottom:
+    1px solid
+    var(--color-border);
+}
+
+
+.baselineSummary {
+  padding:
+    12px
+    0;
+
+  color:
+    var(--color-text-secondary);
+
+  font-size: 12px;
+  font-weight: 700;
+
+  cursor: pointer;
+}
+
+
+.baselineBody {
+  padding-bottom:
+    14px;
+}
+
+
+/*
+ * 보유종목
+ */
+
+.holdingsHeader {
+  display: flex;
+
+  align-items: center;
+  justify-content: space-between;
+
+  gap:
+    var(--space-3);
+
+  margin:
+    var(--space-5)
+    0
+    var(--space-3);
+}
+
+
+.holdingsTitle {
+  margin: 0;
+
+  font-size: 15px;
+}
+
+
+.holdingsCount {
+  color:
+    var(--color-text-secondary);
+
+  font-size: 11px;
   font-weight: 700;
 }
+
+
+.investmentHoldingList {
+  display: grid;
+
+  gap:
+    var(--space-2);
+
+  margin: 0;
+  padding: 0;
+
+  list-style: none;
+}
+
+
+.investmentHoldingRow {
+  display: grid;
+
+  gap:
+    var(--space-3);
+
+  padding: 13px;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius:
+    var(--radius-md);
+}
+
+
+.investmentHoldingTop {
+  display: flex;
+
+  align-items: flex-start;
+  justify-content: space-between;
+
+  gap:
+    var(--space-3);
+}
+
+
+.investmentHoldingIdentity {
+  display: grid;
+
+  min-width: 0;
+
+  gap: 4px;
+}
+
+
+.stockNameRow {
+  display: flex;
+
+  align-items: center;
+
+  min-width: 0;
+
+  gap: 6px;
+}
+
+
+.holdingName {
+  min-width: 0;
+
+  overflow: hidden;
+
+  font-size: 14px;
+  font-weight: 800;
+
+  text-overflow:
+    ellipsis;
+
+  white-space:
+    nowrap;
+}
+
+
+.manualBadge {
+  flex-shrink: 0;
+
+  padding:
+    2px
+    6px;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius:
+    999px;
+
+  background:
+    var(--color-surface-soft);
+
+  color:
+    var(--color-text-secondary);
+
+  font-size: 9px;
+  font-weight: 800;
+}
+
+
+.holdingMeta {
+  color:
+    var(--color-text-secondary);
+
+  font-size: 11px;
+
+  line-height: 1.4;
+}
+
+
+.holdingResult {
+  display: grid;
+
+  flex-shrink: 0;
+
+  gap: 3px;
+
+  text-align: right;
+}
+
+
+.holdingValue {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+
+.holdingReturn {
+  font-size: 11px;
+  font-weight: 800;
+}
+
+
+.holdingDetails {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      3,
+      minmax(
+        0,
+        1fr
+      )
+    );
+
+  gap:
+    var(--space-2);
+
+  padding-top:
+    var(--space-2);
+
+  border-top:
+    1px solid
+    var(--color-border);
+}
+
+
+.holdingDetailItem {
+  display: grid;
+
+  min-width: 0;
+
+  gap: 3px;
+}
+
+
+.holdingDetailItem span {
+  color:
+    var(--color-text-secondary);
+
+  font-size: 9px;
+  font-weight: 700;
+}
+
+
+.holdingDetailItem strong {
+  overflow: hidden;
+
+  font-size: 11px;
+
+  text-overflow:
+    ellipsis;
+
+  white-space:
+    nowrap;
+}
+
+
+.fxMeta {
+  margin: 0;
+
+  color:
+    var(--color-text-secondary);
+
+  font-size: 10px;
+}
+
+
+/*
+ * 상태 문구
+ */
 
 .loading,
 .emptyState,
 .helperText {
-  color: var(--color-text-secondary);
+  color:
+    var(--color-text-secondary);
 
-  font-size: 14px;
+  font-size: 13px;
+
+  line-height: 1.5;
 }
 
-.error {
-  color: var(--color-error);
 
-  font-size: 14px;
+.helperText {
+  margin:
+    0
+    0
+    var(--space-3);
+}
+
+
+.error {
+  margin:
+    var(--space-2)
+    0;
+
+  color:
+    var(--color-error);
+
+  font-size: 13px;
+
+  line-height: 1.5;
+}
+
+
+@media (
+  max-width:
+    480px
+) {
+  .page {
+    padding:
+      20px
+      14px
+      105px;
+  }
+
+
+  .summaryCard {
+    padding: 16px;
+  }
+
+
+  .summaryGrid {
+    gap:
+      var(--space-2);
+  }
+
+
+  .summaryValue {
+    font-size: 15px;
+  }
+
+
+  .accountCard {
+    padding:
+      14px;
+  }
+
+
+  .accountMetrics {
+    grid-template-columns:
+      1fr;
+  }
+
+
+  .detailCard {
+    padding:
+      15px;
+  }
+
+
+  .detailMetrics {
+    gap: 6px;
+  }
+
+
+  .detailMetric {
+    padding:
+      10px
+      7px;
+  }
+
+
+  .detailMetric strong {
+    font-size: 11px;
+  }
+
+
+  .investmentHoldingTop {
+    gap:
+      var(--space-2);
+  }
+
+
+  .holdingName {
+    max-width: 170px;
+  }
+
+
+  .holdingDetails {
+    gap: 6px;
+  }
+
+
+  .cashForm {
+    grid-template-columns:
+      minmax(
+        0,
+        1fr
+      )
+      auto;
+  }
 }
