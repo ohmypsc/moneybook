@@ -4,7 +4,18 @@ import {
   useState
 } from "react";
 
-import styles from "./HomePage.module.css";
+import {
+  prefetchBootstrap
+} from "../../api/bootstrapCache";
+
+import {
+  clearLedgerDirty,
+  isLedgerDirty,
+  subscribeLedgerChanges
+} from "../../utils/ledgerEvents";
+
+import styles
+  from "./HomePage.module.css";
 
 
 interface DashboardSummary {
@@ -53,22 +64,30 @@ interface DashboardData {
   backendVersion: string;
   month: string;
 
-  summary: DashboardSummary;
+  summary:
+    DashboardSummary;
 
-  accounts: DashboardAccount[];
+  accounts:
+    DashboardAccount[];
 
-  categoryExpense: SpendingSummary[];
-  spendingTargetExpense: SpendingSummary[];
+  categoryExpense:
+    SpendingSummary[];
 
-  cards: DashboardCard[];
+  spendingTargetExpense:
+    SpendingSummary[];
+
+  cards:
+    DashboardCard[];
 }
 
 
 interface DashboardResponse {
   success: boolean;
+
   apiVersion?: string;
 
-  data?: DashboardData;
+  data?:
+    DashboardData;
 
   error?: {
     code?: string;
@@ -87,6 +106,21 @@ let dashboardRequest:
     null;
 
 
+let dashboardGeneration =
+  0;
+
+
+function invalidateDashboardMemoryCache() {
+  dashboardGeneration += 1;
+
+  dashboardMemoryCache =
+    null;
+
+  dashboardRequest =
+    null;
+}
+
+
 async function requestDashboard(
   forceRefresh = false
 ) {
@@ -97,6 +131,14 @@ async function requestDashboard(
     return dashboardRequest;
   }
 
+  if (
+    forceRefresh
+  ) {
+    invalidateDashboardMemoryCache();
+  }
+
+  const requestGeneration =
+    dashboardGeneration;
 
   const runRequest =
     async () => {
@@ -119,10 +161,8 @@ async function requestDashboard(
           }
         );
 
-
       let body:
         DashboardResponse;
-
 
       try {
         body =
@@ -136,7 +176,6 @@ async function requestDashboard(
         );
       }
 
-
       if (
         !response.ok ||
         body.success !== true ||
@@ -148,10 +187,13 @@ async function requestDashboard(
         );
       }
 
-
-      dashboardMemoryCache =
-        body.data;
-
+      if (
+        requestGeneration ===
+        dashboardGeneration
+      ) {
+        dashboardMemoryCache =
+          body.data;
+      }
 
       return body.data;
     };
@@ -164,16 +206,23 @@ async function requestDashboard(
   }
 
 
-  dashboardRequest =
+  const request =
     runRequest();
 
+  dashboardRequest =
+    request;
 
   try {
-    return await dashboardRequest;
+    return await request;
 
   } finally {
-    dashboardRequest =
-      null;
+    if (
+      dashboardRequest ===
+      request
+    ) {
+      dashboardRequest =
+        null;
+    }
   }
 }
 
@@ -186,7 +235,9 @@ function formatWon(
   value: number
 ) {
   const safeValue =
-    Number.isFinite(value)
+    Number.isFinite(
+      value
+    )
       ? value
       : 0;
 
@@ -209,7 +260,9 @@ function formatSignedWon(
   value: number
 ) {
   const safeValue =
-    Number.isFinite(value)
+    Number.isFinite(
+      value
+    )
       ? value
       : 0;
 
@@ -256,7 +309,9 @@ function formatMonth(
 
   return (
     `${match[1]}년 ` +
-    `${Number(match[2])}월`
+    `${Number(
+      match[2]
+    )}월`
   );
 }
 
@@ -265,12 +320,25 @@ export default function HomePage(
   _props: HomePageProps
 ) {
   const [
+    needsInitialRefresh
+  ] =
+    useState(
+      () =>
+        isLedgerDirty()
+    );
+
+
+  const [
     dashboard,
     setDashboard
   ] =
-    useState<DashboardData | null>(
+    useState<
+      DashboardData | null
+    >(
       () =>
-        dashboardMemoryCache
+        needsInitialRefresh
+          ? null
+          : dashboardMemoryCache
     );
 
 
@@ -279,6 +347,7 @@ export default function HomePage(
     setLoading
   ] =
     useState(
+      needsInitialRefresh ||
       dashboardMemoryCache ===
         null
     );
@@ -288,20 +357,23 @@ export default function HomePage(
     errorMessage,
     setErrorMessage
   ] =
-    useState("");
+    useState(
+      ""
+    );
 
 
   const [
     refreshing,
     setRefreshing
   ] =
-    useState(false);
+    useState(
+      false
+    );
 
 
   async function loadDashboard() {
     const cachedDashboard =
       dashboardMemoryCache;
-
 
     if (
       cachedDashboard
@@ -320,20 +392,19 @@ export default function HomePage(
       );
     }
 
-
     setErrorMessage(
       ""
     );
-
 
     try {
       const data =
         await requestDashboard();
 
-
       setDashboard(
         data
       );
+
+      clearLedgerDirty();
 
     } catch (
       error
@@ -372,38 +443,21 @@ export default function HomePage(
       return;
     }
 
-
     setRefreshing(
       true
     );
 
-
     try {
-      if (
-        dashboardRequest
-      ) {
-        try {
-          await dashboardRequest;
-
-        } catch {
-          /*
-           * 기존 백그라운드 요청 실패 여부와
-           * 수동 새로고침은 별도로 처리합니다.
-           */
-        }
-      }
-
-
       const data =
         await requestDashboard(
           true
         );
 
-
       setDashboard(
         data
       );
 
+      clearLedgerDirty();
 
       setErrorMessage(
         ""
@@ -424,7 +478,6 @@ export default function HomePage(
         return;
       }
 
-
       window.alert(
         error instanceof Error
           ? error.message
@@ -444,13 +497,30 @@ export default function HomePage(
       let cancelled =
         false;
 
+      /*
+       * 홈을 보는 동안 입력용 bootstrap을 미리 받아 둡니다.
+       * 실패해도 홈 화면에는 영향을 주지 않습니다.
+       */
+      void prefetchBootstrap();
 
-      async function refreshDashboard() {
+
+      if (
+        needsInitialRefresh
+      ) {
+        invalidateDashboardMemoryCache();
+      }
+
+
+      async function refreshDashboard(
+        afterLedgerChange =
+          false
+      ) {
         const cachedDashboard =
           dashboardMemoryCache;
 
-
         if (
+          !afterLedgerChange &&
+          !needsInitialRefresh &&
           cachedDashboard
         ) {
           setDashboard(
@@ -463,10 +533,20 @@ export default function HomePage(
         }
 
 
+        if (
+          afterLedgerChange
+        ) {
+          invalidateDashboardMemoryCache();
+
+          setLoading(
+            true
+          );
+        }
+
+
         try {
           const data =
             await requestDashboard();
-
 
           if (
             cancelled
@@ -474,10 +554,11 @@ export default function HomePage(
             return;
           }
 
-
           setDashboard(
             data
           );
+
+          clearLedgerDirty();
 
           setErrorMessage(
             ""
@@ -492,7 +573,6 @@ export default function HomePage(
             return;
           }
 
-
           if (
             dashboardMemoryCache
           ) {
@@ -502,7 +582,6 @@ export default function HomePage(
 
             return;
           }
-
 
           setDashboard(
             null
@@ -529,12 +608,32 @@ export default function HomePage(
       void refreshDashboard();
 
 
+      const unsubscribe =
+        subscribeLedgerChanges(
+          () => {
+            if (
+              cancelled
+            ) {
+              return;
+            }
+
+            void refreshDashboard(
+              true
+            );
+          }
+        );
+
+
       return () => {
         cancelled =
           true;
+
+        unsubscribe();
       };
     },
-    []
+    [
+      needsInitialRefresh
+    ]
   );
 
 
@@ -545,12 +644,10 @@ export default function HomePage(
           !dashboard
         ) {
           return {
-            total:
-              0,
+            total: 0,
 
-            cards:
-              [] as
-                DashboardCardView[]
+            cards: [] as
+              DashboardCardView[]
           };
         }
 
@@ -563,12 +660,13 @@ export default function HomePage(
               )
                 ? dashboard.accounts
                 : []
-            ).map(
-              account => [
-                account.accountId,
-                account
-              ] as const
             )
+              .map(
+                account => [
+                  account.accountId,
+                  account
+                ] as const
+              )
           );
 
 
@@ -711,7 +809,7 @@ export default function HomePage(
                       ) /
                       total
                     ) *
-                      100
+                    100
                   )
                 : 0
           })
@@ -895,11 +993,8 @@ export default function HomePage(
             position:
               "absolute",
 
-            top:
-              0,
-
-            right:
-              0,
+            top: 0,
+            right: 0,
 
             width:
               "36px",
@@ -913,8 +1008,7 @@ export default function HomePage(
             placeItems:
               "center",
 
-            padding:
-              0,
+            padding: 0,
 
             border:
               "1px solid var(--color-border)",
