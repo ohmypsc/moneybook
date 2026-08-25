@@ -14,45 +14,42 @@ export type InvestmentTradeType =
 export interface InvestmentTrade {
   investmentTradeId: string;
 
-  date: string;
-  tradeType: InvestmentTradeType;
-
   accountId: string;
-  accountName: string;
+  accountName?: string;
 
   holdingId: string;
 
-  stockCode: string;
-  stockName: string;
+  stockCode?: string;
+  stockName?: string;
 
-  market: Market;
+  market?: Market;
+
+  tradeType: InvestmentTradeType;
+  tradeDate: string;
 
   quantity: number;
   unitPrice: number;
 
-  currency: string;
-  fxRate: number;
+  currency?: string;
+  fxRate?: number;
 
-  feeKrw: number;
-  taxKrw: number;
+  feeKrw?: number;
+  taxKrw?: number;
 
   settlementKrw: number;
-  realizedPnlKrw: number;
 
-  memo: string;
+  realizedPnlKrw?: number;
 
-  requestId: string | null;
-
-  createdAt: string | null;
-  updatedAt: string | null;
-
-  isDeleted: boolean;
+  memo?: string;
+  requestId?: string;
 }
 
 
 export interface InvestmentTradesResponse {
   total: number;
-  items: InvestmentTrade[];
+
+  items:
+    InvestmentTrade[];
 }
 
 
@@ -67,6 +64,11 @@ export interface CreateInvestmentTradePayload {
   market?: Market;
   quoteMode?: QuoteMode;
 
+  /*
+   * 신규 종목 + 수동 시세일 때 사용
+   */
+  manualPrice?: number;
+
   tradeType:
     InvestmentTradeType;
 
@@ -78,15 +80,22 @@ export interface CreateInvestmentTradePayload {
   currency?: string;
   fxRate?: number;
 
+  /*
+   * 선택 입력.
+   * 입력하지 않으면 백엔드가 0으로 계산.
+   */
   feeKrw?: number;
   taxKrw?: number;
 
+  /*
+   * 증권사에 실제 찍힌 원화 결제/입금액.
+   *
+   * 입력하면 백엔드가 이 값을
+   * 최종 결제금액으로 우선 사용.
+   */
   settlementKrw?: number;
 
-  manualPrice?: number;
-
   memo?: string;
-
   requestId?: string;
 }
 
@@ -97,6 +106,5 @@ export interface SetInvestmentCashBaselinePayload {
   cashBaselineKrw: number;
 
   force?: boolean;
-
   requestId?: string;
 }
