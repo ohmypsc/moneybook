@@ -44,13 +44,18 @@ function getLoginUsers(env) {
   }
 
   let users;
+
   try {
     users = JSON.parse(env.LOGIN_USERS);
   } catch (error) {
     throw new Error("LOGIN_USERS가 올바른 JSON 형식이 아닙니다.");
   }
 
-  if (!users || typeof users !== "object" || Array.isArray(users)) {
+  if (
+    !users ||
+    typeof users !== "object" ||
+    Array.isArray(users)
+  ) {
     throw new Error("LOGIN_USERS 형식이 올바르지 않습니다.");
   }
 
@@ -75,6 +80,7 @@ async function safeEqual(valueA, valueB) {
   const bytesB = new Uint8Array(hashB);
 
   let difference = 0;
+
   for (let i = 0; i < bytesA.length; i++) {
     difference |= bytesA[i] ^ bytesB[i];
   }
@@ -705,7 +711,6 @@ export default {
           return unauthorized();
         }
 
-        // 앱을 열 때마다 새로운 400일 세션을 발급
         const refreshedToken =
           await createSessionToken(
             session.name,
@@ -871,7 +876,6 @@ export default {
         }
 
         /**
-         * 프론트엔드가 곧 사용할
          * Bootstrap API
          */
         if (
@@ -910,7 +914,10 @@ export default {
         }
 
         /**
-         * 거래 조회
+         * 일반 거래 조회
+         *
+         * 삭제된 거래는 앱의 일반 조회에서
+         * 별도로 요청하지 않습니다.
          */
         if (
           request.method === "GET" &&
@@ -964,11 +971,6 @@ export default {
                 offset:
                   url.searchParams.get(
                     "offset"
-                  ) || "",
-
-                includeDeleted:
-                  url.searchParams.get(
-                    "includeDeleted"
                   ) || ""
               }
             );
@@ -1130,7 +1132,10 @@ export default {
         }
 
         /**
-         * 거래 삭제 (soft delete)
+         * 거래 삭제
+         *
+         * 실제 행 제거가 아니라
+         * Apps Script의 soft delete 사용
          */
         if (
           request.method === "POST" &&
@@ -1208,6 +1213,8 @@ export default {
 
         /**
          * 거래 복원
+         *
+         * 삭제 직후 '실행 취소'에서 사용
          */
         if (
           request.method === "POST" &&
@@ -1284,12 +1291,11 @@ export default {
         }
 
         /* =====================================================
-         * 투자 - 신규 라우트
+         * 투자
          * ===================================================== */
 
         /**
          * 투자계좌 목록
-         * (bootstrap과 별개로 필요할 때만 가볍게 조회)
          */
         if (
           request.method === "GET" &&
@@ -1344,7 +1350,7 @@ export default {
         }
 
         /**
-         * 투자거래(매수/매도) 내역 조회
+         * 투자거래 내역 조회
          */
         if (
           request.method === "GET" &&
@@ -1382,7 +1388,7 @@ export default {
         }
 
         /**
-         * 투자계좌 예수금 현황 조회
+         * 투자계좌 예수금 조회
          */
         if (
           request.method === "GET" &&
@@ -1406,7 +1412,6 @@ export default {
 
         /**
          * 투자계좌 예수금 기준값 설정
-         * (최초 1회, 또는 force로 강제 재설정)
          */
         if (
           request.method === "POST" &&
@@ -1463,7 +1468,7 @@ export default {
         }
 
         /**
-         * 투자거래 생성 (매수/매도)
+         * 투자거래 생성
          */
         if (
           request.method === "POST" &&
@@ -1597,7 +1602,7 @@ export default {
         }
 
         /**
-         * 투자거래 삭제 (soft delete)
+         * 투자거래 삭제
          */
         if (
           request.method === "POST" &&
@@ -1728,7 +1733,8 @@ export default {
         {
           success: false,
           error: {
-            code: "NOT_FOUND",
+            code:
+              "NOT_FOUND",
             message:
               "페이지를 찾을 수 없습니다."
           }
@@ -1740,7 +1746,8 @@ export default {
         {
           success: false,
           error: {
-            code: "WORKER_ERROR",
+            code:
+              "WORKER_ERROR",
             message:
               error instanceof Error
                 ? error.message
