@@ -522,11 +522,251 @@ async function appsScriptPost(
 
 /**
  * =========================================================
+ * Bootstrap 캐시 / 프리페치
+ * =========================================================
+ *
+ * 로그인 또는 세션 확인 직후 미리 로딩합니다.
+ * /api/bootstrap은 같은 캐시를 재사용합니다.
+ *
+ * 캐시 유지시간은 5분입니다.
+ * 실패한 응답은 캐시하지 않습니다.
+ */
+
+const BOOTSTRAP_CACHE_TTL_SECONDS =
+  60 * 5;
+
+let bootstrapMemoryValue =
+  null;
+
+let bootstrapMemoryExpiresAt =
+  0;
+
+let bootstrapMemoryCacheUrl =
+  "";
+
+let bootstrapLoadPromise =
+  null;
+
+function bootstrapCacheUrl(
+  origin
+) {
+  return (
+    `${origin}/` +
+    "__moneybook_internal/" +
+    "bootstrap-v1"
+  );
+}
+
+function bootstrapCacheKey(
+  origin
+) {
+  return new Request(
+    bootstrapCacheUrl(origin),
+    {
+      method: "GET"
+    }
+  );
+}
+
+function rememberBootstrap(
+  data,
+  origin
+) {
+  bootstrapMemoryValue =
+    data;
+
+  bootstrapMemoryCacheUrl =
+    bootstrapCacheUrl(
+      origin
+    );
+
+  bootstrapMemoryExpiresAt =
+    Date.now() +
+    BOOTSTRAP_CACHE_TTL_SECONDS *
+      1000;
+}
+
+function getRememberedBootstrap(
+  origin
+) {
+  if (
+    bootstrapMemoryValue &&
+    bootstrapMemoryCacheUrl ===
+      bootstrapCacheUrl(origin) &&
+    bootstrapMemoryExpiresAt >
+      Date.now()
+  ) {
+    return bootstrapMemoryValue;
+  }
+
+  bootstrapMemoryValue =
+    null;
+
+  bootstrapMemoryExpiresAt =
+    0;
+
+  bootstrapMemoryCacheUrl =
+    "";
+
+  return null;
+}
+
+async function readBootstrapEdgeCache(
+  origin
+) {
+  if (
+    typeof caches ===
+      "undefined" ||
+    !caches.default
+  ) {
+    return null;
+  }
+
+  const cached =
+    await caches.default.match(
+      bootstrapCacheKey(origin)
+    );
+
+  if (!cached) {
+    return null;
+  }
+
+  try {
+    const data =
+      await cached.json();
+
+    rememberBootstrap(
+      data,
+      origin
+    );
+
+    return data;
+  } catch (error) {
+    return null;
+  }
+}
+
+async function writeBootstrapEdgeCache(
+  data,
+  origin
+) {
+  if (
+    typeof caches ===
+      "undefined" ||
+    !caches.default
+  ) {
+    return;
+  }
+
+  const response =
+    new Response(
+      JSON.stringify(data),
+      {
+        headers: {
+          "Content-Type":
+            "application/json; charset=utf-8",
+
+          "Cache-Control":
+            `public, s-maxage=${BOOTSTRAP_CACHE_TTL_SECONDS}`
+        }
+      }
+    );
+
+  await caches.default.put(
+    bootstrapCacheKey(origin),
+    response
+  );
+}
+
+async function loadBootstrapCached(
+  env,
+  origin
+) {
+  const remembered =
+    getRememberedBootstrap(
+      origin
+    );
+
+  if (remembered) {
+    return remembered;
+  }
+
+  const edgeCached =
+    await readBootstrapEdgeCache(
+      origin
+    );
+
+  if (edgeCached) {
+    return edgeCached;
+  }
+
+  if (!bootstrapLoadPromise) {
+    bootstrapLoadPromise =
+      appsScriptGet(
+        env,
+        "bootstrap"
+      )
+        .then(
+          async data => {
+            if (
+              data &&
+              data.success !== false
+            ) {
+              rememberBootstrap(
+                data,
+                origin
+              );
+
+              await writeBootstrapEdgeCache(
+                data,
+                origin
+              );
+            }
+
+            return data;
+          }
+        )
+        .finally(
+          () => {
+            bootstrapLoadPromise =
+              null;
+          }
+        );
+  }
+
+  return bootstrapLoadPromise;
+}
+
+async function prefetchBootstrap(
+  env,
+  origin
+) {
+  try {
+    await loadBootstrapCached(
+      env,
+      origin
+    );
+  } catch (error) {
+    /*
+     * 프리페치 실패가
+     * 로그인이나 세션 확인을
+     * 실패시키면 안 됩니다.
+     */
+  }
+}
+
+/**
+ * =========================================================
  * Worker
  * =========================================================
  */
+
 export default {
-  async fetch(request, env) {
+  async fetch(
+    request,
+    env,
+    ctx
+  ) {
     const url =
       new URL(request.url);
 
@@ -568,7 +808,8 @@ export default {
        */
       if (
         request.method === "POST" &&
-        url.pathname === "/api/auth/login"
+        url.pathname ===
+          "/api/auth/login"
       ) {
         if (!isSameOrigin(request)) {
           return jsonResponse(
@@ -645,7 +886,9 @@ export default {
               users,
               name
             )
-            ? String(users[name])
+            ? String(
+                users[name]
+              )
             : "";
 
         const valid =
@@ -678,6 +921,23 @@ export default {
             env
           );
 
+        /**
+         * 로그인 응답을 기다리게 하지 않고
+         * bootstrap을 미리 가져옵니다.
+         */
+        if (
+          ctx &&
+          typeof ctx.waitUntil ===
+            "function"
+        ) {
+          ctx.waitUntil(
+            prefetchBootstrap(
+              env,
+              url.origin
+            )
+          );
+        }
+
         return jsonResponse(
           {
             success: true,
@@ -699,7 +959,8 @@ export default {
        */
       if (
         request.method === "GET" &&
-        url.pathname === "/api/auth/session"
+        url.pathname ===
+          "/api/auth/session"
       ) {
         const session =
           await getSession(
@@ -717,12 +978,31 @@ export default {
             env
           );
 
+        /**
+         * 앱을 열었을 때
+         * 입력 화면용 데이터를
+         * 미리 준비합니다.
+         */
+        if (
+          ctx &&
+          typeof ctx.waitUntil ===
+            "function"
+        ) {
+          ctx.waitUntil(
+            prefetchBootstrap(
+              env,
+              url.origin
+            )
+          );
+        }
+
         return jsonResponse(
           {
             success: true,
             loggedIn: true,
             user: {
-              name: session.name
+              name:
+                session.name
             }
           },
           200,
@@ -740,7 +1020,8 @@ export default {
        */
       if (
         request.method === "POST" &&
-        url.pathname === "/api/auth/logout"
+        url.pathname ===
+          "/api/auth/logout"
       ) {
         if (!isSameOrigin(request)) {
           return jsonResponse(
@@ -792,8 +1073,7 @@ export default {
          * 보안 연결 테스트
          */
         if (
-          request.method ===
-            "GET" &&
+          request.method === "GET" &&
           url.pathname ===
             "/api/backend-test"
         ) {
@@ -809,10 +1089,12 @@ export default {
                 success: false,
                 backendAuthenticated:
                   false,
+
                 error:
                   data.error || {
                     code:
                       "BACKEND_ERROR",
+
                     message:
                       "Apps Script 요청에 실패했습니다."
                   }
@@ -826,14 +1108,19 @@ export default {
 
           return jsonResponse({
             success: true,
+
             backendAuthenticated:
               true,
+
             apiVersion:
               data.apiVersion,
+
             user:
               session.name,
+
             message:
               "로그인 + Cloudflare + Apps Script 연결 성공",
+
             counts: {
               accounts:
                 Array.isArray(
@@ -877,15 +1164,20 @@ export default {
 
         /**
          * Bootstrap API
+         *
+         * 로그인/세션 확인 시
+         * 이미 프리페치된 값이 있다면
+         * Apps Script를 다시 호출하지 않습니다.
          */
         if (
           request.method === "GET" &&
-          url.pathname === "/api/bootstrap"
+          url.pathname ===
+            "/api/bootstrap"
         ) {
           const data =
-            await appsScriptGet(
+            await loadBootstrapCached(
               env,
-              "bootstrap"
+              url.origin
             );
 
           return jsonResponse(data);
@@ -896,7 +1188,8 @@ export default {
          */
         if (
           request.method === "GET" &&
-          url.pathname === "/api/dashboard"
+          url.pathname ===
+            "/api/dashboard"
         ) {
           const data =
             await appsScriptGet(
@@ -916,12 +1209,13 @@ export default {
         /**
          * 일반 거래 조회
          *
-         * 삭제된 거래는 앱의 일반 조회에서
-         * 별도로 요청하지 않습니다.
+         * 삭제된 거래는 앱에서
+         * 별도 조회하지 않습니다.
          */
         if (
           request.method === "GET" &&
-          url.pathname === "/api/transactions"
+          url.pathname ===
+            "/api/transactions"
         ) {
           const data =
             await appsScriptGet(
@@ -983,7 +1277,8 @@ export default {
          */
         if (
           request.method === "POST" &&
-          url.pathname === "/api/transactions"
+          url.pathname ===
+            "/api/transactions"
         ) {
           if (!isSameOrigin(request)) {
             return jsonResponse(
@@ -1134,8 +1429,8 @@ export default {
         /**
          * 거래 삭제
          *
-         * 실제 행 제거가 아니라
-         * Apps Script의 soft delete 사용
+         * 실제 행 삭제가 아닌
+         * Apps Script soft delete입니다.
          */
         if (
           request.method === "POST" &&
@@ -1214,7 +1509,7 @@ export default {
         /**
          * 거래 복원
          *
-         * 삭제 직후 '실행 취소'에서 사용
+         * 삭제 직후 실행 취소에서 사용합니다.
          */
         if (
           request.method === "POST" &&
@@ -1721,6 +2016,7 @@ export default {
             error: {
               code:
                 "API_NOT_FOUND",
+
               message:
                 "지원하지 않는 API입니다."
             }
@@ -1735,6 +2031,7 @@ export default {
           error: {
             code:
               "NOT_FOUND",
+
             message:
               "페이지를 찾을 수 없습니다."
           }
@@ -1748,6 +2045,7 @@ export default {
           error: {
             code:
               "WORKER_ERROR",
+
             message:
               error instanceof Error
                 ? error.message
