@@ -91,36 +91,6 @@ export interface TransactionItem {
 }
 
 
-export interface TransactionListResponse {
-  total: number;
-
-  items:
-    TransactionItem[];
-}
-
-
-export interface TransactionListParams {
-  dateFrom?: string;
-
-  dateTo?: string;
-
-  type?:
-    TransactionType;
-
-  categoryId?: string;
-
-  accountId?: string;
-
-  spendingTarget?: string;
-
-  q?: string;
-
-  limit?: number;
-
-  offset?: number;
-}
-
-
 export interface UpdateTransactionInput {
   transactionId: string;
 
@@ -176,149 +146,11 @@ export interface RestoreTransactionResult {
 }
 
 
-function appendListParams(
-  searchParams:
-    URLSearchParams,
-
-  params:
-    TransactionListParams
-) {
-  if (
-    params.dateFrom
-  ) {
-    searchParams.set(
-      "dateFrom",
-      params.dateFrom
-    );
-  }
-
-
-  if (
-    params.dateTo
-  ) {
-    searchParams.set(
-      "dateTo",
-      params.dateTo
-    );
-  }
-
-
-  if (
-    params.type
-  ) {
-    searchParams.set(
-      "type",
-      params.type
-    );
-  }
-
-
-  if (
-    params.categoryId
-  ) {
-    searchParams.set(
-      "categoryId",
-      params.categoryId
-    );
-  }
-
-
-  if (
-    params.accountId
-  ) {
-    searchParams.set(
-      "accountId",
-      params.accountId
-    );
-  }
-
-
-  if (
-    params.spendingTarget
-  ) {
-    searchParams.set(
-      "spendingTarget",
-      params.spendingTarget
-    );
-  }
-
-
-  if (
-    params.q
-  ) {
-    searchParams.set(
-      "q",
-      params.q
-    );
-  }
-
-
-  if (
-    params.limit !==
-      undefined
-  ) {
-    searchParams.set(
-      "limit",
-      String(
-        params.limit
-      )
-    );
-  }
-
-
-  if (
-    params.offset !==
-      undefined
-  ) {
-    searchParams.set(
-      "offset",
-      String(
-        params.offset
-      )
-    );
-  }
-}
-
-
-export async function getTransactionsIncludingDeleted(
-  params:
-    TransactionListParams = {}
-) {
-  const searchParams =
-    new URLSearchParams();
-
-
-  appendListParams(
-    searchParams,
-    params
-  );
-
-
-  searchParams.set(
-    "includeDeleted",
-    "true"
-  );
-
-
-  const raw =
-    await apiRequest<
-      | ApiEnvelope<
-          TransactionListResponse
-        >
-      | TransactionListResponse
-    >(
-      `/api/transactions?${searchParams.toString()}`
-    );
-
-
-  return unwrapEnvelope<
-    TransactionListResponse
-  >(
-    raw
-  );
-}
-
-
+/**
+ * =========================================================
+ * 거래 수정
+ * =========================================================
+ */
 export async function updateTransaction(
   input:
     UpdateTransactionInput
@@ -332,7 +164,8 @@ export async function updateTransaction(
     >(
       "/api/transactions/update",
       {
-        method: "POST",
+        method:
+          "POST",
 
         body:
           JSON.stringify(
@@ -340,7 +173,6 @@ export async function updateTransaction(
           )
       }
     );
-
 
   return unwrapEnvelope<
     UpdateTransactionResult
@@ -350,6 +182,14 @@ export async function updateTransaction(
 }
 
 
+/**
+ * =========================================================
+ * 거래 삭제
+ *
+ * 실제 데이터 제거가 아니라
+ * 백엔드 soft delete를 호출합니다.
+ * =========================================================
+ */
 export async function deleteTransaction(
   transactionId:
     string
@@ -363,7 +203,8 @@ export async function deleteTransaction(
     >(
       "/api/transactions/delete",
       {
-        method: "POST",
+        method:
+          "POST",
 
         body:
           JSON.stringify({
@@ -371,7 +212,6 @@ export async function deleteTransaction(
           })
       }
     );
-
 
   return unwrapEnvelope<
     DeleteTransactionResult
@@ -381,6 +221,15 @@ export async function deleteTransaction(
 }
 
 
+/**
+ * =========================================================
+ * 삭제 취소
+ *
+ * 삭제된 거래 목록을 보여주기 위한 기능이 아니라,
+ * 사용자가 거래를 삭제한 직후
+ * "실행 취소"를 눌렀을 때만 사용합니다.
+ * =========================================================
+ */
 export async function restoreTransaction(
   transactionId:
     string
@@ -394,7 +243,8 @@ export async function restoreTransaction(
     >(
       "/api/transactions/restore",
       {
-        method: "POST",
+        method:
+          "POST",
 
         body:
           JSON.stringify({
@@ -402,7 +252,6 @@ export async function restoreTransaction(
           })
       }
     );
-
 
   return unwrapEnvelope<
     RestoreTransactionResult
