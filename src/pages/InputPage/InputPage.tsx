@@ -14,7 +14,15 @@ import {
   createTransaction
 } from "../../api/transactions";
 
-import styles from "./InputPage.module.css";
+import {
+  applyAccountPreferences,
+  applyCategoryPreferences,
+  getInputPreferences,
+  sortAccountsByPreferences
+} from "../../utils/inputPreferences";
+
+import styles
+  from "./InputPage.module.css";
 
 
 type TransactionType =
@@ -56,16 +64,23 @@ interface Category {
 
 
 interface BootstrapData {
-  transactionTypes: TransactionType[];
+  transactionTypes:
+    TransactionType[];
+
   members: string[];
-  spendingTargets: string[];
+
+  spendingTargets:
+    string[];
+
   accounts: Account[];
+
   categories: Category[];
 }
 
 
 interface BootstrapResponse {
   success: boolean;
+
   apiVersion?: string;
 
   data?: BootstrapData;
@@ -99,7 +114,6 @@ const CARD_PAYMENT_CATEGORY =
 const CARD_PREPAYMENT_CATEGORY =
   "카드선결제";
 
-
 const CARD_CATEGORY_NAMES =
   new Set([
     CARD_PAYMENT_CATEGORY,
@@ -109,12 +123,11 @@ const CARD_CATEGORY_NAMES =
 
 let bootstrapPromise:
   Promise<BootstrapData> | null =
-    null;
+  null;
 
 
 async function loadBootstrap():
   Promise<BootstrapData> {
-
   if (!bootstrapPromise) {
     bootstrapPromise =
       apiRequest<BootstrapResponse>(
@@ -129,7 +142,7 @@ async function loadBootstrap():
               throw new Error(
                 response.error
                   ?.message ||
-                "입력 정보를 불러오지 못했습니다."
+                  "입력 정보를 불러오지 못했습니다."
               );
             }
 
@@ -152,16 +165,15 @@ async function loadBootstrap():
 
 function getToday():
   string {
-
   const now =
     new Date();
 
   const local =
     new Date(
       now.getTime() -
-      now.getTimezoneOffset() *
-        60 *
-        1000
+        now.getTimezoneOffset() *
+          60 *
+          1000
     );
 
   return local
@@ -175,7 +187,6 @@ function getToday():
 
 function createRequestId():
   string {
-
   if (
     globalThis.crypto &&
     typeof globalThis.crypto
@@ -200,7 +211,6 @@ function getErrorMessage(
   error: unknown
 ):
   string {
-
   if (
     error instanceof Error &&
     error.message
@@ -216,7 +226,6 @@ function getBackendType(
   mode: InputMode
 ):
   TransactionType {
-
   if (
     mode ===
       "card-payment" ||
@@ -248,7 +257,6 @@ function getModeLabel(
   mode: InputMode
 ):
   string {
-
   switch (mode) {
     case "income":
       return "수입";
@@ -272,7 +280,6 @@ function getAccountLabel(
   account: Account
 ):
   string {
-
   return (
     account.displayName ||
     account.accountName ||
@@ -285,7 +292,6 @@ export default function InputPage() {
   const today =
     getToday();
 
-
   const [
     bootstrap,
     setBootstrap
@@ -294,20 +300,17 @@ export default function InputPage() {
       null
     );
 
-
   const [
     bootstrapLoading,
     setBootstrapLoading
   ] =
     useState(true);
 
-
   const [
     bootstrapError,
     setBootstrapError
   ] =
     useState("");
-
 
   const [
     mode,
@@ -317,13 +320,11 @@ export default function InputPage() {
       "expense"
     );
 
-
   const [
     date,
     setDate
   ] =
     useState(today);
-
 
   const [
     amount,
@@ -331,13 +332,11 @@ export default function InputPage() {
   ] =
     useState("");
 
-
   const [
     categoryId,
     setCategoryId
   ] =
     useState("");
-
 
   const [
     paymentMethodId,
@@ -345,13 +344,11 @@ export default function InputPage() {
   ] =
     useState("");
 
-
   const [
     spendingTarget,
     setSpendingTarget
   ] =
     useState("");
-
 
   const [
     fromAccountId,
@@ -359,13 +356,11 @@ export default function InputPage() {
   ] =
     useState("");
 
-
   const [
     toAccountId,
     setToAccountId
   ] =
     useState("");
-
 
   const [
     billingMonth,
@@ -378,13 +373,11 @@ export default function InputPage() {
       )
     );
 
-
   const [
     memo,
     setMemo
   ] =
     useState("");
-
 
   const [
     submitting,
@@ -392,20 +385,17 @@ export default function InputPage() {
   ] =
     useState(false);
 
-
   const [
     error,
     setError
   ] =
     useState("");
 
-
   const [
     success,
     setSuccess
   ] =
     useState("");
-
 
   const requestMemory =
     useRef<RequestMemory | null>(
@@ -462,9 +452,7 @@ export default function InputPage() {
         )
         .finally(
           () => {
-            if (
-              active
-            ) {
+            if (active) {
               setBootstrapLoading(
                 false
               );
@@ -481,46 +469,102 @@ export default function InputPage() {
   );
 
 
-  const categories =
+  const preferences =
     useMemo(
       () => {
         if (!bootstrap) {
+          return null;
+        }
+
+        return getInputPreferences(
+          bootstrap.categories,
+          bootstrap.accounts
+        );
+      },
+      [
+        bootstrap
+      ]
+    );
+
+
+  const categories =
+    useMemo(
+      () => {
+        if (
+          !bootstrap ||
+          !preferences
+        ) {
           return [];
         }
 
-        return bootstrap.categories
-          .filter(
-            category =>
-              category.type ===
-              backendType
-          )
-          .filter(
-            category => {
-              if (
-                mode !==
-                "transfer"
-              ) {
-                return true;
-              }
-
-              return !CARD_CATEGORY_NAMES
-                .has(
-                  category.name
-                );
+        return applyCategoryPreferences(
+          bootstrap.categories,
+          backendType,
+          preferences
+        ).filter(
+          category => {
+            if (
+              mode !==
+              "transfer"
+            ) {
+              return true;
             }
-          );
+
+            return !CARD_CATEGORY_NAMES
+              .has(
+                category.name
+              );
+          }
+        );
       },
       [
         bootstrap,
+        preferences,
         backendType,
         mode
       ]
     );
 
 
-  const accounts =
+  const allAccounts =
     bootstrap?.accounts ??
     [];
+
+
+  const accounts =
+    useMemo(
+      () => {
+        if (
+          !preferences
+        ) {
+          return [];
+        }
+
+        return applyAccountPreferences(
+          allAccounts,
+          preferences
+        );
+      },
+      [
+        allAccounts,
+        preferences
+      ]
+    );
+
+
+  const visibleAccountIds =
+    useMemo(
+      () =>
+        new Set(
+          accounts.map(
+            account =>
+              account.accountId
+          )
+        ),
+      [
+        accounts
+      ]
+    );
 
 
   const creditCards =
@@ -540,14 +584,14 @@ export default function InputPage() {
   const selectedCard =
     useMemo(
       () =>
-        creditCards.find(
+        allAccounts.find(
           account =>
             account.accountId ===
             toAccountId
         ) ??
         null,
       [
-        creditCards,
+        allAccounts,
         toAccountId
       ]
     );
@@ -556,40 +600,62 @@ export default function InputPage() {
   const cardSourceAccounts =
     useMemo(
       () => {
+        if (
+          !preferences
+        ) {
+          return [];
+        }
+
         const linkedId =
           selectedCard
             ?.paymentAccountId ||
           "";
 
-        return accounts.filter(
-          account => {
-            if (
-              account.accountId ===
-              toAccountId
-            ) {
-              return false;
-            }
+        const candidates =
+          allAccounts.filter(
+            account => {
+              if (
+                account.accountId ===
+                toAccountId
+              ) {
+                return false;
+              }
 
-            if (
-              account.accountId ===
-              linkedId
-            ) {
-              return true;
-            }
+              if (
+                account.accountId ===
+                linkedId
+              ) {
+                return true;
+              }
 
-            return (
-              account.accountType ===
-                "자산" &&
-              account.subType !==
-                "주식"
-            );
-          }
+              if (
+                !visibleAccountIds.has(
+                  account.accountId
+                )
+              ) {
+                return false;
+              }
+
+              return (
+                account.accountType ===
+                  "자산" &&
+                account.subType !==
+                  "주식"
+              );
+            }
+          );
+
+        return sortAccountsByPreferences(
+          candidates,
+          preferences
         );
       },
       [
-        accounts,
+        allAccounts,
+        preferences,
         selectedCard,
-        toAccountId
+        toAccountId,
+        visibleAccountIds
       ]
     );
 
@@ -716,7 +782,7 @@ export default function InputPage() {
 
     setFromAccountId(
       card?.paymentAccountId ||
-      ""
+        ""
     );
 
     clearFeedback();
@@ -725,7 +791,6 @@ export default function InputPage() {
 
   function getCardCategory():
     Category | undefined {
-
     if (!bootstrap) {
       return undefined;
     }
@@ -749,22 +814,18 @@ export default function InputPage() {
 
   function validate():
     string | null {
-
     if (!bootstrap) {
       return "입력 정보를 불러오지 못했습니다.";
     }
-
 
     if (!date) {
       return "날짜를 선택해주세요.";
     }
 
-
     const numericAmount =
       Number(
         amount
       );
-
 
     if (
       !Number.isFinite(
@@ -776,10 +837,7 @@ export default function InputPage() {
       return "금액을 입력해주세요.";
     }
 
-
-    if (
-      isCardMode
-    ) {
+    if (isCardMode) {
       if (
         !getCardCategory()
       ) {
@@ -789,27 +847,17 @@ export default function InputPage() {
           : "카드정기결제 카테고리를 찾을 수 없습니다.";
       }
 
-
-      if (
-        !toAccountId
-      ) {
+      if (!toAccountId) {
         return "결제할 카드를 선택해주세요.";
       }
 
-
-      if (
-        !fromAccountId
-      ) {
+      if (!fromAccountId) {
         return "돈이 나갈 계좌를 선택해주세요.";
       }
 
-
-      if (
-        !billingMonth
-      ) {
+      if (!billingMonth) {
         return "대상 청구월을 선택해주세요.";
       }
-
 
       if (
         fromAccountId ===
@@ -818,17 +866,12 @@ export default function InputPage() {
         return "출금계좌와 카드는 같을 수 없습니다.";
       }
 
-
       return null;
     }
 
-
-    if (
-      !categoryId
-    ) {
+    if (!categoryId) {
       return "카테고리를 선택해주세요.";
     }
-
 
     if (
       mode ===
@@ -840,14 +883,12 @@ export default function InputPage() {
         return "결제수단을 선택해주세요.";
       }
 
-
       if (
         !spendingTarget
       ) {
         return "지출대상을 선택해주세요.";
       }
     }
-
 
     if (
       mode ===
@@ -857,24 +898,17 @@ export default function InputPage() {
       return "입금수단을 선택해주세요.";
     }
 
-
     if (
       mode ===
       "transfer"
     ) {
-      if (
-        !fromAccountId
-      ) {
+      if (!fromAccountId) {
         return "보내는 수단을 선택해주세요.";
       }
 
-
-      if (
-        !toAccountId
-      ) {
+      if (!toAccountId) {
         return "받는 수단을 선택해주세요.";
       }
-
 
       if (
         fromAccountId ===
@@ -883,7 +917,6 @@ export default function InputPage() {
         return "보내는 수단과 받는 수단은 같을 수 없습니다.";
       }
     }
-
 
     return null;
   }
@@ -896,19 +929,23 @@ export default function InputPage() {
       string
   ):
     CreateTransactionPayload {
-
     const base = {
       date,
+
       type:
         backendType,
+
       categoryId:
         resolvedCategoryId,
+
       amount:
         Number(
           amount
         ),
+
       memo:
         memo.trim(),
+
       requestId
     };
 
@@ -921,6 +958,7 @@ export default function InputPage() {
         ...base,
 
         paymentMethodId,
+
         spendingTarget
       };
     }
@@ -946,6 +984,7 @@ export default function InputPage() {
         ...base,
 
         fromAccountId,
+
         toAccountId
       };
     }
@@ -955,7 +994,9 @@ export default function InputPage() {
       ...base,
 
       fromAccountId,
+
       toAccountId,
+
       billingMonth
     };
   }
@@ -967,20 +1008,14 @@ export default function InputPage() {
   ) {
     event.preventDefault();
 
-
-    if (
-      submitting
-    ) {
+    if (submitting) {
       return;
     }
 
-
     clearFeedback();
-
 
     const validationError =
       validate();
-
 
     if (
       validationError
@@ -992,10 +1027,7 @@ export default function InputPage() {
       return;
     }
 
-
-    if (
-      !bootstrap
-    ) {
+    if (!bootstrap) {
       return;
     }
 
@@ -1089,7 +1121,6 @@ export default function InputPage() {
       requestId =
         requestMemory.current
           .requestId;
-
     } else {
       requestId =
         createRequestId();
@@ -1119,10 +1150,8 @@ export default function InputPage() {
           payload
         );
 
-
       const apiResult =
         result as ApiResult;
-
 
       if (
         apiResult
@@ -1132,7 +1161,7 @@ export default function InputPage() {
         throw new Error(
           apiResult.error
             ?.message ||
-          "거래를 저장하지 못했습니다."
+            "거래를 저장하지 못했습니다."
         );
       }
 
@@ -1143,7 +1172,6 @@ export default function InputPage() {
         )} 내역을 저장했습니다.`
       );
 
-
       setAmount("");
       setCategoryId("");
       setPaymentMethodId("");
@@ -1153,9 +1181,7 @@ export default function InputPage() {
       setMemo("");
 
 
-      if (
-        isCardMode
-      ) {
+      if (isCardMode) {
         setBillingMonth(
           date.slice(
             0,
@@ -1167,7 +1193,6 @@ export default function InputPage() {
 
       requestMemory.current =
         null;
-
     } catch (
       submitError
     ) {
@@ -1176,7 +1201,6 @@ export default function InputPage() {
           submitError
         )
       );
-
     } finally {
       setSubmitting(
         false
@@ -1206,9 +1230,7 @@ export default function InputPage() {
   }
 
 
-  if (
-    !bootstrap
-  ) {
+  if (!bootstrap) {
     return (
       <main
         className={
@@ -1325,7 +1347,6 @@ export default function InputPage() {
           지출
         </button>
 
-
         <button
           type="button"
           className={[
@@ -1350,7 +1371,6 @@ export default function InputPage() {
         >
           수입
         </button>
-
 
         <button
           type="button"
@@ -1550,7 +1570,6 @@ export default function InputPage() {
               }
             >
               날짜
-
               <span
                 className={
                   styles.required
@@ -1593,7 +1612,6 @@ export default function InputPage() {
               }
             >
               금액
-
               <span
                 className={
                   styles.required
@@ -1654,7 +1672,6 @@ export default function InputPage() {
                 }
               >
                 카테고리
-
                 <span
                   className={
                     styles.required
@@ -1730,7 +1747,6 @@ export default function InputPage() {
                 지출 정보
               </h2>
 
-
               <label
                 className={
                   styles.field
@@ -1742,7 +1758,6 @@ export default function InputPage() {
                   }
                 >
                   결제수단
-
                   <span
                     className={
                       styles.required
@@ -1823,7 +1838,6 @@ export default function InputPage() {
                   }
                 >
                   지출대상
-
                   <span
                     className={
                       styles.required
@@ -1911,7 +1925,6 @@ export default function InputPage() {
                   }
                 >
                   입금수단
-
                   <span
                     className={
                       styles.required
@@ -2006,7 +2019,6 @@ export default function InputPage() {
                     }
                   >
                     보내는 수단
-
                     <span
                       className={
                         styles.required
@@ -2078,7 +2090,6 @@ export default function InputPage() {
                     }
                   >
                     받는 수단
-
                     <span
                       className={
                         styles.required
@@ -2211,7 +2222,6 @@ export default function InputPage() {
                   }
                 >
                   결제할 카드
-
                   <span
                     className={
                       styles.required
@@ -2280,7 +2290,6 @@ export default function InputPage() {
                   }
                 >
                   돈이 나갈 계좌
-
                   <span
                     className={
                       styles.required
@@ -2341,6 +2350,7 @@ export default function InputPage() {
                     )}
                 </select>
 
+
                 {selectedCard
                   ?.paymentAccountId && (
                   <p
@@ -2369,7 +2379,6 @@ export default function InputPage() {
                   }
                 >
                   대상 청구월
-
                   <span
                     className={
                       styles.required
