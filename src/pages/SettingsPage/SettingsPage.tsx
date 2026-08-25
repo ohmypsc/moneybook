@@ -12,14 +12,15 @@ import {
   applyCategoryPreferences,
   createDefaultInputPreferences,
   getInputPreferences,
-  resetInputPreferences,
+  normalizeInputPreferences,
   saveInputPreferences,
   sortAccountsByPreferences
 } from "../../utils/inputPreferences";
 
 import type {
   InputPreferences,
-  PreferenceTransactionType
+  PreferenceTransactionType,
+  SharedInputPreferencesState
 } from "../../utils/inputPreferences";
 
 import styles
@@ -58,6 +59,9 @@ interface BootstrapData {
   accounts: Account[];
 
   categories: Category[];
+
+  inputPreferences?:
+    SharedInputPreferencesState;
 }
 
 
@@ -67,6 +71,21 @@ interface BootstrapResponse {
   apiVersion?: string;
 
   data?: BootstrapData;
+
+  error?: {
+    code?: string;
+    message?: string;
+  };
+}
+
+
+interface SavePreferencesResponse {
+  success: boolean;
+
+  apiVersion?: string;
+
+  data?:
+    SharedInputPreferencesState;
 
   error?: {
     code?: string;
@@ -170,6 +189,18 @@ export default function SettingsPage() {
   ] =
     useState("");
 
+  const [
+    saveError,
+    setSaveError
+  ] =
+    useState("");
+
+  const [
+    saving,
+    setSaving
+  ] =
+    useState(false);
+
 
   useEffect(
     () => {
@@ -215,12 +246,37 @@ export default function SettingsPage() {
             data
           );
 
+          const sharedPreferences =
+            data.inputPreferences
+              ?.configured === true
+              ? data.inputPreferences
+                  .preferences
+              : null;
+
+          const nextPreferences =
+            sharedPreferences
+              ? normalizeInputPreferences(
+                  sharedPreferences,
+                  data.categories,
+                  data.accounts
+                )
+              : getInputPreferences(
+                  data.categories,
+                  data.accounts
+                );
+
+          if (
+            sharedPreferences
+          ) {
+            saveInputPreferences(
+              nextPreferences
+            );
+          }
+
           setPreferences(
-            getInputPreferences(
-              data.categories,
-              data.accounts
-            )
+            nextPreferences
           );
+
         } catch (
           loadError
         ) {
@@ -233,6 +289,7 @@ export default function SettingsPage() {
               ? loadError.message
               : "설정 정보를 불러오지 못했습니다."
           );
+
         } finally {
           if (active) {
             setLoading(
@@ -346,6 +403,10 @@ export default function SettingsPage() {
     setFeedback(
       ""
     );
+
+    setSaveError(
+      ""
+    );
   }
 
 
@@ -369,6 +430,10 @@ export default function SettingsPage() {
     });
 
     setFeedback(
+      ""
+    );
+
+    setSaveError(
       ""
     );
   }
@@ -395,6 +460,7 @@ export default function SettingsPage() {
       hidden.delete(
         accountId
       );
+
     } else {
       hidden.add(
         accountId
@@ -413,31 +479,128 @@ export default function SettingsPage() {
     setFeedback(
       ""
     );
+
+    setSaveError(
+      ""
+    );
   }
 
 
-  function handleSave() {
-    if (!preferences) {
+  async function handleSave() {
+    if (
+      !preferences ||
+      !bootstrap ||
+      saving
+    ) {
       return;
     }
 
+    const normalized =
+      normalizeInputPreferences(
+        preferences,
+        bootstrap.categories,
+        bootstrap.accounts
+      );
+
+    /*
+     * 서버 장애가 있어도 현재 브라우저에서는
+     * 설정을 잃지 않도록 먼저 로컬 백업을 갱신합니다.
+     */
     saveInputPreferences(
-      preferences
+      normalized
+    );
+
+    setPreferences(
+      normalized
+    );
+
+    setSaving(
+      true
     );
 
     setFeedback(
-      "입력 화면 설정을 저장했습니다."
+      ""
     );
+
+    setSaveError(
+      ""
+    );
+
+    try {
+      const response =
+        await apiRequest<
+          SavePreferencesResponse
+        >(
+          "/api/settings/input-preferences",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              preferences:
+                normalized
+            })
+          }
+        );
+
+      if (
+        !response.success ||
+        !response.data ||
+        response.data.configured !==
+          true ||
+        !response.data.preferences
+      ) {
+        throw new Error(
+          response.error
+            ?.message ||
+            "공통 설정을 저장하지 못했습니다."
+        );
+      }
+
+      const saved =
+        normalizeInputPreferences(
+          response.data.preferences,
+          bootstrap.categories,
+          bootstrap.accounts
+        );
+
+      saveInputPreferences(
+        saved
+      );
+
+      setPreferences(
+        saved
+      );
+
+      setFeedback(
+        "부부 공통 설정으로 저장했습니다."
+      );
+
+    } catch (
+      saveFailure
+    ) {
+      setSaveError(
+        saveFailure instanceof Error
+          ? `공통 서버 저장에 실패했습니다. 현재 브라우저에는 저장했습니다. (${saveFailure.message})`
+          : "공통 서버 저장에 실패했습니다. 현재 브라우저에는 저장했습니다."
+      );
+
+    } finally {
+      setSaving(
+        false
+      );
+    }
   }
 
 
   function handleReset() {
-    if (!bootstrap) {
+    if (
+      !bootstrap ||
+      saving
+    ) {
       return;
     }
 
     const next =
-      resetInputPreferences(
+      createDefaultInputPreferences(
         bootstrap.categories,
         bootstrap.accounts
       );
@@ -447,7 +610,11 @@ export default function SettingsPage() {
     );
 
     setFeedback(
-      "기본 설정으로 되돌렸습니다. 저장 버튼을 누르면 적용됩니다."
+      "기본 설정으로 되돌렸습니다. 저장 버튼을 누르면 부부 공통으로 적용됩니다."
+    );
+
+    setSaveError(
+      ""
     );
   }
 
@@ -544,12 +711,10 @@ export default function SettingsPage() {
           styles.storageNotice
         }
       >
-        현재 단계에서는 이 설정이
-        사용 중인 브라우저에 저장됩니다.
-        앱 전체 기능을 완성한 뒤
-        마지막 통합 단계에서
-        부부 공통 서버 설정으로
-        전환할 예정입니다.
+        이 설정은 부부 공통으로 서버에 저장되며,
+        현재 브라우저에도 백업됩니다.
+        다른 기기에서는 앱을 새로 열거나 새로고침한 뒤
+        입력·설정 화면에 들어가면 같은 설정을 사용합니다.
       </p>
 
 
@@ -977,6 +1142,18 @@ export default function SettingsPage() {
       )}
 
 
+      {saveError && (
+        <p
+          className={
+            styles.error
+          }
+          role="alert"
+        >
+          {saveError}
+        </p>
+      )}
+
+
       <div
         className={
           styles.actionArea
@@ -990,6 +1167,9 @@ export default function SettingsPage() {
           onClick={
             handleReset
           }
+          disabled={
+            saving
+          }
         >
           기본값
         </button>
@@ -1000,10 +1180,18 @@ export default function SettingsPage() {
             styles.saveButton
           }
           onClick={
-            handleSave
+            () =>
+              void handleSave()
+          }
+          disabled={
+            saving
           }
         >
-          설정 저장
+          {
+            saving
+              ? "저장 중..."
+              : "설정 저장"
+          }
         </button>
       </div>
     </main>
