@@ -1,9 +1,7 @@
 .page {
   width: 100%;
   max-width: var(--content-width);
-
   min-height: 100vh;
-
   margin: 0 auto;
   padding: 24px 18px 110px;
 }
@@ -14,29 +12,23 @@
 
 .eyebrow {
   margin: 0 0 var(--space-1);
-
   color: var(--color-text-secondary);
-
   font-size: 13px;
   font-weight: 700;
 }
 
 .title {
   margin: 0;
-
   font-size: 26px;
   line-height: 1.3;
 }
 
 .description {
   margin: var(--space-2) 0 0;
-
   color: var(--color-text-secondary);
-
   font-size: 14px;
   line-height: 1.6;
 }
-
 
 /* =========================================================
    월 이동
@@ -46,24 +38,19 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-
   gap: var(--space-3);
-
   margin-bottom: var(--space-4);
 }
 
 .monthNavigator {
   display: flex;
   align-items: center;
-
   gap: var(--space-2);
 }
 
 .monthLabel {
   min-width: 112px;
-
   margin: 0;
-
   font-size: 18px;
   font-weight: 800;
   text-align: center;
@@ -73,17 +60,13 @@
 .todayButton,
 .refreshButton {
   min-height: 40px;
-
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-
   background: var(--color-surface);
   color: var(--color-text-primary);
-
   font: inherit;
   font-size: 13px;
   font-weight: 700;
-
   cursor: pointer;
 }
 
@@ -109,7 +92,6 @@
   cursor: default;
 }
 
-
 /* =========================================================
    월 요약
    ========================================================= */
@@ -121,44 +103,32 @@
       3,
       minmax(0, 1fr)
     );
-
   gap: var(--space-3);
-
   margin-bottom: var(--space-4);
 }
 
 .summaryCard {
   min-width: 0;
-
   padding: 15px 12px;
-
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-
   background: var(--color-surface);
-
   box-shadow: var(--shadow-card);
 }
 
 .summaryLabel {
   display: block;
-
   margin-bottom: 5px;
-
   color: var(--color-text-secondary);
-
   font-size: 12px;
   font-weight: 700;
 }
 
 .summaryValue {
   display: block;
-
   overflow: hidden;
-
   font-size: 16px;
   font-weight: 800;
-
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -175,21 +145,16 @@
   color: var(--color-error);
 }
 
-
 /* =========================================================
    유형 필터
    ========================================================= */
 
 .filters {
   display: flex;
-
   gap: 6px;
-
   overflow-x: auto;
-
   margin-bottom: var(--space-4);
   padding-bottom: 2px;
-
   scrollbar-width: none;
 }
 
@@ -199,31 +164,23 @@
 
 .filterButton {
   flex: 0 0 auto;
-
   min-height: 36px;
-
   padding: 0 14px;
-
   border: 1px solid var(--color-border);
   border-radius: 999px;
-
   background: var(--color-surface);
   color: var(--color-text-secondary);
-
   font: inherit;
   font-size: 13px;
   font-weight: 700;
-
   cursor: pointer;
 }
 
 .filterButtonActive {
   border-color: var(--color-primary);
-
   background: var(--color-primary);
   color: var(--color-primary-text);
 }
-
 
 /* =========================================================
    달력
@@ -231,14 +188,10 @@
 
 .calendarCard {
   overflow: hidden;
-
   margin-bottom: var(--space-5);
-
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-
   background: var(--color-surface);
-
   box-shadow: var(--shadow-card);
 }
 
@@ -249,20 +202,16 @@
       7,
       minmax(0, 1fr)
     );
-
   border-bottom:
     1px solid
     var(--color-border);
-
   background:
     var(--color-surface-soft);
 }
 
 .weekday {
   padding: 10px 2px;
-
   color: var(--color-text-secondary);
-
   font-size: 11px;
   font-weight: 700;
   text-align: center;
@@ -287,31 +236,24 @@
 
 .blankCell {
   min-height: 88px;
-
   border-right:
     1px solid
     var(--color-border);
   border-bottom:
     1px solid
     var(--color-border);
-
   background:
     var(--color-surface-soft);
 }
 
 .dayCell {
   position: relative;
-
   min-width: 0;
   min-height: 88px;
-
   display: flex;
   flex-direction: column;
-
   gap: 4px;
-
   padding: 7px 5px;
-
   border: 0;
   border-right:
     1px solid
@@ -319,13 +261,10 @@
   border-bottom:
     1px solid
     var(--color-border);
-
   background: var(--color-surface);
   color: var(--color-text-primary);
-
   font: inherit;
   text-align: left;
-
   cursor: pointer;
 }
 
@@ -347,14 +286,10 @@
 .dayCellToday .dayNumber {
   width: 25px;
   height: 25px;
-
   display: grid;
   place-items: center;
-
   margin: -2px 0 0 -2px;
-
   border-radius: 50%;
-
   background: var(--color-primary);
   color: var(--color-primary-text);
 }
@@ -363,7 +298,6 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-
   min-width: 0;
 }
 
@@ -375,28 +309,20 @@
 .transactionCount {
   min-width: 17px;
   height: 17px;
-
   display: grid;
   place-items: center;
-
   padding: 0 4px;
-
   border-radius: 999px;
-
   background: var(--color-surface-soft);
   color: var(--color-text-secondary);
-
   font-size: 9px;
   font-weight: 800;
 }
 
 .dayStats {
   display: grid;
-
   gap: 2px;
-
   margin-top: auto;
-
   min-width: 0;
 }
 
@@ -404,12 +330,9 @@
 .dayExpense,
 .dayTransfer {
   display: block;
-
   overflow: hidden;
-
   font-size: 9px;
   font-weight: 700;
-
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -426,7 +349,6 @@
   color: var(--color-text-secondary);
 }
 
-
 /* =========================================================
    상태 메시지
    ========================================================= */
@@ -435,14 +357,10 @@
 .error,
 .emptyState {
   margin: 0;
-
   padding: 22px 16px;
-
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-
   background: var(--color-surface);
-
   font-size: 14px;
   line-height: 1.6;
   text-align: center;
@@ -457,7 +375,6 @@
   color: var(--color-error);
 }
 
-
 /* =========================================================
    선택 날짜 상세
    ========================================================= */
@@ -470,9 +387,7 @@
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-
   gap: var(--space-3);
-
   margin-bottom: var(--space-3);
 }
 
@@ -482,25 +397,20 @@
 
 .detailEyebrow {
   margin: 0 0 3px;
-
   color: var(--color-text-secondary);
-
   font-size: 12px;
   font-weight: 700;
 }
 
 .detailTitle {
   margin: 0;
-
   font-size: 19px;
   line-height: 1.35;
 }
 
 .detailCount {
   flex-shrink: 0;
-
   color: var(--color-text-secondary);
-
   font-size: 12px;
   font-weight: 700;
 }
@@ -512,47 +422,35 @@
       3,
       minmax(0, 1fr)
     );
-
   gap: var(--space-2);
-
   margin-bottom: var(--space-3);
 }
 
 .daySummaryItem {
   min-width: 0;
-
   padding: 10px;
-
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-
   background:
     var(--color-surface-soft);
 }
 
 .daySummaryLabel {
   display: block;
-
   margin-bottom: 4px;
-
   color: var(--color-text-secondary);
-
   font-size: 10px;
   font-weight: 700;
 }
 
 .daySummaryValue {
   display: block;
-
   overflow: hidden;
-
   font-size: 13px;
   font-weight: 800;
-
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
 
 /* =========================================================
    거래 목록
@@ -560,21 +458,16 @@
 
 .transactionList {
   display: grid;
-
   gap: var(--space-2);
-
   margin: 0;
   padding: 0;
-
   list-style: none;
 }
 
 .transactionItem {
   padding: 14px;
-
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-
   background: var(--color-surface);
 }
 
@@ -582,7 +475,6 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-
   gap: var(--space-3);
 }
 
@@ -593,22 +485,16 @@
 .transactionTitleRow {
   display: flex;
   align-items: center;
-
   gap: 7px;
-
   min-width: 0;
 }
 
 .transactionType {
   flex-shrink: 0;
-
   padding: 3px 7px;
-
   border-radius: 999px;
-
   background:
     var(--color-surface-soft);
-
   font-size: 10px;
   font-weight: 800;
 }
@@ -627,17 +513,14 @@
 
 .transactionTitle {
   overflow: hidden;
-
   font-size: 14px;
   font-weight: 800;
-
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .transactionAmount {
   flex-shrink: 0;
-
   font-size: 15px;
   font-weight: 800;
 }
@@ -656,39 +539,29 @@
 
 .transactionMeta {
   margin: 7px 0 0;
-
   color: var(--color-text-secondary);
-
   font-size: 12px;
   line-height: 1.5;
 }
 
 .transactionMemo {
   margin: 7px 0 0;
-
   padding-top: 7px;
-
   border-top:
     1px solid
     var(--color-border);
-
   color: var(--color-text-secondary);
-
   font-size: 12px;
   line-height: 1.5;
 }
 
 .reversalLabel {
   display: inline-block;
-
   margin-left: 6px;
-
   color: var(--color-text-secondary);
-
   font-size: 10px;
   font-weight: 700;
 }
-
 
 /* =========================================================
    모바일
@@ -712,9 +585,7 @@
 
   .monthLabel {
     flex: 1;
-
     min-width: 0;
-
     font-size: 17px;
   }
 
@@ -728,7 +599,6 @@
 
   .refreshButton {
     width: 40px;
-
     padding: 0;
   }
 
@@ -785,5 +655,273 @@
 
   .daySummaryValue {
     font-size: 11px;
+  }
+}
+
+/* =========================================================
+   거래 수정 / 삭제
+   ========================================================= */
+
+.actionError,
+.actionFeedback {
+  margin:
+    0
+    0
+    var(--space-3);
+  padding: 11px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.actionError {
+  color: var(--color-error);
+}
+
+.actionFeedback {
+  color: var(--color-text-primary);
+}
+
+.transactionActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.editButton,
+.deleteButton,
+.editCloseButton,
+.editCancelButton,
+.editSaveButton,
+.undoButton {
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.editButton,
+.deleteButton,
+.editCancelButton {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.editButton,
+.editCancelButton {
+  color: var(--color-text-primary);
+}
+
+.deleteButton {
+  color: var(--color-error);
+}
+
+.editButton:disabled,
+.deleteButton:disabled,
+.editCloseButton:disabled,
+.editCancelButton:disabled,
+.editSaveButton:disabled,
+.undoButton:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.editPanel {
+  margin-top: 12px;
+  padding: 13px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+}
+
+.editHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: 12px;
+}
+
+.editEyebrow {
+  margin: 0 0 2px;
+  color: var(--color-text-secondary);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.editTitle {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.editCloseButton {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.editNotice {
+  margin:
+    0
+    0
+    12px;
+  padding: 10px 11px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.editGrid {
+  display: grid;
+  grid-template-columns:
+    repeat(
+      2,
+      minmax(0, 1fr)
+    );
+  gap: 10px;
+}
+
+.editField {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.editField input,
+.editField select,
+.editField textarea {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+
+.editField input:disabled,
+.editField select:disabled,
+.editField textarea:disabled {
+  opacity: 0.65;
+}
+
+.editField textarea {
+  min-height: 76px;
+  resize: vertical;
+}
+
+.editMemoField {
+  grid-column: 1 / -1;
+}
+
+.editActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.editSaveButton {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+}
+
+/* =========================================================
+   삭제 직후 실행 취소
+   ========================================================= */
+
+.undoBar {
+  position: fixed;
+  left: 50%;
+  bottom:
+    calc(
+      88px +
+      env(safe-area-inset-bottom)
+    );
+  z-index: 50;
+  width:
+    min(
+      calc(100% - 28px),
+      460px
+    );
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 13px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-card);
+  transform: translateX(-50%);
+}
+
+.undoText {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  font-size: 12px;
+}
+
+.undoText span {
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.undoButton {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+}
+
+@media (max-width: 520px) {
+  .transactionTop {
+    gap: 8px;
+  }
+
+  .editGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .editMemoField {
+    grid-column: auto;
+  }
+
+  .undoBar {
+    bottom:
+      calc(
+        82px +
+        env(safe-area-inset-bottom)
+      );
   }
 }
