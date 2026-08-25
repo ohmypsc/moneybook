@@ -6,299 +6,133 @@
  */
 
 const COOKIE_NAME = "__Host-moneybook_session";
-const SESSION_MAX_AGE = 60 * 60 * 24 * 400;
+const SESSION_MAX_AGE = 60 * 60 * 24 * 400; // 400일
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
-
 
 /**
  * =========================================================
  * 공통 응답
  * =========================================================
  */
-function jsonResponse(
-  data,
-  status = 200,
-  extraHeaders = {}
-) {
+function jsonResponse(data, status = 200, extraHeaders = {}) {
   const headers = new Headers({
-    "Content-Type":
-      "application/json; charset=utf-8",
-
-    "Cache-Control":
-      "no-store",
-
-    "X-Content-Type-Options":
-      "nosniff"
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store",
+    "X-Content-Type-Options": "nosniff"
   });
 
+  Object.entries(extraHeaders).forEach(([key, value]) => {
+    headers.set(key, value);
+  });
 
-  Object.entries(
-    extraHeaders
-  ).forEach(
-    ([key, value]) => {
-      headers.set(
-        key,
-        value
-      );
-    }
-  );
-
-
-  return new Response(
-    JSON.stringify(
-      data,
-      null,
-      2
-    ),
-    {
-      status,
-      headers
-    }
-  );
+  return new Response(JSON.stringify(data, null, 2), {
+    status,
+    headers
+  });
 }
-
 
 /**
  * =========================================================
  * LOGIN_USERS
  * =========================================================
  */
-function getLoginUsers(
-  env
-) {
-  if (
-    !env.LOGIN_USERS
-  ) {
-    throw new Error(
-      "LOGIN_USERS Secret이 설정되지 않았습니다."
-    );
+function getLoginUsers(env) {
+  if (!env.LOGIN_USERS) {
+    throw new Error("LOGIN_USERS Secret이 설정되지 않았습니다.");
   }
-
 
   let users;
-
-
   try {
-    users =
-      JSON.parse(
-        env.LOGIN_USERS
-      );
-  } catch (
-    error
-  ) {
-    throw new Error(
-      "LOGIN_USERS가 올바른 JSON 형식이 아닙니다."
-    );
+    users = JSON.parse(env.LOGIN_USERS);
+  } catch (error) {
+    throw new Error("LOGIN_USERS가 올바른 JSON 형식이 아닙니다.");
   }
 
-
-  if (
-    !users ||
-    typeof users !==
-      "object" ||
-    Array.isArray(
-      users
-    )
-  ) {
-    throw new Error(
-      "LOGIN_USERS 형식이 올바르지 않습니다."
-    );
+  if (!users || typeof users !== "object" || Array.isArray(users)) {
+    throw new Error("LOGIN_USERS 형식이 올바르지 않습니다.");
   }
-
 
   return users;
 }
-
 
 /**
  * =========================================================
  * 안전한 문자열 비교
  * =========================================================
  */
-async function safeEqual(
-  valueA,
-  valueB
-) {
-  const a =
-    encoder.encode(
-      String(
-        valueA
-      )
-    );
+async function safeEqual(valueA, valueB) {
+  const a = encoder.encode(String(valueA));
+  const b = encoder.encode(String(valueB));
 
-  const b =
-    encoder.encode(
-      String(
-        valueB
-      )
-    );
+  const [hashA, hashB] = await Promise.all([
+    crypto.subtle.digest("SHA-256", a),
+    crypto.subtle.digest("SHA-256", b)
+  ]);
 
+  const bytesA = new Uint8Array(hashA);
+  const bytesB = new Uint8Array(hashB);
 
-  const [
-    hashA,
-    hashB
-  ] =
-    await Promise.all([
-      crypto.subtle.digest(
-        "SHA-256",
-        a
-      ),
-
-      crypto.subtle.digest(
-        "SHA-256",
-        b
-      )
-    ]);
-
-
-  const bytesA =
-    new Uint8Array(
-      hashA
-    );
-
-  const bytesB =
-    new Uint8Array(
-      hashB
-    );
-
-
-  let difference =
-    0;
-
-
-  for (
-    let i = 0;
-    i < bytesA.length;
-    i++
-  ) {
-    difference |=
-      bytesA[i] ^
-      bytesB[i];
+  let difference = 0;
+  for (let i = 0; i < bytesA.length; i++) {
+    difference |= bytesA[i] ^ bytesB[i];
   }
 
-
-  return (
-    difference ===
-    0
-  );
+  return difference === 0;
 }
-
 
 /**
  * =========================================================
  * Base64 URL
  * =========================================================
  */
-function bytesToBase64Url(
-  bytes
-) {
-  let binary =
-    "";
+function bytesToBase64Url(bytes) {
+  let binary = "";
 
-
-  for (
-    const byte
-    of bytes
-  ) {
-    binary +=
-      String.fromCharCode(
-        byte
-      );
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
   }
 
-
-  return btoa(
-    binary
-  )
-    .replace(
-      /\+/g,
-      "-"
-    )
-    .replace(
-      /\//g,
-      "_"
-    )
-    .replace(
-      /=+$/g,
-      ""
-    );
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
 }
 
+function base64UrlToBytes(value) {
+  let text = value
+    .replace(/-/g, "+")
+    .replace(/_/g, "/");
 
-function base64UrlToBytes(
-  value
-) {
-  let text =
-    value
-      .replace(
-        /-/g,
-        "+"
-      )
-      .replace(
-        /_/g,
-        "/"
-      );
+  text += "=".repeat(
+    (4 - (text.length % 4)) % 4
+  );
 
-
-  text +=
-    "=".repeat(
-      (
-        4 -
-        (
-          text.length %
-          4
-        )
-      ) %
-      4
-    );
-
-
-  const binary =
-    atob(
-      text
-    );
-
+  const binary = atob(text);
 
   return Uint8Array.from(
     binary,
-    char =>
-      char.charCodeAt(
-        0
-      )
+    char => char.charCodeAt(0)
   );
 }
-
 
 /**
  * =========================================================
  * 세션 서명
  * =========================================================
  */
-async function getSessionKey(
-  env
-) {
-  if (
-    !env.SESSION_SECRET
-  ) {
-    throw new Error(
-      "SESSION_SECRET Secret이 설정되지 않았습니다."
-    );
+async function getSessionKey(env) {
+  if (!env.SESSION_SECRET) {
+    throw new Error("SESSION_SECRET Secret이 설정되지 않았습니다.");
   }
-
 
   return crypto.subtle.importKey(
     "raw",
-    encoder.encode(
-      env.SESSION_SECRET
-    ),
+    encoder.encode(env.SESSION_SECRET),
     {
-      name:
-        "HMAC",
-
-      hash:
-        "SHA-256"
+      name: "HMAC",
+      hash: "SHA-256"
     },
     false,
     [
@@ -308,312 +142,183 @@ async function getSessionKey(
   );
 }
 
-
-async function createSessionToken(
-  name,
-  env
-) {
-  const now =
-    Math.floor(
-      Date.now() /
-      1000
-    );
-
+async function createSessionToken(name, env) {
+  const now = Math.floor(
+    Date.now() / 1000
+  );
 
   const payload = {
     v: 1,
     name,
     iat: now,
-    exp:
-      now +
-      SESSION_MAX_AGE
+    exp: now + SESSION_MAX_AGE
   };
 
+  const body = bytesToBase64Url(
+    encoder.encode(
+      JSON.stringify(payload)
+    )
+  );
 
-  const body =
-    bytesToBase64Url(
-      encoder.encode(
-        JSON.stringify(
-          payload
-        )
-      )
-    );
-
-
-  const key =
-    await getSessionKey(
-      env
-    );
-
+  const key = await getSessionKey(env);
 
   const signature =
     await crypto.subtle.sign(
       "HMAC",
       key,
-      encoder.encode(
-        body
-      )
+      encoder.encode(body)
     );
-
 
   const signatureText =
     bytesToBase64Url(
-      new Uint8Array(
-        signature
-      )
+      new Uint8Array(signature)
     );
 
-
-  return (
-    body +
-    "." +
-    signatureText
-  );
+  return body + "." + signatureText;
 }
 
-
-async function verifySessionToken(
-  token,
-  env
-) {
+async function verifySessionToken(token, env) {
   if (
     !token ||
-    typeof token !==
-      "string"
+    typeof token !== "string"
   ) {
     return null;
   }
 
+  const parts = token.split(".");
 
-  const parts =
-    token.split(
-      "."
-    );
-
-
-  if (
-    parts.length !==
-    2
-  ) {
+  if (parts.length !== 2) {
     return null;
   }
-
 
   const [
     body,
     signature
-  ] =
-    parts;
-
+  ] = parts;
 
   try {
     const key =
-      await getSessionKey(
-        env
-      );
-
+      await getSessionKey(env);
 
     const valid =
       await crypto.subtle.verify(
         "HMAC",
         key,
-        base64UrlToBytes(
-          signature
-        ),
-        encoder.encode(
-          body
-        )
+        base64UrlToBytes(signature),
+        encoder.encode(body)
       );
 
-
-    if (
-      !valid
-    ) {
+    if (!valid) {
       return null;
     }
-
 
     const payload =
       JSON.parse(
         decoder.decode(
-          base64UrlToBytes(
-            body
-          )
+          base64UrlToBytes(body)
         )
       );
 
-
     const now =
       Math.floor(
-        Date.now() /
-        1000
+        Date.now() / 1000
       );
-
 
     if (
       !payload ||
-      payload.v !==
-        1 ||
-      typeof payload.name !==
-        "string" ||
-      !Number.isFinite(
-        payload.exp
-      ) ||
-      payload.exp <=
-        now
+      payload.v !== 1 ||
+      typeof payload.name !== "string" ||
+      !Number.isFinite(payload.exp) ||
+      payload.exp <= now
     ) {
       return null;
     }
 
-
     return payload;
-  } catch (
-    error
-  ) {
+  } catch (error) {
     return null;
   }
 }
-
 
 /**
  * =========================================================
  * Cookie
  * =========================================================
  */
-function getCookie(
-  request,
-  name
-) {
+function getCookie(request, name) {
   const raw =
     request.headers.get(
       "Cookie"
     );
 
-
-  if (
-    !raw
-  ) {
+  if (!raw) {
     return "";
   }
 
-
   const cookies =
-    raw.split(
-      ";"
-    );
+    raw.split(";");
 
-
-  for (
-    const cookie
-    of cookies
-  ) {
+  for (const cookie of cookies) {
     const part =
       cookie.trim();
 
     const index =
-      part.indexOf(
-        "="
-      );
+      part.indexOf("=");
 
-
-    if (
-      index <
-      0
-    ) {
+    if (index < 0) {
       continue;
     }
 
-
     const key =
       part
-        .slice(
-          0,
-          index
-        )
+        .slice(0, index)
         .trim();
 
-
     const value =
-      part.slice(
-        index +
-        1
-      );
+      part.slice(index + 1);
 
-
-    if (
-      key ===
-      name
-    ) {
+    if (key === name) {
       return value;
     }
   }
 
-
   return "";
 }
 
-
-function createCookie(
-  token
-) {
+function createCookie(token) {
   return [
-    COOKIE_NAME +
-      "=" +
-      token,
-
+    COOKIE_NAME + "=" + token,
     "Path=/",
-
-    "Max-Age=" +
-      SESSION_MAX_AGE,
-
+    "Max-Age=" + SESSION_MAX_AGE,
     "HttpOnly",
-
     "Secure",
-
     "SameSite=Strict"
-  ].join(
-    "; "
-  );
+  ].join("; ");
 }
-
 
 function clearCookie() {
   return [
-    COOKIE_NAME +
-      "=",
-
+    COOKIE_NAME + "=",
     "Path=/",
-
     "Max-Age=0",
-
     "Expires=Thu, 01 Jan 1970 00:00:00 GMT",
-
     "HttpOnly",
-
     "Secure",
-
     "SameSite=Strict"
-  ].join(
-    "; "
-  );
+  ].join("; ");
 }
-
 
 /**
  * =========================================================
  * 로그인 상태 확인
  * =========================================================
  */
-async function getSession(
-  request,
-  env
-) {
+async function getSession(request, env) {
   const token =
     getCookie(
       request,
       COOKIE_NAME
     );
-
 
   const payload =
     await verifySessionToken(
@@ -621,19 +326,12 @@ async function getSession(
       env
     );
 
-
-  if (
-    !payload
-  ) {
+  if (!payload) {
     return null;
   }
 
-
   const users =
-    getLoginUsers(
-      env
-    );
-
+    getLoginUsers(env);
 
   if (
     !Object.prototype
@@ -646,62 +344,43 @@ async function getSession(
     return null;
   }
 
-
   return payload;
 }
-
 
 function unauthorized() {
   return jsonResponse(
     {
-      success:
-        false,
-
-      loggedIn:
-        false,
-
+      success: false,
+      loggedIn: false,
       error: {
-        code:
-          "LOGIN_REQUIRED",
-
-        message:
-          "로그인이 필요합니다."
+        code: "LOGIN_REQUIRED",
+        message: "로그인이 필요합니다."
       }
     },
     401
   );
 }
 
-
 /**
  * =========================================================
  * 같은 사이트 POST 요청만 허용
  * =========================================================
  */
-function isSameOrigin(
-  request
-) {
+function isSameOrigin(request) {
   const origin =
     request.headers.get(
       "Origin"
     );
 
-
-  if (
-    !origin
-  ) {
+  if (!origin) {
     return true;
   }
 
-
   return (
     origin ===
-    new URL(
-      request.url
-    ).origin
+    new URL(request.url).origin
   );
 }
-
 
 /**
  * =========================================================
@@ -714,61 +393,43 @@ async function appsScriptGet(
   params = {},
   useSecret = true
 ) {
-  if (
-    !env.APPS_SCRIPT_URL
-  ) {
+  if (!env.APPS_SCRIPT_URL) {
     throw new Error(
       "APPS_SCRIPT_URL Secret이 설정되지 않았습니다."
     );
   }
-
 
   const target =
     new URL(
       env.APPS_SCRIPT_URL
     );
 
-
   target.searchParams.set(
     "action",
     action
   );
 
-
-  Object.entries(
-    params
-  ).forEach(
+  Object.entries(params).forEach(
     ([key, value]) => {
       if (
-        value !==
-          undefined &&
-        value !==
-          null &&
-        value !==
-          ""
+        value !== undefined &&
+        value !== null &&
+        value !== ""
       ) {
         target.searchParams.set(
           key,
-          String(
-            value
-          )
+          String(value)
         );
       }
     }
   );
 
-
-  if (
-    useSecret
-  ) {
-    if (
-      !env.LEDGER_API_SECRET
-    ) {
+  if (useSecret) {
+    if (!env.LEDGER_API_SECRET) {
       throw new Error(
         "LEDGER_API_SECRET Secret이 설정되지 않았습니다."
       );
     }
-
 
     target.searchParams.set(
       "apiSecret",
@@ -776,37 +437,26 @@ async function appsScriptGet(
     );
   }
 
-
   const response =
     await fetch(
       target.toString(),
       {
-        method:
-          "GET",
-
-        redirect:
-          "follow"
+        method: "GET",
+        redirect: "follow"
       }
     );
-
 
   const text =
     await response.text();
 
-
   try {
-    return JSON.parse(
-      text
-    );
-  } catch (
-    error
-  ) {
+    return JSON.parse(text);
+  } catch (error) {
     throw new Error(
       "Apps Script가 JSON이 아닌 응답을 반환했습니다."
     );
   }
 }
-
 
 /**
  * =========================================================
@@ -818,23 +468,17 @@ async function appsScriptPost(
   action,
   payload = {}
 ) {
-  if (
-    !env.APPS_SCRIPT_URL
-  ) {
+  if (!env.APPS_SCRIPT_URL) {
     throw new Error(
       "APPS_SCRIPT_URL Secret이 설정되지 않았습니다."
     );
   }
 
-
-  if (
-    !env.LEDGER_API_SECRET
-  ) {
+  if (!env.LEDGER_API_SECRET) {
     throw new Error(
       "LEDGER_API_SECRET Secret이 설정되지 않았습니다."
     );
   }
-
 
   const body = {
     ...payload,
@@ -843,47 +487,32 @@ async function appsScriptPost(
       env.LEDGER_API_SECRET
   };
 
-
   const response =
     await fetch(
       env.APPS_SCRIPT_URL,
       {
-        method:
-          "POST",
-
+        method: "POST",
         headers: {
           "Content-Type":
             "application/json"
         },
-
         body:
-          JSON.stringify(
-            body
-          ),
-
-        redirect:
-          "follow"
+          JSON.stringify(body),
+        redirect: "follow"
       }
     );
-
 
   const text =
     await response.text();
 
-
   try {
-    return JSON.parse(
-      text
-    );
-  } catch (
-    error
-  ) {
+    return JSON.parse(text);
+  } catch (error) {
     throw new Error(
       "Apps Script가 JSON이 아닌 응답을 반환했습니다."
     );
   }
 }
-
 
 /**
  * =========================================================
@@ -891,44 +520,31 @@ async function appsScriptPost(
  * =========================================================
  */
 export default {
-  async fetch(
-    request,
-    env
-  ) {
+  async fetch(request, env) {
     const url =
-      new URL(
-        request.url
-      );
-
+      new URL(request.url);
 
     try {
       /**
        * Worker 확인
        */
       if (
-        request.method ===
-          "GET" &&
-        url.pathname ===
-          "/api/ping"
+        request.method === "GET" &&
+        url.pathname === "/api/ping"
       ) {
         return jsonResponse({
-          success:
-            true,
-
+          success: true,
           message:
             "Cloudflare Worker is running."
         });
       }
 
-
       /**
        * Apps Script health
        */
       if (
-        request.method ===
-          "GET" &&
-        url.pathname ===
-          "/api/health"
+        request.method === "GET" &&
+        url.pathname === "/api/health"
       ) {
         const data =
           await appsScriptGet(
@@ -938,36 +554,23 @@ export default {
             false
           );
 
-
-        return jsonResponse(
-          data
-        );
+        return jsonResponse(data);
       }
-
 
       /**
        * 로그인
        */
       if (
-        request.method ===
-          "POST" &&
-        url.pathname ===
-          "/api/auth/login"
+        request.method === "POST" &&
+        url.pathname === "/api/auth/login"
       ) {
-        if (
-          !isSameOrigin(
-            request
-          )
-        ) {
+        if (!isSameOrigin(request)) {
           return jsonResponse(
             {
-              success:
-                false,
-
+              success: false,
               error: {
                 code:
                   "INVALID_ORIGIN",
-
                 message:
                   "허용되지 않은 요청입니다."
               }
@@ -976,25 +579,18 @@ export default {
           );
         }
 
-
         let body;
-
 
         try {
           body =
             await request.json();
-        } catch (
-          error
-        ) {
+        } catch (error) {
           return jsonResponse(
             {
-              success:
-                false,
-
+              success: false,
               error: {
                 code:
                   "INVALID_JSON",
-
                 message:
                   "로그인 요청 형식이 올바르지 않습니다."
               }
@@ -1003,38 +599,28 @@ export default {
           );
         }
 
-
         const name =
           String(
-            body.name ||
-            ""
+            body.name || ""
           ).trim();
-
 
         const password =
           String(
-            body.password ||
-            ""
+            body.password || ""
           );
-
 
         if (
           !name ||
           !password ||
-          name.length >
-            100 ||
-          password.length >
-            500
+          name.length > 100 ||
+          password.length > 500
         ) {
           return jsonResponse(
             {
-              success:
-                false,
-
+              success: false,
               error: {
                 code:
                   "INVALID_LOGIN",
-
                 message:
                   "이름 또는 비밀번호를 확인해주세요."
               }
@@ -1043,12 +629,8 @@ export default {
           );
         }
 
-
         const users =
-          getLoginUsers(
-            env
-          );
-
+          getLoginUsers(env);
 
         const stored =
           Object.prototype
@@ -1057,11 +639,8 @@ export default {
               users,
               name
             )
-            ? String(
-                users[name]
-              )
+            ? String(users[name])
             : "";
-
 
         const valid =
           stored &&
@@ -1072,19 +651,13 @@ export default {
             )
           );
 
-
-        if (
-          !valid
-        ) {
+        if (!valid) {
           return jsonResponse(
             {
-              success:
-                false,
-
+              success: false,
               error: {
                 code:
                   "INVALID_LOGIN",
-
                 message:
                   "이름 또는 비밀번호를 확인해주세요."
               }
@@ -1093,22 +666,16 @@ export default {
           );
         }
 
-
         const token =
           await createSessionToken(
             name,
             env
           );
 
-
         return jsonResponse(
           {
-            success:
-              true,
-
-            loggedIn:
-              true,
-
+            success: true,
+            loggedIn: true,
             user: {
               name
             }
@@ -1116,22 +683,17 @@ export default {
           200,
           {
             "Set-Cookie":
-              createCookie(
-                token
-              )
+              createCookie(token)
           }
         );
       }
-
 
       /**
        * 세션 확인 + 로그인 기간 자동 연장
        */
       if (
-        request.method ===
-          "GET" &&
-        url.pathname ===
-          "/api/auth/session"
+        request.method === "GET" &&
+        url.pathname === "/api/auth/session"
       ) {
         const session =
           await getSession(
@@ -1139,32 +701,23 @@ export default {
             env
           );
 
-
-        if (
-          !session
-        ) {
+        if (!session) {
           return unauthorized();
         }
 
-
+        // 앱을 열 때마다 새로운 400일 세션을 발급
         const refreshedToken =
           await createSessionToken(
             session.name,
             env
           );
 
-
         return jsonResponse(
           {
-            success:
-              true,
-
-            loggedIn:
-              true,
-
+            success: true,
+            loggedIn: true,
             user: {
-              name:
-                session.name
+              name: session.name
             }
           },
           200,
@@ -1177,30 +730,20 @@ export default {
         );
       }
 
-
       /**
        * 로그아웃
        */
       if (
-        request.method ===
-          "POST" &&
-        url.pathname ===
-          "/api/auth/logout"
+        request.method === "POST" &&
+        url.pathname === "/api/auth/logout"
       ) {
-        if (
-          !isSameOrigin(
-            request
-          )
-        ) {
+        if (!isSameOrigin(request)) {
           return jsonResponse(
             {
-              success:
-                false,
-
+              success: false,
               error: {
                 code:
                   "INVALID_ORIGIN",
-
                 message:
                   "허용되지 않은 요청입니다."
               }
@@ -1209,14 +752,10 @@ export default {
           );
         }
 
-
         return jsonResponse(
           {
-            success:
-              true,
-
-            loggedIn:
-              false
+            success: true,
+            loggedIn: false
           },
           200,
           {
@@ -1225,7 +764,6 @@ export default {
           }
         );
       }
-
 
       /**
        * 이하 API는 로그인 필수
@@ -1241,13 +779,9 @@ export default {
             env
           );
 
-
-        if (
-          !session
-        ) {
+        if (!session) {
           return unauthorized();
         }
-
 
         /**
          * 보안 연결 테스트
@@ -1264,24 +798,16 @@ export default {
               "bootstrap"
             );
 
-
-          if (
-            !data.success
-          ) {
+          if (!data.success) {
             return jsonResponse(
               {
-                success:
-                  false,
-
+                success: false,
                 backendAuthenticated:
                   false,
-
                 error:
-                  data.error ||
-                  {
+                  data.error || {
                     code:
                       "BACKEND_ERROR",
-
                     message:
                       "Apps Script 요청에 실패했습니다."
                   }
@@ -1290,28 +816,19 @@ export default {
             );
           }
 
-
           const bootstrap =
-            data.data ||
-            {};
-
+            data.data || {};
 
           return jsonResponse({
-            success:
-              true,
-
+            success: true,
             backendAuthenticated:
               true,
-
             apiVersion:
               data.apiVersion,
-
             user:
               session.name,
-
             message:
               "로그인 + Cloudflare + Apps Script 연결 성공",
-
             counts: {
               accounts:
                 Array.isArray(
@@ -1342,7 +859,8 @@ export default {
 
               spendingTargets:
                 Array.isArray(
-                  bootstrap.spendingTargets
+                  bootstrap
+                    .spendingTargets
                 )
                   ? bootstrap
                       .spendingTargets
@@ -1352,15 +870,13 @@ export default {
           });
         }
 
-
         /**
+         * 프론트엔드가 곧 사용할
          * Bootstrap API
          */
         if (
-          request.method ===
-            "GET" &&
-          url.pathname ===
-            "/api/bootstrap"
+          request.method === "GET" &&
+          url.pathname === "/api/bootstrap"
         ) {
           const data =
             await appsScriptGet(
@@ -1368,21 +884,15 @@ export default {
               "bootstrap"
             );
 
-
-          return jsonResponse(
-            data
-          );
+          return jsonResponse(data);
         }
-
 
         /**
          * 대시보드
          */
         if (
-          request.method ===
-            "GET" &&
-          url.pathname ===
-            "/api/dashboard"
+          request.method === "GET" &&
+          url.pathname === "/api/dashboard"
         ) {
           const data =
             await appsScriptGet(
@@ -1390,30 +900,21 @@ export default {
               "dashboard",
               {
                 month:
-                  url
-                    .searchParams
-                    .get(
-                      "month"
-                    ) ||
-                  ""
+                  url.searchParams.get(
+                    "month"
+                  ) || ""
               }
             );
 
-
-          return jsonResponse(
-            data
-          );
+          return jsonResponse(data);
         }
-
 
         /**
          * 거래 조회
          */
         if (
-          request.method ===
-            "GET" &&
-          url.pathname ===
-            "/api/transactions"
+          request.method === "GET" &&
+          url.pathname === "/api/transactions"
         ) {
           const data =
             await appsScriptGet(
@@ -1423,89 +924,72 @@ export default {
                 dateFrom:
                   url.searchParams.get(
                     "dateFrom"
-                  ) ||
-                  "",
+                  ) || "",
 
                 dateTo:
                   url.searchParams.get(
                     "dateTo"
-                  ) ||
-                  "",
+                  ) || "",
 
                 type:
                   url.searchParams.get(
                     "type"
-                  ) ||
-                  "",
+                  ) || "",
 
                 categoryId:
                   url.searchParams.get(
                     "categoryId"
-                  ) ||
-                  "",
+                  ) || "",
 
                 accountId:
                   url.searchParams.get(
                     "accountId"
-                  ) ||
-                  "",
+                  ) || "",
 
                 spendingTarget:
                   url.searchParams.get(
                     "spendingTarget"
-                  ) ||
-                  "",
+                  ) || "",
 
                 q:
                   url.searchParams.get(
                     "q"
-                  ) ||
-                  "",
+                  ) || "",
 
                 limit:
                   url.searchParams.get(
                     "limit"
-                  ) ||
-                  "",
+                  ) || "",
 
                 offset:
                   url.searchParams.get(
                     "offset"
-                  ) ||
-                  ""
+                  ) || "",
+
+                includeDeleted:
+                  url.searchParams.get(
+                    "includeDeleted"
+                  ) || ""
               }
             );
 
-
-          return jsonResponse(
-            data
-          );
+          return jsonResponse(data);
         }
-
 
         /**
          * 거래 생성
          */
         if (
-          request.method ===
-            "POST" &&
-          url.pathname ===
-            "/api/transactions"
+          request.method === "POST" &&
+          url.pathname === "/api/transactions"
         ) {
-          if (
-            !isSameOrigin(
-              request
-            )
-          ) {
+          if (!isSameOrigin(request)) {
             return jsonResponse(
               {
-                success:
-                  false,
-
+                success: false,
                 error: {
                   code:
                     "INVALID_ORIGIN",
-
                   message:
                     "허용되지 않은 요청입니다."
                 }
@@ -1514,25 +998,18 @@ export default {
             );
           }
 
-
           let body;
-
 
           try {
             body =
               await request.json();
-          } catch (
-            error
-          ) {
+          } catch (error) {
             return jsonResponse(
               {
-                success:
-                  false,
-
+                success: false,
                 error: {
                   code:
                     "INVALID_JSON",
-
                   message:
                     "거래 입력 형식이 올바르지 않습니다."
                 }
@@ -1540,25 +1017,19 @@ export default {
               400
             );
           }
-
 
           if (
             !body ||
             typeof body !==
               "object" ||
-            Array.isArray(
-              body
-            )
+            Array.isArray(body)
           ) {
             return jsonResponse(
               {
-                success:
-                  false,
-
+                success: false,
                 error: {
                   code:
                     "INVALID_TRANSACTION",
-
                   message:
                     "거래 입력 형식이 올바르지 않습니다."
                 }
@@ -1566,7 +1037,6 @@ export default {
               400
             );
           }
-
 
           const data =
             await appsScriptPost(
@@ -1579,24 +1049,250 @@ export default {
               }
             );
 
-
-          return jsonResponse(
-            data
-          );
+          return jsonResponse(data);
         }
 
+        /**
+         * 거래 수정
+         */
+        if (
+          request.method === "POST" &&
+          url.pathname ===
+            "/api/transactions/update"
+        ) {
+          if (!isSameOrigin(request)) {
+            return jsonResponse(
+              {
+                success: false,
+                error: {
+                  code:
+                    "INVALID_ORIGIN",
+                  message:
+                    "허용되지 않은 요청입니다."
+                }
+              },
+              403
+            );
+          }
+
+          let body;
+
+          try {
+            body =
+              await request.json();
+          } catch (error) {
+            return jsonResponse(
+              {
+                success: false,
+                error: {
+                  code:
+                    "INVALID_JSON",
+                  message:
+                    "거래 수정 형식이 올바르지 않습니다."
+                }
+              },
+              400
+            );
+          }
+
+          if (
+            !body ||
+            typeof body !==
+              "object" ||
+            Array.isArray(body)
+          ) {
+            return jsonResponse(
+              {
+                success: false,
+                error: {
+                  code:
+                    "INVALID_TRANSACTION",
+                  message:
+                    "거래 수정 형식이 올바르지 않습니다."
+                }
+              },
+              400
+            );
+          }
+
+          const data =
+            await appsScriptPost(
+              env,
+              "updateTransaction",
+              {
+                ...body,
+                actor:
+                  session.name
+              }
+            );
+
+          return jsonResponse(data);
+        }
+
+        /**
+         * 거래 삭제 (soft delete)
+         */
+        if (
+          request.method === "POST" &&
+          url.pathname ===
+            "/api/transactions/delete"
+        ) {
+          if (!isSameOrigin(request)) {
+            return jsonResponse(
+              {
+                success: false,
+                error: {
+                  code:
+                    "INVALID_ORIGIN",
+                  message:
+                    "허용되지 않은 요청입니다."
+                }
+              },
+              403
+            );
+          }
+
+          let body;
+
+          try {
+            body =
+              await request.json();
+          } catch (error) {
+            return jsonResponse(
+              {
+                success: false,
+                error: {
+                  code:
+                    "INVALID_JSON",
+                  message:
+                    "거래 삭제 형식이 올바르지 않습니다."
+                }
+              },
+              400
+            );
+          }
+
+          if (
+            !body ||
+            typeof body !==
+              "object" ||
+            Array.isArray(body)
+          ) {
+            return jsonResponse(
+              {
+                success: false,
+                error: {
+                  code:
+                    "INVALID_TRANSACTION",
+                  message:
+                    "거래 삭제 형식이 올바르지 않습니다."
+                }
+              },
+              400
+            );
+          }
+
+          const data =
+            await appsScriptPost(
+              env,
+              "deleteTransaction",
+              {
+                ...body,
+                actor:
+                  session.name
+              }
+            );
+
+          return jsonResponse(data);
+        }
+
+        /**
+         * 거래 복원
+         */
+        if (
+          request.method === "POST" &&
+          url.pathname ===
+            "/api/transactions/restore"
+        ) {
+          if (!isSameOrigin(request)) {
+            return jsonResponse(
+              {
+                success: false,
+                error: {
+                  code:
+                    "INVALID_ORIGIN",
+                  message:
+                    "허용되지 않은 요청입니다."
+                }
+              },
+              403
+            );
+          }
+
+          let body;
+
+          try {
+            body =
+              await request.json();
+          } catch (error) {
+            return jsonResponse(
+              {
+                success: false,
+                error: {
+                  code:
+                    "INVALID_JSON",
+                  message:
+                    "거래 복원 형식이 올바르지 않습니다."
+                }
+              },
+              400
+            );
+          }
+
+          if (
+            !body ||
+            typeof body !==
+              "object" ||
+            Array.isArray(body)
+          ) {
+            return jsonResponse(
+              {
+                success: false,
+                error: {
+                  code:
+                    "INVALID_TRANSACTION",
+                  message:
+                    "거래 복원 형식이 올바르지 않습니다."
+                }
+              },
+              400
+            );
+          }
+
+          const data =
+            await appsScriptPost(
+              env,
+              "restoreTransaction",
+              {
+                ...body,
+                actor:
+                  session.name
+              }
+            );
+
+          return jsonResponse(data);
+        }
 
         /* =====================================================
-         * 투자
+         * 투자 - 신규 라우트
          * ===================================================== */
-
 
         /**
          * 투자계좌 목록
+         * (bootstrap과 별개로 필요할 때만 가볍게 조회)
          */
         if (
-          request.method ===
-            "GET" &&
+          request.method === "GET" &&
           url.pathname ===
             "/api/investments/accounts"
         ) {
@@ -1606,19 +1302,14 @@ export default {
               "investmentAccounts"
             );
 
-
-          return jsonResponse(
-            data
-          );
+          return jsonResponse(data);
         }
-
 
         /**
          * 보유종목 조회
          */
         if (
-          request.method ===
-            "GET" &&
+          request.method === "GET" &&
           url.pathname ===
             "/api/investments/holdings"
         ) {
@@ -1630,145 +1321,33 @@ export default {
                 accountId:
                   url.searchParams.get(
                     "accountId"
-                  ) ||
-                  "",
+                  ) || "",
 
                 market:
                   url.searchParams.get(
                     "market"
-                  ) ||
-                  "",
+                  ) || "",
 
                 quoteMode:
                   url.searchParams.get(
                     "quoteMode"
-                  ) ||
-                  "",
+                  ) || "",
 
                 includeDeleted:
                   url.searchParams.get(
                     "includeDeleted"
-                  ) ||
-                  ""
+                  ) || ""
               }
             );
 
-
-          return jsonResponse(
-            data
-          );
+          return jsonResponse(data);
         }
 
-
         /**
-         * 보유종목 수동시세 수정
+         * 투자거래(매수/매도) 내역 조회
          */
         if (
-          request.method ===
-            "POST" &&
-          url.pathname ===
-            "/api/investments/holdings/update"
-        ) {
-          if (
-            !isSameOrigin(
-              request
-            )
-          ) {
-            return jsonResponse(
-              {
-                success:
-                  false,
-
-                error: {
-                  code:
-                    "INVALID_ORIGIN",
-
-                  message:
-                    "허용되지 않은 요청입니다."
-                }
-              },
-              403
-            );
-          }
-
-
-          let body;
-
-
-          try {
-            body =
-              await request.json();
-          } catch (
-            error
-          ) {
-            return jsonResponse(
-              {
-                success:
-                  false,
-
-                error: {
-                  code:
-                    "INVALID_JSON",
-
-                  message:
-                    "보유종목 수정 형식이 올바르지 않습니다."
-                }
-              },
-              400
-            );
-          }
-
-
-          if (
-            !body ||
-            typeof body !==
-              "object" ||
-            Array.isArray(
-              body
-            )
-          ) {
-            return jsonResponse(
-              {
-                success:
-                  false,
-
-                error: {
-                  code:
-                    "INVALID_HOLDING_UPDATE",
-
-                  message:
-                    "보유종목 수정 형식이 올바르지 않습니다."
-                }
-              },
-              400
-            );
-          }
-
-
-          const data =
-            await appsScriptPost(
-              env,
-              "updateHolding",
-              {
-                ...body,
-                actor:
-                  session.name
-              }
-            );
-
-
-          return jsonResponse(
-            data
-          );
-        }
-
-
-        /**
-         * 투자거래 내역 조회
-         */
-        if (
-          request.method ===
-            "GET" &&
+          request.method === "GET" &&
           url.pathname ===
             "/api/investments/trades"
         ) {
@@ -1780,42 +1359,33 @@ export default {
                 accountId:
                   url.searchParams.get(
                     "accountId"
-                  ) ||
-                  "",
+                  ) || "",
 
                 holdingId:
                   url.searchParams.get(
                     "holdingId"
-                  ) ||
-                  "",
+                  ) || "",
 
                 tradeType:
                   url.searchParams.get(
                     "tradeType"
-                  ) ||
-                  "",
+                  ) || "",
 
                 includeDeleted:
                   url.searchParams.get(
                     "includeDeleted"
-                  ) ||
-                  ""
+                  ) || ""
               }
             );
 
-
-          return jsonResponse(
-            data
-          );
+          return jsonResponse(data);
         }
 
-
         /**
-         * 투자계좌 예수금 현황
+         * 투자계좌 예수금 현황 조회
          */
         if (
-          request.method ===
-            "GET" &&
+          request.method === "GET" &&
           url.pathname ===
             "/api/investments/cash"
         ) {
@@ -1827,41 +1397,29 @@ export default {
                 accountId:
                   url.searchParams.get(
                     "accountId"
-                  ) ||
-                  ""
+                  ) || ""
               }
             );
 
-
-          return jsonResponse(
-            data
-          );
+          return jsonResponse(data);
         }
-
 
         /**
          * 투자계좌 예수금 기준값 설정
+         * (최초 1회, 또는 force로 강제 재설정)
          */
         if (
-          request.method ===
-            "POST" &&
+          request.method === "POST" &&
           url.pathname ===
             "/api/investments/cash-baseline"
         ) {
-          if (
-            !isSameOrigin(
-              request
-            )
-          ) {
+          if (!isSameOrigin(request)) {
             return jsonResponse(
               {
-                success:
-                  false,
-
+                success: false,
                 error: {
                   code:
                     "INVALID_ORIGIN",
-
                   message:
                     "허용되지 않은 요청입니다."
                 }
@@ -1870,25 +1428,18 @@ export default {
             );
           }
 
-
           let body;
-
 
           try {
             body =
               await request.json();
-          } catch (
-            error
-          ) {
+          } catch (error) {
             return jsonResponse(
               {
-                success:
-                  false,
-
+                success: false,
                 error: {
                   code:
                     "INVALID_JSON",
-
                   message:
                     "요청 형식이 올바르지 않습니다."
                 }
@@ -1896,7 +1447,6 @@ export default {
               400
             );
           }
-
 
           const data =
             await appsScriptPost(
@@ -1909,36 +1459,24 @@ export default {
               }
             );
 
-
-          return jsonResponse(
-            data
-          );
+          return jsonResponse(data);
         }
 
-
         /**
-         * 투자거래 생성
+         * 투자거래 생성 (매수/매도)
          */
         if (
-          request.method ===
-            "POST" &&
+          request.method === "POST" &&
           url.pathname ===
             "/api/investments/trades"
         ) {
-          if (
-            !isSameOrigin(
-              request
-            )
-          ) {
+          if (!isSameOrigin(request)) {
             return jsonResponse(
               {
-                success:
-                  false,
-
+                success: false,
                 error: {
                   code:
                     "INVALID_ORIGIN",
-
                   message:
                     "허용되지 않은 요청입니다."
                 }
@@ -1947,25 +1485,18 @@ export default {
             );
           }
 
-
           let body;
-
 
           try {
             body =
               await request.json();
-          } catch (
-            error
-          ) {
+          } catch (error) {
             return jsonResponse(
               {
-                success:
-                  false,
-
+                success: false,
                 error: {
                   code:
                     "INVALID_JSON",
-
                   message:
                     "투자거래 입력 형식이 올바르지 않습니다."
                 }
@@ -1973,25 +1504,19 @@ export default {
               400
             );
           }
-
 
           if (
             !body ||
             typeof body !==
               "object" ||
-            Array.isArray(
-              body
-            )
+            Array.isArray(body)
           ) {
             return jsonResponse(
               {
-                success:
-                  false,
-
+                success: false,
                 error: {
                   code:
                     "INVALID_TRANSACTION",
-
                   message:
                     "투자거래 입력 형식이 올바르지 않습니다."
                 }
@@ -1999,7 +1524,6 @@ export default {
               400
             );
           }
-
 
           const data =
             await appsScriptPost(
@@ -2012,36 +1536,24 @@ export default {
               }
             );
 
-
-          return jsonResponse(
-            data
-          );
+          return jsonResponse(data);
         }
-
 
         /**
          * 투자거래 수정
          */
         if (
-          request.method ===
-            "POST" &&
+          request.method === "POST" &&
           url.pathname ===
             "/api/investments/trades/update"
         ) {
-          if (
-            !isSameOrigin(
-              request
-            )
-          ) {
+          if (!isSameOrigin(request)) {
             return jsonResponse(
               {
-                success:
-                  false,
-
+                success: false,
                 error: {
                   code:
                     "INVALID_ORIGIN",
-
                   message:
                     "허용되지 않은 요청입니다."
                 }
@@ -2050,25 +1562,18 @@ export default {
             );
           }
 
-
           let body;
-
 
           try {
             body =
               await request.json();
-          } catch (
-            error
-          ) {
+          } catch (error) {
             return jsonResponse(
               {
-                success:
-                  false,
-
+                success: false,
                 error: {
                   code:
                     "INVALID_JSON",
-
                   message:
                     "투자거래 수정 형식이 올바르지 않습니다."
                 }
@@ -2076,7 +1581,6 @@ export default {
               400
             );
           }
-
 
           const data =
             await appsScriptPost(
@@ -2089,36 +1593,24 @@ export default {
               }
             );
 
-
-          return jsonResponse(
-            data
-          );
+          return jsonResponse(data);
         }
 
-
         /**
-         * 투자거래 삭제
+         * 투자거래 삭제 (soft delete)
          */
         if (
-          request.method ===
-            "POST" &&
+          request.method === "POST" &&
           url.pathname ===
             "/api/investments/trades/delete"
         ) {
-          if (
-            !isSameOrigin(
-              request
-            )
-          ) {
+          if (!isSameOrigin(request)) {
             return jsonResponse(
               {
-                success:
-                  false,
-
+                success: false,
                 error: {
                   code:
                     "INVALID_ORIGIN",
-
                   message:
                     "허용되지 않은 요청입니다."
                 }
@@ -2127,25 +1619,18 @@ export default {
             );
           }
 
-
           let body;
-
 
           try {
             body =
               await request.json();
-          } catch (
-            error
-          ) {
+          } catch (error) {
             return jsonResponse(
               {
-                success:
-                  false,
-
+                success: false,
                 error: {
                   code:
                     "INVALID_JSON",
-
                   message:
                     "요청 형식이 올바르지 않습니다."
                 }
@@ -2153,7 +1638,6 @@ export default {
               400
             );
           }
-
 
           const data =
             await appsScriptPost(
@@ -2166,36 +1650,24 @@ export default {
               }
             );
 
-
-          return jsonResponse(
-            data
-          );
+          return jsonResponse(data);
         }
-
 
         /**
          * 투자거래 복원
          */
         if (
-          request.method ===
-            "POST" &&
+          request.method === "POST" &&
           url.pathname ===
             "/api/investments/trades/restore"
         ) {
-          if (
-            !isSameOrigin(
-              request
-            )
-          ) {
+          if (!isSameOrigin(request)) {
             return jsonResponse(
               {
-                success:
-                  false,
-
+                success: false,
                 error: {
                   code:
                     "INVALID_ORIGIN",
-
                   message:
                     "허용되지 않은 요청입니다."
                 }
@@ -2204,25 +1676,18 @@ export default {
             );
           }
 
-
           let body;
-
 
           try {
             body =
               await request.json();
-          } catch (
-            error
-          ) {
+          } catch (error) {
             return jsonResponse(
               {
-                success:
-                  false,
-
+                success: false,
                 error: {
                   code:
                     "INVALID_JSON",
-
                   message:
                     "요청 형식이 올바르지 않습니다."
                 }
@@ -2230,7 +1695,6 @@ export default {
               400
             );
           }
-
 
           const data =
             await appsScriptPost(
@@ -2243,22 +1707,15 @@ export default {
               }
             );
 
-
-          return jsonResponse(
-            data
-          );
+          return jsonResponse(data);
         }
-
 
         return jsonResponse(
           {
-            success:
-              false,
-
+            success: false,
             error: {
               code:
                 "API_NOT_FOUND",
-
               message:
                 "지원하지 않는 API입니다."
             }
@@ -2267,40 +1724,27 @@ export default {
         );
       }
 
-
       return jsonResponse(
         {
-          success:
-            false,
-
+          success: false,
           error: {
-            code:
-              "NOT_FOUND",
-
+            code: "NOT_FOUND",
             message:
               "페이지를 찾을 수 없습니다."
           }
         },
         404
       );
-    } catch (
-      error
-    ) {
+    } catch (error) {
       return jsonResponse(
         {
-          success:
-            false,
-
+          success: false,
           error: {
-            code:
-              "WORKER_ERROR",
-
+            code: "WORKER_ERROR",
             message:
               error instanceof Error
                 ? error.message
-                : String(
-                    error
-                  )
+                : String(error)
           }
         },
         500
