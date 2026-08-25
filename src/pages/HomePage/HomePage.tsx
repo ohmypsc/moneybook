@@ -87,19 +87,24 @@ let dashboardRequest:
     null;
 
 
-async function requestDashboard() {
+async function requestDashboard(
+  forceRefresh = false
+) {
   if (
+    !forceRefresh &&
     dashboardRequest
   ) {
     return dashboardRequest;
   }
 
 
-  dashboardRequest =
-    (async () => {
+  const runRequest =
+    async () => {
       const response =
         await fetch(
-          "/api/dashboard",
+          forceRefresh
+            ? "/api/dashboard?refresh=1"
+            : "/api/dashboard",
           {
             method:
               "GET",
@@ -149,7 +154,18 @@ async function requestDashboard() {
 
 
       return body.data;
-    })();
+    };
+
+
+  if (
+    forceRefresh
+  ) {
+    return runRequest();
+  }
+
+
+  dashboardRequest =
+    runRequest();
 
 
   try {
@@ -275,6 +291,13 @@ export default function HomePage(
     useState("");
 
 
+  const [
+    refreshing,
+    setRefreshing
+  ] =
+    useState(false);
+
+
   async function loadDashboard() {
     const cachedDashboard =
       dashboardMemoryCache;
@@ -336,6 +359,80 @@ export default function HomePage(
 
     } finally {
       setLoading(
+        false
+      );
+    }
+  }
+
+
+  async function handleManualRefresh() {
+    if (
+      refreshing
+    ) {
+      return;
+    }
+
+
+    setRefreshing(
+      true
+    );
+
+
+    try {
+      if (
+        dashboardRequest
+      ) {
+        try {
+          await dashboardRequest;
+
+        } catch {
+          /*
+           * 기존 백그라운드 요청 실패 여부와
+           * 수동 새로고침은 별도로 처리합니다.
+           */
+        }
+      }
+
+
+      const data =
+        await requestDashboard(
+          true
+        );
+
+
+      setDashboard(
+        data
+      );
+
+
+      setErrorMessage(
+        ""
+      );
+
+    } catch (
+      error
+    ) {
+      if (
+        !dashboard
+      ) {
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "가계부 데이터를 불러오지 못했습니다."
+        );
+
+        return;
+      }
+
+
+      window.alert(
+        error instanceof Error
+          ? error.message
+          : "새로고침에 실패했습니다."
+      );
+
+    } finally {
+      setRefreshing(
         false
       );
     }
@@ -448,10 +545,12 @@ export default function HomePage(
           !dashboard
         ) {
           return {
-            total: 0,
+            total:
+              0,
 
-            cards: [] as
-              DashboardCardView[]
+            cards:
+              [] as
+                DashboardCardView[]
           };
         }
 
@@ -464,13 +563,12 @@ export default function HomePage(
               )
                 ? dashboard.accounts
                 : []
+            ).map(
+              account => [
+                account.accountId,
+                account
+              ] as const
             )
-              .map(
-                account => [
-                  account.accountId,
-                  account
-                ] as const
-              )
           );
 
 
@@ -761,6 +859,10 @@ export default function HomePage(
         className={
           styles.header
         }
+        style={{
+          position:
+            "relative"
+        }}
       >
         <p
           className={
@@ -777,6 +879,93 @@ export default function HomePage(
             )
           }
         </h1>
+
+        <button
+          type="button"
+          aria-label="홈 새로고침"
+          title="새로고침"
+          disabled={
+            refreshing
+          }
+          onClick={
+            () =>
+              void handleManualRefresh()
+          }
+          style={{
+            position:
+              "absolute",
+
+            top:
+              0,
+
+            right:
+              0,
+
+            width:
+              "36px",
+
+            height:
+              "36px",
+
+            display:
+              "grid",
+
+            placeItems:
+              "center",
+
+            padding:
+              0,
+
+            border:
+              "1px solid var(--color-border)",
+
+            borderRadius:
+              "var(--radius-md)",
+
+            background:
+              "var(--color-surface)",
+
+            color:
+              "var(--color-text-secondary)",
+
+            font:
+              "inherit",
+
+            fontSize:
+              "18px",
+
+            fontWeight:
+              700,
+
+            cursor:
+              refreshing
+                ? "default"
+                : "pointer",
+
+            opacity:
+              refreshing
+                ? 0.55
+                : 1
+          }}
+        >
+          <span
+            aria-hidden="true"
+            style={{
+              display:
+                "block",
+
+              transform:
+                refreshing
+                  ? "rotate(180deg)"
+                  : "rotate(0deg)",
+
+              transition:
+                "transform 180ms ease"
+            }}
+          >
+            ↻
+          </span>
+        </button>
       </header>
 
 
