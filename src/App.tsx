@@ -36,6 +36,9 @@ import InputPage
 import AssetsPage
   from "./pages/AssetsPage/AssetsPage";
 
+import SettingsPage
+  from "./pages/SettingsPage/SettingsPage";
+
 import {
   AppShell
 } from "./components/layout/AppShell/AppShell";
@@ -339,25 +342,7 @@ export default function App() {
     );
   } else {
     pageContent = (
-      <main
-        className={
-          styles.center
-        }
-      >
-        <section
-          className={
-            styles.panel
-          }
-        >
-          <h1>
-            설정
-          </h1>
-
-          <p>
-            설정 화면은 다음 단계에서 연결합니다.
-          </p>
-        </section>
-      </main>
+      <SettingsPage />
     );
   }
 
