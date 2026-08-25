@@ -30,8 +30,19 @@ export interface InputPreferences {
   hiddenAccountIds: string[];
 }
 
+export interface SharedInputPreferencesState {
+  configured: boolean;
+  version: 1;
+  preferences: InputPreferences | null;
+  updatedAt: string | null;
+  updatedBy: string | null;
+}
+
 const STORAGE_KEY =
   "moneybook.inputPreferences.v1";
+
+const FETCH_PATCH_MARKER =
+  "__moneybookInputPreferencesFetchPatched";
 
 const TRANSACTION_TYPES:
   PreferenceTransactionType[] = [
@@ -133,6 +144,133 @@ function mergeOrder(
 }
 
 
+function isRecord(
+  value: unknown
+): value is Record<string, unknown> {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    !Array.isArray(value)
+  );
+}
+
+
+function readStringArray(
+  value: unknown
+): string[] | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  const result: string[] = [];
+  const seen =
+    new Set<string>();
+
+  for (
+    const item
+    of value
+  ) {
+    if (
+      typeof item !==
+      "string"
+    ) {
+      return null;
+    }
+
+    const text =
+      item.trim();
+
+    if (
+      text &&
+      !seen.has(text)
+    ) {
+      seen.add(text);
+      result.push(text);
+    }
+  }
+
+  return result;
+}
+
+
+/**
+ * 서버/localStorage에서 읽은 값을
+ * 현재 앱이 이해할 수 있는 v1 설정인지 검사합니다.
+ */
+export function parseInputPreferences(
+  value: unknown
+): InputPreferences | null {
+  if (
+    !isRecord(value)
+  ) {
+    return null;
+  }
+
+  if (
+    value.version !== 1
+  ) {
+    return null;
+  }
+
+  if (
+    !isRecord(
+      value.categoryOrder
+    )
+  ) {
+    return null;
+  }
+
+  const expenseOrder =
+    readStringArray(
+      value.categoryOrder.지출
+    );
+
+  const incomeOrder =
+    readStringArray(
+      value.categoryOrder.수입
+    );
+
+  const transferOrder =
+    readStringArray(
+      value.categoryOrder.이체
+    );
+
+  const accountOrder =
+    readStringArray(
+      value.accountOrder
+    );
+
+  const hiddenAccountIds =
+    readStringArray(
+      value.hiddenAccountIds
+    );
+
+  if (
+    !expenseOrder ||
+    !incomeOrder ||
+    !transferOrder ||
+    !accountOrder ||
+    !hiddenAccountIds
+  ) {
+    return null;
+  }
+
+  return {
+    version: 1,
+
+    categoryOrder: {
+      지출: expenseOrder,
+      수입: incomeOrder,
+      이체: transferOrder
+    },
+
+    accountOrder,
+
+    hiddenAccountIds
+  };
+}
+
+
 function safeReadStoredPreferences():
   InputPreferences | null {
   if (
@@ -152,61 +290,9 @@ function safeReadStoredPreferences():
       return null;
     }
 
-    const parsed =
-      JSON.parse(raw) as
-        Partial<InputPreferences>;
-
-    if (
-      parsed.version !== 1 ||
-      !parsed.categoryOrder ||
-      !Array.isArray(
-        parsed.accountOrder
-      ) ||
-      !Array.isArray(
-        parsed.hiddenAccountIds
-      )
-    ) {
-      return null;
-    }
-
-    return {
-      version: 1,
-
-      categoryOrder: {
-        지출:
-          Array.isArray(
-            parsed.categoryOrder
-              .지출
-          )
-            ? parsed.categoryOrder
-                .지출
-            : [],
-
-        수입:
-          Array.isArray(
-            parsed.categoryOrder
-              .수입
-          )
-            ? parsed.categoryOrder
-                .수입
-            : [],
-
-        이체:
-          Array.isArray(
-            parsed.categoryOrder
-              .이체
-          )
-            ? parsed.categoryOrder
-                .이체
-            : []
-      },
-
-      accountOrder:
-        parsed.accountOrder,
-
-      hiddenAccountIds:
-        parsed.hiddenAccountIds
-    };
+    return parseInputPreferences(
+      JSON.parse(raw) as unknown
+    );
   } catch {
     return null;
   }
@@ -414,6 +500,10 @@ export function getInputPreferences(
 }
 
 
+/**
+ * localStorage는 서버 공통 설정의 로컬 백업입니다.
+ * 서버가 잠시 응답하지 않아도 입력 화면은 이 값을 사용합니다.
+ */
 export function saveInputPreferences(
   preferences:
     InputPreferences
@@ -453,6 +543,197 @@ export function resetInputPreferences(
     categories,
     accounts
   );
+}
+
+
+/**
+ * Apps Script bootstrap에 포함된 부부 공통 설정을
+ * 현재 브라우저의 백업값으로 동기화합니다.
+ *
+ * 서버에 아직 공통 설정이 없으면 기존 localStorage를
+ * 지우지 않습니다. 최초 저장 시 현재 브라우저 설정이
+ * 서버 공통값이 됩니다.
+ */
+export function syncInputPreferencesFromBootstrapPayload(
+  payload: unknown
+) {
+  if (
+    typeof window ===
+    "undefined" ||
+    !isRecord(payload)
+  ) {
+    return false;
+  }
+
+  const data =
+    isRecord(payload.data)
+      ? payload.data
+      : payload;
+
+  if (
+    !isRecord(
+      data.inputPreferences
+    )
+  ) {
+    return false;
+  }
+
+  if (
+    data.inputPreferences
+      .configured !==
+    true
+  ) {
+    return false;
+  }
+
+  const parsed =
+    parseInputPreferences(
+      data.inputPreferences
+        .preferences
+    );
+
+  if (!parsed) {
+    return false;
+  }
+
+  saveInputPreferences(
+    parsed
+  );
+
+  return true;
+}
+
+
+function isBootstrapRequest(
+  input: RequestInfo | URL
+) {
+  if (
+    typeof window ===
+    "undefined"
+  ) {
+    return false;
+  }
+
+  try {
+    let value: string;
+
+    if (
+      typeof input ===
+      "string"
+    ) {
+      value = input;
+
+    } else if (
+      input instanceof URL
+    ) {
+      value =
+        input.toString();
+
+    } else {
+      value =
+        input.url;
+    }
+
+    const url =
+      new URL(
+        value,
+        window.location.origin
+      );
+
+    return (
+      url.origin ===
+        window.location.origin &&
+      url.pathname ===
+        "/api/bootstrap"
+    );
+
+  } catch {
+    return false;
+  }
+}
+
+
+/**
+ * InputPage 자체를 다시 쓰지 않고도 서버 공통 설정을
+ * 적용하기 위한 얇은 bootstrap 동기화 계층입니다.
+ *
+ * /api/bootstrap의 네트워크 요청을 추가하지 않습니다.
+ * 기존 요청의 응답 복사본만 읽고 localStorage를 갱신한 뒤
+ * 원래 Response를 그대로 반환합니다.
+ */
+function installBootstrapPreferenceSync() {
+  if (
+    typeof window ===
+      "undefined" ||
+    typeof window.fetch !==
+      "function"
+  ) {
+    return;
+  }
+
+  const markedWindow =
+    window as typeof window & {
+      [FETCH_PATCH_MARKER]?:
+        boolean;
+    };
+
+  if (
+    markedWindow[
+      FETCH_PATCH_MARKER
+    ]
+  ) {
+    return;
+  }
+
+  const originalFetch =
+    window.fetch.bind(
+      window
+    );
+
+  markedWindow[
+    FETCH_PATCH_MARKER
+  ] =
+    true;
+
+  window.fetch =
+    (async (
+      input:
+        RequestInfo | URL,
+      init?:
+        RequestInit
+    ) => {
+      const response =
+        await originalFetch(
+          input,
+          init
+        );
+
+      if (
+        response.ok &&
+        isBootstrapRequest(
+          input
+        )
+      ) {
+        try {
+          const payload =
+            await response
+              .clone()
+              .json() as unknown;
+
+          syncInputPreferencesFromBootstrapPayload(
+            payload
+          );
+
+        } catch {
+          /*
+           * 설정 동기화 실패가 bootstrap 자체를
+           * 실패시키면 안 됩니다.
+           */
+        }
+      }
+
+      return response;
+    }) as typeof window.fetch;
 }
 
 
@@ -583,3 +864,6 @@ export function applyAccountPreferences<
     preferences
   );
 }
+
+
+installBootstrapPreferenceSync();
