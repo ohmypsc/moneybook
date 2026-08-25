@@ -2,41 +2,57 @@ import {
   useEffect,
   useState
 } from "react";
+
 import type {
   ReactNode
 } from "react";
+
 import {
   getSession,
   login,
   logout
 } from "./api/auth";
+
 import {
   ApiError
 } from "./api/client";
+
 import type {
   User
 } from "./types/api";
+
 import LoginPage
   from "./pages/LoginPage/LoginPage";
+
 import HomePage
   from "./pages/HomePage/HomePage";
+
+import CalendarPage
+  from "./pages/CalendarPage/CalendarPage";
+
 import InputPage
   from "./pages/InputPage/InputPage";
+
 import AssetsPage
   from "./pages/AssetsPage/AssetsPage";
+
 import {
   AppShell
 } from "./components/layout/AppShell/AppShell";
+
 import type {
   NavigationKey
 } from "./components/layout/BottomNav/BottomNav";
+
 import styles
   from "./App.module.css";
+
 
 type AppStatus =
   | "checking"
   | "authenticated"
   | "guest";
+
 
 export default function App() {
   const [
@@ -46,6 +62,7 @@ export default function App() {
     useState<AppStatus>(
       "checking"
     );
+
   const [
     user,
     setUser
@@ -53,6 +70,7 @@ export default function App() {
     useState<User | null>(
       null
     );
+
   const [
     loginLoading,
     setLoginLoading
@@ -60,6 +78,7 @@ export default function App() {
     useState(
       false
     );
+
   const [
     loginError,
     setLoginError
@@ -67,6 +86,7 @@ export default function App() {
     useState(
       ""
     );
+
   const [
     activeNavigation,
     setActiveNavigation
@@ -75,19 +95,23 @@ export default function App() {
       "home"
     );
 
+
   useEffect(
     () => {
       let cancelled =
         false;
+
       async function restoreSession() {
         try {
           const session =
             await getSession();
+
           if (
             cancelled
           ) {
             return;
           }
+
           if (
             session.loggedIn &&
             session.user
@@ -95,14 +119,18 @@ export default function App() {
             setUser(
               session.user
             );
+
             setStatus(
               "authenticated"
             );
+
             return;
           }
+
           setUser(
             null
           );
+
           setStatus(
             "guest"
           );
@@ -114,12 +142,15 @@ export default function App() {
           ) {
             return;
           }
+
           setUser(
             null
           );
+
           setStatus(
             "guest"
           );
+
           if (
             error instanceof ApiError &&
             error.status === 401
@@ -127,8 +158,10 @@ export default function App() {
             setLoginError(
               ""
             );
+
             return;
           }
+
           setLoginError(
             error instanceof Error
               ? error.message
@@ -136,7 +169,9 @@ export default function App() {
           );
         }
       }
+
       void restoreSession();
+
       return () => {
         cancelled =
           true;
@@ -145,6 +180,7 @@ export default function App() {
     []
   );
 
+
   async function handleLogin(
     name: string,
     password: string
@@ -152,21 +188,26 @@ export default function App() {
     setLoginLoading(
       true
     );
+
     setLoginError(
       ""
     );
+
     try {
       const result =
         await login(
           name,
           password
         );
+
       setUser(
         result.user
       );
+
       setStatus(
         "authenticated"
       );
+
       setActiveNavigation(
         "home"
       );
@@ -185,6 +226,7 @@ export default function App() {
     }
   }
 
+
   async function handleLogout() {
     try {
       await logout();
@@ -192,17 +234,21 @@ export default function App() {
       setUser(
         null
       );
+
       setStatus(
         "guest"
       );
+
       setActiveNavigation(
         "home"
       );
+
       setLoginError(
         ""
       );
     }
   }
+
 
   if (
     status ===
@@ -222,6 +268,7 @@ export default function App() {
           <h1>
             우리 가계부
           </h1>
+
           <p>
             로그인 상태를 확인하고 있습니다.
           </p>
@@ -229,6 +276,7 @@ export default function App() {
       </main>
     );
   }
+
 
   if (
     status === "guest" ||
@@ -249,8 +297,10 @@ export default function App() {
     );
   }
 
+
   let pageContent:
     ReactNode;
+
 
   if (
     activeNavigation ===
@@ -271,24 +321,7 @@ export default function App() {
     "calendar"
   ) {
     pageContent = (
-      <main
-        className={
-          styles.center
-        }
-      >
-        <section
-          className={
-            styles.panel
-          }
-        >
-          <h1>
-            거래 내역
-          </h1>
-          <p>
-            거래 내역 화면은 다음 단계에서 연결합니다.
-          </p>
-        </section>
-      </main>
+      <CalendarPage />
     );
   } else if (
     activeNavigation ===
@@ -319,6 +352,7 @@ export default function App() {
           <h1>
             설정
           </h1>
+
           <p>
             설정 화면은 다음 단계에서 연결합니다.
           </p>
@@ -326,6 +360,7 @@ export default function App() {
       </main>
     );
   }
+
 
   return (
     <AppShell
