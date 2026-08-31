@@ -5,146 +5,439 @@
   min-height: 100vh;
 
   margin: 0 auto;
-  padding: 24px 18px 110px;
+
+  padding:
+    24px
+    18px
+    110px;
 }
 
-.header {
-  margin-bottom: var(--space-5);
+
+.pageHeader,
+.detailHeader {
+  margin-bottom:
+    var(--space-5);
 }
+
 
 .eyebrow {
-  margin: 0 0 var(--space-1);
+  margin:
+    0
+    0
+    var(--space-1);
 
-  color: var(--color-text-secondary);
+  color:
+    var(--color-text-secondary);
 
   font-size: 13px;
   font-weight: 700;
 }
 
-.title {
+
+.pageTitle,
+.detailTitle {
   margin: 0;
+
+  color:
+    var(--color-text-primary);
 
   font-size: 26px;
   line-height: 1.3;
 }
 
-.description {
-  margin: var(--space-2) 0 0;
 
-  color: var(--color-text-secondary);
+.pageDescription,
+.detailDescription {
+  margin:
+    var(--space-2)
+    0
+    0;
+
+  color:
+    var(--color-text-secondary);
 
   font-size: 14px;
   line-height: 1.6;
 }
 
-.storageNotice {
-  margin: 0 0 var(--space-5);
-  padding: 12px 14px;
 
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+.backButton {
+  display: inline-flex;
 
-  background: var(--color-surface-soft);
-  color: var(--color-text-secondary);
+  align-items: center;
+
+  gap: 4px;
+
+  min-height: 38px;
+
+  margin:
+    0
+    0
+    var(--space-3);
+
+  padding:
+    0
+    10px
+    0
+    6px;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius:
+    var(--radius-md);
+
+  background:
+    var(--color-surface);
+
+  color:
+    var(--color-text-primary);
+
+  font: inherit;
+
+  font-size: 13px;
+  font-weight: 800;
+
+  cursor: pointer;
+}
+
+
+.backButton span {
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+
+.menuSection {
+  margin-bottom:
+    var(--space-5);
+}
+
+
+.menuSectionTitle {
+  margin:
+    0
+    0
+    var(--space-2);
+
+  padding:
+    0
+    4px;
+
+  color:
+    var(--color-text-secondary);
 
   font-size: 12px;
-  line-height: 1.6;
+  font-weight: 800;
 }
 
-.section {
-  margin-bottom: var(--space-5);
+
+.menuCard {
+  overflow: hidden;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius:
+    var(--radius-lg);
+
+  background:
+    var(--color-surface);
+
+  box-shadow:
+    var(--shadow-card);
+}
+
+
+.menuRow {
+  width: 100%;
+
+  min-height: 72px;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: space-between;
+
+  gap:
+    var(--space-3);
+
+  padding:
+    14px
+    16px;
+
+  border: 0;
+
+  border-top:
+    1px solid
+    var(--color-border);
+
+  background:
+    transparent;
+
+  color:
+    var(--color-text-primary);
+
+  font: inherit;
+
+  text-align: left;
+
+  cursor: pointer;
+}
+
+
+.menuRow:first-child {
+  border-top: 0;
+}
+
+
+.menuRow:hover {
+  background:
+    var(--color-surface-soft);
+}
+
+
+.menuText {
+  min-width: 0;
+
+  display: grid;
+
+  gap: 4px;
+}
+
+
+.menuText strong {
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+
+.menuText span {
+  color:
+    var(--color-text-secondary);
+
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+
+.chevron {
+  flex: 0 0 auto;
+
+  color:
+    var(--color-text-secondary);
+
+  font-size: 25px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+
+.settingsBody {
+  display: grid;
+
+  gap:
+    var(--space-4);
+}
+
+
+.cardSection,
+.formCard {
   padding: 18px;
 
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  border:
+    1px solid
+    var(--color-border);
 
-  background: var(--color-surface);
+  border-radius:
+    var(--radius-lg);
 
-  box-shadow: var(--shadow-card);
+  background:
+    var(--color-surface);
+
+  box-shadow:
+    var(--shadow-card);
 }
 
-.sectionHeader {
-  margin-bottom: var(--space-4);
+
+.sectionHeading {
+  margin-bottom:
+    var(--space-3);
 }
 
-.sectionTitle {
+
+.sectionHeading h2,
+.formHeader h2 {
   margin: 0;
 
-  font-size: 18px;
+  color:
+    var(--color-text-primary);
+
+  font-size: 17px;
   line-height: 1.4;
 }
 
-.sectionDescription {
-  margin: 5px 0 0;
 
-  color: var(--color-text-secondary);
+.sectionHeading p,
+.formHeader p {
+  margin:
+    5px
+    0
+    0;
 
-  font-size: 13px;
+  color:
+    var(--color-text-secondary);
+
+  font-size: 12px;
   line-height: 1.55;
 }
 
 
-/* =========================================================
-   카테고리 유형 탭
-   ========================================================= */
+.notice,
+.error,
+.feedback {
+  margin: 0;
 
-.typeTabs {
+  padding:
+    11px
+    13px;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius:
+    var(--radius-md);
+
+  background:
+    var(--color-surface-soft);
+
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+
+.notice,
+.feedback {
+  color:
+    var(--color-text-primary);
+}
+
+
+.error {
+  color:
+    var(--color-error);
+}
+
+
+.state,
+.emptyState {
+  margin: 0;
+
+  padding:
+    18px
+    8px;
+
+  color:
+    var(--color-text-secondary);
+
+  font-size: 13px;
+  line-height: 1.55;
+
+  text-align: center;
+}
+
+
+.segmentedControl {
   display: grid;
+
   grid-template-columns:
     repeat(
       3,
-      minmax(0, 1fr)
+      minmax(
+        0,
+        1fr
+      )
     );
 
   gap: 4px;
 
-  margin-bottom: var(--space-4);
+  margin-bottom:
+    var(--space-3);
+
   padding: 4px;
 
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border:
+    1px solid
+    var(--color-border);
 
-  background: var(--color-surface-soft);
+  border-radius:
+    var(--radius-md);
+
+  background:
+    var(--color-surface-soft);
 }
 
-.typeButton {
-  min-height: 40px;
 
-  padding: 0 10px;
+.segmentButton,
+.segmentButtonActive {
+  min-height: 38px;
+
+  padding:
+    0
+    10px;
 
   border: 0;
+
   border-radius:
     calc(
       var(--radius-md) -
       4px
     );
 
-  background: transparent;
-  color: var(--color-text-secondary);
+  background:
+    transparent;
+
+  color:
+    var(--color-text-secondary);
 
   font: inherit;
-  font-size: 13px;
-  font-weight: 700;
+
+  font-size: 12px;
+  font-weight: 800;
 
   cursor: pointer;
 }
 
-.typeButtonActive {
-  background: var(--color-surface);
-  color: var(--color-text-primary);
 
-  box-shadow: var(--shadow-card);
+.segmentButtonActive {
+  background:
+    var(--color-surface);
+
+  color:
+    var(--color-text-primary);
+
+  box-shadow:
+    var(--shadow-card);
 }
 
 
-/* =========================================================
-   정렬 리스트
-   ========================================================= */
+.segmentButton:disabled,
+.segmentButtonActive:disabled {
+  opacity: 0.55;
 
-.list {
+  cursor: default;
+}
+
+
+.itemList {
   display: grid;
 
-  gap: 8px;
+  gap:
+    var(--space-2);
 
   margin: 0;
   padding: 0;
@@ -152,241 +445,805 @@
   list-style: none;
 }
 
-.row {
-  display: flex;
-  align-items: center;
 
-  gap: 10px;
-
+.orderRow,
+.managementRow,
+.deletedRow {
   min-width: 0;
 
-  padding: 11px 12px;
+  display: flex;
 
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  align-items: center;
+  justify-content: space-between;
 
-  background: var(--color-surface);
+  gap:
+    var(--space-3);
+
+  padding: 12px;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius:
+    var(--radius-md);
+
+  background:
+    var(--color-surface-soft);
 }
 
-.rowHidden {
-  opacity: 0.58;
+
+.mutedRow {
+  opacity: 0.63;
 }
+
 
 .orderNumber {
   flex: 0 0 auto;
 
   width: 24px;
+  height: 24px;
 
-  color: var(--color-text-secondary);
+  display: grid;
 
-  font-size: 11px;
+  place-items: center;
+
+  border-radius: 50%;
+
+  background:
+    var(--color-surface);
+
+  color:
+    var(--color-text-secondary);
+
+  font-size: 10px;
   font-weight: 800;
-  text-align: center;
 }
 
-.itemInfo {
+
+.primaryItemText {
   min-width: 0;
+
+  flex: 1;
+
+  overflow: hidden;
+
+  color:
+    var(--color-text-primary);
+
+  font-size: 13px;
+  font-weight: 800;
+
+  text-overflow:
+    ellipsis;
+
+  white-space:
+    nowrap;
+}
+
+
+.itemTextGroup {
+  min-width: 0;
+
   flex: 1;
 
   display: grid;
 
-  gap: 2px;
+  gap: 3px;
 }
 
-.itemName {
+
+.itemTextGroup strong {
   overflow: hidden;
 
-  font-size: 14px;
-  font-weight: 700;
+  color:
+    var(--color-text-primary);
 
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 13px;
+  line-height: 1.4;
+
+  text-overflow:
+    ellipsis;
+
+  white-space:
+    nowrap;
 }
 
-.itemMeta {
+
+.itemTextGroup span {
   overflow: hidden;
 
-  color: var(--color-text-secondary);
+  color:
+    var(--color-text-secondary);
 
   font-size: 11px;
+  line-height: 1.4;
 
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  text-overflow:
+    ellipsis;
+
+  white-space:
+    nowrap;
 }
 
-.controls {
+
+.compactActions,
+.rowActions,
+.formActions {
   flex: 0 0 auto;
 
   display: flex;
-  align-items: center;
 
-  gap: 4px;
+  align-items: center;
+  justify-content: flex-end;
+
+  gap: 6px;
 }
 
-.moveButton {
-  width: 34px;
-  height: 34px;
 
-  padding: 0;
-
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-
-  background: var(--color-surface);
-  color: var(--color-text-primary);
+.iconButton,
+.visibilityButton,
+.visibleButton,
+.primaryButton,
+.secondaryButton,
+.primarySmallButton,
+.secondarySmallButton,
+.dangerSmallButton,
+.restoreButton,
+.fullWidthButton,
+.logoutButton,
+.closeButton {
+  border-radius:
+    var(--radius-md);
 
   font: inherit;
-  font-size: 16px;
   font-weight: 800;
 
   cursor: pointer;
 }
 
-.moveButton:disabled {
-  opacity: 0.3;
+
+.iconButton {
+  width: 36px;
+  height: 36px;
+
+  padding: 0;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  background:
+    var(--color-surface);
+
+  color:
+    var(--color-text-primary);
+
+  font-size: 13px;
+}
+
+
+.visibilityButton,
+.visibleButton {
+  min-width: 46px;
+  min-height: 34px;
+
+  padding:
+    0
+    9px;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  background:
+    var(--color-surface);
+
+  font-size: 10px;
+}
+
+
+.visibilityButton {
+  color:
+    var(--color-text-secondary);
+}
+
+
+.visibleButton {
+  color:
+    var(--color-primary);
+}
+
+
+.primaryButton,
+.secondaryButton,
+.fullWidthButton,
+.logoutButton {
+  min-height: 42px;
+
+  padding:
+    0
+    15px;
+
+  font-size: 12px;
+}
+
+
+.primaryButton {
+  border:
+    1px solid
+    var(--color-primary);
+
+  background:
+    var(--color-primary);
+
+  color:
+    var(--color-primary-text);
+}
+
+
+.secondaryButton,
+.fullWidthButton {
+  border:
+    1px solid
+    var(--color-border);
+
+  background:
+    var(--color-surface);
+
+  color:
+    var(--color-text-primary);
+}
+
+
+.primarySmallButton,
+.secondarySmallButton,
+.dangerSmallButton,
+.restoreButton {
+  min-height: 34px;
+
+  padding:
+    0
+    10px;
+
+  font-size: 10px;
+}
+
+
+.primarySmallButton {
+  border:
+    1px solid
+    var(--color-primary);
+
+  background:
+    var(--color-primary);
+
+  color:
+    var(--color-primary-text);
+}
+
+
+.secondarySmallButton,
+.dangerSmallButton,
+.restoreButton {
+  border:
+    1px solid
+    var(--color-border);
+
+  background:
+    var(--color-surface);
+}
+
+
+.secondarySmallButton {
+  color:
+    var(--color-text-primary);
+}
+
+
+.dangerSmallButton {
+  color:
+    var(--color-error);
+}
+
+
+.restoreButton {
+  color:
+    var(--color-primary);
+}
+
+
+.iconButton:disabled,
+.visibilityButton:disabled,
+.visibleButton:disabled,
+.primaryButton:disabled,
+.secondaryButton:disabled,
+.primarySmallButton:disabled,
+.secondarySmallButton:disabled,
+.dangerSmallButton:disabled,
+.restoreButton:disabled,
+.fullWidthButton:disabled,
+.logoutButton:disabled,
+.closeButton:disabled {
+  opacity: 0.5;
 
   cursor: default;
 }
 
 
-/* =========================================================
-   표시 스위치
-   ========================================================= */
-
-.visibilityButton {
-  min-width: 54px;
-  height: 34px;
-
-  padding: 0 9px;
-
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-
-  background: var(--color-surface-soft);
-  color: var(--color-text-secondary);
-
-  font: inherit;
-  font-size: 11px;
-  font-weight: 800;
-
-  cursor: pointer;
-}
-
-.visibilityButtonVisible {
-  border-color: var(--color-primary);
-
-  background: var(--color-primary);
-  color: var(--color-primary-text);
-}
-
-
-/* =========================================================
-   저장 영역
-   ========================================================= */
-
-.actionArea {
+.stickyActions {
   position: sticky;
+
   bottom:
     calc(
-      80px +
-      env(safe-area-inset-bottom)
+      76px +
+      env(
+        safe-area-inset-bottom
+      )
     );
 
   z-index: 5;
 
-  display: flex;
+  display: grid;
 
-  gap: 8px;
+  grid-template-columns:
+    1fr
+    2fr;
 
-  padding: 12px 0 4px;
+  gap:
+    var(--space-2);
+
+  padding: 10px;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius:
+    var(--radius-lg);
 
   background:
-    linear-gradient(
-      to bottom,
-      transparent,
-      var(--color-background) 22%
-    );
+    var(--color-surface);
+
+  box-shadow:
+    var(--shadow-card);
 }
 
-.saveButton,
-.resetButton {
-  min-height: 46px;
 
-  border-radius: var(--radius-md);
+.createRow {
+  display: grid;
+
+  grid-template-columns:
+    minmax(
+      0,
+      1fr
+    )
+    auto;
+
+  align-items: end;
+
+  gap:
+    var(--space-2);
+
+  margin-bottom:
+    var(--space-3);
+}
+
+
+.field {
+  min-width: 0;
+
+  display: grid;
+
+  gap: 6px;
+
+  color:
+    var(--color-text-primary);
+
+  font-size: 11px;
+  font-weight: 800;
+}
+
+
+.field input,
+.field select,
+.inlineEdit input {
+  width: 100%;
+
+  box-sizing:
+    border-box;
+
+  min-height: 42px;
+
+  padding:
+    8px
+    11px;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius:
+    var(--radius-md);
+
+  background:
+    var(--color-surface);
+
+  color:
+    var(--color-text-primary);
 
   font: inherit;
-  font-size: 14px;
+
+  font-size: 13px;
+}
+
+
+.field input:focus,
+.field select:focus,
+.inlineEdit input:focus {
+  outline:
+    2px solid
+    var(--color-primary);
+
+  outline-offset:
+    1px;
+}
+
+
+.inlineEdit {
+  width: 100%;
+
+  display: grid;
+
+  grid-template-columns:
+    minmax(
+      0,
+      1fr
+    )
+    auto
+    auto;
+
+  gap: 6px;
+}
+
+
+.deletedSection {
+  margin-top:
+    var(--space-3);
+
+  padding-top:
+    var(--space-3);
+
+  border-top:
+    1px solid
+    var(--color-border);
+}
+
+
+.deletedSection summary {
+  min-height: 40px;
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 7px;
+
+  color:
+    var(--color-text-primary);
+
+  font-size: 12px;
   font-weight: 800;
 
   cursor: pointer;
+
+  list-style: none;
 }
 
-.saveButton {
-  flex: 1;
 
-  border: 1px solid var(--color-primary);
-
-  background: var(--color-primary);
-  color: var(--color-primary-text);
+.deletedSection summary::-webkit-details-marker {
+  display: none;
 }
 
-.resetButton {
-  flex: 0 0 auto;
 
-  padding: 0 14px;
+.deletedSection summary::after {
+  content: "⌄";
 
-  border: 1px solid var(--color-border);
+  margin-left: auto;
 
-  background: var(--color-surface);
-  color: var(--color-text-primary);
+  color:
+    var(--color-text-secondary);
+
+  font-size: 15px;
+
+  transition:
+    transform
+    0.15s
+    ease;
 }
 
-.feedback {
-  margin: 0 0 var(--space-3);
 
-  padding: 10px 12px;
-
-  border-radius: var(--radius-md);
-
-  background: var(--color-surface-soft);
-  color: var(--color-primary);
-
-  font-size: 13px;
-  font-weight: 700;
+.deletedSection[open]
+summary::after {
+  transform:
+    rotate(
+      180deg
+    );
 }
 
-.loading,
-.error,
-.emptyState {
-  margin: 0;
 
-  padding: 20px 14px;
+.deletedSection summary span {
+  min-width: 20px;
 
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  padding:
+    2px
+    6px;
 
-  background: var(--color-surface);
+  border-radius:
+    999px;
 
-  font-size: 14px;
-  line-height: 1.6;
+  background:
+    var(--color-surface-soft);
+
+  color:
+    var(--color-text-secondary);
+
+  font-size: 10px;
+
   text-align: center;
 }
 
-.loading,
+
+.deletedSection >
+.itemList,
+.deletedSection >
 .emptyState {
-  color: var(--color-text-secondary);
-}
-
-.error {
-  color: var(--color-error);
+  margin-top:
+    var(--space-2);
 }
 
 
-/* =========================================================
-   모바일
-   ========================================================= */
+.deletedRow {
+  color:
+    var(--color-text-secondary);
 
-@media (max-width: 520px) {
+  font-size: 12px;
+}
+
+
+.topActionRow {
+  display: flex;
+
+  align-items: center;
+  justify-content: space-between;
+
+  gap:
+    var(--space-3);
+
+  padding: 14px;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius:
+    var(--radius-lg);
+
+  background:
+    var(--color-surface-soft);
+}
+
+
+.topActionRow p {
+  margin: 0;
+
+  color:
+    var(--color-text-secondary);
+
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+
+.formHeader {
+  display: flex;
+
+  align-items: flex-start;
+  justify-content: space-between;
+
+  gap:
+    var(--space-3);
+
+  margin-bottom:
+    var(--space-4);
+}
+
+
+.closeButton {
+  flex: 0 0 auto;
+
+  width: 36px;
+  height: 36px;
+
+  padding: 0;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  background:
+    var(--color-surface);
+
+  color:
+    var(--color-text-secondary);
+
+  font-size: 20px;
+}
+
+
+.formGrid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      2,
+      minmax(
+        0,
+        1fr
+      )
+    );
+
+  gap:
+    var(--space-3);
+}
+
+
+.fullField {
+  grid-column:
+    1 /
+    -1;
+}
+
+
+.formActions {
+  margin-top:
+    var(--space-4);
+}
+
+
+.dateSettingRow {
+  display: grid;
+
+  grid-template-columns:
+    minmax(
+      0,
+      1fr
+    )
+    auto;
+
+  align-items: end;
+
+  gap:
+    var(--space-3);
+}
+
+
+.fullWidthButton {
+  width: 100%;
+}
+
+
+.profileRow {
+  display: flex;
+
+  align-items: center;
+
+  gap:
+    var(--space-3);
+}
+
+
+.avatar {
+  flex: 0 0 auto;
+
+  width: 46px;
+  height: 46px;
+
+  display: grid;
+
+  place-items: center;
+
+  border-radius: 50%;
+
+  background:
+    var(--color-primary);
+
+  color:
+    var(--color-primary-text);
+
+  font-size: 17px;
+  font-weight: 900;
+}
+
+
+.infoList {
+  display: grid;
+
+  gap: 0;
+
+  margin: 0;
+}
+
+
+.infoList div {
+  display: grid;
+
+  grid-template-columns:
+    110px
+    minmax(
+      0,
+      1fr
+    );
+
+  gap:
+    var(--space-3);
+
+  padding:
+    12px
+    0;
+
+  border-top:
+    1px solid
+    var(--color-border);
+}
+
+
+.infoList div:first-child {
+  border-top: 0;
+}
+
+
+.infoList dt {
+  color:
+    var(--color-text-secondary);
+
+  font-size: 12px;
+  font-weight: 700;
+}
+
+
+.infoList dd {
+  margin: 0;
+
+  color:
+    var(--color-text-primary);
+
+  font-size: 12px;
+  line-height: 1.5;
+
+  text-align: right;
+}
+
+
+.logoutButton {
+  width: 100%;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  background:
+    var(--color-surface);
+
+  color:
+    var(--color-error);
+}
+
+
+@media (
+  max-width:
+    560px
+) {
   .page {
     padding:
       20px
@@ -394,37 +1251,128 @@
       106px;
   }
 
-  .section {
-    padding: 15px 12px;
+
+  .pageTitle,
+  .detailTitle {
+    font-size: 24px;
   }
 
-  .row {
-    gap: 6px;
 
-    padding: 10px 8px;
+  .cardSection,
+  .formCard {
+    padding: 14px;
   }
 
-  .orderNumber {
-    width: 18px;
+
+  .orderRow,
+  .managementRow {
+    align-items:
+      flex-start;
   }
 
-  .moveButton {
-    width: 31px;
-    height: 31px;
+
+  .managementRow {
+    flex-direction:
+      column;
   }
 
-  .visibilityButton {
-    min-width: 48px;
-    height: 31px;
 
-    padding: 0 7px;
+  .managementRow
+  .rowActions {
+    width: 100%;
   }
 
-  .actionArea {
-    bottom:
-      calc(
-        76px +
-        env(safe-area-inset-bottom)
-      );
+
+  .managementRow
+  .rowActions
+  button {
+    flex:
+      1
+      1
+      0;
+  }
+
+
+  .compactActions {
+    gap: 4px;
+  }
+
+
+  .iconButton {
+    width: 34px;
+    height: 34px;
+  }
+
+
+  .inlineEdit {
+    grid-template-columns:
+      1fr
+      1fr;
+  }
+
+
+  .inlineEdit input {
+    grid-column:
+      1 /
+      -1;
+  }
+
+
+  .topActionRow {
+    align-items:
+      stretch;
+
+    flex-direction:
+      column;
+  }
+
+
+  .topActionRow
+  .primaryButton {
+    width: 100%;
+  }
+
+
+  .dateSettingRow {
+    align-items:
+      stretch;
+
+    grid-template-columns:
+      1fr;
+  }
+
+
+  .formGrid {
+    grid-template-columns:
+      1fr;
+  }
+
+
+  .fullField {
+    grid-column:
+      auto;
+  }
+
+
+  .dateSettingRow
+  .rowActions {
+    display: grid;
+
+    grid-template-columns:
+      1fr
+      1fr;
+  }
+
+
+  .infoList div {
+    grid-template-columns:
+      1fr;
+
+    gap: 4px;
+  }
+
+
+  .infoList dd {
+    text-align: left;
   }
 }
