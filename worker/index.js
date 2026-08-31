@@ -110,6 +110,7 @@ function bytesToBase64Url(bytes) {
   for (const byte of bytes) {
     binary += String.fromCharCode(byte);
   }
+
   return btoa(binary)
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
@@ -119,8 +120,13 @@ function bytesToBase64Url(bytes) {
 function base64UrlToBytes(value) {
   let text = value.replace(/-/g, "+").replace(/_/g, "/");
   text += "=".repeat((4 - (text.length % 4)) % 4);
+
   const binary = atob(text);
-  return Uint8Array.from(binary, char => char.charCodeAt(0));
+
+  return Uint8Array.from(
+    binary,
+    char => char.charCodeAt(0)
+  );
 }
 
 /**
@@ -136,7 +142,10 @@ async function getSessionKey(env) {
   return crypto.subtle.importKey(
     "raw",
     encoder.encode(env.SESSION_SECRET),
-    { name: "HMAC", hash: "SHA-256" },
+    {
+      name: "HMAC",
+      hash: "SHA-256"
+    },
     false,
     ["sign", "verify"]
   );
@@ -144,6 +153,7 @@ async function getSessionKey(env) {
 
 async function createSessionToken(name, env) {
   const now = Math.floor(Date.now() / 1000);
+
   const payload = {
     v: 1,
     name,
@@ -156,13 +166,16 @@ async function createSessionToken(name, env) {
   );
 
   const key = await getSessionKey(env);
+
   const signature = await crypto.subtle.sign(
     "HMAC",
     key,
     encoder.encode(body)
   );
 
-  const signatureText = bytesToBase64Url(new Uint8Array(signature));
+  const signatureText = bytesToBase64Url(
+    new Uint8Array(signature)
+  );
 
   return body + "." + signatureText;
 }
@@ -173,6 +186,7 @@ async function verifySessionToken(token, env) {
   }
 
   const parts = token.split(".");
+
   if (parts.length !== 2) {
     return null;
   }
@@ -181,6 +195,7 @@ async function verifySessionToken(token, env) {
 
   try {
     const key = await getSessionKey(env);
+
     const valid = await crypto.subtle.verify(
       "HMAC",
       key,
@@ -193,7 +208,9 @@ async function verifySessionToken(token, env) {
     }
 
     const payload = JSON.parse(
-      decoder.decode(base64UrlToBytes(body))
+      decoder.decode(
+        base64UrlToBytes(body)
+      )
     );
 
     const now = Math.floor(Date.now() / 1000);
@@ -221,19 +238,24 @@ async function verifySessionToken(token, env) {
  */
 function getCookie(request, name) {
   const raw = request.headers.get("Cookie");
+
   if (!raw) {
     return "";
   }
 
   const cookies = raw.split(";");
+
   for (const cookie of cookies) {
     const part = cookie.trim();
     const index = part.indexOf("=");
+
     if (index < 0) {
       continue;
     }
+
     const key = part.slice(0, index).trim();
     const value = part.slice(index + 1);
+
     if (key === name) {
       return value;
     }
@@ -281,7 +303,10 @@ async function getSession(request, env) {
   const users = getLoginUsers(env);
 
   if (
-    !Object.prototype.hasOwnProperty.call(users, payload.name)
+    !Object.prototype.hasOwnProperty.call(
+      users,
+      payload.name
+    )
   ) {
     return null;
   }
@@ -310,9 +335,11 @@ function unauthorized() {
  */
 function isSameOrigin(request) {
   const origin = request.headers.get("Origin");
+
   if (!origin) {
     return true;
   }
+
   return origin === new URL(request.url).origin;
 }
 
@@ -330,31 +357,60 @@ function markAppsScriptActivity() {
  * Apps Script GET
  * =========================================================
  */
-async function appsScriptGet(env, action, params = {}, useSecret = true) {
+async function appsScriptGet(
+  env,
+  action,
+  params = {},
+  useSecret = true
+) {
   if (!env.APPS_SCRIPT_URL) {
-    throw new Error("APPS_SCRIPT_URL Secret이 설정되지 않았습니다.");
+    throw new Error(
+      "APPS_SCRIPT_URL Secret이 설정되지 않았습니다."
+    );
   }
 
   const target = new URL(env.APPS_SCRIPT_URL);
-  target.searchParams.set("action", action);
 
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== "") {
-      target.searchParams.set(key, String(value));
+  target.searchParams.set(
+    "action",
+    action
+  );
+
+  Object.entries(params).forEach(
+    ([key, value]) => {
+      if (
+        value !== undefined &&
+        value !== null &&
+        value !== ""
+      ) {
+        target.searchParams.set(
+          key,
+          String(value)
+        );
+      }
     }
-  });
+  );
 
   if (useSecret) {
     if (!env.LEDGER_API_SECRET) {
-      throw new Error("LEDGER_API_SECRET Secret이 설정되지 않았습니다.");
+      throw new Error(
+        "LEDGER_API_SECRET Secret이 설정되지 않았습니다."
+      );
     }
-    target.searchParams.set("apiSecret", env.LEDGER_API_SECRET);
+
+    target.searchParams.set(
+      "apiSecret",
+      env.LEDGER_API_SECRET
+    );
   }
 
-  const response = await fetch(target.toString(), {
-    method: "GET",
-    redirect: "follow"
-  });
+  const response = await fetch(
+    target.toString(),
+    {
+      method: "GET",
+      redirect: "follow"
+    }
+  );
 
   const text = await response.text();
 
@@ -363,7 +419,9 @@ async function appsScriptGet(env, action, params = {}, useSecret = true) {
   try {
     return JSON.parse(text);
   } catch (error) {
-    throw new Error("Apps Script가 JSON이 아닌 응답을 반환했습니다.");
+    throw new Error(
+      "Apps Script가 JSON이 아닌 응답을 반환했습니다."
+    );
   }
 }
 
@@ -372,13 +430,21 @@ async function appsScriptGet(env, action, params = {}, useSecret = true) {
  * Apps Script POST
  * =========================================================
  */
-async function appsScriptPost(env, action, payload = {}) {
+async function appsScriptPost(
+  env,
+  action,
+  payload = {}
+) {
   if (!env.APPS_SCRIPT_URL) {
-    throw new Error("APPS_SCRIPT_URL Secret이 설정되지 않았습니다.");
+    throw new Error(
+      "APPS_SCRIPT_URL Secret이 설정되지 않았습니다."
+    );
   }
 
   if (!env.LEDGER_API_SECRET) {
-    throw new Error("LEDGER_API_SECRET Secret이 설정되지 않았습니다.");
+    throw new Error(
+      "LEDGER_API_SECRET Secret이 설정되지 않았습니다."
+    );
   }
 
   const body = {
@@ -387,14 +453,17 @@ async function appsScriptPost(env, action, payload = {}) {
     apiSecret: env.LEDGER_API_SECRET
   };
 
-  const response = await fetch(env.APPS_SCRIPT_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(body),
-    redirect: "follow"
-  });
+  const response = await fetch(
+    env.APPS_SCRIPT_URL,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body),
+      redirect: "follow"
+    }
+  );
 
   const text = await response.text();
 
@@ -403,10 +472,11 @@ async function appsScriptPost(env, action, payload = {}) {
   try {
     return JSON.parse(text);
   } catch (error) {
-    throw new Error("Apps Script가 JSON이 아닌 응답을 반환했습니다.");
+    throw new Error(
+      "Apps Script가 JSON이 아닌 응답을 반환했습니다."
+    );
   }
 }
-
 
 /**
  * =========================================================
@@ -418,7 +488,8 @@ async function warmAppsScript(env) {
 
   if (
     lastAppsScriptActivityAt &&
-    now - lastAppsScriptActivityAt < BACKEND_WARM_INTERVAL_MS
+    now - lastAppsScriptActivityAt <
+      BACKEND_WARM_INTERVAL_MS
   ) {
     return;
   }
@@ -451,20 +522,30 @@ function bootstrapCacheUrl(origin) {
 }
 
 function bootstrapCacheKey(origin) {
-  return new Request(bootstrapCacheUrl(origin), { method: "GET" });
+  return new Request(
+    bootstrapCacheUrl(origin),
+    {
+      method: "GET"
+    }
+  );
 }
 
 function rememberBootstrap(data, origin) {
   bootstrapMemoryValue = data;
-  bootstrapMemoryCacheUrl = bootstrapCacheUrl(origin);
+
+  bootstrapMemoryCacheUrl =
+    bootstrapCacheUrl(origin);
+
   bootstrapMemoryExpiresAt =
-    Date.now() + BOOTSTRAP_CACHE_TTL_SECONDS * 1000;
+    Date.now() +
+    BOOTSTRAP_CACHE_TTL_SECONDS * 1000;
 }
 
 function getRememberedBootstrap(origin) {
   if (
     bootstrapMemoryValue &&
-    bootstrapMemoryCacheUrl === bootstrapCacheUrl(origin) &&
+    bootstrapMemoryCacheUrl ===
+      bootstrapCacheUrl(origin) &&
     bootstrapMemoryExpiresAt > Date.now()
   ) {
     return bootstrapMemoryValue;
@@ -473,41 +554,68 @@ function getRememberedBootstrap(origin) {
   bootstrapMemoryValue = null;
   bootstrapMemoryExpiresAt = 0;
   bootstrapMemoryCacheUrl = "";
+
   return null;
 }
 
 async function readBootstrapEdgeCache(origin) {
-  if (typeof caches === "undefined" || !caches.default) {
+  if (
+    typeof caches === "undefined" ||
+    !caches.default
+  ) {
     return null;
   }
 
-  const cached = await caches.default.match(bootstrapCacheKey(origin));
+  const cached = await caches.default.match(
+    bootstrapCacheKey(origin)
+  );
+
   if (!cached) {
     return null;
   }
 
   try {
     const data = await cached.json();
-    rememberBootstrap(data, origin);
+
+    rememberBootstrap(
+      data,
+      origin
+    );
+
     return data;
   } catch (error) {
     return null;
   }
 }
 
-async function writeBootstrapEdgeCache(data, origin) {
-  if (typeof caches === "undefined" || !caches.default) {
+async function writeBootstrapEdgeCache(
+  data,
+  origin
+) {
+  if (
+    typeof caches === "undefined" ||
+    !caches.default
+  ) {
     return;
   }
 
-  const response = new Response(JSON.stringify(data), {
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-      "Cache-Control": `public, max-age=${BOOTSTRAP_CACHE_TTL_SECONDS}`
-    }
-  });
+  const response = new Response(
+    JSON.stringify(data),
+    {
+      headers: {
+        "Content-Type":
+          "application/json; charset=utf-8",
 
-  await caches.default.put(bootstrapCacheKey(origin), response);
+        "Cache-Control":
+          `public, max-age=${BOOTSTRAP_CACHE_TTL_SECONDS}`
+      }
+    }
+  );
+
+  await caches.default.put(
+    bootstrapCacheKey(origin),
+    response
+  );
 }
 
 async function invalidateBootstrapCache(origin) {
@@ -517,48 +625,78 @@ async function invalidateBootstrapCache(origin) {
   bootstrapMemoryCacheUrl = "";
   bootstrapLoadPromise = null;
 
-  if (typeof caches === "undefined" || !caches.default) {
+  if (
+    typeof caches === "undefined" ||
+    !caches.default
+  ) {
     return;
   }
 
   try {
-    await caches.default.delete(bootstrapCacheKey(origin));
+    await caches.default.delete(
+      bootstrapCacheKey(origin)
+    );
   } catch (error) {
     // 설정 저장 자체는 캐시 삭제 실패 때문에 실패시키지 않습니다.
   }
 }
 
-async function loadBootstrapCached(env, origin) {
-  const remembered = getRememberedBootstrap(origin);
+async function loadBootstrapCached(
+  env,
+  origin
+) {
+  const remembered =
+    getRememberedBootstrap(origin);
+
   if (remembered) {
     return remembered;
   }
 
-  const edgeCached = await readBootstrapEdgeCache(origin);
+  const edgeCached =
+    await readBootstrapEdgeCache(origin);
+
   if (edgeCached) {
     return edgeCached;
   }
 
   if (!bootstrapLoadPromise) {
-    const generation = bootstrapCacheGeneration;
+    const generation =
+      bootstrapCacheGeneration;
 
-    const promise = appsScriptGet(env, "bootstrap")
-      .then(async data => {
-        if (
-          data &&
-          data.success !== false &&
-          generation === bootstrapCacheGeneration
-        ) {
-          rememberBootstrap(data, origin);
-          await writeBootstrapEdgeCache(data, origin);
-        }
-        return data;
-      })
-      .finally(() => {
-        if (bootstrapLoadPromise === promise) {
-          bootstrapLoadPromise = null;
-        }
-      });
+    const promise =
+      appsScriptGet(
+        env,
+        "bootstrap"
+      )
+        .then(
+          async data => {
+            if (
+              data &&
+              data.success !== false &&
+              generation ===
+                bootstrapCacheGeneration
+            ) {
+              rememberBootstrap(
+                data,
+                origin
+              );
+
+              await writeBootstrapEdgeCache(
+                data,
+                origin
+              );
+            }
+
+            return data;
+          }
+        )
+        .finally(() => {
+          if (
+            bootstrapLoadPromise === promise
+          ) {
+            bootstrapLoadPromise = null;
+          }
+        });
 
     bootstrapLoadPromise = promise;
   }
@@ -566,17 +704,85 @@ async function loadBootstrapCached(env, origin) {
   return bootstrapLoadPromise;
 }
 
-async function prefetchBootstrap(env, origin) {
+async function prefetchBootstrap(
+  env,
+  origin
+) {
   try {
-    await loadBootstrapCached(env, origin);
+    await loadBootstrapCached(
+      env,
+      origin
+    );
   } catch (error) {
     // 프리페치 실패가 인증이나 화면 진입을 막지 않습니다.
   }
 }
 
-async function prepareAppBackend(env, origin) {
+/**
+ * 무거운 bootstrap 본문은 기존 캐시를 사용하되,
+ * 부부 공통 입력 설정만 Apps Script에서 최신값을 다시 읽어 합칩니다.
+ *
+ * Cloudflare의 메모리/엣지 캐시는 실행 위치마다 따로 남을 수 있으므로
+ * bootstrap에 들어 있던 설정값만 사용하면 다른 기기에서 최대 5분 동안
+ * 이전 카테고리 순서를 볼 수 있습니다.
+ */
+async function mergeLatestInputPreferences(
+  env,
+  bootstrapPayload
+) {
+  if (
+    !bootstrapPayload ||
+    typeof bootstrapPayload !== "object" ||
+    !bootstrapPayload.data ||
+    typeof bootstrapPayload.data !== "object" ||
+    Array.isArray(bootstrapPayload.data)
+  ) {
+    return bootstrapPayload;
+  }
+
   try {
-    await prefetchBootstrap(env, origin);
+    const latest =
+      await appsScriptGet(
+        env,
+        "inputPreferences"
+      );
+
+    if (
+      !latest ||
+      latest.success !== true ||
+      !latest.data ||
+      typeof latest.data !== "object" ||
+      Array.isArray(latest.data)
+    ) {
+      return bootstrapPayload;
+    }
+
+    return {
+      ...bootstrapPayload,
+
+      data: {
+        ...bootstrapPayload.data,
+
+        inputPreferences:
+          latest.data
+      }
+    };
+  } catch (error) {
+    // 최신 설정 조회 실패 때문에 기존 bootstrap까지 실패시키지 않습니다.
+    return bootstrapPayload;
+  }
+}
+
+async function prepareAppBackend(
+  env,
+  origin
+) {
+  try {
+    await prefetchBootstrap(
+      env,
+      origin
+    );
+
     await warmAppsScript(env);
   } catch (error) {
     // 준비 작업은 사용자 요청을 실패시키지 않습니다.
@@ -589,30 +795,68 @@ async function prepareAppBackend(env, origin) {
  * =========================================================
  */
 function getCurrentMonthSeoul() {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit"
-  }).formatToParts(new Date());
+  const parts =
+    new Intl.DateTimeFormat(
+      "en-CA",
+      {
+        timeZone: "Asia/Seoul",
+        year: "numeric",
+        month: "2-digit"
+      }
+    ).formatToParts(
+      new Date()
+    );
 
-  const year = parts.find(part => part.type === "year")?.value || "";
-  const month = parts.find(part => part.type === "month")?.value || "";
+  const year =
+    parts.find(
+      part =>
+        part.type === "year"
+    )?.value || "";
+
+  const month =
+    parts.find(
+      part =>
+        part.type === "month"
+    )?.value || "";
+
   return `${year}-${month}`;
 }
 
-function dashboardCacheUrl(origin, month) {
-  return `${origin}/__moneybook_internal/dashboard-v2/${encodeURIComponent(month)}`;
+function dashboardCacheUrl(
+  origin,
+  month
+) {
+  return (
+    `${origin}/__moneybook_internal/dashboard-v2/` +
+    encodeURIComponent(month)
+  );
 }
 
-function dashboardCacheKey(origin, month) {
-  return new Request(dashboardCacheUrl(origin, month), { method: "GET" });
+function dashboardCacheKey(
+  origin,
+  month
+) {
+  return new Request(
+    dashboardCacheUrl(
+      origin,
+      month
+    ),
+    {
+      method: "GET"
+    }
+  );
 }
 
-function rememberDashboard(data, month) {
+function rememberDashboard(
+  data,
+  month
+) {
   dashboardMemoryValue = data;
   dashboardMemoryMonth = month;
+
   dashboardMemoryExpiresAt =
-    Date.now() + DASHBOARD_CACHE_TTL_SECONDS * 1000;
+    Date.now() +
+    DASHBOARD_CACHE_TTL_SECONDS * 1000;
 }
 
 function getRememberedDashboard(month) {
@@ -627,45 +871,88 @@ function getRememberedDashboard(month) {
   dashboardMemoryValue = null;
   dashboardMemoryMonth = "";
   dashboardMemoryExpiresAt = 0;
+
   return null;
 }
 
-async function readDashboardEdgeCache(origin, month) {
-  if (typeof caches === "undefined" || !caches.default) {
+async function readDashboardEdgeCache(
+  origin,
+  month
+) {
+  if (
+    typeof caches === "undefined" ||
+    !caches.default
+  ) {
     return null;
   }
 
-  const cached = await caches.default.match(dashboardCacheKey(origin, month));
+  const cached =
+    await caches.default.match(
+      dashboardCacheKey(
+        origin,
+        month
+      )
+    );
+
   if (!cached) {
     return null;
   }
 
   try {
-    const data = await cached.json();
-    rememberDashboard(data, month);
+    const data =
+      await cached.json();
+
+    rememberDashboard(
+      data,
+      month
+    );
+
     return data;
   } catch (error) {
     return null;
   }
 }
 
-async function writeDashboardEdgeCache(data, origin, month) {
-  if (typeof caches === "undefined" || !caches.default) {
+async function writeDashboardEdgeCache(
+  data,
+  origin,
+  month
+) {
+  if (
+    typeof caches === "undefined" ||
+    !caches.default
+  ) {
     return;
   }
 
-  const response = new Response(JSON.stringify(data), {
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-      "Cache-Control": `public, max-age=${DASHBOARD_CACHE_TTL_SECONDS}`
-    }
-  });
+  const response =
+    new Response(
+      JSON.stringify(data),
+      {
+        headers: {
+          "Content-Type":
+            "application/json; charset=utf-8",
 
-  await caches.default.put(dashboardCacheKey(origin, month), response);
+          "Cache-Control":
+            `public, max-age=${DASHBOARD_CACHE_TTL_SECONDS}`
+        }
+      }
+    );
+
+  await caches.default.put(
+    dashboardCacheKey(
+      origin,
+      month
+    ),
+    response
+  );
 }
 
-async function invalidateCurrentDashboardCache(origin) {
-  const currentMonth = getCurrentMonthSeoul();
+async function invalidateCurrentDashboardCache(
+  origin
+) {
+  const currentMonth =
+    getCurrentMonthSeoul();
 
   dashboardCacheGeneration += 1;
   dashboardMemoryValue = null;
@@ -673,12 +960,20 @@ async function invalidateCurrentDashboardCache(origin) {
   dashboardMemoryExpiresAt = 0;
   dashboardLoadPromise = null;
 
-  if (typeof caches === "undefined" || !caches.default) {
+  if (
+    typeof caches === "undefined" ||
+    !caches.default
+  ) {
     return;
   }
 
   try {
-    await caches.default.delete(dashboardCacheKey(origin, currentMonth));
+    await caches.default.delete(
+      dashboardCacheKey(
+        origin,
+        currentMonth
+      )
+    );
   } catch (error) {
     // 실제 거래 저장은 캐시 삭제 실패 때문에 실패시키지 않습니다.
   }
@@ -690,49 +985,94 @@ async function loadDashboardCached(
   requestedMonth = "",
   forceRefresh = false
 ) {
-  const currentMonth = getCurrentMonthSeoul();
-  const month = requestedMonth || currentMonth;
+  const currentMonth =
+    getCurrentMonthSeoul();
 
-  if (month !== currentMonth) {
-    return appsScriptGet(env, "dashboard", { month });
+  const month =
+    requestedMonth ||
+    currentMonth;
+
+  if (
+    month !== currentMonth
+  ) {
+    return appsScriptGet(
+      env,
+      "dashboard",
+      {
+        month
+      }
+    );
   }
 
   if (!forceRefresh) {
-    const remembered = getRememberedDashboard(month);
+    const remembered =
+      getRememberedDashboard(
+        month
+      );
+
     if (remembered) {
       return remembered;
     }
 
-    const edgeCached = await readDashboardEdgeCache(origin, month);
+    const edgeCached =
+      await readDashboardEdgeCache(
+        origin,
+        month
+      );
+
     if (edgeCached) {
       return edgeCached;
     }
   }
 
   if (forceRefresh) {
-    await invalidateCurrentDashboardCache(origin);
+    await invalidateCurrentDashboardCache(
+      origin
+    );
   }
 
   if (!dashboardLoadPromise) {
-    const generation = dashboardCacheGeneration;
+    const generation =
+      dashboardCacheGeneration;
 
-    const promise = appsScriptGet(env, "dashboard", { month })
-      .then(async data => {
-        if (
-          data &&
-          data.success !== false &&
-          generation === dashboardCacheGeneration
-        ) {
-          rememberDashboard(data, month);
-          await writeDashboardEdgeCache(data, origin, month);
+    const promise =
+      appsScriptGet(
+        env,
+        "dashboard",
+        {
+          month
         }
-        return data;
-      })
-      .finally(() => {
-        if (dashboardLoadPromise === promise) {
-          dashboardLoadPromise = null;
-        }
-      });
+      )
+        .then(
+          async data => {
+            if (
+              data &&
+              data.success !== false &&
+              generation ===
+                dashboardCacheGeneration
+            ) {
+              rememberDashboard(
+                data,
+                month
+              );
+
+              await writeDashboardEdgeCache(
+                data,
+                origin,
+                month
+              );
+            }
+
+            return data;
+          }
+        )
+        .finally(() => {
+          if (
+            dashboardLoadPromise === promise
+          ) {
+            dashboardLoadPromise = null;
+          }
+        });
 
     dashboardLoadPromise = promise;
   }
@@ -740,7 +1080,10 @@ async function loadDashboardCached(
   return dashboardLoadPromise;
 }
 
-async function prefetchCurrentDashboard(env, origin) {
+async function prefetchCurrentDashboard(
+  env,
+  origin
+) {
   try {
     await loadDashboardCached(
       env,
@@ -753,15 +1096,33 @@ async function prefetchCurrentDashboard(env, origin) {
   }
 }
 
-async function refreshDashboardAfterMutation(data, ctx, env, origin) {
-  if (!data || data.success === false) {
+async function refreshDashboardAfterMutation(
+  data,
+  ctx,
+  env,
+  origin
+) {
+  if (
+    !data ||
+    data.success === false
+  ) {
     return;
   }
 
-  await invalidateCurrentDashboardCache(origin);
+  await invalidateCurrentDashboardCache(
+    origin
+  );
 
-  if (ctx && typeof ctx.waitUntil === "function") {
-    ctx.waitUntil(prefetchCurrentDashboard(env, origin));
+  if (
+    ctx &&
+    typeof ctx.waitUntil === "function"
+  ) {
+    ctx.waitUntil(
+      prefetchCurrentDashboard(
+        env,
+        origin
+      )
+    );
   }
 }
 
@@ -771,39 +1132,62 @@ async function refreshDashboardAfterMutation(data, ctx, env, origin) {
  * =========================================================
  */
 export default {
-  async fetch(request, env, ctx) {
-    const url = new URL(request.url);
+  async fetch(
+    request,
+    env,
+    ctx
+  ) {
+    const url =
+      new URL(request.url);
 
     try {
       /**
        * Worker 확인
        */
-      if (request.method === "GET" && url.pathname === "/api/ping") {
+      if (
+        request.method === "GET" &&
+        url.pathname === "/api/ping"
+      ) {
         return jsonResponse({
           success: true,
-          message: "Cloudflare Worker is running."
+          message:
+            "Cloudflare Worker is running."
         });
       }
 
       /**
        * Apps Script health
        */
-      if (request.method === "GET" && url.pathname === "/api/health") {
-        const data = await appsScriptGet(env, "health", {}, false);
+      if (
+        request.method === "GET" &&
+        url.pathname === "/api/health"
+      ) {
+        const data =
+          await appsScriptGet(
+            env,
+            "health",
+            {},
+            false
+          );
+
         return jsonResponse(data);
       }
 
       /**
        * 로그인
        */
-      if (request.method === "POST" && url.pathname === "/api/auth/login") {
+      if (
+        request.method === "POST" &&
+        url.pathname === "/api/auth/login"
+      ) {
         if (!isSameOrigin(request)) {
           return jsonResponse(
             {
               success: false,
               error: {
                 code: "INVALID_ORIGIN",
-                message: "허용되지 않은 요청입니다."
+                message:
+                  "허용되지 않은 요청입니다."
               }
             },
             403
@@ -811,23 +1195,33 @@ export default {
         }
 
         let body;
+
         try {
-          body = await request.json();
+          body =
+            await request.json();
         } catch (error) {
           return jsonResponse(
             {
               success: false,
               error: {
                 code: "INVALID_JSON",
-                message: "로그인 요청 형식이 올바르지 않습니다."
+                message:
+                  "로그인 요청 형식이 올바르지 않습니다."
               }
             },
             400
           );
         }
 
-        const name = String(body.name || "").trim();
-        const password = String(body.password || "");
+        const name =
+          String(
+            body.name || ""
+          ).trim();
+
+        const password =
+          String(
+            body.password || ""
+          );
 
         if (
           !name ||
@@ -840,19 +1234,31 @@ export default {
               success: false,
               error: {
                 code: "INVALID_LOGIN",
-                message: "이름 또는 비밀번호를 확인해주세요."
+                message:
+                  "이름 또는 비밀번호를 확인해주세요."
               }
             },
             401
           );
         }
 
-        const users = getLoginUsers(env);
-        const stored = Object.prototype.hasOwnProperty.call(users, name)
-          ? String(users[name])
-          : "";
+        const users =
+          getLoginUsers(env);
 
-        const valid = stored && (await safeEqual(password, stored));
+        const stored =
+          Object.prototype.hasOwnProperty.call(
+            users,
+            name
+          )
+            ? String(users[name])
+            : "";
+
+        const valid =
+          stored &&
+          await safeEqual(
+            password,
+            stored
+          );
 
         if (!valid) {
           return jsonResponse(
@@ -860,17 +1266,31 @@ export default {
               success: false,
               error: {
                 code: "INVALID_LOGIN",
-                message: "이름 또는 비밀번호를 확인해주세요."
+                message:
+                  "이름 또는 비밀번호를 확인해주세요."
               }
             },
             401
           );
         }
 
-        const token = await createSessionToken(name, env);
+        const token =
+          await createSessionToken(
+            name,
+            env
+          );
 
-        if (ctx && typeof ctx.waitUntil === "function") {
-          ctx.waitUntil(prepareAppBackend(env, url.origin));
+        if (
+          ctx &&
+          typeof ctx.waitUntil ===
+            "function"
+        ) {
+          ctx.waitUntil(
+            prepareAppBackend(
+              env,
+              url.origin
+            )
+          );
         }
 
         return jsonResponse(
@@ -883,7 +1303,8 @@ export default {
           },
           200,
           {
-            "Set-Cookie": createCookie(token)
+            "Set-Cookie":
+              createCookie(token)
           }
         );
       }
@@ -891,17 +1312,38 @@ export default {
       /**
        * 세션 확인 + 로그인 기간 자동 연장
        */
-      if (request.method === "GET" && url.pathname === "/api/auth/session") {
-        const session = await getSession(request, env);
+      if (
+        request.method === "GET" &&
+        url.pathname ===
+          "/api/auth/session"
+      ) {
+        const session =
+          await getSession(
+            request,
+            env
+          );
 
         if (!session) {
           return unauthorized();
         }
 
-        const refreshedToken = await createSessionToken(session.name, env);
+        const refreshedToken =
+          await createSessionToken(
+            session.name,
+            env
+          );
 
-        if (ctx && typeof ctx.waitUntil === "function") {
-          ctx.waitUntil(prepareAppBackend(env, url.origin));
+        if (
+          ctx &&
+          typeof ctx.waitUntil ===
+            "function"
+        ) {
+          ctx.waitUntil(
+            prepareAppBackend(
+              env,
+              url.origin
+            )
+          );
         }
 
         return jsonResponse(
@@ -914,7 +1356,10 @@ export default {
           },
           200,
           {
-            "Set-Cookie": createCookie(refreshedToken)
+            "Set-Cookie":
+              createCookie(
+                refreshedToken
+              )
           }
         );
       }
@@ -922,14 +1367,19 @@ export default {
       /**
        * 로그아웃
        */
-      if (request.method === "POST" && url.pathname === "/api/auth/logout") {
+      if (
+        request.method === "POST" &&
+        url.pathname ===
+          "/api/auth/logout"
+      ) {
         if (!isSameOrigin(request)) {
           return jsonResponse(
             {
               success: false,
               error: {
                 code: "INVALID_ORIGIN",
-                message: "허용되지 않은 요청입니다."
+                message:
+                  "허용되지 않은 요청입니다."
               }
             },
             403
@@ -943,7 +1393,8 @@ export default {
           },
           200,
           {
-            "Set-Cookie": clearCookie()
+            "Set-Cookie":
+              clearCookie()
           }
         );
       }
@@ -951,8 +1402,16 @@ export default {
       /**
        * 이하 API는 로그인 필수
        */
-      if (url.pathname.startsWith("/api/")) {
-        const session = await getSession(request, env);
+      if (
+        url.pathname.startsWith(
+          "/api/"
+        )
+      ) {
+        const session =
+          await getSession(
+            request,
+            env
+          );
 
         if (!session) {
           return unauthorized();
@@ -960,223 +1419,217 @@ export default {
 
         if (
           request.method === "GET" &&
-          url.pathname === "/api/backend-test"
+          url.pathname ===
+            "/api/backend-test"
         ) {
-          const data = await appsScriptGet(env, "bootstrap");
+          const data =
+            await appsScriptGet(
+              env,
+              "bootstrap"
+            );
 
           if (!data.success) {
             return jsonResponse(
               {
                 success: false,
-                backendAuthenticated: false,
-                error: data.error || {
-                  code: "BACKEND_ERROR",
-                  message: "Apps Script 요청에 실패했습니다."
-                }
+                backendAuthenticated:
+                  false,
+
+                error:
+                  data.error || {
+                    code:
+                      "BACKEND_ERROR",
+
+                    message:
+                      "Apps Script 요청에 실패했습니다."
+                  }
               },
               502
             );
           }
 
-          const bootstrap = data.data || {};
+          const bootstrap =
+            data.data || {};
 
           return jsonResponse({
             success: true,
-            backendAuthenticated: true,
-            apiVersion: data.apiVersion,
-            user: session.name,
-            message: "로그인 + Cloudflare + Apps Script 연결 성공",
+            backendAuthenticated:
+              true,
+
+            apiVersion:
+              data.apiVersion,
+
+            user:
+              session.name,
+
+            message:
+              "로그인 + Cloudflare + Apps Script 연결 성공",
+
             counts: {
-              accounts: Array.isArray(bootstrap.accounts)
-                ? bootstrap.accounts.length
-                : 0,
-              categories: Array.isArray(bootstrap.categories)
-                ? bootstrap.categories.length
-                : 0,
-              members: Array.isArray(bootstrap.members)
-                ? bootstrap.members.length
-                : 0,
-              spendingTargets: Array.isArray(bootstrap.spendingTargets)
-                ? bootstrap.spendingTargets.length
-                : 0
+              accounts:
+                Array.isArray(
+                  bootstrap.accounts
+                )
+                  ? bootstrap
+                      .accounts
+                      .length
+                  : 0,
+
+              categories:
+                Array.isArray(
+                  bootstrap.categories
+                )
+                  ? bootstrap
+                      .categories
+                      .length
+                  : 0,
+
+              members:
+                Array.isArray(
+                  bootstrap.members
+                )
+                  ? bootstrap
+                      .members
+                      .length
+                  : 0,
+
+              spendingTargets:
+                Array.isArray(
+                  bootstrap.spendingTargets
+                )
+                  ? bootstrap
+                      .spendingTargets
+                      .length
+                  : 0
             }
           });
         }
 
-        if (request.method === "GET" && url.pathname === "/api/bootstrap") {
-          const data = await loadBootstrapCached(env, url.origin);
+        if (
+          request.method === "GET" &&
+          url.pathname ===
+            "/api/bootstrap"
+        ) {
+          const cachedData =
+            await loadBootstrapCached(
+              env,
+              url.origin
+            );
 
-          if (ctx && typeof ctx.waitUntil === "function") {
-            ctx.waitUntil(warmAppsScript(env));
+          const data =
+            await mergeLatestInputPreferences(
+              env,
+              cachedData
+            );
+
+          if (
+            ctx &&
+            typeof ctx.waitUntil ===
+              "function"
+          ) {
+            ctx.waitUntil(
+              warmAppsScript(env)
+            );
           }
-
-          return jsonResponse(data);
-        }
-
-        if (request.method === "GET" && url.pathname === "/api/dashboard") {
-          const data = await loadDashboardCached(
-            env,
-            url.origin,
-            url.searchParams.get("month") || "",
-            url.searchParams.get("refresh") === "1"
-          );
 
           return jsonResponse(data);
         }
 
         if (
           request.method === "GET" &&
-          url.pathname === "/api/transactions"
+          url.pathname ===
+            "/api/dashboard"
         ) {
-          const data = await appsScriptGet(env, "transactions", {
-            dateFrom: url.searchParams.get("dateFrom") || "",
-            dateTo: url.searchParams.get("dateTo") || "",
-            type: url.searchParams.get("type") || "",
-            categoryId: url.searchParams.get("categoryId") || "",
-            accountId: url.searchParams.get("accountId") || "",
-            spendingTarget: url.searchParams.get("spendingTarget") || "",
-            q: url.searchParams.get("q") || "",
-            limit: url.searchParams.get("limit") || "",
-            offset: url.searchParams.get("offset") || ""
-          });
+          const data =
+            await loadDashboardCached(
+              env,
+              url.origin,
+              url.searchParams.get(
+                "month"
+              ) || "",
+              url.searchParams.get(
+                "refresh"
+              ) === "1"
+            );
+
+          return jsonResponse(data);
+        }
+
+        if (
+          request.method === "GET" &&
+          url.pathname ===
+            "/api/transactions"
+        ) {
+          const data =
+            await appsScriptGet(
+              env,
+              "transactions",
+              {
+                dateFrom:
+                  url.searchParams.get(
+                    "dateFrom"
+                  ) || "",
+
+                dateTo:
+                  url.searchParams.get(
+                    "dateTo"
+                  ) || "",
+
+                type:
+                  url.searchParams.get(
+                    "type"
+                  ) || "",
+
+                categoryId:
+                  url.searchParams.get(
+                    "categoryId"
+                  ) || "",
+
+                accountId:
+                  url.searchParams.get(
+                    "accountId"
+                  ) || "",
+
+                spendingTarget:
+                  url.searchParams.get(
+                    "spendingTarget"
+                  ) || "",
+
+                q:
+                  url.searchParams.get(
+                    "q"
+                  ) || "",
+
+                limit:
+                  url.searchParams.get(
+                    "limit"
+                  ) || "",
+
+                offset:
+                  url.searchParams.get(
+                    "offset"
+                  ) || ""
+              }
+            );
 
           return jsonResponse(data);
         }
 
         if (
           request.method === "POST" &&
-          url.pathname === "/api/transactions"
+          url.pathname ===
+            "/api/transactions"
         ) {
           if (!isSameOrigin(request)) {
             return jsonResponse(
               {
                 success: false,
                 error: {
-                  code: "INVALID_ORIGIN",
-                  message: "허용되지 않은 요청입니다."
-                }
-              },
-              403
-            );
-          }
+                  code:
+                    "INVALID_ORIGIN",
 
-          let body;
-          try {
-            body = await request.json();
-          } catch (error) {
-            return jsonResponse(
-              {
-                success: false,
-                error: {
-                  code: "INVALID_JSON",
-                  message: "거래 입력 형식이 올바르지 않습니다."
-                }
-              },
-              400
-            );
-          }
-
-          if (!body || typeof body !== "object" || Array.isArray(body)) {
-            return jsonResponse(
-              {
-                success: false,
-                error: {
-                  code: "INVALID_TRANSACTION",
-                  message: "거래 입력 형식이 올바르지 않습니다."
-                }
-              },
-              400
-            );
-          }
-
-          const data = await appsScriptPost(env, "createTransaction", {
-            ...body,
-            actor: session.name
-          });
-
-          await refreshDashboardAfterMutation(
-            data,
-            ctx,
-            env,
-            url.origin
-          );
-
-          return jsonResponse(data);
-        }
-
-        if (
-          request.method === "POST" &&
-          url.pathname === "/api/transactions/update"
-        ) {
-          if (!isSameOrigin(request)) {
-            return jsonResponse(
-              {
-                success: false,
-                error: {
-                  code: "INVALID_ORIGIN",
-                  message: "허용되지 않은 요청입니다."
-                }
-              },
-              403
-            );
-          }
-
-          let body;
-
-          try {
-            body = await request.json();
-          } catch (error) {
-            return jsonResponse(
-              {
-                success: false,
-                error: {
-                  code: "INVALID_JSON",
-                  message: "거래 수정 형식이 올바르지 않습니다."
-                }
-              },
-              400
-            );
-          }
-
-          if (!body || typeof body !== "object" || Array.isArray(body)) {
-            return jsonResponse(
-              {
-                success: false,
-                error: {
-                  code: "INVALID_TRANSACTION",
-                  message: "거래 수정 형식이 올바르지 않습니다."
-                }
-              },
-              400
-            );
-          }
-
-          const data = await appsScriptPost(env, "updateTransaction", {
-            ...body,
-            actor: session.name
-          });
-
-          await refreshDashboardAfterMutation(
-            data,
-            ctx,
-            env,
-            url.origin
-          );
-
-          return jsonResponse(data);
-        }
-
-        if (
-          request.method === "POST" &&
-          url.pathname === "/api/transactions/delete"
-        ) {
-          if (!isSameOrigin(request)) {
-            return jsonResponse(
-              {
-                success: false,
-                error: {
-                  code: "INVALID_ORIGIN",
-                  message: "허용되지 않은 요청입니다."
+                  message:
+                    "허용되지 않은 요청입니다."
                 }
               },
               403
@@ -1186,138 +1639,18 @@ export default {
           let body;
 
           try {
-            body = await request.json();
+            body =
+              await request.json();
           } catch (error) {
             return jsonResponse(
               {
                 success: false,
                 error: {
-                  code: "INVALID_JSON",
-                  message: "거래 삭제 형식이 올바르지 않습니다."
-                }
-              },
-              400
-            );
-          }
+                  code:
+                    "INVALID_JSON",
 
-          if (!body || typeof body !== "object" || Array.isArray(body)) {
-            return jsonResponse(
-              {
-                success: false,
-                error: {
-                  code: "INVALID_TRANSACTION",
-                  message: "거래 삭제 형식이 올바르지 않습니다."
-                }
-              },
-              400
-            );
-          }
-
-          const data = await appsScriptPost(env, "deleteTransaction", {
-            ...body,
-            actor: session.name
-          });
-
-          await refreshDashboardAfterMutation(
-            data,
-            ctx,
-            env,
-            url.origin
-          );
-
-          return jsonResponse(data);
-        }
-
-        if (
-          request.method === "POST" &&
-          url.pathname === "/api/transactions/restore"
-        ) {
-          if (!isSameOrigin(request)) {
-            return jsonResponse(
-              {
-                success: false,
-                error: {
-                  code: "INVALID_ORIGIN",
-                  message: "허용되지 않은 요청입니다."
-                }
-              },
-              403
-            );
-          }
-
-          let body;
-
-          try {
-            body = await request.json();
-          } catch (error) {
-            return jsonResponse(
-              {
-                success: false,
-                error: {
-                  code: "INVALID_JSON",
-                  message: "거래 복원 형식이 올바르지 않습니다."
-                }
-              },
-              400
-            );
-          }
-
-          if (!body || typeof body !== "object" || Array.isArray(body)) {
-            return jsonResponse(
-              {
-                success: false,
-                error: {
-                  code: "INVALID_TRANSACTION",
-                  message: "거래 복원 형식이 올바르지 않습니다."
-                }
-              },
-              400
-            );
-          }
-
-          const data = await appsScriptPost(env, "restoreTransaction", {
-            ...body,
-            actor: session.name
-          });
-
-          await refreshDashboardAfterMutation(
-            data,
-            ctx,
-            env,
-            url.origin
-          );
-
-          return jsonResponse(data);
-        }
-
-        if (
-          request.method === "POST" &&
-          url.pathname === "/api/settings/input-preferences"
-        ) {
-          if (!isSameOrigin(request)) {
-            return jsonResponse(
-              {
-                success: false,
-                error: {
-                  code: "INVALID_ORIGIN",
-                  message: "허용되지 않은 요청입니다."
-                }
-              },
-              403
-            );
-          }
-
-          let body;
-
-          try {
-            body = await request.json();
-          } catch (error) {
-            return jsonResponse(
-              {
-                success: false,
-                error: {
-                  code: "INVALID_JSON",
-                  message: "설정 저장 형식이 올바르지 않습니다."
+                  message:
+                    "거래 입력 형식이 올바르지 않습니다."
                 }
               },
               400
@@ -1326,32 +1659,379 @@ export default {
 
           if (
             !body ||
-            typeof body !== "object" ||
-            Array.isArray(body) ||
-            !body.preferences ||
-            typeof body.preferences !== "object" ||
-            Array.isArray(body.preferences)
+            typeof body !==
+              "object" ||
+            Array.isArray(body)
           ) {
             return jsonResponse(
               {
                 success: false,
                 error: {
-                  code: "INVALID_INPUT_PREFERENCES",
-                  message: "입력 설정 형식이 올바르지 않습니다."
+                  code:
+                    "INVALID_TRANSACTION",
+
+                  message:
+                    "거래 입력 형식이 올바르지 않습니다."
                 }
               },
               400
             );
           }
 
-          const data = await appsScriptPost(
+          const data =
+            await appsScriptPost(
+              env,
+              "createTransaction",
+              {
+                ...body,
+                actor:
+                  session.name
+              }
+            );
+
+          await refreshDashboardAfterMutation(
+            data,
+            ctx,
             env,
-            "setInputPreferences",
-            {
-              preferences: body.preferences,
-              actor: session.name
-            }
+            url.origin
           );
+
+          return jsonResponse(data);
+        }
+
+        if (
+          request.method === "POST" &&
+          url.pathname ===
+            "/api/transactions/update"
+        ) {
+          if (!isSameOrigin(request)) {
+            return jsonResponse(
+              {
+                success: false,
+                error: {
+                  code:
+                    "INVALID_ORIGIN",
+
+                  message:
+                    "허용되지 않은 요청입니다."
+                }
+              },
+              403
+            );
+          }
+
+          let body;
+
+          try {
+            body =
+              await request.json();
+          } catch (error) {
+            return jsonResponse(
+              {
+                success: false,
+                error: {
+                  code:
+                    "INVALID_JSON",
+
+                  message:
+                    "거래 수정 형식이 올바르지 않습니다."
+                }
+              },
+              400
+            );
+          }
+
+          if (
+            !body ||
+            typeof body !==
+              "object" ||
+            Array.isArray(body)
+          ) {
+            return jsonResponse(
+              {
+                success: false,
+                error: {
+                  code:
+                    "INVALID_TRANSACTION",
+
+                  message:
+                    "거래 수정 형식이 올바르지 않습니다."
+                }
+              },
+              400
+            );
+          }
+
+          const data =
+            await appsScriptPost(
+              env,
+              "updateTransaction",
+              {
+                ...body,
+                actor:
+                  session.name
+              }
+            );
+
+          await refreshDashboardAfterMutation(
+            data,
+            ctx,
+            env,
+            url.origin
+          );
+
+          return jsonResponse(data);
+        }
+
+        if (
+          request.method === "POST" &&
+          url.pathname ===
+            "/api/transactions/delete"
+        ) {
+          if (!isSameOrigin(request)) {
+            return jsonResponse(
+              {
+                success: false,
+                error: {
+                  code:
+                    "INVALID_ORIGIN",
+
+                  message:
+                    "허용되지 않은 요청입니다."
+                }
+              },
+              403
+            );
+          }
+
+          let body;
+
+          try {
+            body =
+              await request.json();
+          } catch (error) {
+            return jsonResponse(
+              {
+                success: false,
+                error: {
+                  code:
+                    "INVALID_JSON",
+
+                  message:
+                    "거래 삭제 형식이 올바르지 않습니다."
+                }
+              },
+              400
+            );
+          }
+
+          if (
+            !body ||
+            typeof body !==
+              "object" ||
+            Array.isArray(body)
+          ) {
+            return jsonResponse(
+              {
+                success: false,
+                error: {
+                  code:
+                    "INVALID_TRANSACTION",
+
+                  message:
+                    "거래 삭제 형식이 올바르지 않습니다."
+                }
+              },
+              400
+            );
+          }
+
+          const data =
+            await appsScriptPost(
+              env,
+              "deleteTransaction",
+              {
+                ...body,
+                actor:
+                  session.name
+              }
+            );
+
+          await refreshDashboardAfterMutation(
+            data,
+            ctx,
+            env,
+            url.origin
+          );
+
+          return jsonResponse(data);
+        }
+
+        if (
+          request.method === "POST" &&
+          url.pathname ===
+            "/api/transactions/restore"
+        ) {
+          if (!isSameOrigin(request)) {
+            return jsonResponse(
+              {
+                success: false,
+                error: {
+                  code:
+                    "INVALID_ORIGIN",
+
+                  message:
+                    "허용되지 않은 요청입니다."
+                }
+              },
+              403
+            );
+          }
+
+          let body;
+
+          try {
+            body =
+              await request.json();
+          } catch (error) {
+            return jsonResponse(
+              {
+                success: false,
+                error: {
+                  code:
+                    "INVALID_JSON",
+
+                  message:
+                    "거래 복원 형식이 올바르지 않습니다."
+                }
+              },
+              400
+            );
+          }
+
+          if (
+            !body ||
+            typeof body !==
+              "object" ||
+            Array.isArray(body)
+          ) {
+            return jsonResponse(
+              {
+                success: false,
+                error: {
+                  code:
+                    "INVALID_TRANSACTION",
+
+                  message:
+                    "거래 복원 형식이 올바르지 않습니다."
+                }
+              },
+              400
+            );
+          }
+
+          const data =
+            await appsScriptPost(
+              env,
+              "restoreTransaction",
+              {
+                ...body,
+                actor:
+                  session.name
+              }
+            );
+
+          await refreshDashboardAfterMutation(
+            data,
+            ctx,
+            env,
+            url.origin
+          );
+
+          return jsonResponse(data);
+        }
+
+        if (
+          request.method === "POST" &&
+          url.pathname ===
+            "/api/settings/input-preferences"
+        ) {
+          if (!isSameOrigin(request)) {
+            return jsonResponse(
+              {
+                success: false,
+                error: {
+                  code:
+                    "INVALID_ORIGIN",
+
+                  message:
+                    "허용되지 않은 요청입니다."
+                }
+              },
+              403
+            );
+          }
+
+          let body;
+
+          try {
+            body =
+              await request.json();
+          } catch (error) {
+            return jsonResponse(
+              {
+                success: false,
+                error: {
+                  code:
+                    "INVALID_JSON",
+
+                  message:
+                    "설정 저장 형식이 올바르지 않습니다."
+                }
+              },
+              400
+            );
+          }
+
+          if (
+            !body ||
+            typeof body !==
+              "object" ||
+            Array.isArray(body) ||
+            !body.preferences ||
+            typeof body.preferences !==
+              "object" ||
+            Array.isArray(
+              body.preferences
+            )
+          ) {
+            return jsonResponse(
+              {
+                success: false,
+                error: {
+                  code:
+                    "INVALID_INPUT_PREFERENCES",
+
+                  message:
+                    "입력 설정 형식이 올바르지 않습니다."
+                }
+              },
+              400
+            );
+          }
+
+          const data =
+            await appsScriptPost(
+              env,
+              "setInputPreferences",
+              {
+                preferences:
+                  body.preferences,
+
+                actor:
+                  session.name
+              }
+            );
 
           if (
             data &&
@@ -1363,7 +2043,8 @@ export default {
 
             if (
               ctx &&
-              typeof ctx.waitUntil === "function"
+              typeof ctx.waitUntil ===
+                "function"
             ) {
               ctx.waitUntil(
                 prefetchBootstrap(
@@ -1379,87 +2060,123 @@ export default {
 
         if (
           request.method === "GET" &&
-          url.pathname === "/api/investments/accounts"
+          url.pathname ===
+            "/api/investments/accounts"
         ) {
-          const data = await appsScriptGet(
-            env,
-            "investmentAccounts"
-          );
+          const data =
+            await appsScriptGet(
+              env,
+              "investmentAccounts"
+            );
 
           return jsonResponse(data);
         }
 
         if (
           request.method === "GET" &&
-          url.pathname === "/api/investments/holdings"
+          url.pathname ===
+            "/api/investments/holdings"
         ) {
-          const data = await appsScriptGet(
-            env,
-            "holdings",
-            {
-              accountId:
-                url.searchParams.get("accountId") || "",
-              market:
-                url.searchParams.get("market") || "",
-              quoteMode:
-                url.searchParams.get("quoteMode") || "",
-              includeDeleted:
-                url.searchParams.get("includeDeleted") || ""
-            }
-          );
+          const data =
+            await appsScriptGet(
+              env,
+              "holdings",
+              {
+                accountId:
+                  url.searchParams.get(
+                    "accountId"
+                  ) || "",
+
+                market:
+                  url.searchParams.get(
+                    "market"
+                  ) || "",
+
+                quoteMode:
+                  url.searchParams.get(
+                    "quoteMode"
+                  ) || "",
+
+                includeDeleted:
+                  url.searchParams.get(
+                    "includeDeleted"
+                  ) || ""
+              }
+            );
 
           return jsonResponse(data);
         }
 
         if (
           request.method === "GET" &&
-          url.pathname === "/api/investments/trades"
+          url.pathname ===
+            "/api/investments/trades"
         ) {
-          const data = await appsScriptGet(
-            env,
-            "investmentTrades",
-            {
-              accountId:
-                url.searchParams.get("accountId") || "",
-              holdingId:
-                url.searchParams.get("holdingId") || "",
-              tradeType:
-                url.searchParams.get("tradeType") || "",
-              includeDeleted:
-                url.searchParams.get("includeDeleted") || ""
-            }
-          );
+          const data =
+            await appsScriptGet(
+              env,
+              "investmentTrades",
+              {
+                accountId:
+                  url.searchParams.get(
+                    "accountId"
+                  ) || "",
+
+                holdingId:
+                  url.searchParams.get(
+                    "holdingId"
+                  ) || "",
+
+                tradeType:
+                  url.searchParams.get(
+                    "tradeType"
+                  ) || "",
+
+                includeDeleted:
+                  url.searchParams.get(
+                    "includeDeleted"
+                  ) || ""
+              }
+            );
 
           return jsonResponse(data);
         }
 
         if (
           request.method === "GET" &&
-          url.pathname === "/api/investments/cash"
+          url.pathname ===
+            "/api/investments/cash"
         ) {
-          const data = await appsScriptGet(
-            env,
-            "investmentCash",
-            {
-              accountId:
-                url.searchParams.get("accountId") || ""
-            }
-          );
+          const data =
+            await appsScriptGet(
+              env,
+              "investmentCash",
+              {
+                accountId:
+                  url.searchParams.get(
+                    "accountId"
+                  ) || ""
+              }
+            );
 
           return jsonResponse(data);
         }
 
         if (
           request.method === "POST" &&
-          url.pathname === "/api/investments/cash-baseline"
+          url.pathname ===
+            "/api/investments/cash-baseline"
         ) {
           if (!isSameOrigin(request)) {
             return jsonResponse(
               {
                 success: false,
                 error: {
-                  code: "INVALID_ORIGIN",
-                  message: "허용되지 않은 요청입니다."
+                  code:
+                    "INVALID_ORIGIN",
+
+                  message:
+                    "허용되지 않은 요청입니다."
                 }
               },
               403
@@ -1469,28 +2186,34 @@ export default {
           let body;
 
           try {
-            body = await request.json();
+            body =
+              await request.json();
           } catch (error) {
             return jsonResponse(
               {
                 success: false,
                 error: {
-                  code: "INVALID_JSON",
-                  message: "요청 형식이 올바르지 않습니다."
+                  code:
+                    "INVALID_JSON",
+
+                  message:
+                    "요청 형식이 올바르지 않습니다."
                 }
               },
               400
             );
           }
 
-          const data = await appsScriptPost(
-            env,
-            "setInvestmentCashBaseline",
-            {
-              ...body,
-              actor: session.name
-            }
-          );
+          const data =
+            await appsScriptPost(
+              env,
+              "setInvestmentCashBaseline",
+              {
+                ...body,
+                actor:
+                  session.name
+              }
+            );
 
           await refreshDashboardAfterMutation(
             data,
@@ -1504,15 +2227,19 @@ export default {
 
         if (
           request.method === "POST" &&
-          url.pathname === "/api/investments/trades"
+          url.pathname ===
+            "/api/investments/trades"
         ) {
           if (!isSameOrigin(request)) {
             return jsonResponse(
               {
                 success: false,
                 error: {
-                  code: "INVALID_ORIGIN",
-                  message: "허용되지 않은 요청입니다."
+                  code:
+                    "INVALID_ORIGIN",
+
+                  message:
+                    "허용되지 않은 요청입니다."
                 }
               },
               403
@@ -1522,14 +2249,18 @@ export default {
           let body;
 
           try {
-            body = await request.json();
+            body =
+              await request.json();
           } catch (error) {
             return jsonResponse(
               {
                 success: false,
                 error: {
-                  code: "INVALID_JSON",
-                  message: "투자거래 입력 형식이 올바르지 않습니다."
+                  code:
+                    "INVALID_JSON",
+
+                  message:
+                    "투자거래 입력 형식이 올바르지 않습니다."
                 }
               },
               400
@@ -1538,29 +2269,35 @@ export default {
 
           if (
             !body ||
-            typeof body !== "object" ||
+            typeof body !==
+              "object" ||
             Array.isArray(body)
           ) {
             return jsonResponse(
               {
                 success: false,
                 error: {
-                  code: "INVALID_TRANSACTION",
-                  message: "투자거래 입력 형식이 올바르지 않습니다."
+                  code:
+                    "INVALID_TRANSACTION",
+
+                  message:
+                    "투자거래 입력 형식이 올바르지 않습니다."
                 }
               },
               400
             );
           }
 
-          const data = await appsScriptPost(
-            env,
-            "createInvestmentTrade",
-            {
-              ...body,
-              actor: session.name
-            }
-          );
+          const data =
+            await appsScriptPost(
+              env,
+              "createInvestmentTrade",
+              {
+                ...body,
+                actor:
+                  session.name
+              }
+            );
 
           await refreshDashboardAfterMutation(
             data,
@@ -1574,15 +2311,19 @@ export default {
 
         if (
           request.method === "POST" &&
-          url.pathname === "/api/investments/trades/update"
+          url.pathname ===
+            "/api/investments/trades/update"
         ) {
           if (!isSameOrigin(request)) {
             return jsonResponse(
               {
                 success: false,
                 error: {
-                  code: "INVALID_ORIGIN",
-                  message: "허용되지 않은 요청입니다."
+                  code:
+                    "INVALID_ORIGIN",
+
+                  message:
+                    "허용되지 않은 요청입니다."
                 }
               },
               403
@@ -1592,28 +2333,34 @@ export default {
           let body;
 
           try {
-            body = await request.json();
+            body =
+              await request.json();
           } catch (error) {
             return jsonResponse(
               {
                 success: false,
                 error: {
-                  code: "INVALID_JSON",
-                  message: "투자거래 수정 형식이 올바르지 않습니다."
+                  code:
+                    "INVALID_JSON",
+
+                  message:
+                    "투자거래 수정 형식이 올바르지 않습니다."
                 }
               },
               400
             );
           }
 
-          const data = await appsScriptPost(
-            env,
-            "updateInvestmentTrade",
-            {
-              ...body,
-              actor: session.name
-            }
-          );
+          const data =
+            await appsScriptPost(
+              env,
+              "updateInvestmentTrade",
+              {
+                ...body,
+                actor:
+                  session.name
+              }
+            );
 
           await refreshDashboardAfterMutation(
             data,
@@ -1627,15 +2374,19 @@ export default {
 
         if (
           request.method === "POST" &&
-          url.pathname === "/api/investments/trades/delete"
+          url.pathname ===
+            "/api/investments/trades/delete"
         ) {
           if (!isSameOrigin(request)) {
             return jsonResponse(
               {
                 success: false,
                 error: {
-                  code: "INVALID_ORIGIN",
-                  message: "허용되지 않은 요청입니다."
+                  code:
+                    "INVALID_ORIGIN",
+
+                  message:
+                    "허용되지 않은 요청입니다."
                 }
               },
               403
@@ -1645,28 +2396,34 @@ export default {
           let body;
 
           try {
-            body = await request.json();
+            body =
+              await request.json();
           } catch (error) {
             return jsonResponse(
               {
                 success: false,
                 error: {
-                  code: "INVALID_JSON",
-                  message: "요청 형식이 올바르지 않습니다."
+                  code:
+                    "INVALID_JSON",
+
+                  message:
+                    "요청 형식이 올바르지 않습니다."
                 }
               },
               400
             );
           }
 
-          const data = await appsScriptPost(
-            env,
-            "deleteInvestmentTrade",
-            {
-              ...body,
-              actor: session.name
-            }
-          );
+          const data =
+            await appsScriptPost(
+              env,
+              "deleteInvestmentTrade",
+              {
+                ...body,
+                actor:
+                  session.name
+              }
+            );
 
           await refreshDashboardAfterMutation(
             data,
@@ -1680,15 +2437,19 @@ export default {
 
         if (
           request.method === "POST" &&
-          url.pathname === "/api/investments/trades/restore"
+          url.pathname ===
+            "/api/investments/trades/restore"
         ) {
           if (!isSameOrigin(request)) {
             return jsonResponse(
               {
                 success: false,
                 error: {
-                  code: "INVALID_ORIGIN",
-                  message: "허용되지 않은 요청입니다."
+                  code:
+                    "INVALID_ORIGIN",
+
+                  message:
+                    "허용되지 않은 요청입니다."
                 }
               },
               403
@@ -1698,28 +2459,34 @@ export default {
           let body;
 
           try {
-            body = await request.json();
+            body =
+              await request.json();
           } catch (error) {
             return jsonResponse(
               {
                 success: false,
                 error: {
-                  code: "INVALID_JSON",
-                  message: "요청 형식이 올바르지 않습니다."
+                  code:
+                    "INVALID_JSON",
+
+                  message:
+                    "요청 형식이 올바르지 않습니다."
                 }
               },
               400
             );
           }
 
-          const data = await appsScriptPost(
-            env,
-            "restoreInvestmentTrade",
-            {
-              ...body,
-              actor: session.name
-            }
-          );
+          const data =
+            await appsScriptPost(
+              env,
+              "restoreInvestmentTrade",
+              {
+                ...body,
+                actor:
+                  session.name
+              }
+            );
 
           await refreshDashboardAfterMutation(
             data,
@@ -1736,7 +2503,8 @@ export default {
             success: false,
             error: {
               code: "API_NOT_FOUND",
-              message: "지원하지 않는 API입니다."
+              message:
+                "지원하지 않는 API입니다."
             }
           },
           404
@@ -1748,7 +2516,8 @@ export default {
           success: false,
           error: {
             code: "NOT_FOUND",
-            message: "페이지를 찾을 수 없습니다."
+            message:
+              "페이지를 찾을 수 없습니다."
           }
         },
         404
@@ -1759,6 +2528,7 @@ export default {
           success: false,
           error: {
             code: "WORKER_ERROR",
+
             message:
               error instanceof Error
                 ? error.message
