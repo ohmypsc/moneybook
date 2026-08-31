@@ -9,6 +9,42 @@ import {
 } from "../../api/client";
 
 import {
+  getSession,
+  logout
+} from "../../api/auth";
+
+import {
+  getTransactions
+} from "../../api/transactions";
+
+import type {
+  Transaction
+} from "../../api/transactions";
+
+import {
+  clearLedgerStartDate,
+  createManagedAccount,
+  createManagedCategory,
+  deleteManagedAccount,
+  deleteManagedCategory,
+  getLedgerConfig,
+  getManagedAccounts,
+  getManagedCategories,
+  restoreManagedAccount,
+  restoreManagedCategory,
+  setLedgerStartDate,
+  updateManagedAccount,
+  updateManagedCategory
+} from "../../api/settingsManagement";
+
+import type {
+  LedgerCategoryType,
+  ManagedAccount,
+  ManagedCategory,
+  SaveAccountInput
+} from "../../api/settingsManagement";
+
+import {
   applyCategoryPreferences,
   createDefaultInputPreferences,
   getInputPreferences,
@@ -27,18 +63,35 @@ import styles
   from "./SettingsPage.module.css";
 
 
-interface Account {
+type SettingsView =
+  | "home"
+  | "input"
+  | "categories"
+  | "accounts"
+  | "ledger"
+  | "profile";
+
+
+interface InputAccount {
   accountId: string;
+
   accountName?: string;
+
   displayName: string;
+
   accountType: string;
+
   subType: string;
+
   owner?: string;
-  paymentAccountId?: string | null;
+
+  paymentAccountId?:
+    string |
+    null;
 }
 
 
-interface Category {
+interface InputCategory {
   categoryId: string;
 
   type:
@@ -56,9 +109,11 @@ interface BootstrapData {
 
   spendingTargets: string[];
 
-  accounts: Account[];
+  accounts:
+    InputAccount[];
 
-  categories: Category[];
+  categories:
+    InputCategory[];
 
   inputPreferences?:
     SharedInputPreferencesState;
@@ -94,12 +149,84 @@ interface SavePreferencesResponse {
 }
 
 
+interface AccountFormState {
+  accountName: string;
+
+  accountType: string;
+
+  subType: string;
+
+  owner: string;
+
+  openingBalance: string;
+
+  billingCutoffDay: string;
+
+  paymentDay: string;
+
+  startYear: string;
+
+  endYear: string;
+
+  balanceMethod: string;
+
+  paymentAccountId: string;
+
+  assetAttribution: string;
+}
+
+
 const CATEGORY_TYPES:
   PreferenceTransactionType[] = [
     "지출",
     "수입",
     "이체"
   ];
+
+
+const MANAGED_CATEGORY_TYPES:
+  LedgerCategoryType[] = [
+    "지출",
+    "수입",
+    "이체"
+  ];
+
+
+const FIXED_OWNERS = [
+  "공동",
+  "미영",
+  "승철"
+];
+
+
+const ACCOUNT_TYPE_SUGGESTIONS = [
+  "자산",
+  "부채",
+  "투자"
+];
+
+
+const ACCOUNT_SUBTYPE_SUGGESTIONS = [
+  "입출금",
+  "현금",
+  "체크카드",
+  "신용카드",
+  "선불/지역화폐",
+  "예금",
+  "적금",
+  "주식",
+  "대출"
+];
+
+
+function getErrorMessage(
+  error: unknown,
+  fallback: string
+) {
+  return error instanceof Error
+    ? error.message
+    : fallback;
+}
 
 
 function moveItem(
@@ -120,21 +247,21 @@ function moveItem(
   const next =
     items.slice();
 
-  const currentValue =
-    next[index];
-
-  next[index] =
-    next[nextIndex];
-
-  next[nextIndex] =
-    currentValue;
+  [
+    next[index],
+    next[nextIndex]
+  ] = [
+    next[nextIndex],
+    next[index]
+  ];
 
   return next;
 }
 
 
-function getAccountName(
-  account: Account
+function getInputAccountName(
+  account:
+    InputAccount
 ) {
   return (
     account.displayName ||
@@ -144,7 +271,559 @@ function getAccountName(
 }
 
 
-export default function SettingsPage() {
+function formatKrw(
+  value:
+    number |
+    undefined
+) {
+  if (
+    value === undefined ||
+    !Number.isFinite(value)
+  ) {
+    return "-";
+  }
+
+  return `${Math.round(
+    value
+  ).toLocaleString(
+    "ko-KR"
+  )}원`;
+}
+
+
+function csvCell(
+  value: unknown
+) {
+  const text =
+    value === null ||
+    value === undefined
+      ? ""
+      : String(value);
+
+  return `"${text.replace(
+    /"/g,
+    '""'
+  )}"`;
+}
+
+
+function createEmptyAccountForm():
+  AccountFormState {
+  return {
+    accountName: "",
+    accountType: "자산",
+    subType: "입출금",
+    owner: "공동",
+    openingBalance: "0",
+    billingCutoffDay: "",
+    paymentDay: "",
+    startYear: "",
+    endYear: "",
+    balanceMethod: "자동계산",
+    paymentAccountId: "",
+    assetAttribution: "공동"
+  };
+}
+
+
+function accountToForm(
+  account:
+    ManagedAccount
+): AccountFormState {
+  return {
+    accountName:
+      account.accountName,
+
+    accountType:
+      account.accountType,
+
+    subType:
+      account.subType,
+
+    owner:
+      account.owner,
+
+    openingBalance:
+      String(
+        account.openingBalance ??
+          0
+      ),
+
+    billingCutoffDay:
+      account.billingCutoffDay ===
+      null
+        ? ""
+        : String(
+            account.billingCutoffDay
+          ),
+
+    paymentDay:
+      account.paymentDay ===
+      null
+        ? ""
+        : String(
+            account.paymentDay
+          ),
+
+    startYear:
+      account.startYear ===
+      null
+        ? ""
+        : String(
+            account.startYear
+          ),
+
+    endYear:
+      account.endYear ===
+      null
+        ? ""
+        : String(
+            account.endYear
+          ),
+
+    balanceMethod:
+      account.balanceMethod ||
+      "자동계산",
+
+    paymentAccountId:
+      account.paymentAccountId ||
+      "",
+
+    assetAttribution:
+      account.assetAttribution ||
+      account.owner
+  };
+}
+
+
+function parseOptionalInteger(
+  value: string,
+  label: string,
+  minimum: number,
+  maximum: number
+) {
+  const text =
+    value.trim();
+
+  if (!text) {
+    return null;
+  }
+
+  const number =
+    Number(text);
+
+  if (
+    !Number.isInteger(number) ||
+    number < minimum ||
+    number > maximum
+  ) {
+    throw new Error(
+      `${label}은 ${minimum}~${maximum} 사이의 정수여야 합니다.`
+    );
+  }
+
+  return number;
+}
+
+
+function buildAccountPayload(
+  form:
+    AccountFormState
+): SaveAccountInput {
+  const accountName =
+    form.accountName.trim();
+
+  const accountType =
+    form.accountType.trim();
+
+  const subType =
+    form.subType.trim();
+
+  const owner =
+    form.owner.trim();
+
+  const openingBalance =
+    Number(
+      form.openingBalance ||
+        0
+    );
+
+  if (!accountName) {
+    throw new Error(
+      "계좌 이름을 입력해주세요."
+    );
+  }
+
+  if (!accountType) {
+    throw new Error(
+      "계좌 유형을 입력해주세요."
+    );
+  }
+
+  if (!subType) {
+    throw new Error(
+      "세부 구분을 입력해주세요."
+    );
+  }
+
+  if (!owner) {
+    throw new Error(
+      "명의자를 선택해주세요."
+    );
+  }
+
+  if (
+    !Number.isFinite(
+      openingBalance
+    )
+  ) {
+    throw new Error(
+      "시작 잔액은 숫자로 입력해주세요."
+    );
+  }
+
+  const billingCutoffDay =
+    parseOptionalInteger(
+      form.billingCutoffDay,
+      "청구 마감일",
+      1,
+      31
+    );
+
+  const paymentDay =
+    parseOptionalInteger(
+      form.paymentDay,
+      "결제일",
+      1,
+      31
+    );
+
+  const startYear =
+    parseOptionalInteger(
+      form.startYear,
+      "사용 시작 연도",
+      1900,
+      2200
+    );
+
+  const endYear =
+    parseOptionalInteger(
+      form.endYear,
+      "사용 종료 연도",
+      1900,
+      2200
+    );
+
+  if (
+    startYear !== null &&
+    endYear !== null &&
+    startYear > endYear
+  ) {
+    throw new Error(
+      "사용 시작 연도는 종료 연도보다 늦을 수 없습니다."
+    );
+  }
+
+  const isCard =
+    subType === "체크카드" ||
+    subType === "신용카드";
+
+  if (
+    isCard &&
+    !form.paymentAccountId
+  ) {
+    throw new Error(
+      "카드의 결제계좌를 선택해주세요."
+    );
+  }
+
+  return {
+    accountName,
+    accountType,
+    subType,
+    owner,
+    openingBalance,
+    billingCutoffDay,
+    paymentDay,
+    startYear,
+    endYear,
+
+    balanceMethod:
+      form.balanceMethod.trim() ||
+      "자동계산",
+
+    paymentAccountId:
+      isCard
+        ? form.paymentAccountId
+        : null,
+
+    assetAttribution:
+      form.assetAttribution.trim() ||
+      owner
+  };
+}
+
+
+function SettingsHome(
+  {
+    onOpen
+  }: {
+    onOpen:
+      (
+        view:
+          SettingsView
+      ) => void;
+  }
+) {
+  const sharedItems: Array<{
+    key: SettingsView;
+    title: string;
+    description: string;
+  }> = [
+    {
+      key: "input",
+      title: "입력 화면 설정",
+      description:
+        "카테고리와 계좌의 표시 순서·노출 여부"
+    },
+    {
+      key: "categories",
+      title: "카테고리 관리",
+      description:
+        "추가·이름 변경·사용 중지·삭제·복원"
+    },
+    {
+      key: "accounts",
+      title: "계좌·카드 관리",
+      description:
+        "계좌와 카드의 추가·수정·사용 종료·복원"
+    },
+    {
+      key: "ledger",
+      title: "가계부 운영·데이터",
+      description:
+        "가계부 시작일, 전체 거래 내보내기, 새로고침"
+    }
+  ];
+
+  return (
+    <>
+      <header
+        className={
+          styles.pageHeader
+        }
+      >
+        <p
+          className={
+            styles.eyebrow
+          }
+        >
+          설정
+        </p>
+
+        <h1
+          className={
+            styles.pageTitle
+          }
+        >
+          우리 가계부 설정
+        </h1>
+
+        <p
+          className={
+            styles.pageDescription
+          }
+        >
+          부부가 함께 쓰는 설정과
+          내 계정 정보를 관리합니다.
+        </p>
+      </header>
+
+      <section
+        className={
+          styles.menuSection
+        }
+      >
+        <h2
+          className={
+            styles.menuSectionTitle
+          }
+        >
+          부부 공통
+        </h2>
+
+        <div
+          className={
+            styles.menuCard
+          }
+        >
+          {
+            sharedItems.map(
+              item => (
+                <button
+                  type="button"
+                  key={
+                    item.key
+                  }
+                  className={
+                    styles.menuRow
+                  }
+                  onClick={
+                    () =>
+                      onOpen(
+                        item.key
+                      )
+                  }
+                >
+                  <span
+                    className={
+                      styles.menuText
+                    }
+                  >
+                    <strong>
+                      {
+                        item.title
+                      }
+                    </strong>
+
+                    <span>
+                      {
+                        item.description
+                      }
+                    </span>
+                  </span>
+
+                  <span
+                    className={
+                      styles.chevron
+                    }
+                    aria-hidden="true"
+                  >
+                    ›
+                  </span>
+                </button>
+              )
+            )
+          }
+        </div>
+      </section>
+
+      <section
+        className={
+          styles.menuSection
+        }
+      >
+        <h2
+          className={
+            styles.menuSectionTitle
+          }
+        >
+          내 설정
+        </h2>
+
+        <div
+          className={
+            styles.menuCard
+          }
+        >
+          <button
+            type="button"
+            className={
+              styles.menuRow
+            }
+            onClick={
+              () =>
+                onOpen(
+                  "profile"
+                )
+            }
+          >
+            <span
+              className={
+                styles.menuText
+              }
+            >
+              <strong>
+                내 계정·앱 정보
+              </strong>
+
+              <span>
+                현재 사용자, 데이터 저장 방식, 로그아웃
+              </span>
+            </span>
+
+            <span
+              className={
+                styles.chevron
+              }
+              aria-hidden="true"
+            >
+              ›
+            </span>
+          </button>
+        </div>
+      </section>
+    </>
+  );
+}
+
+
+function DetailHeader(
+  {
+    title,
+    description,
+    onBack
+  }: {
+    title: string;
+    description: string;
+    onBack: () => void;
+  }
+) {
+  return (
+    <header
+      className={
+        styles.detailHeader
+      }
+    >
+      <button
+        type="button"
+        className={
+          styles.backButton
+        }
+        onClick={
+          onBack
+        }
+      >
+        <span
+          aria-hidden="true"
+        >
+          ‹
+        </span>
+
+        설정
+      </button>
+
+      <h1
+        className={
+          styles.detailTitle
+        }
+      >
+        {title}
+      </h1>
+
+      <p
+        className={
+          styles.detailDescription
+        }
+      >
+        {description}
+      </p>
+    </header>
+  );
+}
+
+
+function InputSettings() {
   const [
     bootstrap,
     setBootstrap
@@ -165,9 +844,7 @@ export default function SettingsPage() {
     categoryType,
     setCategoryType
   ] =
-    useState<
-      PreferenceTransactionType
-    >(
+    useState<PreferenceTransactionType>(
       "지출"
     );
 
@@ -242,14 +919,12 @@ export default function SettingsPage() {
           const data =
             response.data;
 
-          setBootstrap(
-            data
-          );
-
           const sharedPreferences =
             data.inputPreferences
-              ?.configured === true
-              ? data.inputPreferences
+              ?.configured ===
+            true
+              ? data
+                  .inputPreferences
                   .preferences
               : null;
 
@@ -273,25 +948,30 @@ export default function SettingsPage() {
             );
           }
 
+          setBootstrap(
+            data
+          );
+
           setPreferences(
             nextPreferences
           );
-
         } catch (
           loadError
         ) {
-          if (!active) {
-            return;
+          if (
+            active
+          ) {
+            setError(
+              getErrorMessage(
+                loadError,
+                "설정 정보를 불러오지 못했습니다."
+              )
+            );
           }
-
-          setError(
-            loadError instanceof Error
-              ? loadError.message
-              : "설정 정보를 불러오지 못했습니다."
-          );
-
         } finally {
-          if (active) {
+          if (
+            active
+          ) {
             setLoading(
               false
             );
@@ -328,8 +1008,8 @@ export default function SettingsPage() {
       },
       [
         bootstrap,
-        preferences,
-        categoryType
+        categoryType,
+        preferences
       ]
     );
 
@@ -370,19 +1050,26 @@ export default function SettingsPage() {
     );
 
 
+  function clearMessages() {
+    setFeedback(
+      ""
+    );
+
+    setSaveError(
+      ""
+    );
+  }
+
+
   function handleMoveCategory(
     index: number,
     direction: -1 | 1
   ) {
-    if (!preferences) {
+    if (
+      !preferences
+    ) {
       return;
     }
-
-    const currentOrder =
-      preferences
-        .categoryOrder[
-          categoryType
-        ];
 
     setPreferences({
       ...preferences,
@@ -393,20 +1080,17 @@ export default function SettingsPage() {
 
         [categoryType]:
           moveItem(
-            currentOrder,
+            preferences
+              .categoryOrder[
+                categoryType
+              ],
             index,
             direction
           )
       }
     });
 
-    setFeedback(
-      ""
-    );
-
-    setSaveError(
-      ""
-    );
+    clearMessages();
   }
 
 
@@ -414,7 +1098,9 @@ export default function SettingsPage() {
     index: number,
     direction: -1 | 1
   ) {
-    if (!preferences) {
+    if (
+      !preferences
+    ) {
       return;
     }
 
@@ -423,26 +1109,23 @@ export default function SettingsPage() {
 
       accountOrder:
         moveItem(
-          preferences.accountOrder,
+          preferences
+            .accountOrder,
           index,
           direction
         )
     });
 
-    setFeedback(
-      ""
-    );
-
-    setSaveError(
-      ""
-    );
+    clearMessages();
   }
 
 
   function handleToggleAccount(
     accountId: string
   ) {
-    if (!preferences) {
+    if (
+      !preferences
+    ) {
       return;
     }
 
@@ -460,7 +1143,6 @@ export default function SettingsPage() {
       hidden.delete(
         accountId
       );
-
     } else {
       hidden.add(
         accountId
@@ -476,13 +1158,7 @@ export default function SettingsPage() {
         )
     });
 
-    setFeedback(
-      ""
-    );
-
-    setSaveError(
-      ""
-    );
+    clearMessages();
   }
 
 
@@ -502,10 +1178,6 @@ export default function SettingsPage() {
         bootstrap.accounts
       );
 
-    /*
-     * 서버 장애가 있어도 현재 브라우저에서는
-     * 설정을 잃지 않도록 먼저 로컬 백업을 갱신합니다.
-     */
     saveInputPreferences(
       normalized
     );
@@ -518,13 +1190,7 @@ export default function SettingsPage() {
       true
     );
 
-    setFeedback(
-      ""
-    );
-
-    setSaveError(
-      ""
-    );
+    clearMessages();
 
     try {
       const response =
@@ -533,31 +1199,37 @@ export default function SettingsPage() {
         >(
           "/api/settings/input-preferences",
           {
-            method: "POST",
-            body: JSON.stringify({
-              preferences:
-                normalized
-            })
+            method:
+              "POST",
+
+            body:
+              JSON.stringify({
+                preferences:
+                  normalized
+              })
           }
         );
 
       if (
         !response.success ||
         !response.data ||
-        response.data.configured !==
+        response.data
+          .configured !==
           true ||
-        !response.data.preferences
+        !response.data
+          .preferences
       ) {
         throw new Error(
           response.error
             ?.message ||
-            "공통 설정을 저장하지 못했습니다."
+            "부부 공통 설정을 저장하지 못했습니다."
         );
       }
 
       const saved =
         normalizeInputPreferences(
-          response.data.preferences,
+          response.data
+            .preferences,
           bootstrap.categories,
           bootstrap.accounts
         );
@@ -573,16 +1245,15 @@ export default function SettingsPage() {
       setFeedback(
         "부부 공통 설정으로 저장했습니다."
       );
-
     } catch (
       saveFailure
     ) {
       setSaveError(
-        saveFailure instanceof Error
-          ? `공통 서버 저장에 실패했습니다. 현재 브라우저에는 저장했습니다. (${saveFailure.message})`
-          : "공통 서버 저장에 실패했습니다. 현재 브라우저에는 저장했습니다."
+        `공통 서버 저장에 실패했습니다. 현재 브라우저에는 저장했습니다. (${getErrorMessage(
+          saveFailure,
+          "알 수 없는 오류"
+        )})`
       );
-
     } finally {
       setSaving(
         false
@@ -599,18 +1270,15 @@ export default function SettingsPage() {
       return;
     }
 
-    const next =
+    setPreferences(
       createDefaultInputPreferences(
         bootstrap.categories,
         bootstrap.accounts
-      );
-
-    setPreferences(
-      next
+      )
     );
 
     setFeedback(
-      "기본 설정으로 되돌렸습니다. 저장 버튼을 누르면 부부 공통으로 적용됩니다."
+      "기본 설정으로 되돌렸습니다. 저장을 누르면 부부 공통으로 적용됩니다."
     );
 
     setSaveError(
@@ -619,22 +1287,17 @@ export default function SettingsPage() {
   }
 
 
-  if (loading) {
+  if (
+    loading
+  ) {
     return (
-      <main
+      <p
         className={
-          styles.page
+          styles.state
         }
       >
-        <p
-          className={
-            styles.loading
-          }
-        >
-          설정 정보를
-          불러오는 중입니다.
-        </p>
-      </main>
+        입력 설정을 불러오는 중입니다.
+      </p>
     );
   }
 
@@ -645,530 +1308,426 @@ export default function SettingsPage() {
     !preferences
   ) {
     return (
-      <main
+      <p
         className={
-          styles.page
+          styles.error
         }
+        role="alert"
       >
-        <p
-          className={
-            styles.error
-          }
-          role="alert"
-        >
-          {
-            error ||
-            "설정 정보를 불러오지 못했습니다."
-          }
-        </p>
-      </main>
+        {
+          error ||
+          "입력 설정을 불러오지 못했습니다."
+        }
+      </p>
     );
   }
 
 
   return (
-    <main
+    <div
       className={
-        styles.page
+        styles.settingsBody
       }
     >
-      <header
-        className={
-          styles.header
-        }
-      >
-        <p
-          className={
-            styles.eyebrow
-          }
-        >
-          설정
-        </p>
-
-        <h1
-          className={
-            styles.title
-          }
-        >
-          입력 화면 설정
-        </h1>
-
-        <p
-          className={
-            styles.description
-          }
-        >
-          자주 쓰는 카테고리와
-          결제수단을 앞쪽에 두고,
-          필요 없는 계좌는
-          입력 화면에서 숨길 수 있습니다.
-        </p>
-      </header>
-
-
       <p
         className={
-          styles.storageNotice
+          styles.notice
         }
       >
-        이 설정은 부부 공통으로 서버에 저장되며,
-        현재 브라우저에도 백업됩니다.
-        다른 기기에서는 앱을 새로 열거나 새로고침한 뒤
-        입력·설정 화면에 들어가면 같은 설정을 사용합니다.
+        저장한 순서와 노출 설정은
+        미영·승철 계정에 공통으로 적용됩니다.
       </p>
-
 
       <section
         className={
-          styles.section
+          styles.cardSection
         }
       >
         <div
           className={
-            styles.sectionHeader
+            styles.sectionHeading
           }
         >
-          <h2
-            className={
-              styles.sectionTitle
-            }
-          >
+          <h2>
             카테고리 순서
           </h2>
 
-          <p
-            className={
-              styles.sectionDescription
-            }
-          >
-            입력 화면의 카테고리
-            드롭다운에 표시되는
-            순서를 정합니다.
+          <p>
+            입력 화면에 표시되는 순서를
+            거래 유형별로 정합니다.
           </p>
         </div>
-
 
         <div
           className={
-            styles.typeTabs
+            styles.segmentedControl
           }
         >
-          {CATEGORY_TYPES.map(
-            type => (
-              <button
-                type="button"
-                key={
-                  type
-                }
-                className={[
-                  styles
-                    .typeButton,
-
-                  categoryType ===
-                  type
-                    ? styles
-                        .typeButtonActive
-                    : ""
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-                onClick={
-                  () =>
-                    setCategoryType(
-                      type
-                    )
-                }
-              >
-                {type}
-              </button>
-            )
-          )}
-        </div>
-
-
-        {categoryItems.length ===
-          0 && (
-          <p
-            className={
-              styles.emptyState
-            }
-          >
-            표시할 카테고리가
-            없습니다.
-          </p>
-        )}
-
-
-        {categoryItems.length >
-          0 && (
-          <ul
-            className={
-              styles.list
-            }
-          >
-            {categoryItems.map(
-              (
-                category,
-                index
-              ) => (
-                <li
+          {
+            CATEGORY_TYPES.map(
+              type => (
+                <button
+                  type="button"
                   key={
-                    category
-                      .categoryId
+                    type
                   }
                   className={
-                    styles.row
+                    categoryType ===
+                    type
+                      ? styles
+                          .segmentButtonActive
+                      : styles
+                          .segmentButton
+                  }
+                  onClick={
+                    () =>
+                      setCategoryType(
+                        type
+                      )
                   }
                 >
-                  <span
-                    className={
-                      styles.orderNumber
-                    }
-                  >
-                    {
-                      index + 1
-                    }
-                  </span>
-
-                  <div
-                    className={
-                      styles.itemInfo
-                    }
-                  >
-                    <span
-                      className={
-                        styles.itemName
-                      }
-                    >
-                      {
-                        category.name
-                      }
-                    </span>
-
-                    <span
-                      className={
-                        styles.itemMeta
-                      }
-                    >
-                      {
-                        category.type
-                      }
-                    </span>
-                  </div>
-
-                  <div
-                    className={
-                      styles.controls
-                    }
-                  >
-                    <button
-                      type="button"
-                      className={
-                        styles
-                          .moveButton
-                      }
-                      aria-label={`${category.name} 위로 이동`}
-                      disabled={
-                        index === 0
-                      }
-                      onClick={
-                        () =>
-                          handleMoveCategory(
-                            index,
-                            -1
-                          )
-                      }
-                    >
-                      ↑
-                    </button>
-
-                    <button
-                      type="button"
-                      className={
-                        styles
-                          .moveButton
-                      }
-                      aria-label={`${category.name} 아래로 이동`}
-                      disabled={
-                        index ===
-                        categoryItems.length -
-                          1
-                      }
-                      onClick={
-                        () =>
-                          handleMoveCategory(
-                            index,
-                            1
-                          )
-                      }
-                    >
-                      ↓
-                    </button>
-                  </div>
-                </li>
+                  {type}
+                </button>
               )
-            )}
-          </ul>
-        )}
-      </section>
+            )
+          }
+        </div>
 
+        {
+          categoryItems.length ===
+          0
+            ? (
+              <p
+                className={
+                  styles.emptyState
+                }
+              >
+                표시할 카테고리가 없습니다.
+              </p>
+            )
+            : (
+              <ul
+                className={
+                  styles.itemList
+                }
+              >
+                {
+                  categoryItems.map(
+                    (
+                      category,
+                      index
+                    ) => (
+                      <li
+                        key={
+                          category
+                            .categoryId
+                        }
+                        className={
+                          styles.orderRow
+                        }
+                      >
+                        <span
+                          className={
+                            styles.orderNumber
+                          }
+                        >
+                          {
+                            index +
+                            1
+                          }
+                        </span>
+
+                        <span
+                          className={
+                            styles.primaryItemText
+                          }
+                        >
+                          {
+                            category.name
+                          }
+                        </span>
+
+                        <div
+                          className={
+                            styles.compactActions
+                          }
+                        >
+                          <button
+                            type="button"
+                            className={
+                              styles.iconButton
+                            }
+                            aria-label={`${category.name} 위로 이동`}
+                            disabled={
+                              index ===
+                              0
+                            }
+                            onClick={
+                              () =>
+                                handleMoveCategory(
+                                  index,
+                                  -1
+                                )
+                            }
+                          >
+                            ↑
+                          </button>
+
+                          <button
+                            type="button"
+                            className={
+                              styles.iconButton
+                            }
+                            aria-label={`${category.name} 아래로 이동`}
+                            disabled={
+                              index ===
+                              categoryItems.length -
+                                1
+                            }
+                            onClick={
+                              () =>
+                                handleMoveCategory(
+                                  index,
+                                  1
+                                )
+                            }
+                          >
+                            ↓
+                          </button>
+                        </div>
+                      </li>
+                    )
+                  )
+                }
+              </ul>
+            )
+        }
+      </section>
 
       <section
         className={
-          styles.section
+          styles.cardSection
         }
       >
         <div
           className={
-            styles.sectionHeader
+            styles.sectionHeading
           }
         >
-          <h2
-            className={
-              styles.sectionTitle
-            }
-          >
-            결제수단·계좌
+          <h2>
+            입력 화면 계좌·카드
           </h2>
 
-          <p
-            className={
-              styles.sectionDescription
-            }
-          >
-            입력 화면에 표시할
-            계좌를 선택하고
-            순서를 정합니다.
-            주식·대출·예적금 계좌는
-            기본적으로 숨김 처리됩니다.
+          <p>
+            일상 거래 입력에 필요한 항목만
+            표시하고 순서를 정합니다.
           </p>
         </div>
 
+        {
+          accountItems.length ===
+          0
+            ? (
+              <p
+                className={
+                  styles.emptyState
+                }
+              >
+                등록된 계좌가 없습니다.
+              </p>
+            )
+            : (
+              <ul
+                className={
+                  styles.itemList
+                }
+              >
+                {
+                  accountItems.map(
+                    (
+                      account,
+                      index
+                    ) => {
+                      const hidden =
+                        hiddenAccountSet.has(
+                          account.accountId
+                        );
 
-        {accountItems.length ===
-          0 && (
-          <p
-            className={
-              styles.emptyState
-            }
-          >
-            등록된 계좌가 없습니다.
-          </p>
-        )}
-
-
-        {accountItems.length >
-          0 && (
-          <ul
-            className={
-              styles.list
-            }
-          >
-            {accountItems.map(
-              (
-                account,
-                index
-              ) => {
-                const hidden =
-                  hiddenAccountSet.has(
-                    account.accountId
-                  );
-
-                return (
-                  <li
-                    key={
-                      account.accountId
-                    }
-                    className={[
-                      styles.row,
-
-                      hidden
-                        ? styles
-                            .rowHidden
-                        : ""
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                  >
-                    <span
-                      className={
-                        styles.orderNumber
-                      }
-                    >
-                      {
-                        index + 1
-                      }
-                    </span>
-
-                    <div
-                      className={
-                        styles.itemInfo
-                      }
-                    >
-                      <span
-                        className={
-                          styles.itemName
-                        }
-                      >
-                        {
-                          getAccountName(
-                            account
-                          )
-                        }
-                      </span>
-
-                      <span
-                        className={
-                          styles.itemMeta
-                        }
-                      >
-                        {
-                          [
-                            account
-                              .accountType,
-                            account
-                              .subType
-                          ]
-                            .filter(
-                              Boolean
-                            )
-                            .join(
-                              " · "
-                            )
-                        }
-                      </span>
-                    </div>
-
-                    <div
-                      className={
-                        styles.controls
-                      }
-                    >
-                      <button
-                        type="button"
-                        className={[
-                          styles
-                            .visibilityButton,
-
-                          !hidden
-                            ? styles
-                                .visibilityButtonVisible
-                            : ""
-                        ]
-                          .filter(
-                            Boolean
-                          )
-                          .join(" ")}
-                        onClick={
-                          () =>
-                            handleToggleAccount(
-                              account.accountId
-                            )
-                        }
-                      >
-                        {
-                          hidden
-                            ? "숨김"
-                            : "표시"
-                        }
-                      </button>
-
-                      <button
-                        type="button"
-                        className={
-                          styles
-                            .moveButton
-                        }
-                        aria-label={`${getAccountName(
-                          account
-                        )} 위로 이동`}
-                        disabled={
-                          index === 0
-                        }
-                        onClick={
-                          () =>
-                            handleMoveAccount(
-                              index,
-                              -1
-                            )
-                        }
-                      >
-                        ↑
-                      </button>
-
-                      <button
-                        type="button"
-                        className={
-                          styles
-                            .moveButton
-                        }
-                        aria-label={`${getAccountName(
-                          account
-                        )} 아래로 이동`}
-                        disabled={
-                          index ===
-                          accountItems.length -
-                            1
-                        }
-                        onClick={
-                          () =>
-                            handleMoveAccount(
-                              index,
+                      return (
+                        <li
+                          key={
+                            account.accountId
+                          }
+                          className={`${styles.orderRow} ${
+                            hidden
+                              ? styles.mutedRow
+                              : ""
+                          }`}
+                        >
+                          <span
+                            className={
+                              styles.orderNumber
+                            }
+                          >
+                            {
+                              index +
                               1
-                            )
-                        }
-                      >
-                        ↓
-                      </button>
-                    </div>
-                  </li>
-                );
-              }
-            )}
-          </ul>
-        )}
+                            }
+                          </span>
+
+                          <span
+                            className={
+                              styles.itemTextGroup
+                            }
+                          >
+                            <strong>
+                              {
+                                getInputAccountName(
+                                  account
+                                )
+                              }
+                            </strong>
+
+                            <span>
+                              {
+                                [
+                                  account.accountType,
+                                  account.subType
+                                ]
+                                  .filter(
+                                    Boolean
+                                  )
+                                  .join(
+                                    " · "
+                                  )
+                              }
+                            </span>
+                          </span>
+
+                          <div
+                            className={
+                              styles.compactActions
+                            }
+                          >
+                            <button
+                              type="button"
+                              className={
+                                hidden
+                                  ? styles.visibilityButton
+                                  : styles.visibleButton
+                              }
+                              onClick={
+                                () =>
+                                  handleToggleAccount(
+                                    account.accountId
+                                  )
+                              }
+                            >
+                              {
+                                hidden
+                                  ? "숨김"
+                                  : "표시"
+                              }
+                            </button>
+
+                            <button
+                              type="button"
+                              className={
+                                styles.iconButton
+                              }
+                              aria-label={`${getInputAccountName(
+                                account
+                              )} 위로 이동`}
+                              disabled={
+                                index ===
+                                0
+                              }
+                              onClick={
+                                () =>
+                                  handleMoveAccount(
+                                    index,
+                                    -1
+                                  )
+                              }
+                            >
+                              ↑
+                            </button>
+
+                            <button
+                              type="button"
+                              className={
+                                styles.iconButton
+                              }
+                              aria-label={`${getInputAccountName(
+                                account
+                              )} 아래로 이동`}
+                              disabled={
+                                index ===
+                                accountItems.length -
+                                  1
+                              }
+                              onClick={
+                                () =>
+                                  handleMoveAccount(
+                                    index,
+                                    1
+                                  )
+                              }
+                            >
+                              ↓
+                            </button>
+                          </div>
+                        </li>
+                      );
+                    }
+                  )
+                }
+              </ul>
+            )
+        }
       </section>
 
+      {
+        feedback && (
+          <p
+            className={
+              styles.feedback
+            }
+            role="status"
+          >
+            {feedback}
+          </p>
+        )
+      }
 
-      {feedback && (
-        <p
-          className={
-            styles.feedback
-          }
-          role="status"
-        >
-          {feedback}
-        </p>
-      )}
-
-
-      {saveError && (
-        <p
-          className={
-            styles.error
-          }
-          role="alert"
-        >
-          {saveError}
-        </p>
-      )}
-
+      {
+        saveError && (
+          <p
+            className={
+              styles.error
+            }
+            role="alert"
+          >
+            {saveError}
+          </p>
+        )
+      }
 
       <div
         className={
-          styles.actionArea
+          styles.stickyActions
         }
       >
         <button
           type="button"
           className={
-            styles.resetButton
-          }
-          onClick={
-            handleReset
+            styles.secondaryButton
           }
           disabled={
             saving
+          }
+          onClick={
+            handleReset
           }
         >
           기본값
@@ -1177,14 +1736,14 @@ export default function SettingsPage() {
         <button
           type="button"
           className={
-            styles.saveButton
+            styles.primaryButton
+          }
+          disabled={
+            saving
           }
           onClick={
             () =>
               void handleSave()
-          }
-          disabled={
-            saving
           }
         >
           {
@@ -1194,6 +1753,3277 @@ export default function SettingsPage() {
           }
         </button>
       </div>
+    </div>
+  );
+}
+
+
+function CategorySettings() {
+  const [
+    categories,
+    setCategories
+  ] =
+    useState<
+      ManagedCategory[]
+    >(
+      []
+    );
+
+  const [
+    selectedType,
+    setSelectedType
+  ] =
+    useState<
+      LedgerCategoryType
+    >(
+      "지출"
+    );
+
+  const [
+    newName,
+    setNewName
+  ] =
+    useState("");
+
+  const [
+    editingId,
+    setEditingId
+  ] =
+    useState<
+      string |
+      null
+    >(
+      null
+    );
+
+  const [
+    editingName,
+    setEditingName
+  ] =
+    useState("");
+
+  const [
+    loading,
+    setLoading
+  ] =
+    useState(true);
+
+  const [
+    busyKey,
+    setBusyKey
+  ] =
+    useState("");
+
+  const [
+    error,
+    setError
+  ] =
+    useState("");
+
+  const [
+    feedback,
+    setFeedback
+  ] =
+    useState("");
+
+
+  async function refresh() {
+    const result =
+      await getManagedCategories({
+        includeDeleted:
+          true
+      });
+
+    setCategories(
+      result.items
+    );
+  }
+
+
+  useEffect(
+    () => {
+      let active =
+        true;
+
+      async function load() {
+        setLoading(
+          true
+        );
+
+        setError(
+          ""
+        );
+
+        try {
+          const result =
+            await getManagedCategories({
+              includeDeleted:
+                true
+            });
+
+          if (
+            active
+          ) {
+            setCategories(
+              result.items
+            );
+          }
+        } catch (
+          loadError
+        ) {
+          if (
+            active
+          ) {
+            setError(
+              getErrorMessage(
+                loadError,
+                "카테고리를 불러오지 못했습니다."
+              )
+            );
+          }
+        } finally {
+          if (
+            active
+          ) {
+            setLoading(
+              false
+            );
+          }
+        }
+      }
+
+      void load();
+
+      return () => {
+        active =
+          false;
+      };
+    },
+    []
+  );
+
+
+  const activeItems =
+    useMemo(
+      () =>
+        categories.filter(
+          category =>
+            category.type ===
+              selectedType &&
+            !category.isDeleted
+        ),
+      [
+        categories,
+        selectedType
+      ]
+    );
+
+
+  const deletedItems =
+    useMemo(
+      () =>
+        categories.filter(
+          category =>
+            category.type ===
+              selectedType &&
+            category.isDeleted
+        ),
+      [
+        categories,
+        selectedType
+      ]
+    );
+
+
+  async function runMutation(
+    key: string,
+    work:
+      () =>
+        Promise<unknown>,
+    successMessage:
+      string
+  ) {
+    if (
+      busyKey
+    ) {
+      return false;
+    }
+
+    setBusyKey(
+      key
+    );
+
+    setError(
+      ""
+    );
+
+    setFeedback(
+      ""
+    );
+
+    try {
+      await work();
+      await refresh();
+
+      setFeedback(
+        successMessage
+      );
+
+      return true;
+    } catch (
+      mutationError
+    ) {
+      setError(
+        getErrorMessage(
+          mutationError,
+          "카테고리를 처리하지 못했습니다."
+        )
+      );
+
+      return false;
+    } finally {
+      setBusyKey(
+        ""
+      );
+    }
+  }
+
+
+  async function handleCreate() {
+    const name =
+      newName.trim();
+
+    if (!name) {
+      setError(
+        "추가할 카테고리 이름을 입력해주세요."
+      );
+
+      return;
+    }
+
+    const completed =
+      await runMutation(
+        "create",
+
+        () =>
+          createManagedCategory({
+            type:
+              selectedType,
+
+            name
+          }),
+
+        `${selectedType} 카테고리를 추가했습니다.`
+      );
+
+    if (
+      completed
+    ) {
+      setNewName(
+        ""
+      );
+    }
+  }
+
+
+  async function handleRename(
+    category:
+      ManagedCategory
+  ) {
+    const name =
+      editingName.trim();
+
+    if (!name) {
+      setError(
+        "카테고리 이름을 입력해주세요."
+      );
+
+      return;
+    }
+
+    if (
+      name ===
+      category.name
+    ) {
+      setEditingId(
+        null
+      );
+
+      return;
+    }
+
+    const completed =
+      await runMutation(
+        `rename:${category.categoryId}`,
+
+        () =>
+          updateManagedCategory({
+            categoryId:
+              category.categoryId,
+
+            name
+          }),
+
+        "카테고리 이름을 변경했습니다."
+      );
+
+    if (
+      completed
+    ) {
+      setEditingId(
+        null
+      );
+
+      setEditingName(
+        ""
+      );
+    }
+  }
+
+
+  async function handleDelete(
+    category:
+      ManagedCategory
+  ) {
+    if (
+      !window.confirm(
+        `‘${category.name}’ 카테고리를 삭제할까요?\n\n거래에서 사용 중인 카테고리는 삭제되지 않습니다.`
+      )
+    ) {
+      return;
+    }
+
+    await runMutation(
+      `delete:${category.categoryId}`,
+
+      () =>
+        deleteManagedCategory(
+          category.categoryId
+        ),
+
+      "카테고리를 삭제했습니다."
+    );
+  }
+
+
+  return (
+    <div
+      className={
+        styles.settingsBody
+      }
+    >
+      <section
+        className={
+          styles.cardSection
+        }
+      >
+        <div
+          className={
+            styles.segmentedControl
+          }
+        >
+          {
+            MANAGED_CATEGORY_TYPES.map(
+              type => (
+                <button
+                  type="button"
+                  key={
+                    type
+                  }
+                  className={
+                    selectedType ===
+                    type
+                      ? styles.segmentButtonActive
+                      : styles.segmentButton
+                  }
+                  disabled={
+                    Boolean(
+                      busyKey
+                    )
+                  }
+                  onClick={
+                    () => {
+                      setSelectedType(
+                        type
+                      );
+
+                      setEditingId(
+                        null
+                      );
+
+                      setError(
+                        ""
+                      );
+
+                      setFeedback(
+                        ""
+                      );
+                    }
+                  }
+                >
+                  {type}
+                </button>
+              )
+            )
+          }
+        </div>
+
+        <div
+          className={
+            styles.createRow
+          }
+        >
+          <label
+            className={
+              styles.field
+            }
+          >
+            <span>
+              새 {selectedType} 카테고리
+            </span>
+
+            <input
+              type="text"
+              value={
+                newName
+              }
+              maxLength={
+                40
+              }
+              placeholder="예: 식비"
+              disabled={
+                Boolean(
+                  busyKey
+                )
+              }
+              onChange={
+                event =>
+                  setNewName(
+                    event
+                      .target
+                      .value
+                  )
+              }
+              onKeyDown={
+                event => {
+                  if (
+                    event.key ===
+                    "Enter"
+                  ) {
+                    event.preventDefault();
+
+                    void handleCreate();
+                  }
+                }
+              }
+            />
+          </label>
+
+          <button
+            type="button"
+            className={
+              styles.primaryButton
+            }
+            disabled={
+              Boolean(
+                busyKey
+              ) ||
+              !newName.trim()
+            }
+            onClick={
+              () =>
+                void handleCreate()
+            }
+          >
+            {
+              busyKey ===
+              "create"
+                ? "추가 중..."
+                : "추가"
+            }
+          </button>
+        </div>
+
+        {
+          error && (
+            <p
+              className={
+                styles.error
+              }
+              role="alert"
+            >
+              {error}
+            </p>
+          )
+        }
+
+        {
+          feedback && (
+            <p
+              className={
+                styles.feedback
+              }
+              role="status"
+            >
+              {feedback}
+            </p>
+          )
+        }
+
+        {
+          loading
+            ? (
+              <p
+                className={
+                  styles.state
+                }
+              >
+                카테고리를 불러오는 중입니다.
+              </p>
+            )
+            : activeItems.length ===
+              0
+              ? (
+                <p
+                  className={
+                    styles.emptyState
+                  }
+                >
+                  등록된 {selectedType} 카테고리가 없습니다.
+                </p>
+              )
+              : (
+                <ul
+                  className={
+                    styles.itemList
+                  }
+                >
+                  {
+                    activeItems.map(
+                      category => {
+                        const editing =
+                          editingId ===
+                          category.categoryId;
+
+                        const rowBusy =
+                          busyKey.endsWith(
+                            category.categoryId
+                          );
+
+                        return (
+                          <li
+                            key={
+                              category.categoryId
+                            }
+                            className={`${styles.managementRow} ${
+                              !category.active
+                                ? styles.mutedRow
+                                : ""
+                            }`}
+                          >
+                            {
+                              editing
+                                ? (
+                                  <div
+                                    className={
+                                      styles.inlineEdit
+                                    }
+                                  >
+                                    <input
+                                      type="text"
+                                      value={
+                                        editingName
+                                      }
+                                      maxLength={
+                                        40
+                                      }
+                                      disabled={
+                                        Boolean(
+                                          busyKey
+                                        )
+                                      }
+                                      aria-label={`${category.name} 새 이름`}
+                                      onChange={
+                                        event =>
+                                          setEditingName(
+                                            event
+                                              .target
+                                              .value
+                                          )
+                                      }
+                                      onKeyDown={
+                                        event => {
+                                          if (
+                                            event.key ===
+                                            "Enter"
+                                          ) {
+                                            event.preventDefault();
+
+                                            void handleRename(
+                                              category
+                                            );
+                                          }
+
+                                          if (
+                                            event.key ===
+                                            "Escape"
+                                          ) {
+                                            setEditingId(
+                                              null
+                                            );
+                                          }
+                                        }
+                                      }
+                                    />
+
+                                    <button
+                                      type="button"
+                                      className={
+                                        styles.secondarySmallButton
+                                      }
+                                      disabled={
+                                        Boolean(
+                                          busyKey
+                                        )
+                                      }
+                                      onClick={
+                                        () =>
+                                          setEditingId(
+                                            null
+                                          )
+                                      }
+                                    >
+                                      취소
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      className={
+                                        styles.primarySmallButton
+                                      }
+                                      disabled={
+                                        Boolean(
+                                          busyKey
+                                        ) ||
+                                        !editingName.trim()
+                                      }
+                                      onClick={
+                                        () =>
+                                          void handleRename(
+                                            category
+                                          )
+                                      }
+                                    >
+                                      {
+                                        rowBusy
+                                          ? "저장 중..."
+                                          : "저장"
+                                      }
+                                    </button>
+                                  </div>
+                                )
+                                : (
+                                  <>
+                                    <span
+                                      className={
+                                        styles.itemTextGroup
+                                      }
+                                    >
+                                      <strong>
+                                        {
+                                          category.name
+                                        }
+                                      </strong>
+
+                                      <span>
+                                        {
+                                          category.active
+                                            ? "사용 중"
+                                            : "사용 중지"
+                                        }
+                                      </span>
+                                    </span>
+
+                                    <div
+                                      className={
+                                        styles.rowActions
+                                      }
+                                    >
+                                      <button
+                                        type="button"
+                                        className={
+                                          styles.secondarySmallButton
+                                        }
+                                        disabled={
+                                          Boolean(
+                                            busyKey
+                                          )
+                                        }
+                                        onClick={
+                                          () => {
+                                            setEditingId(
+                                              category.categoryId
+                                            );
+
+                                            setEditingName(
+                                              category.name
+                                            );
+
+                                            setError(
+                                              ""
+                                            );
+
+                                            setFeedback(
+                                              ""
+                                            );
+                                          }
+                                        }
+                                      >
+                                        이름 변경
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        className={
+                                          styles.secondarySmallButton
+                                        }
+                                        disabled={
+                                          Boolean(
+                                            busyKey
+                                          )
+                                        }
+                                        onClick={
+                                          () =>
+                                            void runMutation(
+                                              `active:${category.categoryId}`,
+
+                                              () =>
+                                                updateManagedCategory({
+                                                  categoryId:
+                                                    category.categoryId,
+
+                                                  active:
+                                                    !category.active
+                                                }),
+
+                                              category.active
+                                                ? "카테고리를 사용 중지했습니다."
+                                                : "카테고리를 다시 사용합니다."
+                                            )
+                                        }
+                                      >
+                                        {
+                                          rowBusy
+                                            ? "처리 중..."
+                                            : category.active
+                                              ? "사용 중지"
+                                              : "다시 사용"
+                                        }
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        className={
+                                          styles.dangerSmallButton
+                                        }
+                                        disabled={
+                                          Boolean(
+                                            busyKey
+                                          )
+                                        }
+                                        onClick={
+                                          () =>
+                                            void handleDelete(
+                                              category
+                                            )
+                                        }
+                                      >
+                                        삭제
+                                      </button>
+                                    </div>
+                                  </>
+                                )
+                            }
+                          </li>
+                        );
+                      }
+                    )
+                  }
+                </ul>
+              )
+        }
+
+        <details
+          className={
+            styles.deletedSection
+          }
+        >
+          <summary>
+            삭제된 {selectedType} 카테고리
+
+            <span>
+              {
+                deletedItems.length
+              }
+            </span>
+          </summary>
+
+          {
+            deletedItems.length ===
+            0
+              ? (
+                <p
+                  className={
+                    styles.emptyState
+                  }
+                >
+                  삭제된 카테고리가 없습니다.
+                </p>
+              )
+              : (
+                <ul
+                  className={
+                    styles.itemList
+                  }
+                >
+                  {
+                    deletedItems.map(
+                      category => (
+                        <li
+                          key={
+                            category.categoryId
+                          }
+                          className={
+                            styles.deletedRow
+                          }
+                        >
+                          <span>
+                            {
+                              category.name
+                            }
+                          </span>
+
+                          <button
+                            type="button"
+                            className={
+                              styles.restoreButton
+                            }
+                            disabled={
+                              Boolean(
+                                busyKey
+                              )
+                            }
+                            onClick={
+                              () =>
+                                void runMutation(
+                                  `restore:${category.categoryId}`,
+
+                                  () =>
+                                    restoreManagedCategory(
+                                      category.categoryId
+                                    ),
+
+                                  "카테고리를 복원했습니다."
+                                )
+                            }
+                          >
+                            {
+                              busyKey ===
+                              `restore:${category.categoryId}`
+                                ? "복원 중..."
+                                : "복원"
+                            }
+                          </button>
+                        </li>
+                      )
+                    )
+                  }
+                </ul>
+              )
+          }
+        </details>
+      </section>
+    </div>
+  );
+}
+
+
+function AccountSettings() {
+  const [
+    accounts,
+    setAccounts
+  ] =
+    useState<
+      ManagedAccount[]
+    >(
+      []
+    );
+
+  const [
+    form,
+    setForm
+  ] =
+    useState<AccountFormState>(
+      createEmptyAccountForm
+    );
+
+  const [
+    editingId,
+    setEditingId
+  ] =
+    useState<
+      string |
+      null
+    >(
+      null
+    );
+
+  const [
+    showForm,
+    setShowForm
+  ] =
+    useState(false);
+
+  const [
+    loading,
+    setLoading
+  ] =
+    useState(true);
+
+  const [
+    busyKey,
+    setBusyKey
+  ] =
+    useState("");
+
+  const [
+    error,
+    setError
+  ] =
+    useState("");
+
+  const [
+    feedback,
+    setFeedback
+  ] =
+    useState("");
+
+
+  async function refresh() {
+    const result =
+      await getManagedAccounts({
+        includeDeleted:
+          true
+      });
+
+    setAccounts(
+      result.items
+    );
+  }
+
+
+  useEffect(
+    () => {
+      let active =
+        true;
+
+      async function load() {
+        setLoading(
+          true
+        );
+
+        setError(
+          ""
+        );
+
+        try {
+          const result =
+            await getManagedAccounts({
+              includeDeleted:
+                true
+            });
+
+          if (
+            active
+          ) {
+            setAccounts(
+              result.items
+            );
+          }
+        } catch (
+          loadError
+        ) {
+          if (
+            active
+          ) {
+            setError(
+              getErrorMessage(
+                loadError,
+                "계좌를 불러오지 못했습니다."
+              )
+            );
+          }
+        } finally {
+          if (
+            active
+          ) {
+            setLoading(
+              false
+            );
+          }
+        }
+      }
+
+      void load();
+
+      return () => {
+        active =
+          false;
+      };
+    },
+    []
+  );
+
+
+  const activeAccounts =
+    useMemo(
+      () =>
+        accounts.filter(
+          account =>
+            !account.isDeleted
+        ),
+      [
+        accounts
+      ]
+    );
+
+
+  const deletedAccounts =
+    useMemo(
+      () =>
+        accounts.filter(
+          account =>
+            account.isDeleted
+        ),
+      [
+        accounts
+      ]
+    );
+
+
+  const ownerOptions =
+    useMemo(
+      () =>
+        Array.from(
+          new Set([
+            ...FIXED_OWNERS,
+
+            ...accounts
+              .map(
+                account =>
+                  account.owner
+              )
+              .filter(
+                Boolean
+              )
+          ])
+        ),
+      [
+        accounts
+      ]
+    );
+
+
+  const paymentAccountOptions =
+    useMemo(
+      () =>
+        activeAccounts.filter(
+          account => {
+            if (
+              account.accountId ===
+              editingId
+            ) {
+              return false;
+            }
+
+            return ![
+              "체크카드",
+              "신용카드",
+              "주식",
+              "대출"
+            ].some(
+              keyword =>
+                account.subType.includes(
+                  keyword
+                )
+            );
+          }
+        ),
+      [
+        activeAccounts,
+        editingId
+      ]
+    );
+
+
+  const isCard =
+    form.subType ===
+      "체크카드" ||
+    form.subType ===
+      "신용카드";
+
+
+  function updateForm<
+    K extends
+      keyof AccountFormState
+  >(
+    key: K,
+    value:
+      AccountFormState[K]
+  ) {
+    setForm(
+      current => ({
+        ...current,
+        [key]: value
+      })
+    );
+  }
+
+
+  function beginCreate() {
+    setEditingId(
+      null
+    );
+
+    setForm(
+      createEmptyAccountForm()
+    );
+
+    setShowForm(
+      true
+    );
+
+    setError(
+      ""
+    );
+
+    setFeedback(
+      ""
+    );
+  }
+
+
+  function beginEdit(
+    account:
+      ManagedAccount
+  ) {
+    setEditingId(
+      account.accountId
+    );
+
+    setForm(
+      accountToForm(
+        account
+      )
+    );
+
+    setShowForm(
+      true
+    );
+
+    setError(
+      ""
+    );
+
+    setFeedback(
+      ""
+    );
+  }
+
+
+  function closeForm() {
+    setEditingId(
+      null
+    );
+
+    setForm(
+      createEmptyAccountForm()
+    );
+
+    setShowForm(
+      false
+    );
+  }
+
+
+  async function runMutation(
+    key: string,
+    work:
+      () =>
+        Promise<unknown>,
+    successMessage:
+      string
+  ) {
+    if (
+      busyKey
+    ) {
+      return false;
+    }
+
+    setBusyKey(
+      key
+    );
+
+    setError(
+      ""
+    );
+
+    setFeedback(
+      ""
+    );
+
+    try {
+      await work();
+      await refresh();
+
+      setFeedback(
+        successMessage
+      );
+
+      return true;
+    } catch (
+      mutationError
+    ) {
+      setError(
+        getErrorMessage(
+          mutationError,
+          "계좌를 처리하지 못했습니다."
+        )
+      );
+
+      return false;
+    } finally {
+      setBusyKey(
+        ""
+      );
+    }
+  }
+
+
+  async function handleSave() {
+    let payload:
+      SaveAccountInput;
+
+    try {
+      payload =
+        buildAccountPayload(
+          form
+        );
+    } catch (
+      validationError
+    ) {
+      setError(
+        getErrorMessage(
+          validationError,
+          "입력값을 확인해주세요."
+        )
+      );
+
+      return;
+    }
+
+    const completed =
+      editingId
+        ? await runMutation(
+            `save:${editingId}`,
+
+            () =>
+              updateManagedAccount({
+                accountId:
+                  editingId,
+
+                ...payload
+              }),
+
+            "계좌 정보를 수정했습니다."
+          )
+        : await runMutation(
+            "create",
+
+            () =>
+              createManagedAccount(
+                payload
+              ),
+
+            "새 계좌를 추가했습니다."
+          );
+
+    if (
+      completed
+    ) {
+      closeForm();
+    }
+  }
+
+
+  async function handleDelete(
+    account:
+      ManagedAccount
+  ) {
+    if (
+      !window.confirm(
+        `‘${account.displayName}’ 계좌를 삭제할까요?\n\n거래나 카드 결제계좌로 사용 중이면 삭제되지 않습니다. 그 경우 사용 종료 연도를 설정해주세요.`
+      )
+    ) {
+      return;
+    }
+
+    await runMutation(
+      `delete:${account.accountId}`,
+
+      () =>
+        deleteManagedAccount(
+          account.accountId
+        ),
+
+      "계좌를 삭제했습니다."
+    );
+  }
+
+
+  return (
+    <div
+      className={
+        styles.settingsBody
+      }
+    >
+      <div
+        className={
+          styles.topActionRow
+        }
+      >
+        <p>
+          과거 거래가 있는 계좌는
+          삭제 대신 사용 종료 연도를 설정하세요.
+        </p>
+
+        <button
+          type="button"
+          className={
+            styles.primaryButton
+          }
+          onClick={
+            beginCreate
+          }
+        >
+          계좌 추가
+        </button>
+      </div>
+
+      {
+        showForm && (
+          <section
+            className={
+              styles.formCard
+            }
+          >
+            <div
+              className={
+                styles.formHeader
+              }
+            >
+              <div>
+                <h2>
+                  {
+                    editingId
+                      ? "계좌 수정"
+                      : "새 계좌 추가"
+                  }
+                </h2>
+
+                <p>
+                  카드는 결제계좌를 반드시 연결해야 합니다.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className={
+                  styles.closeButton
+                }
+                aria-label="입력창 닫기"
+                disabled={
+                  Boolean(
+                    busyKey
+                  )
+                }
+                onClick={
+                  closeForm
+                }
+              >
+                ×
+              </button>
+            </div>
+
+            <datalist
+              id="account-type-suggestions"
+            >
+              {
+                ACCOUNT_TYPE_SUGGESTIONS.map(
+                  value => (
+                    <option
+                      key={
+                        value
+                      }
+                      value={
+                        value
+                      }
+                    />
+                  )
+                )
+              }
+            </datalist>
+
+            <datalist
+              id="account-subtype-suggestions"
+            >
+              {
+                ACCOUNT_SUBTYPE_SUGGESTIONS.map(
+                  value => (
+                    <option
+                      key={
+                        value
+                      }
+                      value={
+                        value
+                      }
+                    />
+                  )
+                )
+              }
+            </datalist>
+
+            <div
+              className={
+                styles.formGrid
+              }
+            >
+              <label
+                className={
+                  styles.field
+                }
+              >
+                <span>
+                  계좌·카드 이름
+                </span>
+
+                <input
+                  type="text"
+                  value={
+                    form.accountName
+                  }
+                  maxLength={
+                    60
+                  }
+                  disabled={
+                    Boolean(
+                      busyKey
+                    )
+                  }
+                  onChange={
+                    event =>
+                      updateForm(
+                        "accountName",
+                        event.target.value
+                      )
+                  }
+                />
+              </label>
+
+              <label
+                className={
+                  styles.field
+                }
+              >
+                <span>
+                  명의자
+                </span>
+
+                <select
+                  value={
+                    form.owner
+                  }
+                  disabled={
+                    Boolean(
+                      busyKey
+                    )
+                  }
+                  onChange={
+                    event => {
+                      const owner =
+                        event
+                          .target
+                          .value;
+
+                      setForm(
+                        current => ({
+                          ...current,
+
+                          owner,
+
+                          assetAttribution:
+                            current.assetAttribution ===
+                            current.owner
+                              ? owner
+                              : current.assetAttribution
+                        })
+                      );
+                    }
+                  }
+                >
+                  {
+                    ownerOptions.map(
+                      owner => (
+                        <option
+                          key={
+                            owner
+                          }
+                          value={
+                            owner
+                          }
+                        >
+                          {owner}
+                        </option>
+                      )
+                    )
+                  }
+                </select>
+              </label>
+
+              <label
+                className={
+                  styles.field
+                }
+              >
+                <span>
+                  계좌 유형
+                </span>
+
+                <input
+                  type="text"
+                  list="account-type-suggestions"
+                  value={
+                    form.accountType
+                  }
+                  maxLength={
+                    30
+                  }
+                  disabled={
+                    Boolean(
+                      busyKey
+                    )
+                  }
+                  onChange={
+                    event =>
+                      updateForm(
+                        "accountType",
+                        event.target.value
+                      )
+                  }
+                />
+              </label>
+
+              <label
+                className={
+                  styles.field
+                }
+              >
+                <span>
+                  세부 구분
+                </span>
+
+                <input
+                  type="text"
+                  list="account-subtype-suggestions"
+                  value={
+                    form.subType
+                  }
+                  maxLength={
+                    40
+                  }
+                  disabled={
+                    Boolean(
+                      busyKey
+                    )
+                  }
+                  onChange={
+                    event =>
+                      setForm(
+                        current => ({
+                          ...current,
+
+                          subType:
+                            event.target.value,
+
+                          paymentAccountId:
+                            event.target.value ===
+                              "체크카드" ||
+                            event.target.value ===
+                              "신용카드"
+                              ? current.paymentAccountId
+                              : ""
+                        })
+                      )
+                  }
+                />
+              </label>
+
+              <label
+                className={
+                  styles.field
+                }
+              >
+                <span>
+                  시작 잔액
+                </span>
+
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={
+                    form.openingBalance
+                  }
+                  disabled={
+                    Boolean(
+                      busyKey
+                    )
+                  }
+                  onChange={
+                    event =>
+                      updateForm(
+                        "openingBalance",
+                        event.target.value
+                      )
+                  }
+                />
+              </label>
+
+              <label
+                className={
+                  styles.field
+                }
+              >
+                <span>
+                  자산 귀속
+                </span>
+
+                <select
+                  value={
+                    form.assetAttribution
+                  }
+                  disabled={
+                    Boolean(
+                      busyKey
+                    )
+                  }
+                  onChange={
+                    event =>
+                      updateForm(
+                        "assetAttribution",
+                        event.target.value
+                      )
+                  }
+                >
+                  {
+                    ownerOptions.map(
+                      owner => (
+                        <option
+                          key={
+                            owner
+                          }
+                          value={
+                            owner
+                          }
+                        >
+                          {owner}
+                        </option>
+                      )
+                    )
+                  }
+                </select>
+              </label>
+
+              {
+                isCard && (
+                  <label
+                    className={`${styles.field} ${styles.fullField}`}
+                  >
+                    <span>
+                      카드 결제계좌
+                    </span>
+
+                    <select
+                      value={
+                        form.paymentAccountId
+                      }
+                      disabled={
+                        Boolean(
+                          busyKey
+                        )
+                      }
+                      onChange={
+                        event =>
+                          updateForm(
+                            "paymentAccountId",
+                            event.target.value
+                          )
+                      }
+                    >
+                      <option
+                        value=""
+                      >
+                        선택해주세요
+                      </option>
+
+                      {
+                        paymentAccountOptions.map(
+                          account => (
+                            <option
+                              key={
+                                account.accountId
+                              }
+                              value={
+                                account.accountId
+                              }
+                            >
+                              {
+                                account.displayName
+                              }
+                            </option>
+                          )
+                        )
+                      }
+                    </select>
+                  </label>
+                )
+              }
+
+              {
+                form.subType ===
+                "신용카드" && (
+                  <>
+                    <label
+                      className={
+                        styles.field
+                      }
+                    >
+                      <span>
+                        청구 마감일
+                      </span>
+
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min={
+                          1
+                        }
+                        max={
+                          31
+                        }
+                        value={
+                          form.billingCutoffDay
+                        }
+                        placeholder="1~31"
+                        disabled={
+                          Boolean(
+                            busyKey
+                          )
+                        }
+                        onChange={
+                          event =>
+                            updateForm(
+                              "billingCutoffDay",
+                              event.target.value
+                            )
+                        }
+                      />
+                    </label>
+
+                    <label
+                      className={
+                        styles.field
+                      }
+                    >
+                      <span>
+                        결제일
+                      </span>
+
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min={
+                          1
+                        }
+                        max={
+                          31
+                        }
+                        value={
+                          form.paymentDay
+                        }
+                        placeholder="1~31"
+                        disabled={
+                          Boolean(
+                            busyKey
+                          )
+                        }
+                        onChange={
+                          event =>
+                            updateForm(
+                              "paymentDay",
+                              event.target.value
+                            )
+                        }
+                      />
+                    </label>
+                  </>
+                )
+              }
+
+              <label
+                className={
+                  styles.field
+                }
+              >
+                <span>
+                  사용 시작 연도
+                </span>
+
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={
+                    1900
+                  }
+                  max={
+                    2200
+                  }
+                  value={
+                    form.startYear
+                  }
+                  placeholder="선택 입력"
+                  disabled={
+                    Boolean(
+                      busyKey
+                    )
+                  }
+                  onChange={
+                    event =>
+                      updateForm(
+                        "startYear",
+                        event.target.value
+                      )
+                  }
+                />
+              </label>
+
+              <label
+                className={
+                  styles.field
+                }
+              >
+                <span>
+                  사용 종료 연도
+                </span>
+
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={
+                    1900
+                  }
+                  max={
+                    2200
+                  }
+                  value={
+                    form.endYear
+                  }
+                  placeholder="사용 중이면 비워두기"
+                  disabled={
+                    Boolean(
+                      busyKey
+                    )
+                  }
+                  onChange={
+                    event =>
+                      updateForm(
+                        "endYear",
+                        event.target.value
+                      )
+                  }
+                />
+              </label>
+
+              <label
+                className={`${styles.field} ${styles.fullField}`}
+              >
+                <span>
+                  잔액 계산 방식
+                </span>
+
+                <select
+                  value={
+                    form.balanceMethod
+                  }
+                  disabled={
+                    Boolean(
+                      busyKey
+                    )
+                  }
+                  onChange={
+                    event =>
+                      updateForm(
+                        "balanceMethod",
+                        event.target.value
+                      )
+                  }
+                >
+                  <option
+                    value="자동계산"
+                  >
+                    자동계산
+                  </option>
+
+                  <option
+                    value="평가입력"
+                  >
+                    평가입력
+                  </option>
+                </select>
+              </label>
+            </div>
+
+            {
+              error && (
+                <p
+                  className={
+                    styles.error
+                  }
+                  role="alert"
+                >
+                  {error}
+                </p>
+              )
+            }
+
+            <div
+              className={
+                styles.formActions
+              }
+            >
+              <button
+                type="button"
+                className={
+                  styles.secondaryButton
+                }
+                disabled={
+                  Boolean(
+                    busyKey
+                  )
+                }
+                onClick={
+                  closeForm
+                }
+              >
+                취소
+              </button>
+
+              <button
+                type="button"
+                className={
+                  styles.primaryButton
+                }
+                disabled={
+                  Boolean(
+                    busyKey
+                  )
+                }
+                onClick={
+                  () =>
+                    void handleSave()
+                }
+              >
+                {
+                  busyKey
+                    ? "저장 중..."
+                    : editingId
+                      ? "수정 저장"
+                      : "계좌 추가"
+                }
+              </button>
+            </div>
+          </section>
+        )
+      }
+
+      {
+        !showForm &&
+        error && (
+          <p
+            className={
+              styles.error
+            }
+            role="alert"
+          >
+            {error}
+          </p>
+        )
+      }
+
+      {
+        feedback && (
+          <p
+            className={
+              styles.feedback
+            }
+            role="status"
+          >
+            {feedback}
+          </p>
+        )
+      }
+
+      <section
+        className={
+          styles.cardSection
+        }
+      >
+        <div
+          className={
+            styles.sectionHeading
+          }
+        >
+          <h2>
+            사용 중인 계좌·카드
+          </h2>
+
+          <p>
+            입력 화면 노출 여부와 순서는
+            ‘입력 화면 설정’에서 바꿉니다.
+          </p>
+        </div>
+
+        {
+          loading
+            ? (
+              <p
+                className={
+                  styles.state
+                }
+              >
+                계좌를 불러오는 중입니다.
+              </p>
+            )
+            : activeAccounts.length ===
+              0
+              ? (
+                <p
+                  className={
+                    styles.emptyState
+                  }
+                >
+                  등록된 계좌가 없습니다.
+                </p>
+              )
+              : (
+                <ul
+                  className={
+                    styles.itemList
+                  }
+                >
+                  {
+                    activeAccounts.map(
+                      account => (
+                        <li
+                          key={
+                            account.accountId
+                          }
+                          className={`${styles.managementRow} ${
+                            !account.active
+                              ? styles.mutedRow
+                              : ""
+                          }`}
+                        >
+                          <span
+                            className={
+                              styles.itemTextGroup
+                            }
+                          >
+                            <strong>
+                              {
+                                account.displayName
+                              }
+                            </strong>
+
+                            <span>
+                              {
+                                [
+                                  account.accountType,
+                                  account.subType,
+                                  account.owner
+                                ]
+                                  .filter(
+                                    Boolean
+                                  )
+                                  .join(
+                                    " · "
+                                  )
+                              }
+                            </span>
+
+                            <span>
+                              현재 잔액 {
+                                formatKrw(
+                                  account.currentBalance
+                                )
+                              }
+
+                              {
+                                !account.active
+                                  ? " · 사용 종료"
+                                  : ""
+                              }
+                            </span>
+                          </span>
+
+                          <div
+                            className={
+                              styles.rowActions
+                            }
+                          >
+                            <button
+                              type="button"
+                              className={
+                                styles.secondarySmallButton
+                              }
+                              disabled={
+                                Boolean(
+                                  busyKey
+                                )
+                              }
+                              onClick={
+                                () =>
+                                  beginEdit(
+                                    account
+                                  )
+                              }
+                            >
+                              수정
+                            </button>
+
+                            <button
+                              type="button"
+                              className={
+                                styles.dangerSmallButton
+                              }
+                              disabled={
+                                Boolean(
+                                  busyKey
+                                )
+                              }
+                              onClick={
+                                () =>
+                                  void handleDelete(
+                                    account
+                                  )
+                              }
+                            >
+                              {
+                                busyKey ===
+                                `delete:${account.accountId}`
+                                  ? "처리 중..."
+                                  : "삭제"
+                              }
+                            </button>
+                          </div>
+                        </li>
+                      )
+                    )
+                  }
+                </ul>
+              )
+        }
+
+        <details
+          className={
+            styles.deletedSection
+          }
+        >
+          <summary>
+            삭제된 계좌·카드
+
+            <span>
+              {
+                deletedAccounts.length
+              }
+            </span>
+          </summary>
+
+          {
+            deletedAccounts.length ===
+            0
+              ? (
+                <p
+                  className={
+                    styles.emptyState
+                  }
+                >
+                  삭제된 계좌가 없습니다.
+                </p>
+              )
+              : (
+                <ul
+                  className={
+                    styles.itemList
+                  }
+                >
+                  {
+                    deletedAccounts.map(
+                      account => (
+                        <li
+                          key={
+                            account.accountId
+                          }
+                          className={
+                            styles.deletedRow
+                          }
+                        >
+                          <span>
+                            {
+                              account.displayName
+                            }
+                          </span>
+
+                          <button
+                            type="button"
+                            className={
+                              styles.restoreButton
+                            }
+                            disabled={
+                              Boolean(
+                                busyKey
+                              )
+                            }
+                            onClick={
+                              () =>
+                                void runMutation(
+                                  `restore:${account.accountId}`,
+
+                                  () =>
+                                    restoreManagedAccount(
+                                      account.accountId
+                                    ),
+
+                                  "계좌를 복원했습니다."
+                                )
+                            }
+                          >
+                            {
+                              busyKey ===
+                              `restore:${account.accountId}`
+                                ? "복원 중..."
+                                : "복원"
+                            }
+                          </button>
+                        </li>
+                      )
+                    )
+                  }
+                </ul>
+              )
+          }
+        </details>
+      </section>
+    </div>
+  );
+}
+
+
+function LedgerDataSettings() {
+  const [
+    ledgerStartDateValue,
+    setLedgerStartDateValue
+  ] =
+    useState("");
+
+  const [
+    loading,
+    setLoading
+  ] =
+    useState(true);
+
+  const [
+    busyKey,
+    setBusyKey
+  ] =
+    useState("");
+
+  const [
+    error,
+    setError
+  ] =
+    useState("");
+
+  const [
+    feedback,
+    setFeedback
+  ] =
+    useState("");
+
+
+  useEffect(
+    () => {
+      let active =
+        true;
+
+      async function load() {
+        setLoading(
+          true
+        );
+
+        setError(
+          ""
+        );
+
+        try {
+          const result =
+            await getLedgerConfig();
+
+          if (
+            active
+          ) {
+            setLedgerStartDateValue(
+              result.ledgerStartDate ||
+              ""
+            );
+          }
+        } catch (
+          loadError
+        ) {
+          if (
+            active
+          ) {
+            setError(
+              getErrorMessage(
+                loadError,
+                "가계부 설정을 불러오지 못했습니다."
+              )
+            );
+          }
+        } finally {
+          if (
+            active
+          ) {
+            setLoading(
+              false
+            );
+          }
+        }
+      }
+
+      void load();
+
+      return () => {
+        active =
+          false;
+      };
+    },
+    []
+  );
+
+
+  async function handleSaveStartDate() {
+    if (
+      !ledgerStartDateValue
+    ) {
+      setError(
+        "가계부 시작일을 선택해주세요."
+      );
+
+      return;
+    }
+
+    setBusyKey(
+      "start-date"
+    );
+
+    setError(
+      ""
+    );
+
+    setFeedback(
+      ""
+    );
+
+    try {
+      const result =
+        await setLedgerStartDate(
+          ledgerStartDateValue
+        );
+
+      setLedgerStartDateValue(
+        result.ledgerStartDate ||
+        ledgerStartDateValue
+      );
+
+      setFeedback(
+        "가계부 시작일을 저장했습니다."
+      );
+    } catch (
+      saveError
+    ) {
+      setError(
+        getErrorMessage(
+          saveError,
+          "가계부 시작일을 저장하지 못했습니다."
+        )
+      );
+    } finally {
+      setBusyKey(
+        ""
+      );
+    }
+  }
+
+
+  async function handleClearStartDate() {
+    if (
+      !window.confirm(
+        "가계부 시작일 제한을 해제할까요?"
+      )
+    ) {
+      return;
+    }
+
+    setBusyKey(
+      "clear-date"
+    );
+
+    setError(
+      ""
+    );
+
+    setFeedback(
+      ""
+    );
+
+    try {
+      await clearLedgerStartDate();
+
+      setLedgerStartDateValue(
+        ""
+      );
+
+      setFeedback(
+        "가계부 시작일 제한을 해제했습니다."
+      );
+    } catch (
+      clearError
+    ) {
+      setError(
+        getErrorMessage(
+          clearError,
+          "가계부 시작일을 해제하지 못했습니다."
+        )
+      );
+    } finally {
+      setBusyKey(
+        ""
+      );
+    }
+  }
+
+
+  async function handleExport() {
+    setBusyKey(
+      "export"
+    );
+
+    setError(
+      ""
+    );
+
+    setFeedback(
+      ""
+    );
+
+    try {
+      const items:
+        Transaction[] = [];
+
+      let offset =
+        0;
+
+      const limit =
+        1000;
+
+      let total =
+        0;
+
+      do {
+        const response =
+          await getTransactions({
+            limit,
+            offset
+          });
+
+        total =
+          response.data.total;
+
+        items.push(
+          ...response
+            .data
+            .items
+        );
+
+        offset +=
+          response
+            .data
+            .items
+            .length;
+
+        if (
+          response
+            .data
+            .items
+            .length ===
+          0
+        ) {
+          break;
+        }
+      } while (
+        offset <
+        total
+      );
+
+      const headers = [
+        "거래ID",
+        "날짜",
+        "유형",
+        "카테고리",
+        "금액",
+        "출금계좌",
+        "입금계좌",
+        "결제수단",
+        "지출대상",
+        "메모",
+        "청구월",
+        "입력자",
+        "수정자",
+        "입력시각",
+        "수정시각"
+      ];
+
+      const rows =
+        items.map(
+          transaction => [
+            transaction.transactionId,
+            transaction.date,
+            transaction.type,
+            transaction.category,
+            transaction.amount,
+            transaction.fromAccount ||
+              "",
+            transaction.toAccount ||
+              "",
+            transaction.paymentMethod ||
+              "",
+            transaction.spendingTarget ||
+              "",
+            transaction.memo,
+            transaction.billingMonth ||
+              "",
+            transaction.createdBy,
+            transaction.updatedBy,
+            transaction.createdAt ||
+              "",
+            transaction.updatedAt ||
+              ""
+          ]
+        );
+
+      const csv =
+        [
+          headers,
+          ...rows
+        ]
+          .map(
+            row =>
+              row
+                .map(
+                  csvCell
+                )
+                .join(
+                  ","
+                )
+          )
+          .join(
+            "\r\n"
+          );
+
+      const blob =
+        new Blob(
+          [
+            "\uFEFF",
+            csv
+          ],
+          {
+            type:
+              "text/csv;charset=utf-8"
+          }
+        );
+
+      const url =
+        URL.createObjectURL(
+          blob
+        );
+
+      const link =
+        document.createElement(
+          "a"
+        );
+
+      const today =
+        new Date()
+          .toISOString()
+          .slice(
+            0,
+            10
+          );
+
+      link.href =
+        url;
+
+      link.download =
+        `우리_가계부_거래_${today}.csv`;
+
+      document.body.appendChild(
+        link
+      );
+
+      link.click();
+      link.remove();
+
+      URL.revokeObjectURL(
+        url
+      );
+
+      setFeedback(
+        `거래 ${items.length.toLocaleString(
+          "ko-KR"
+        )}건을 내보냈습니다.`
+      );
+    } catch (
+      exportError
+    ) {
+      setError(
+        getErrorMessage(
+          exportError,
+          "거래를 내보내지 못했습니다."
+        )
+      );
+    } finally {
+      setBusyKey(
+        ""
+      );
+    }
+  }
+
+
+  return (
+    <div
+      className={
+        styles.settingsBody
+      }
+    >
+      {
+        error && (
+          <p
+            className={
+              styles.error
+            }
+            role="alert"
+          >
+            {error}
+          </p>
+        )
+      }
+
+      {
+        feedback && (
+          <p
+            className={
+              styles.feedback
+            }
+            role="status"
+          >
+            {feedback}
+          </p>
+        )
+      }
+
+      <section
+        className={
+          styles.cardSection
+        }
+      >
+        <div
+          className={
+            styles.sectionHeading
+          }
+        >
+          <h2>
+            가계부 시작일
+          </h2>
+
+          <p>
+            이 날짜보다 이전의 거래 입력을 막아
+            실수를 방지합니다.
+          </p>
+        </div>
+
+        {
+          loading
+            ? (
+              <p
+                className={
+                  styles.state
+                }
+              >
+                가계부 설정을 불러오는 중입니다.
+              </p>
+            )
+            : (
+              <div
+                className={
+                  styles.dateSettingRow
+                }
+              >
+                <label
+                  className={
+                    styles.field
+                  }
+                >
+                  <span>
+                    시작일
+                  </span>
+
+                  <input
+                    type="date"
+                    value={
+                      ledgerStartDateValue
+                    }
+                    disabled={
+                      Boolean(
+                        busyKey
+                      )
+                    }
+                    onChange={
+                      event =>
+                        setLedgerStartDateValue(
+                          event.target.value
+                        )
+                    }
+                  />
+                </label>
+
+                <div
+                  className={
+                    styles.rowActions
+                  }
+                >
+                  <button
+                    type="button"
+                    className={
+                      styles.secondaryButton
+                    }
+                    disabled={
+                      Boolean(
+                        busyKey
+                      ) ||
+                      !ledgerStartDateValue
+                    }
+                    onClick={
+                      () =>
+                        void handleClearStartDate()
+                    }
+                  >
+                    제한 해제
+                  </button>
+
+                  <button
+                    type="button"
+                    className={
+                      styles.primaryButton
+                    }
+                    disabled={
+                      Boolean(
+                        busyKey
+                      ) ||
+                      !ledgerStartDateValue
+                    }
+                    onClick={
+                      () =>
+                        void handleSaveStartDate()
+                    }
+                  >
+                    {
+                      busyKey ===
+                      "start-date"
+                        ? "저장 중..."
+                        : "시작일 저장"
+                    }
+                  </button>
+                </div>
+              </div>
+            )
+        }
+      </section>
+
+      <section
+        className={
+          styles.cardSection
+        }
+      >
+        <div
+          className={
+            styles.sectionHeading
+          }
+        >
+          <h2>
+            거래 데이터 내보내기
+          </h2>
+
+          <p>
+            현재 저장된 거래를 엑셀에서도 열 수 있는
+            CSV 파일로 받습니다.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          className={
+            styles.fullWidthButton
+          }
+          disabled={
+            Boolean(
+              busyKey
+            )
+          }
+          onClick={
+            () =>
+              void handleExport()
+          }
+        >
+          {
+            busyKey ===
+            "export"
+              ? "내보내는 중..."
+              : "전체 거래 CSV로 내보내기"
+          }
+        </button>
+      </section>
+
+      <section
+        className={
+          styles.cardSection
+        }
+      >
+        <div
+          className={
+            styles.sectionHeading
+          }
+        >
+          <h2>
+            앱 데이터 다시 불러오기
+          </h2>
+
+          <p>
+            다른 계정에서 바꾼 내용이 보이지 않을 때
+            최신 데이터를 다시 읽습니다.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          className={
+            styles.fullWidthButton
+          }
+          disabled={
+            Boolean(
+              busyKey
+            )
+          }
+          onClick={
+            () =>
+              window.location.reload()
+          }
+        >
+          최신 데이터 다시 불러오기
+        </button>
+      </section>
+    </div>
+  );
+}
+
+
+function ProfileSettings() {
+  const [
+    userName,
+    setUserName
+  ] =
+    useState("");
+
+  const [
+    loading,
+    setLoading
+  ] =
+    useState(true);
+
+  const [
+    loggingOut,
+    setLoggingOut
+  ] =
+    useState(false);
+
+
+  useEffect(
+    () => {
+      let active =
+        true;
+
+      async function loadSession() {
+        try {
+          const session =
+            await getSession();
+
+          if (
+            active &&
+            session.loggedIn &&
+            session.user
+          ) {
+            setUserName(
+              session.user.name
+            );
+          }
+        } finally {
+          if (
+            active
+          ) {
+            setLoading(
+              false
+            );
+          }
+        }
+      }
+
+      void loadSession();
+
+      return () => {
+        active =
+          false;
+      };
+    },
+    []
+  );
+
+
+  async function handleLogout() {
+    if (
+      !window.confirm(
+        "로그아웃할까요?"
+      )
+    ) {
+      return;
+    }
+
+    setLoggingOut(
+      true
+    );
+
+    try {
+      await logout();
+
+      window.location.reload();
+    } finally {
+      setLoggingOut(
+        false
+      );
+    }
+  }
+
+
+  return (
+    <div
+      className={
+        styles.settingsBody
+      }
+    >
+      <section
+        className={
+          styles.cardSection
+        }
+      >
+        <div
+          className={
+            styles.profileRow
+          }
+        >
+          <span
+            className={
+              styles.avatar
+            }
+            aria-hidden="true"
+          >
+            {
+              (
+                userName ||
+                "내"
+              ).slice(
+                0,
+                1
+              )
+            }
+          </span>
+
+          <span
+            className={
+              styles.itemTextGroup
+            }
+          >
+            <strong>
+              {
+                loading
+                  ? "확인 중..."
+                  : userName ||
+                    "로그인 사용자"
+              }
+            </strong>
+
+            <span>
+              현재 로그인한 사용자
+            </span>
+          </span>
+        </div>
+      </section>
+
+      <section
+        className={
+          styles.cardSection
+        }
+      >
+        <div
+          className={
+            styles.sectionHeading
+          }
+        >
+          <h2>
+            우리 가계부
+          </h2>
+
+          <p>
+            미영·승철 두 사람이 함께 사용하는
+            부부 공유 가계부입니다.
+          </p>
+        </div>
+
+        <dl
+          className={
+            styles.infoList
+          }
+        >
+          <div>
+            <dt>
+              로그인 유지
+            </dt>
+
+            <dd>
+              접속할 때마다 최대 400일로 연장
+            </dd>
+          </div>
+
+          <div>
+            <dt>
+              원본 데이터
+            </dt>
+
+            <dd>
+              Google Sheets
+            </dd>
+          </div>
+
+          <div>
+            <dt>
+              설정 공유
+            </dt>
+
+            <dd>
+              부부 공통 설정은 두 계정에 동일 적용
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      <button
+        type="button"
+        className={
+          styles.logoutButton
+        }
+        disabled={
+          loggingOut
+        }
+        onClick={
+          () =>
+            void handleLogout()
+        }
+      >
+        {
+          loggingOut
+            ? "로그아웃 중..."
+            : "로그아웃"
+        }
+      </button>
+    </div>
+  );
+}
+
+
+export default function SettingsPage() {
+  const [
+    view,
+    setView
+  ] =
+    useState<SettingsView>(
+      "home"
+    );
+
+
+  const detail = {
+    input: {
+      title:
+        "입력 화면 설정",
+
+      description:
+        "자주 쓰는 항목의 순서와 노출 여부를 정합니다."
+    },
+
+    categories: {
+      title:
+        "카테고리 관리",
+
+      description:
+        "수입·지출·이체 카테고리를 직접 관리합니다."
+    },
+
+    accounts: {
+      title:
+        "계좌·카드 관리",
+
+      description:
+        "계좌와 카드의 정보와 사용 기간을 관리합니다."
+    },
+
+    ledger: {
+      title:
+        "가계부 운영·데이터",
+
+      description:
+        "운영 기준과 데이터 내보내기를 관리합니다."
+    },
+
+    profile: {
+      title:
+        "내 계정·앱 정보",
+
+      description:
+        "현재 로그인 정보와 앱의 저장 방식을 확인합니다."
+    }
+  } as const;
+
+
+  return (
+    <main
+      className={
+        styles.page
+      }
+    >
+      {
+        view ===
+        "home"
+          ? (
+            <SettingsHome
+              onOpen={
+                setView
+              }
+            />
+          )
+          : (
+            <>
+              <DetailHeader
+                title={
+                  detail[
+                    view
+                  ].title
+                }
+                description={
+                  detail[
+                    view
+                  ].description
+                }
+                onBack={
+                  () =>
+                    setView(
+                      "home"
+                    )
+                }
+              />
+
+              {
+                view ===
+                "input" && (
+                  <InputSettings />
+                )
+              }
+
+              {
+                view ===
+                "categories" && (
+                  <CategorySettings />
+                )
+              }
+
+              {
+                view ===
+                "accounts" && (
+                  <AccountSettings />
+                )
+              }
+
+              {
+                view ===
+                "ledger" && (
+                  <LedgerDataSettings />
+                )
+              }
+
+              {
+                view ===
+                "profile" && (
+                  <ProfileSettings />
+                )
+              }
+            </>
+          )
+      }
     </main>
   );
 }
