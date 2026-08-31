@@ -1,86 +1,133 @@
-import { apiRequest } from "./client";
+import {
+  apiRequest
+} from "./client";
+
 import {
   unwrapEnvelope
 } from "./envelope";
+
 import type {
   ApiEnvelope
 } from "./envelope";
+
 
 export type LedgerTransactionType =
   | "지출"
   | "수입"
   | "이체";
 
+
 export interface CalendarTransaction {
   transactionId: string;
 
   date: string;
 
-  type: LedgerTransactionType;
+  type:
+    LedgerTransactionType;
 
-  categoryId: string | null;
+  categoryId:
+    string | null;
+
   category: string;
 
   amount: number;
 
-  fromAccountId: string | null;
-  fromAccount: string | null;
+  fromAccountId:
+    string | null;
 
-  toAccountId: string | null;
-  toAccount: string | null;
+  fromAccount:
+    string | null;
 
-  paymentMethodId: string | null;
-  paymentMethod: string | null;
+  toAccountId:
+    string | null;
 
-  spendingTarget: string | null;
+  toAccount:
+    string | null;
+
+  paymentMethodId:
+    string | null;
+
+  paymentMethod:
+    string | null;
+
+  spendingTarget:
+    string | null;
 
   memo: string;
 
-  billingOverride: string | null;
-  billingMonth: string | null;
+  billingOverride:
+    string | null;
 
-  groupId: string | null;
-  requestId: string | null;
-  reversalOf: string | null;
+  billingMonth:
+    string | null;
 
-  createdAt: string | null;
-  updatedAt: string | null;
+  groupId:
+    string | null;
+
+  requestId:
+    string | null;
+
+  reversalOf:
+    string | null;
+
+  createdAt:
+    string | null;
+
+  updatedAt:
+    string | null;
 
   createdBy?: string;
+
   updatedBy?: string;
 
-  deletedAt?: string | null;
+  deletedAt?:
+    string | null;
+
   deletedBy?: string;
 
   isDeleted: boolean;
 }
 
+
 export interface CalendarTransactionsResponse {
   total: number;
-  items: CalendarTransaction[];
+
+  items:
+    CalendarTransaction[];
 }
+
 
 export interface GetCalendarTransactionsParams {
   dateFrom?: string;
+
   dateTo?: string;
 
-  type?: LedgerTransactionType;
+  type?:
+    LedgerTransactionType;
 
   categoryId?: string;
+
   accountId?: string;
+
   spendingTarget?: string;
 
   q?: string;
 
+  includeDeleted?: boolean;
+
   limit?: number;
+
   offset?: number;
 }
 
+
 export async function getCalendarTransactions(
-  params: GetCalendarTransactionsParams = {}
+  params:
+    GetCalendarTransactionsParams = {}
 ) {
   const searchParams =
     new URLSearchParams();
+
 
   if (params.dateFrom) {
     searchParams.set(
@@ -89,12 +136,14 @@ export async function getCalendarTransactions(
     );
   }
 
+
   if (params.dateTo) {
     searchParams.set(
       "dateTo",
       params.dateTo
     );
   }
+
 
   if (params.type) {
     searchParams.set(
@@ -103,12 +152,14 @@ export async function getCalendarTransactions(
     );
   }
 
+
   if (params.categoryId) {
     searchParams.set(
       "categoryId",
       params.categoryId
     );
   }
+
 
   if (params.accountId) {
     searchParams.set(
@@ -117,12 +168,14 @@ export async function getCalendarTransactions(
     );
   }
 
+
   if (params.spendingTarget) {
     searchParams.set(
       "spendingTarget",
       params.spendingTarget
     );
   }
+
 
   if (params.q) {
     searchParams.set(
@@ -131,6 +184,15 @@ export async function getCalendarTransactions(
     );
   }
 
+
+  if (params.includeDeleted) {
+    searchParams.set(
+      "includeDeleted",
+      "true"
+    );
+  }
+
+
   searchParams.set(
     "limit",
     String(
@@ -138,28 +200,36 @@ export async function getCalendarTransactions(
     )
   );
 
+
   if (
-    params.offset !== undefined
+    params.offset !==
+      undefined
   ) {
     searchParams.set(
       "offset",
-      String(params.offset)
+      String(
+        params.offset
+      )
     );
   }
 
+
   const query =
     searchParams.toString();
+
 
   const url =
     query
       ? `/api/transactions?${query}`
       : "/api/transactions";
 
+
   const raw =
     await apiRequest<
       | ApiEnvelope<CalendarTransactionsResponse>
       | CalendarTransactionsResponse
     >(url);
+
 
   return unwrapEnvelope<
     CalendarTransactionsResponse
