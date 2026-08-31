@@ -120,7 +120,7 @@ const POST_ROUTES = {
 
   "/api/transactions/delete": {
     action: "deleteTransaction",
-    refresh: " "dashboard",
+    refresh: "dashboard",
     invalidCode: "INVALID_TRANSACTION",
     invalidMessage: "거래 삭제 형식이 올바르지 않습니다."
   },
