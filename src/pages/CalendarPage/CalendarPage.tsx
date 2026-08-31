@@ -486,6 +486,48 @@ function getErrorMessage(
   return "요청을 처리하지 못했습니다.";
 }
 
+function formatDeletedAt(
+  value:
+    string |
+    null |
+    undefined
+) {
+  if (!value) {
+    return "삭제 시각 미확인";
+  }
+
+  const normalized =
+    /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/
+      .test(value)
+      ? value.replace(
+          " ",
+          "T"
+        )
+      : value;
+
+  const date =
+    new Date(normalized);
+
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat(
+    "ko-KR",
+    {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    }
+  ).format(date);
+}
+
 export default function CalendarPage() {
   const today =
     getToday();
@@ -595,6 +637,14 @@ export default function CalendarPage() {
     >(null);
 
   const [
+    restoringId,
+    setRestoringId
+  ] =
+    useState<
+      string | null
+    >(null);
+
+  const [
     actionError,
     setActionError
   ] =
@@ -652,6 +702,7 @@ export default function CalendarPage() {
               getCalendarTransactions({
                 dateFrom,
                 dateTo,
+                includeDeleted: true,
                 limit: 1000
               }),
 
@@ -665,10 +716,6 @@ export default function CalendarPage() {
           setTransactions(
             transactionResult
               .items
-              .filter(
-                item =>
-                  !item.isDeleted
-              )
           );
 
           setDashboard(
@@ -736,24 +783,180 @@ export default function CalendarPage() {
     ]
   );
 
+  const activeTransactions =
+    useMemo(
+      () =>
+        transactions.filter(
+          transaction =>
+            !transaction.isDeleted
+        ),
+      [transactions]
+    );
+
   const filteredTransactions =
     useMemo(
       () => {
         if (
           filter === "전체"
         ) {
-          return transactions;
+          return activeTransactions;
         }
 
-        return transactions.filter(
+        return activeTransactions.filter(
           transaction =>
             transaction.type ===
             filter
         );
       },
       [
+        activeTransactions,
+        filter
+      ]
+    );
+
+  const deletedTransactions =
+    useMemo(
+      () =>
+        transactions
+          .filter(
+            transaction =>
+              transaction.isDeleted &&
+              (
+                filter === "전체" ||
+                transaction.type ===
+                  filter
+              )
+          )
+          .sort(
+            (
+              left,
+              right
+            ) => {
+              const dateOrder =
+                right.date.localeCompare(
+                  left.date
+                );
+
+              if (dateOrder !== 0) {
+                return dateOrder;
+              }
+
+              return String(
+                right.deletedAt || ""
+              ).localeCompare(
+                String(
+                  left.deletedAt || ""
+                )
+              );
+            }
+          ),
+      [
         transactions,
         filter
+      ]
+    );
+
+  const categoryNameById =
+    useMemo(
+      () => {
+        const map =
+          new Map<
+            string,
+            string
+          >();
+
+        bootstrap?.categories
+          .forEach(
+            category => {
+              map.set(
+                category.categoryId,
+                category.name
+              );
+            }
+          );
+
+        transactions.forEach(
+          transaction => {
+            if (
+              transaction.categoryId &&
+              transaction.category
+            ) {
+              map.set(
+                transaction.categoryId,
+                transaction.category
+              );
+            }
+          }
+        );
+
+        return map;
+      },
+      [
+        bootstrap,
+        transactions
+      ]
+    );
+
+  const accountNameById =
+    useMemo(
+      () => {
+        const map =
+          new Map<
+            string,
+            string
+          >();
+
+        bootstrap?.accounts
+          .forEach(
+            account => {
+              map.set(
+                account.accountId,
+                getAccountLabel(
+                  account
+                )
+              );
+            }
+          );
+
+        transactions.forEach(
+          transaction => {
+            if (
+              transaction.fromAccountId &&
+              transaction.fromAccount
+            ) {
+              map.set(
+                transaction.fromAccountId,
+                transaction.fromAccount
+              );
+            }
+
+            if (
+              transaction.toAccountId &&
+              transaction.toAccount
+            ) {
+              map.set(
+                transaction.toAccountId,
+                transaction.toAccount
+              );
+            }
+
+            if (
+              transaction.paymentMethodId &&
+              transaction.paymentMethod
+            ) {
+              map.set(
+                transaction.paymentMethodId,
+                transaction.paymentMethod
+              );
+            }
+          }
+        );
+
+        return map;
+      },
+      [
+        bootstrap,
+        transactions
       ]
     );
 
@@ -1455,6 +1658,7 @@ export default function CalendarPage() {
       setActionError(
         validationError
       );
+
       return;
     }
 
@@ -1472,6 +1676,7 @@ export default function CalendarPage() {
       setActionFeedback(
         "변경된 내용이 없습니다."
       );
+
       return;
     }
 
@@ -1625,6 +1830,70 @@ export default function CalendarPage() {
       );
     } finally {
       setUndoBusy(false);
+    }
+  }
+
+  async function handleRestoreDeleted(
+    transaction:
+      CalendarTransaction
+  ) {
+    if (restoringId) {
+      return;
+    }
+
+    const confirmed =
+      window.confirm(
+        `${transaction.category || transaction.type} ${formatCurrency(
+          transaction.amount
+        )} 거래를 복원할까요?`
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    const targetId =
+      transaction
+        .transactionId;
+
+    setRestoringId(targetId);
+    setActionError("");
+    setActionFeedback("");
+
+    try {
+      await restoreTransaction(
+        targetId
+      );
+
+      if (
+        undoTransactionId ===
+        targetId
+      ) {
+        setUndoTransactionId(
+          null
+        );
+
+        setUndoLabel("");
+      }
+
+      setActionFeedback(
+        "삭제된 거래를 복원했습니다."
+      );
+
+      setReloadKey(
+        value =>
+          value + 1
+      );
+    } catch (
+      restoreError
+    ) {
+      setActionError(
+        getErrorMessage(
+          restoreError
+        )
+      );
+    } finally {
+      setRestoringId(null);
     }
   }
 
@@ -3165,6 +3434,285 @@ export default function CalendarPage() {
                   </ul>
                 )}
             </section>
+
+            <details
+              className={
+                styles.deletedSection
+              }
+            >
+              <summary
+                className={
+                  styles.deletedSummary
+                }
+              >
+                <span
+                  className={
+                    styles.deletedSummaryText
+                  }
+                >
+                  <strong>
+                    삭제 거래 보기
+                  </strong>
+
+                  <span>
+                    이 달의 삭제된 거래를
+                    확인하고 복원할 수 있습니다.
+                  </span>
+                </span>
+
+                <span
+                  className={
+                    styles.deletedCount
+                  }
+                >
+                  {
+                    deletedTransactions
+                      .length
+                  }
+                  건
+                </span>
+              </summary>
+
+              <div
+                className={
+                  styles.deletedBody
+                }
+              >
+                {deletedTransactions
+                  .length ===
+                  0 && (
+                    <p
+                      className={
+                        styles.deletedEmpty
+                      }
+                    >
+                      이 달에는 현재 유형 필터에
+                      해당하는 삭제 거래가 없습니다.
+                    </p>
+                  )}
+
+                {deletedTransactions
+                  .length >
+                  0 && (
+                    <ul
+                      className={
+                        styles.deletedList
+                      }
+                    >
+                      {deletedTransactions.map(
+                        transaction => {
+                          const isRestoring =
+                            restoringId ===
+                            transaction
+                              .transactionId;
+
+                          const deletedCategory =
+                            transaction.category ||
+                            (
+                              transaction.categoryId
+                                ? categoryNameById.get(
+                                    transaction.categoryId
+                                  )
+                                : ""
+                            ) ||
+                            transaction.type;
+
+                          const displayTransaction = {
+                            ...transaction,
+
+                            fromAccount:
+                              transaction.fromAccount ||
+                              (
+                                transaction.fromAccountId
+                                  ? accountNameById.get(
+                                      transaction.fromAccountId
+                                    ) ||
+                                    null
+                                  : null
+                              ),
+
+                            toAccount:
+                              transaction.toAccount ||
+                              (
+                                transaction.toAccountId
+                                  ? accountNameById.get(
+                                      transaction.toAccountId
+                                    ) ||
+                                    null
+                                  : null
+                              ),
+
+                            paymentMethod:
+                              transaction.paymentMethod ||
+                              (
+                                transaction.paymentMethodId
+                                  ? accountNameById.get(
+                                      transaction.paymentMethodId
+                                    ) ||
+                                    null
+                                  : null
+                              )
+                          };
+
+                          return (
+                            <li
+                              key={
+                                transaction
+                                  .transactionId
+                              }
+                              className={
+                                styles.deletedItem
+                              }
+                            >
+                              <div
+                                className={
+                                  styles.transactionTop
+                                }
+                              >
+                                <div
+                                  className={
+                                    styles.transactionMain
+                                  }
+                                >
+                                  <div
+                                    className={
+                                      styles.transactionTitleRow
+                                    }
+                                  >
+                                    <span
+                                      className={[
+                                        styles.transactionType,
+
+                                        transaction.type ===
+                                        "지출"
+                                          ? styles.transactionTypeExpense
+                                          : transaction.type ===
+                                            "수입"
+                                            ? styles.transactionTypeIncome
+                                            : styles.transactionTypeTransfer
+                                      ].join(" ")}
+                                    >
+                                      {
+                                        transaction.type
+                                      }
+                                    </span>
+
+                                    <strong
+                                      className={
+                                        styles.transactionTitle
+                                      }
+                                    >
+                                      {
+                                        deletedCategory
+                                      }
+                                    </strong>
+                                  </div>
+
+                                  <p
+                                    className={
+                                      styles.transactionMeta
+                                    }
+                                  >
+                                    {
+                                      formatDateLabel(
+                                        transaction.date
+                                      )
+                                    }
+                                    {" · "}
+                                    {
+                                      getTransactionMethod(
+                                        displayTransaction
+                                      )
+                                    }
+                                  </p>
+                                </div>
+
+                                <strong
+                                  className={[
+                                    styles.transactionAmount,
+
+                                    transaction.type ===
+                                    "지출"
+                                      ? styles.amountExpense
+                                      : transaction.type ===
+                                        "수입"
+                                        ? styles.amountIncome
+                                        : styles.amountTransfer
+                                  ].join(" ")}
+                                >
+                                  {
+                                    getAmountText(
+                                      transaction
+                                    )
+                                  }
+                                </strong>
+                              </div>
+
+                              {transaction.memo && (
+                                <p
+                                  className={
+                                    styles.transactionMemo
+                                  }
+                                >
+                                  {transaction.memo}
+                                </p>
+                              )}
+
+                              <div
+                                className={
+                                  styles.deletedFooter
+                                }
+                              >
+                                <span
+                                  className={
+                                    styles.deletedAudit
+                                  }
+                                >
+                                  삭제{" · "}
+                                  {
+                                    transaction.deletedBy
+                                      ? `${transaction.deletedBy} · `
+                                      : ""
+                                  }
+                                  {
+                                    formatDeletedAt(
+                                      transaction.deletedAt
+                                    )
+                                  }
+                                </span>
+
+                                <button
+                                  type="button"
+                                  className={
+                                    styles.restoreButton
+                                  }
+                                  disabled={
+                                    Boolean(
+                                      restoringId
+                                    )
+                                  }
+                                  onClick={
+                                    () =>
+                                      void handleRestoreDeleted(
+                                        transaction
+                                      )
+                                  }
+                                >
+                                  {
+                                    isRestoring
+                                      ? "복원 중..."
+                                      : "복원"
+                                  }
+                                </button>
+                              </div>
+                            </li>
+                          );
+                        }
+                      )}
+                    </ul>
+                  )}
+              </div>
+            </details>
           </>
         )}
 
