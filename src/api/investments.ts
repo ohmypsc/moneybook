@@ -73,10 +73,26 @@ export async function setInvestmentCashBaseline(
   payload:
     SetInvestmentCashBaselinePayload
 ) {
+  const {
+    cashBaselineKrw,
+    ...rest
+  } =
+    payload;
+
+
   return postInvestmentMutation(
     "/api/investments/cash-baseline",
     {
-      ...payload
+      ...rest,
+
+      /*
+       * 프런트에서는 의미가 분명한
+       * cashBaselineKrw를 사용하고,
+       * Apps Script 요청 시에는
+       * 백엔드가 요구하는 amount로 변환합니다.
+       */
+      amount:
+        cashBaselineKrw
     }
   );
 }
