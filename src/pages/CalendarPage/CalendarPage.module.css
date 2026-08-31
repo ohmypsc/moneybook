@@ -850,6 +850,137 @@
 }
 
 /* =========================================================
+   삭제 거래 목록 / 복원
+   ========================================================= */
+
+.deletedSection {
+  margin-top: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.deletedSummary {
+  min-height: 66px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 13px 15px;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  list-style: none;
+}
+
+.deletedSummary::-webkit-details-marker {
+  display: none;
+}
+
+.deletedSummary::after {
+  content: "⌄";
+  flex: 0 0 auto;
+  color: var(--color-text-secondary);
+  font-size: 16px;
+  line-height: 1;
+  transition: transform 0.15s ease;
+}
+
+.deletedSection[open]
+.deletedSummary::after {
+  transform: rotate(180deg);
+}
+
+.deletedSummaryText {
+  min-width: 0;
+  display: grid;
+  flex: 1;
+  gap: 3px;
+}
+
+.deletedSummaryText strong {
+  font-size: 14px;
+}
+
+.deletedSummaryText span {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.deletedCount {
+  flex: 0 0 auto;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.deletedBody {
+  padding: 0 14px 14px;
+}
+
+.deletedEmpty {
+  margin: 0;
+  padding: 17px 12px;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.55;
+  text-align: center;
+}
+
+.deletedList {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--color-border);
+  list-style: none;
+}
+
+.deletedItem {
+  padding: 13px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+}
+
+.deletedFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border);
+}
+
+.deletedAudit {
+  min-width: 0;
+  color: var(--color-text-secondary);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.restoreButton {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 0 13px;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.restoreButton:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* =========================================================
    삭제 직후 실행 취소
    ========================================================= */
 
@@ -915,6 +1046,18 @@
 
   .editMemoField {
     grid-column: auto;
+  }
+
+  .deletedSummary {
+    padding: 12px;
+  }
+
+  .deletedBody {
+    padding: 0 10px 10px;
+  }
+
+  .deletedFooter {
+    align-items: flex-end;
   }
 
   .undoBar {
