@@ -36,6 +36,11 @@ import {
   prefetchInvestmentTrades
 } from "./api/investments";
 
+import {
+  clearManagedSettingsCache,
+  prefetchManagedSettings
+} from "./api/settingsManagement";
+
 import type {
   User
 } from "./types/api";
@@ -91,6 +96,9 @@ const PRIMARY_WARM_TIMEOUT_MS =
 
 const SECONDARY_WARM_DELAY_MS =
   250;
+
+const MANAGED_SETTINGS_WARM_DELAY_MS =
+  1100;
 
 
 function wait(
@@ -258,11 +266,13 @@ async function warmPrimaryData() {
 
 /*
  * 홈이 실제로 뜬 뒤에는
- * dashboard에 포함되지 않는 투자 매매내역을
- * 전체 1회만 조용히 받아둡니다.
+ * 첫 화면에 필요하지 않은 데이터를 순서대로 준비합니다.
  *
- * 이후 특정 투자계좌를 펼치면
- * 프런트에서 accountId 기준으로 필터링합니다.
+ * 1. 투자 매매내역
+ * 2. 카테고리·계좌 관리용 전체 목록
+ *
+ * 설정 데이터는 홈 렌더링과 경쟁하지 않도록
+ * 조금 더 늦게 프리페치합니다.
  */
 function scheduleSecondaryWarm() {
   window.setTimeout(
@@ -278,6 +288,22 @@ function scheduleSecondaryWarm() {
         );
     },
     SECONDARY_WARM_DELAY_MS
+  );
+
+
+  window.setTimeout(
+    () => {
+      void prefetchManagedSettings()
+        .catch(
+          () => {
+            /*
+             * 실패해도 설정 화면에서
+             * 필요할 때 다시 요청합니다.
+             */
+          }
+        );
+    },
+    MANAGED_SETTINGS_WARM_DELAY_MS
   );
 }
 
@@ -565,6 +591,32 @@ export default function App() {
   }
 
 
+  function handleNavigate(
+    nextNavigation:
+      NavigationKey
+  ) {
+    setActiveNavigation(
+      nextNavigation
+    );
+
+
+    if (
+      nextNavigation ===
+      "settings"
+    ) {
+      void prefetchManagedSettings()
+        .catch(
+          () => {
+            /*
+             * 설정 화면에서 필요할 때
+             * 다시 요청할 수 있습니다.
+             */
+          }
+        );
+    }
+  }
+
+
   async function handleLogout() {
     try {
       await logout();
@@ -572,6 +624,7 @@ export default function App() {
     } finally {
       invalidateDashboardCache();
       clearInvestmentPrefetchCache();
+      clearManagedSettingsCache();
 
 
       setUser(
@@ -701,7 +754,7 @@ export default function App() {
         activeNavigation
       }
       onNavigate={
-        setActiveNavigation
+        handleNavigate
       }
     >
       {pageContent}
