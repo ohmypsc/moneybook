@@ -19,140 +19,309 @@ import {
 } from "../utils/ledgerEvents";
 
 
-interface PrefetchedDashboard {
-  data: DashboardData;
-  storedAt: number;
-}
+type DashboardCacheEntry = {
+  data:
+    DashboardData;
+
+  fetchedAt:
+    number;
+};
 
 
-const PREFETCH_TTL_MS =
-  60 * 1000;
+type GetDashboardOptions = {
+  forceRefresh?:
+    boolean;
+};
 
 
-let prefetchedCurrentDashboard:
-  PrefetchedDashboard |
-  null =
-    null;
+const CURRENT_KEY =
+  "__current__";
+
+const CURRENT_TTL_MS =
+  30 * 1000;
+
+const ARCHIVE_TTL_MS =
+  5 * 60 * 1000;
 
 
-/*
- * App 시작 단계에서 이미 받아온
- * 현재 월 대시보드를 자산 화면용으로
- * 잠시 보관합니다.
- *
- * 홈 화면은 자체 캐시를 사용하므로
- * 이 캐시는 자산 화면의 첫 진입을
- * 빠르게 만드는 용도입니다.
- */
-export function primeDashboardPrefetch(
-  data: DashboardData
-) {
-  prefetchedCurrentDashboard = {
-    data,
-    storedAt:
-      Date.now()
-  };
-}
+const dashboardCache =
+  new Map<
+    string,
+    DashboardCacheEntry
+  >();
 
 
-export function clearDashboardPrefetch() {
-  prefetchedCurrentDashboard =
-    null;
-}
+const dashboardRequests =
+  new Map<
+    string,
+    Promise<DashboardData>
+  >();
 
 
-function consumeDashboardPrefetch() {
-  const cached =
-    prefetchedCurrentDashboard;
+let dashboardGeneration =
+  0;
 
 
-  if (!cached) {
-    return null;
-  }
-
-
-  if (
-    Date.now() -
-      cached.storedAt >
-    PREFETCH_TTL_MS
-  ) {
-    prefetchedCurrentDashboard =
-      null;
-
-    return null;
-  }
-
-
-  /*
-   * 한 번 사용한 뒤 제거합니다.
-   *
-   * 따라서 이후 예수금 수정,
-   * 매수/매도 등의 새로고침에서는
-   * 오래된 시작 캐시를 다시 쓰지 않습니다.
-   */
-  prefetchedCurrentDashboard =
-    null;
-
-
-  return cached.data;
-}
-
-
-export async function getDashboard(
+function getCacheKey(
   month?: string
 ) {
-  /*
-   * 월을 따로 지정하지 않은
-   * 현재 대시보드 조회에서만
-   * 시작 프리페치를 사용합니다.
-   */
-  if (!month) {
-    const prefetched =
-      consumeDashboardPrefetch();
+  return month ||
+    CURRENT_KEY;
+}
 
 
-    if (prefetched) {
-      return prefetched;
-    }
-  }
+function getTtl(
+  month?: string
+) {
+  return month
+    ? ARCHIVE_TTL_MS
+    : CURRENT_TTL_MS;
+}
 
 
-  const query =
-    month
-      ? `?month=${encodeURIComponent(
-          month
-        )}`
-      : "";
+function isFresh(
+  entry:
+    DashboardCacheEntry,
 
-
-  const raw =
-    await apiRequest<
-      | ApiEnvelope<DashboardData>
-      | DashboardData
-    >(
-      `/api/dashboard${query}`
-    );
-
-
-  return unwrapEnvelope<
-    DashboardData
-  >(
-    raw
+  month?:
+    string
+) {
+  return (
+    Date.now() -
+      entry.fetchedAt <=
+    getTtl(
+      month
+    )
   );
 }
 
 
-/*
- * 이 기기에서 거래나 투자 정보가
- * 변경되면 시작 캐시는 즉시 폐기합니다.
- */
+export function getDashboardSnapshot(
+  month?: string
+) {
+  return dashboardCache.get(
+    getCacheKey(
+      month
+    )
+  )?.data ??
+    null;
+}
+
+
+export function invalidateDashboardCache(
+  month?: string
+) {
+  dashboardGeneration +=
+    1;
+
+  if (
+    month
+  ) {
+    dashboardCache.delete(
+      getCacheKey(
+        month
+      )
+    );
+
+    dashboardRequests.delete(
+      getCacheKey(
+        month
+      )
+    );
+
+    return;
+  }
+
+  dashboardCache.clear();
+  dashboardRequests.clear();
+}
+
+
+export async function getDashboard(
+  month?: string,
+
+  options:
+    GetDashboardOptions = {}
+) {
+  const forceRefresh =
+    options.forceRefresh ===
+    true;
+
+  const key =
+    getCacheKey(
+      month
+    );
+
+
+  if (
+    forceRefresh
+  ) {
+    invalidateDashboardCache(
+      month
+    );
+  }
+
+
+  const cached =
+    dashboardCache.get(
+      key
+    );
+
+
+  if (
+    !forceRefresh &&
+    cached &&
+    isFresh(
+      cached,
+      month
+    )
+  ) {
+    return cached.data;
+  }
+
+
+  if (
+    !forceRefresh
+  ) {
+    const existingRequest =
+      dashboardRequests.get(
+        key
+      );
+
+    if (
+      existingRequest
+    ) {
+      return existingRequest;
+    }
+  }
+
+
+  const requestGeneration =
+    dashboardGeneration;
+
+
+  const searchParams =
+    new URLSearchParams();
+
+
+  if (
+    month
+  ) {
+    searchParams.set(
+      "month",
+      month
+    );
+  }
+
+
+  if (
+    forceRefresh
+  ) {
+    searchParams.set(
+      "refresh",
+      "1"
+    );
+  }
+
+
+  const query =
+    searchParams.toString();
+
+
+  let request:
+    Promise<DashboardData>;
+
+
+  request =
+    apiRequest<
+      | ApiEnvelope<DashboardData>
+      | DashboardData
+    >(
+      query
+        ? `/api/dashboard?${query}`
+        : "/api/dashboard"
+    )
+      .then(
+        raw => {
+          const data =
+            unwrapEnvelope<
+              DashboardData
+            >(
+              raw
+            );
+
+
+          if (
+            requestGeneration ===
+            dashboardGeneration
+          ) {
+            dashboardCache.set(
+              key,
+              {
+                data,
+                fetchedAt:
+                  Date.now()
+              }
+            );
+          }
+
+
+          return data;
+        }
+      )
+      .finally(
+        () => {
+          if (
+            dashboardRequests.get(
+              key
+            ) ===
+            request
+          ) {
+            dashboardRequests.delete(
+              key
+            );
+          }
+        }
+      );
+
+
+  if (
+    !forceRefresh
+  ) {
+    dashboardRequests.set(
+      key,
+      request
+    );
+  }
+
+
+  return request;
+}
+
+
+export async function prefetchDashboard(
+  month?: string
+) {
+  try {
+    await getDashboard(
+      month
+    );
+  } catch {
+    /*
+     * 프리페치 실패는 실제 화면 진입을
+     * 막지 않습니다.
+     */
+  }
+}
+
+
 if (
   typeof window !==
   "undefined"
 ) {
   subscribeLedgerChanges(
     () => {
-      clearDashboardPrefetch();
+      invalidateDashboardCache();
     }
   );
 }
