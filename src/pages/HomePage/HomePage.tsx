@@ -574,21 +574,26 @@ export default function HomePage(
             );
 
 
-        return {
-          total:
-            cards.reduce(
-              (
-                sum,
-                card
-              ) =>
-                sum +
+        const total =
+          cards.reduce(
+            (
+              sum,
+              card
+            ) =>
+              sum +
+              Math.max(
+                0,
                 Number(
-                  card.estimatedRemaining ||
-                  0
-                ),
-              0
-            ),
+                  card.estimatedRemaining
+                ) ||
+                0
+              ),
+            0
+          );
 
+
+        return {
+          total,
           cards
         };
       },
@@ -598,98 +603,79 @@ export default function HomePage(
     );
 
 
-  const categoryExpense =
+  const spendingTargets =
     useMemo(
-      () =>
-        (
-          Array.isArray(
-            dashboard
-              ?.categoryExpense
+      () => {
+        if (
+          !dashboard
+        ) {
+          return [];
+        }
+
+
+        const rows =
+          (
+            Array.isArray(
+              dashboard
+                .spendingTargetExpense
+            )
+              ? dashboard
+                  .spendingTargetExpense
+              : []
           )
-            ? dashboard
-                ?.categoryExpense
-            : []
-        ) as
-          SpendingSummary[],
+            .filter(
+              item =>
+                Number(
+                  item.amount
+                ) > 0
+            );
+
+
+        const total =
+          rows.reduce(
+            (
+              sum,
+              item
+            ) =>
+              sum +
+              (
+                Number(
+                  item.amount
+                ) ||
+                0
+              ),
+            0
+          );
+
+
+        return rows.map(
+          item => ({
+            ...item,
+
+            ratio:
+              total > 0
+                ? Math.min(
+                    100,
+                    (
+                      Number(
+                        item.amount
+                      ) /
+                      total
+                    ) *
+                    100
+                  )
+                : 0
+          })
+        );
+      },
       [
         dashboard
       ]
-    );
-
-
-  const spendingTargetExpense =
-    useMemo(
-      () =>
-        (
-          Array.isArray(
-            dashboard
-              ?.spendingTargetExpense
-          )
-            ? dashboard
-                ?.spendingTargetExpense
-            : []
-        ) as
-          SpendingSummary[],
-      [
-        dashboard
-      ]
-    );
-
-
-  const hasDashboard =
-    !!dashboard;
-
-
-  const summary =
-    dashboard?.summary;
-
-
-  const monthIncome =
-    Number(
-      summary?.monthIncome ||
-      0
-    );
-
-
-  const monthExpense =
-    Number(
-      summary?.monthExpense ||
-      0
-    );
-
-
-  const monthNetCashFlow =
-    Number(
-      summary
-        ?.monthNetCashFlow ||
-      0
-    );
-
-
-  const assets =
-    Number(
-      summary?.assets ||
-      0
-    );
-
-
-  const liabilities =
-    Number(
-      summary?.liabilities ||
-      0
-    );
-
-
-  const netWorth =
-    Number(
-      summary?.netWorth ||
-      0
     );
 
 
   if (
-    loading &&
-    !hasDashboard
+    loading
   ) {
     return (
       <main
@@ -697,18 +683,51 @@ export default function HomePage(
           styles.page
         }
       >
+        <header
+          className={
+            styles.header
+          }
+        >
+          <p
+            className={
+              styles.monthLabel
+            }
+          >
+            가계부
+          </p>
+
+          <h1>
+            불러오는 중
+          </h1>
+        </header>
+
+
         <section
           className={
             styles.loadingCard
           }
         >
-          <strong>
-            가계부를 불러오는 중입니다.
-          </strong>
+          <div
+            className={
+              styles.loadingLineShort
+            }
+          />
 
-          <span>
-            잠시만 기다려주세요.
-          </span>
+          <div
+            className={
+              styles.loadingLineLong
+            }
+          />
+
+          <div
+            className={
+              styles.loadingGrid
+            }
+          >
+            <div />
+
+            <div />
+          </div>
         </section>
       </main>
     );
@@ -716,8 +735,8 @@ export default function HomePage(
 
 
   if (
-    errorMessage &&
-    !hasDashboard
+    errorMessage ||
+    !dashboard
   ) {
     return (
       <main
@@ -725,18 +744,35 @@ export default function HomePage(
           styles.page
         }
       >
+        <header
+          className={
+            styles.header
+          }
+        >
+          <p
+            className={
+              styles.monthLabel
+            }
+          >
+            가계부
+          </p>
+
+          <h1>
+            데이터를 불러오지 못했어요
+          </h1>
+        </header>
+
+
         <section
           className={
             styles.errorCard
           }
         >
-          <strong>
-            가계부를 불러오지 못했습니다.
-          </strong>
-
-          <span>
-            {errorMessage}
-          </span>
+          <p>
+            {
+              errorMessage
+            }
+          </p>
 
           <button
             type="button"
@@ -744,17 +780,24 @@ export default function HomePage(
               styles.retryButton
             }
             onClick={
-              () => {
-                void loadDashboard();
-              }
+              () =>
+                void loadDashboard()
             }
           >
-            다시 시도
+            다시 불러오기
           </button>
         </section>
       </main>
     );
   }
+
+
+  const {
+    monthIncome,
+    monthExpense,
+    monthNetCashFlow
+  } =
+    dashboard.summary;
 
 
   return (
@@ -767,83 +810,120 @@ export default function HomePage(
         className={
           styles.header
         }
+        style={{
+          position:
+            "relative"
+        }}
       >
-        <div>
-          <p
-            className={
-              styles.eyebrow
-            }
-          >
-            우리 가계부
-          </p>
+        <p
+          className={
+            styles.monthLabel
+          }
+        >
+          이번 달
+        </p>
 
-          <h1
-            className={
-              styles.title
-            }
-          >
-            {formatMonth(
-              dashboard?.month ||
-              ""
-            )}
-          </h1>
-        </div>
+        <h1>
+          {
+            formatMonth(
+              dashboard.month
+            )
+          }
+        </h1>
 
         <button
           type="button"
-          className={
-            styles.refreshButton
-          }
+          aria-label="홈 새로고침"
+          title="새로고침"
           disabled={
             refreshing
           }
           onClick={
-            () => {
-              void handleManualRefresh();
-            }
+            () =>
+              void handleManualRefresh()
           }
+          style={{
+            position:
+              "absolute",
+
+            top: 0,
+            right: 0,
+
+            width:
+              "36px",
+
+            height:
+              "36px",
+
+            display:
+              "grid",
+
+            placeItems:
+              "center",
+
+            padding: 0,
+
+            border:
+              "1px solid var(--color-border)",
+
+            borderRadius:
+              "var(--radius-md)",
+
+            background:
+              "var(--color-surface)",
+
+            color:
+              "var(--color-text-secondary)",
+
+            font:
+              "inherit",
+
+            fontSize:
+              "18px",
+
+            fontWeight:
+              700,
+
+            cursor:
+              refreshing
+                ? "default"
+                : "pointer",
+
+            opacity:
+              refreshing
+                ? 0.55
+                : 1
+          }}
         >
-          {
-            refreshing
-              ? "새로고침 중"
-              : "새로고침"
-          }
+          <span
+            aria-hidden="true"
+            style={{
+              display:
+                "block",
+
+              transform:
+                refreshing
+                  ? "rotate(180deg)"
+                  : "rotate(0deg)",
+
+              transition:
+                "transform 180ms ease"
+            }}
+          >
+            ↻
+          </span>
         </button>
       </header>
 
 
       <section
         className={
-          styles.monthSummary
+          styles.summaryCard
         }
       >
         <div
           className={
-            styles.monthSummaryItem
-          }
-        >
-          <span
-            className={
-              styles.summaryLabel
-            }
-          >
-            수입
-          </span>
-
-          <strong
-            className={
-              styles.incomeValue
-            }
-          >
-            {formatWon(
-              monthIncome
-            )}
-          </strong>
-        </div>
-
-        <div
-          className={
-            styles.monthSummaryItem
+            styles.primarySummary
           }
         >
           <span
@@ -856,104 +936,64 @@ export default function HomePage(
 
           <strong
             className={
-              styles.expenseValue
+              styles.expenseAmount
             }
           >
-            {formatWon(
-              monthExpense
-            )}
+            {
+              formatWon(
+                monthExpense
+              )
+            }
           </strong>
         </div>
 
-        <div
-          className={
-            styles.monthSummaryItem
-          }
-        >
-          <span
-            className={
-              styles.summaryLabel
-            }
-          >
-            차액
-          </span>
-
-          <strong
-            className={
-              monthNetCashFlow <
-              0
-                ? styles.negativeValue
-                : styles.netValue
-            }
-          >
-            {formatSignedWon(
-              monthNetCashFlow
-            )}
-          </strong>
-        </div>
-      </section>
-
-
-      <section
-        className={
-          styles.netWorthCard
-        }
-      >
-        <div
-          className={
-            styles.netWorthMain
-          }
-        >
-          <span
-            className={
-              styles.summaryLabel
-            }
-          >
-            순자산
-          </span>
-
-          <strong
-            className={
-              netWorth <
-              0
-                ? styles
-                    .negativeNetWorth
-                : styles
-                    .netWorthValue
-            }
-          >
-            {formatSignedWon(
-              netWorth
-            )}
-          </strong>
-        </div>
 
         <div
           className={
-            styles.netWorthSub
+            styles.summaryDivider
+          }
+        />
+
+
+        <div
+          className={
+            styles.summaryGrid
           }
         >
-          <div>
+          <div
+            className={
+              styles.summaryItem
+            }
+          >
             <span>
-              자산
+              수입
             </span>
 
             <strong>
-              {formatWon(
-                assets
-              )}
+              {
+                formatWon(
+                  monthIncome
+                )
+              }
             </strong>
           </div>
 
-          <div>
+
+          <div
+            className={
+              styles.summaryItem
+            }
+          >
             <span>
-              부채
+              차액
             </span>
 
             <strong>
-              {formatWon(
-                liabilities
-              )}
+              {
+                formatSignedWon(
+                  monthNetCashFlow
+                )
+              }
             </strong>
           </div>
         </div>
@@ -962,68 +1002,46 @@ export default function HomePage(
 
       <section
         className={
-          styles.card
+          styles.section
         }
       >
         <div
           className={
-            styles.sectionHeading
+            styles.sectionHeader
           }
         >
-          <div>
-            <p
-              className={
-                styles.sectionEyebrow
-              }
-            >
-              카드
-            </p>
-
-            <h2
-              className={
-                styles.sectionTitle
-              }
-            >
-              이번 달 청구 예정
-            </h2>
-          </div>
+          <h2>
+            카드 결제 예정
+          </h2>
 
           <strong
             className={
               styles.sectionTotal
             }
           >
-            {formatWon(
-              cardSummary.total
-            )}
+            {
+              formatWon(
+                cardSummary.total
+              )
+            }
           </strong>
         </div>
 
 
-        {
-          cardSummary.cards
-            .length ===
-          0
-            ? (
-              <p
-                className={
-                  styles.empty
-                }
-              >
-                이번 달 청구 예정 금액이 없습니다.
-              </p>
-            )
-            : (
-              <ul
-                className={
-                  styles.cardList
-                }
-              >
-                {
+        <div
+          className={
+            styles.cardList
+          }
+        >
+          {
+            cardSummary.cards
+              .length >
+            0
+              ? (
                   cardSummary.cards
                     .map(
                       card => (
-                        <li
+                        <div
                           key={
                             card.accountId
                           }
@@ -1033,20 +1051,33 @@ export default function HomePage(
                         >
                           <div
                             className={
-                              styles.cardInfo
+                              styles.cardName
                             }
                           >
-                            <strong>
-                              {card.name}
-                            </strong>
-
-                            <span>
-                              {
-                                card.paymentDay
-                                  ? `${card.paymentDay}일 결제`
-                                  : "결제일 미설정"
+                            <span
+                              className={
+                                styles.cardIcon
                               }
+                              aria-hidden="true"
+                            >
+                              ₩
                             </span>
+
+                            <div>
+                              <strong>
+                                {
+                                  card.name
+                                }
+                              </strong>
+
+                              <span>
+                                {
+                                  card.paymentDay
+                                    ? `${card.paymentDay}일 결제`
+                                    : "결제일 미설정"
+                                }
+                              </span>
+                            </div>
                           </div>
 
                           <strong
@@ -1054,184 +1085,135 @@ export default function HomePage(
                               styles.cardAmount
                             }
                           >
-                            {formatWon(
-                              Number(
-                                card.estimatedRemaining ||
-                                0
+                            {
+                              formatWon(
+                                card
+                                  .estimatedRemaining
                               )
-                            )}
+                            }
                           </strong>
-                        </li>
+                        </div>
                       )
                     )
-                }
-              </ul>
-            )
-        }
+                )
+              : (
+                  <p
+                    className={
+                      styles.emptyText
+                    }
+                  >
+                    이번 달 결제 예정액이 없습니다.
+                  </p>
+                )
+          }
+        </div>
       </section>
 
 
       <section
         className={
-          styles.card
+          styles.section
         }
       >
         <div
           className={
-            styles.sectionHeading
+            styles.sectionHeader
           }
         >
-          <div>
-            <p
-              className={
-                styles.sectionEyebrow
-              }
-            >
-              지출
-            </p>
-
-            <h2
-              className={
-                styles.sectionTitle
-              }
-            >
-              카테고리별 지출
-            </h2>
-          </div>
+          <h2>
+            지출대상
+          </h2>
         </div>
 
 
-        {
-          categoryExpense.length ===
-          0
-            ? (
-              <p
-                className={
-                  styles.empty
-                }
-              >
-                이번 달 지출 내역이 없습니다.
-              </p>
-            )
-            : (
-              <ul
-                className={
-                  styles.summaryList
-                }
-              >
-                {
-                  categoryExpense.map(
-                    item => (
-                      <li
-                        key={
-                          item.name
-                        }
-                        className={
-                          styles.summaryRow
-                        }
-                      >
-                        <span>
-                          {item.name}
-                        </span>
-
-                        <strong>
-                          {formatWon(
-                            Number(
-                              item.amount ||
-                              0
-                            )
-                          )}
-                        </strong>
-                      </li>
-                    )
-                  )
-                }
-              </ul>
-            )
-        }
-      </section>
-
-
-      <section
-        className={
-          styles.card
-        }
-      >
         <div
           className={
-            styles.sectionHeading
+            styles.targetCard
           }
         >
-          <div>
-            <p
-              className={
-                styles.sectionEyebrow
-              }
-            >
-              지출대상
-            </p>
-
-            <h2
-              className={
-                styles.sectionTitle
-              }
-            >
-              누구를 위한 지출인가요?
-            </h2>
-          </div>
-        </div>
-
-
-        {
-          spendingTargetExpense
-            .length ===
-          0
-            ? (
-              <p
-                className={
-                  styles.empty
-                }
-              >
-                이번 달 지출 내역이 없습니다.
-              </p>
-            )
-            : (
-              <ul
-                className={
-                  styles.summaryList
-                }
-              >
-                {
-                  spendingTargetExpense
+          {
+            spendingTargets
+              .length >
+            0
+              ? (
+                  spendingTargets
                     .map(
-                      item => (
-                        <li
+                      target => (
+                        <div
                           key={
-                            item.name
+                            target.name
                           }
                           className={
-                            styles.summaryRow
+                            styles.targetRow
                           }
                         >
-                          <span>
-                            {item.name}
-                          </span>
+                          <div
+                            className={
+                              styles.targetTop
+                            }
+                          >
+                            <strong>
+                              {
+                                target.name
+                              }
+                            </strong>
 
-                          <strong>
-                            {formatWon(
-                              Number(
-                                item.amount ||
-                                0
-                              )
-                            )}
-                          </strong>
-                        </li>
+                            <div
+                              className={
+                                styles.targetNumbers
+                              }
+                            >
+                              <span>
+                                {
+                                  Math.round(
+                                    target.ratio
+                                  )
+                                }
+                                %
+                              </span>
+
+                              <strong>
+                                {
+                                  formatWon(
+                                    target.amount
+                                  )
+                                }
+                              </strong>
+                            </div>
+                          </div>
+
+
+                          <div
+                            className={
+                              styles.progressTrack
+                            }
+                            aria-hidden="true"
+                          >
+                            <div
+                              className={
+                                styles.progressBar
+                              }
+                              style={{
+                                width:
+                                  `${target.ratio}%`
+                              }}
+                            />
+                          </div>
+                        </div>
                       )
                     )
-                }
-              </ul>
-            )
-        }
+                )
+              : (
+                  <p
+                    className={
+                      styles.emptyText
+                    }
+                  >
+                    이번 달 지출 기록이 없습니다.
+                  </p>
+                )
+          }
+        </div>
       </section>
     </main>
   );
