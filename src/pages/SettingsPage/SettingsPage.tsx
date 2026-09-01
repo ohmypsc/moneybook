@@ -199,6 +199,17 @@ const FIXED_OWNERS = [
 ];
 
 
+const ACCOUNT_OWNER_TABS = [
+  "미영",
+  "승철",
+  "공동"
+] as const;
+
+
+type AccountOwnerTab =
+  typeof ACCOUNT_OWNER_TABS[number];
+
+
 const ACCOUNT_TYPE_SUGGESTIONS = [
   "자산",
   "부채",
@@ -307,13 +318,15 @@ function csvCell(
 }
 
 
-function createEmptyAccountForm():
-  AccountFormState {
+function createEmptyAccountForm(
+  owner: string =
+    "공동"
+): AccountFormState {
   return {
     accountName: "",
     accountType: "자산",
     subType: "입출금",
-    owner: "공동",
+    owner,
     openingBalance: "0",
     billingCutoffDay: "",
     paymentDay: "",
@@ -321,7 +334,7 @@ function createEmptyAccountForm():
     endYear: "",
     balanceMethod: "자동계산",
     paymentAccountId: "",
-    assetAttribution: "공동"
+    assetAttribution: owner
   };
 }
 
@@ -2708,6 +2721,14 @@ function AccountSettings() {
   ] =
     useState("");
 
+  const [
+    ownerTab,
+    setOwnerTab
+  ] =
+    useState<AccountOwnerTab>(
+      "미영"
+    );
+
 
   async function refresh() {
     const result =
@@ -2785,7 +2806,7 @@ function AccountSettings() {
   );
 
 
-  const activeAccounts =
+  const allActiveAccounts =
     useMemo(
       () =>
         accounts.filter(
@@ -2798,15 +2819,33 @@ function AccountSettings() {
     );
 
 
+  const activeAccounts =
+    useMemo(
+      () =>
+        allActiveAccounts.filter(
+          account =>
+            account.owner ===
+            ownerTab
+        ),
+      [
+        allActiveAccounts,
+        ownerTab
+      ]
+    );
+
+
   const deletedAccounts =
     useMemo(
       () =>
         accounts.filter(
           account =>
-            account.isDeleted
+            account.isDeleted &&
+            account.owner ===
+              ownerTab
         ),
       [
-        accounts
+        accounts,
+        ownerTab
       ]
     );
 
@@ -2837,7 +2876,7 @@ function AccountSettings() {
   const paymentAccountOptions =
     useMemo(
       () =>
-        activeAccounts.filter(
+        allActiveAccounts.filter(
           account => {
             if (
               account.accountId ===
@@ -2860,7 +2899,7 @@ function AccountSettings() {
           }
         ),
       [
-        activeAccounts,
+        allActiveAccounts,
         editingId
       ]
     );
@@ -2896,7 +2935,9 @@ function AccountSettings() {
     );
 
     setForm(
-      createEmptyAccountForm()
+      createEmptyAccountForm(
+        ownerTab
+      )
     );
 
     setShowForm(
@@ -2947,7 +2988,9 @@ function AccountSettings() {
     );
 
     setForm(
-      createEmptyAccountForm()
+      createEmptyAccountForm(
+        ownerTab
+      )
     );
 
     setShowForm(
@@ -3097,6 +3140,86 @@ function AccountSettings() {
         styles.settingsBody
       }
     >
+      <section
+        className={
+          styles.cardSection
+        }
+      >
+        <div
+          className={
+            styles.segmentedControl
+          }
+        >
+          {
+            ACCOUNT_OWNER_TABS.map(
+              owner => (
+                <button
+                  type="button"
+                  key={
+                    owner
+                  }
+                  className={
+                    ownerTab ===
+                    owner
+                      ? styles.segmentButtonActive
+                      : styles.segmentButton
+                  }
+                  disabled={
+                    Boolean(
+                      busyKey
+                    )
+                  }
+                  onClick={
+                    () => {
+                      setOwnerTab(
+                        owner
+                      );
+
+                      setEditingId(
+                        null
+                      );
+
+                      setShowForm(
+                        false
+                      );
+
+                      setForm(
+                        createEmptyAccountForm(
+                          owner
+                        )
+                      );
+
+                      setError(
+                        ""
+                      );
+
+                      setFeedback(
+                        ""
+                      );
+                    }
+                  }
+                >
+                  {
+                    owner
+                  }
+                  {
+                    " "
+                  }
+                  {
+                    accounts.filter(
+                      account =>
+                        !account.isDeleted &&
+                        account.owner ===
+                          owner
+                    ).length
+                  }
+                </button>
+              )
+            )
+          }
+        </div>
+      </section>
+
       <div
         className={
           styles.topActionRow
@@ -3116,7 +3239,7 @@ function AccountSettings() {
             beginCreate
           }
         >
-          계좌 추가
+          {ownerTab} 계좌 추가
         </button>
       </div>
 
@@ -3803,7 +3926,7 @@ function AccountSettings() {
           }
         >
           <h2>
-            사용 중인 계좌·카드
+            {ownerTab} 계좌·카드
           </h2>
 
           <p>
@@ -3831,7 +3954,7 @@ function AccountSettings() {
                     styles.emptyState
                   }
                 >
-                  등록된 계좌가 없습니다.
+                  {ownerTab} 명의로 등록된 계좌가 없습니다.
                 </p>
               )
               : (
@@ -3977,7 +4100,7 @@ function AccountSettings() {
                     styles.emptyState
                   }
                 >
-                  삭제된 계좌가 없습니다.
+                  {ownerTab} 명의의 삭제된 계좌가 없습니다.
                 </p>
               )
               : (
