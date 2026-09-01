@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "node scripts/generate-pwa-icons.mjs",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "deploy": "wrangler deploy"
+    "deploy": "npm run build && wrangler deploy --config dist/moneybook/wrangler.json"
   },
   "dependencies": {
     "react": "19.2.8",
