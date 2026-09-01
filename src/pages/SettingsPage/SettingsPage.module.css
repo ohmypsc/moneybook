@@ -866,7 +866,7 @@
   border-radius:
     var(--radius-md);
 
-  background:
+  background-color:
     var(--color-surface);
 
   color:
@@ -875,6 +875,57 @@
   font: inherit;
 
   font-size: 13px;
+}
+
+
+.field select {
+  -webkit-appearance:
+    none;
+
+  appearance:
+    none;
+
+  padding-right:
+    38px;
+
+  background-image:
+    linear-gradient(
+      45deg,
+      transparent 50%,
+      var(--color-text-secondary) 50%
+    ),
+    linear-gradient(
+      135deg,
+      var(--color-text-secondary) 50%,
+      transparent 50%
+    );
+
+  background-position:
+    calc(100% - 17px)
+    50%,
+    calc(100% - 12px)
+    50%;
+
+  background-size:
+    5px
+    5px,
+    5px
+    5px;
+
+  background-repeat:
+    no-repeat;
+
+  cursor:
+    pointer;
+}
+
+
+.field select option {
+  background:
+    var(--color-surface);
+
+  color:
+    var(--color-text-primary);
 }
 
 
@@ -887,6 +938,17 @@
 
   outline-offset:
     1px;
+}
+
+
+.field input:disabled,
+.field select:disabled,
+.inlineEdit input:disabled {
+  opacity:
+    0.6;
+
+  cursor:
+    default;
 }
 
 
