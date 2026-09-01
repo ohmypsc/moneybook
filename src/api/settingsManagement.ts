@@ -69,8 +69,7 @@ function createMemoryQueryCache<T>() {
     0;
 
   function clear() {
-    generation +=
-      1;
+    generation += 1;
 
     cache =
       null;
@@ -79,7 +78,21 @@ function createMemoryQueryCache<T>() {
       null;
   }
 
-  function snapshot() {
+  /*
+   * 화면 재진입 시에는 만료된 값이라도
+   * 마지막 정상 데이터를 즉시 표시합니다.
+   *
+   * 실제 최신 여부는 get()에서 판단하고
+   * 필요하면 백그라운드 요청으로 교체됩니다.
+   */
+  function peek() {
+    return (
+      cache?.data ||
+      null
+    );
+  }
+
+  function freshSnapshot() {
     if (
       !cache ||
       Date.now() -
@@ -98,19 +111,15 @@ function createMemoryQueryCache<T>() {
         Promise<T>
   ) {
     const cached =
-      snapshot();
+      freshSnapshot();
 
-    if (
-      cached
-    ) {
+    if (cached) {
       return Promise.resolve(
         cached
       );
     }
 
-    if (
-      request
-    ) {
+    if (request) {
       return request;
     }
 
@@ -161,7 +170,7 @@ function createMemoryQueryCache<T>() {
   return {
     clear,
     get,
-    snapshot
+    peek
   };
 }
 
@@ -239,12 +248,12 @@ export function clearManagedSettingsCache() {
 
 export function getManagedCategoriesSnapshot() {
   return categoryCache
-    .snapshot();
+    .peek();
 }
 
 export function getManagedAccountsSnapshot() {
   return accountCache
-    .snapshot();
+    .peek();
 }
 
 export function getManagedCategories(
