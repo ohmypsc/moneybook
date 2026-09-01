@@ -27,20 +27,18 @@ import {
 } from "./api/calendarCache";
 
 import {
-  primeDashboardPrefetch
+  getDashboard,
+  invalidateDashboardCache
 } from "./api/dashboard";
 
 import {
-  prefetchInvestmentTradesForAccounts
+  clearInvestmentPrefetchCache,
+  prefetchInvestmentTrades
 } from "./api/investments";
 
 import type {
   User
 } from "./types/api";
-
-import type {
-  DashboardData
-} from "./types/dashboard";
 
 import LoginPage
   from "./pages/LoginPage/LoginPage";
@@ -85,25 +83,6 @@ type SplashWindow =
   };
 
 
-interface DashboardResponse {
-  success: boolean;
-
-  apiVersion?:
-    string;
-
-  data?:
-    DashboardData;
-
-  error?: {
-    code?:
-      string;
-
-    message?:
-      string;
-  };
-}
-
-
 const SPLASH_MINIMUM_MS =
   900;
 
@@ -111,7 +90,7 @@ const PRIMARY_WARM_TIMEOUT_MS =
   4500;
 
 const SECONDARY_WARM_DELAY_MS =
-  180;
+  250;
 
 
 function wait(
@@ -219,183 +198,28 @@ function hideSplashAfterPaint() {
 }
 
 
-function getInvestmentAccountIds(
-  dashboard:
-    DashboardData |
-    null
-) {
-  if (
-    !dashboard ||
-    !dashboard.investments ||
-    !Array.isArray(
-      dashboard
-        .investments
-        .accounts
-    )
-  ) {
-    return [];
-  }
-
-
-  return dashboard
-    .investments
-    .accounts
-    .map(
-      account =>
-        account.accountId
-    )
-    .filter(
-      (
-        accountId
-      ): accountId is string =>
-        typeof accountId ===
-          "string" &&
-        accountId.length >
-          0
-    );
-}
-
-
 /*
- * 홈이 화면에 표시된 뒤
- * 투자계좌별 매매내역을 조용히 준비합니다.
+ * 스플래시가 보이는 동안
+ * 첫 진입에 가장 중요한 세 가지를 준비합니다.
  *
- * 자산 요약/투자계좌/보유종목/예수금은
- * 이미 dashboard 응답 안에 들어 있으므로
- * 별도 중복 요청을 하지 않습니다.
- */
-function scheduleSecondaryWarm(
-  dashboard:
-    DashboardData |
-    null
-) {
-  if (
-    !dashboard
-  ) {
-    return;
-  }
-
-
-  const accountIds =
-    getInvestmentAccountIds(
-      dashboard
-    );
-
-
-  if (
-    accountIds.length ===
-    0
-  ) {
-    return;
-  }
-
-
-  window.setTimeout(
-    () => {
-      void prefetchInvestmentTradesForAccounts(
-        accountIds
-      );
-    },
-    SECONDARY_WARM_DELAY_MS
-  );
-}
-
-
-/*
- * 앱 시작 화면이 떠 있는 동안
- * 가장 먼저 필요한 데이터를 준비합니다.
- *
- * 1. 홈 대시보드
- *    - 여기에는 자산/부채
+ * 1. dashboard
+ *    - 홈
+ *    - 현금성 자산
  *    - 투자계좌
  *    - 보유종목
  *    - 예수금
- *      정보까지 들어 있습니다.
+ *    을 한 번의 Apps Script dashboard 요청으로 준비합니다.
  *
- * 2. 이번 달 달력
+ * 2. 이번 달 달력 거래
  *
  * 3. 입력용 bootstrap
  *
- * 투자 매매내역은 홈이 뜬 직후
- * 2차 백그라운드 로딩으로 이어집니다.
+ * 같은 dashboard 응답은 브라우저 공용 캐시에 저장되어
+ * HomePage와 AssetsPage가 다시 서버에서 받을 필요가 없습니다.
  */
-async function warmPrimaryData():
-  Promise<
-    DashboardData |
-    null
-  > {
-  let dashboardData:
-    DashboardData |
-    null =
-      null;
-
-
+async function warmPrimaryData() {
   const dashboardRequest =
-    fetch(
-      "/api/dashboard",
-      {
-        method:
-          "GET",
-
-        credentials:
-          "same-origin",
-
-        headers: {
-          Accept:
-            "application/json"
-        }
-      }
-    )
-      .then(
-        async response => {
-          let body:
-            DashboardResponse;
-
-
-          try {
-            body =
-              await response.json() as
-                DashboardResponse;
-
-          } catch {
-            throw new Error(
-              "홈 데이터를 읽지 못했습니다."
-            );
-          }
-
-
-          if (
-            !response.ok ||
-            body.success !==
-              true ||
-            !body.data
-          ) {
-            throw new Error(
-              body.error
-                ?.message ||
-              "홈 데이터를 준비하지 못했습니다."
-            );
-          }
-
-
-          dashboardData =
-            body.data;
-
-
-          /*
-           * AssetsPage가 처음 열릴 때
-           * 서버를 다시 기다리지 않도록
-           * 같은 응답을 한 번 사용할 수 있게
-           * 넘겨둡니다.
-           */
-          primeDashboardPrefetch(
-            body.data
-          );
-
-
-          return body.data;
-        }
-      );
+    getDashboard();
 
 
   const calendarRequest =
@@ -405,17 +229,14 @@ async function warmPrimaryData():
 
 
   /*
-   * 입력 화면용 데이터도
-   * 같은 시점에 준비합니다.
-   *
-   * 이것 때문에 홈 진입이
-   * 늦어지지는 않게 합니다.
+   * 입력 화면용 데이터도 동시에 준비합니다.
+   * bootstrap이 늦어져도 홈 진입은 막지 않습니다.
    */
   void prefetchBootstrap()
     .catch(
       () => {
         /*
-         * 실패해도 입력 화면에서
+         * 입력 화면에서 필요할 때
          * 다시 요청할 수 있습니다.
          */
       }
@@ -432,9 +253,32 @@ async function warmPrimaryData():
       PRIMARY_WARM_TIMEOUT_MS
     )
   ]);
+}
 
 
-  return dashboardData;
+/*
+ * 홈이 실제로 뜬 뒤에는
+ * dashboard에 포함되지 않는 투자 매매내역을
+ * 전체 1회만 조용히 받아둡니다.
+ *
+ * 이후 특정 투자계좌를 펼치면
+ * 프런트에서 accountId 기준으로 필터링합니다.
+ */
+function scheduleSecondaryWarm() {
+  window.setTimeout(
+    () => {
+      void prefetchInvestmentTrades()
+        .catch(
+          () => {
+            /*
+             * 실패해도 자산 화면에서
+             * 필요할 때 다시 요청합니다.
+             */
+          }
+        );
+    },
+    SECONDARY_WARM_DELAY_MS
+  );
 }
 
 
@@ -512,8 +356,7 @@ export default function App() {
             session.loggedIn &&
             session.user
           ) {
-            const warmDashboard =
-              await warmPrimaryData();
+            await warmPrimaryData();
 
 
             if (
@@ -551,14 +394,7 @@ export default function App() {
             hideSplashAfterPaint();
 
 
-            /*
-             * 홈이 뜨고 난 뒤
-             * 투자 매매내역까지
-             * 2차로 준비합니다.
-             */
-            scheduleSecondaryWarm(
-              warmDashboard
-            );
+            scheduleSecondaryWarm();
 
 
             return;
@@ -682,8 +518,7 @@ export default function App() {
       showLaunchSplash();
 
 
-      const warmDashboard =
-        await warmPrimaryData();
+      await warmPrimaryData();
 
 
       await waitForMinimumSplash();
@@ -707,9 +542,7 @@ export default function App() {
       hideSplashAfterPaint();
 
 
-      scheduleSecondaryWarm(
-        warmDashboard
-      );
+      scheduleSecondaryWarm();
 
     } catch (
       error
@@ -737,6 +570,10 @@ export default function App() {
       await logout();
 
     } finally {
+      invalidateDashboardCache();
+      clearInvestmentPrefetchCache();
+
+
       setUser(
         null
       );
