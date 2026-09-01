@@ -3,49 +3,13 @@ import { apiRequest } from "../../api/client";
 import { getSession, logout } from "../../api/auth";
 import { getTransactions } from "../../api/transactions";
 import type { Transaction } from "../../api/transactions";
-import {
-    clearLedgerStartDate,
-    createManagedAccount,
-    createManagedCategory,
-    deleteManagedAccount,
-    deleteManagedCategory,
-    getLedgerConfig,
-    getManagedAccounts,
-    getManagedCategories,
-    restoreManagedAccount,
-    restoreManagedCategory,
-    setLedgerStartDate,
-    updateManagedAccount,
-    updateManagedCategory
-} from "../../api/settingsManagement";
-import type {
-    LedgerCategoryType,
-    ManagedAccount,
-    ManagedCategory,
-    SaveAccountInput
-} from "../../api/settingsManagement";
-import {
-    applyCategoryPreferences,
-    createDefaultInputPreferences,
-    getInputPreferences,
-    normalizeInputPreferences,
-    saveInputPreferences,
-    sortAccountsByPreferences
-} from "../../utils/inputPreferences";
-import type {
-    InputPreferences,
-    PreferenceTransactionType,
-    SharedInputPreferencesState
-} from "../../utils/inputPreferences";
+import { clearLedgerStartDate, createManagedAccount, createManagedCategory, deleteManagedAccount, deleteManagedCategory, getLedgerConfig, getManagedAccounts, getManagedAccountsSnapshot, getManagedCategories, getManagedCategoriesSnapshot, restoreManagedAccount, restoreManagedCategory, setLedgerStartDate, updateManagedAccount, updateManagedCategory } from "../../api/settingsManagement";
+import type { LedgerCategoryType, ManagedAccount, ManagedCategory, SaveAccountInput } from "../../api/settingsManagement";
+import { applyCategoryPreferences, getInputPreferences, normalizeInputPreferences, saveInputPreferences, sortAccountsByPreferences } from "../../utils/inputPreferences";
+import type { InputPreferences, PreferenceTransactionType, SharedInputPreferencesState } from "../../utils/inputPreferences";
 import styles from "./SettingsPage.module.css";
 
-type SettingsView =
-    | "home"
-    | "input"
-    | "categories"
-    | "accounts"
-    | "ledger"
-    | "profile";
+type SettingsView = "home" | "categories" | "accounts" | "ledger" | "profile";
 
 interface InputAccount {
     accountId: string;
@@ -69,8 +33,7 @@ interface BootstrapData {
     spendingTargets: string[];
     accounts: InputAccount[];
     categories: InputCategory[];
-    inputPreferences?:
-        SharedInputPreferencesState;
+    inputPreferences?: SharedInputPreferencesState;
 }
 
 interface BootstrapResponse {
@@ -109,19 +72,17 @@ interface AccountFormState {
     paymentAccountId: string;
 }
 
-const CATEGORY_TYPES:
-    PreferenceTransactionType[] = [
-        "지출",
-        "수입",
-        "이체"
-    ];
+const CATEGORY_TYPES: PreferenceTransactionType[] = [
+    "지출",
+    "수입",
+    "이체"
+];
 
-const MANAGED_CATEGORY_TYPES:
-    LedgerCategoryType[] = [
-        "지출",
-        "수입",
-        "이체"
-    ];
+const MANAGED_CATEGORY_TYPES: LedgerCategoryType[] = [
+    "지출",
+    "수입",
+    "이체"
+];
 
 const FIXED_OWNERS = [
     "공동",
@@ -135,119 +96,149 @@ const ACCOUNT_OWNER_TABS = [
     "공동"
 ] as const;
 
-type AccountOwnerTab =
-    typeof ACCOUNT_OWNER_TABS[number];
+type AccountOwnerTab = typeof ACCOUNT_OWNER_TABS[number];
 
-const ACCOUNT_TYPE_OPTIONS = [
-    "자산",
-    "부채",
-    "투자"
-] as const;
+type AccountKindValue =
+    | "checking"
+    | "cash"
+    | "deposit"
+    | "saving"
+    | "prepaid"
+    | "checkCard"
+    | "creditCard"
+    | "loan"
+    | "investment";
 
-type AccountType =
-    typeof ACCOUNT_TYPE_OPTIONS[number];
+interface AccountKindDefinition {
+    value: AccountKindValue;
+    label: string;
+    accountType: string;
+    subType: string;
+    balanceMethod: string;
+}
 
-const ACCOUNT_SUBTYPE_OPTIONS:
-    Record<
-        AccountType,
-        readonly string[]
-    > = {
-        자산: [
-            "입출금",
-            "현금",
-            "체크카드",
-            "선불/지역화폐",
-            "예금",
-            "적금"
-        ],
+const ACCOUNT_KIND_OPTIONS: AccountKindDefinition[] = [
+    {
+        value: "checking",
+        label: "입출금통장",
+        accountType: "자산",
+        subType: "입출금",
+        balanceMethod: "자동계산"
+    },
+    {
+        value: "cash",
+        label: "현금",
+        accountType: "자산",
+        subType: "현금",
+        balanceMethod: "자동계산"
+    },
+    {
+        value: "deposit",
+        label: "예금",
+        accountType: "자산",
+        subType: "예금",
+        balanceMethod: "자동계산"
+    },
+    {
+        value: "saving",
+        label: "적금",
+        accountType: "자산",
+        subType: "적금",
+        balanceMethod: "자동계산"
+    },
+    {
+        value: "prepaid",
+        label: "선불·지역화폐",
+        accountType: "자산",
+        subType: "선불/지역화폐",
+        balanceMethod: "자동계산"
+    },
+    {
+        value: "checkCard",
+        label: "체크카드",
+        accountType: "결제수단",
+        subType: "체크카드",
+        balanceMethod: "자동계산"
+    },
+    {
+        value: "creditCard",
+        label: "신용카드",
+        accountType: "부채",
+        subType: "신용카드",
+        balanceMethod: "자동계산"
+    },
+    {
+        value: "loan",
+        label: "대출",
+        accountType: "부채",
+        subType: "대출",
+        balanceMethod: "자동계산"
+    },
+    {
+        value: "investment",
+        label: "투자계좌",
+        accountType: "자산",
+        subType: "주식",
+        balanceMethod: "평가입력"
+    }
+];
 
-        부채: [
-            "신용카드",
-            "대출"
-        ],
-
-        투자: [
-            "주식"
-        ]
-    };
-
-function isAccountType(
-    value: string
-): value is AccountType {
-    return ACCOUNT_TYPE_OPTIONS.some(
-        option =>
-            option === value
+function getAccountKind(
+    accountType: string,
+    subType: string
+) {
+    /*
+     * 과거 데이터에 체크카드의 accountType이 다르게 저장된 경우가 있어
+     * 사용자 화면의 종류는 subType을 우선해 판별합니다.
+     */
+    return (
+        ACCOUNT_KIND_OPTIONS.find(
+            option =>
+                option.subType ===
+                subType
+        ) ||
+        ACCOUNT_KIND_OPTIONS.find(
+            option =>
+                option.accountType ===
+                    accountType &&
+                option.subType ===
+                    subType
+        ) ||
+        null
     );
 }
 
-function getAccountTypeOptions(
-    currentAccountType: string
-) {
-    const options:
-        string[] = [
-            ...ACCOUNT_TYPE_OPTIONS
-        ];
-
-    if (
-        currentAccountType &&
-        !options.includes(
-            currentAccountType
-        )
-    ) {
-        options.unshift(
-            currentAccountType
-        );
-    }
-
-    return options;
-}
-
-function getAccountSubtypeOptions(
-    accountType: string,
-    currentSubType: string = ""
-) {
-    const options =
-        isAccountType(
-            accountType
-        )
-            ? [
-                  ...ACCOUNT_SUBTYPE_OPTIONS[
-                      accountType
-                  ]
-              ]
-            : [];
-
-    if (
-        currentSubType &&
-        !options.includes(
-            currentSubType
-        )
-    ) {
-        return [
-            currentSubType,
-            ...options
-        ];
-    }
-
-    return options;
-}
-
-function applyAccountClassification(
-    current: AccountFormState,
+function getAccountKindLabel(
     accountType: string,
     subType: string
+) {
+    return (
+        getAccountKind(
+            accountType,
+            subType
+        )?.label ||
+        subType ||
+        accountType ||
+        "기타"
+    );
+}
+
+function applyAccountKind(
+    current: AccountFormState,
+    kind: AccountKindDefinition
 ): AccountFormState {
     const isCard =
-        subType === "체크카드" ||
-        subType === "신용카드";
+        kind.subType === "체크카드" ||
+        kind.subType === "신용카드";
 
     const isCreditCard =
-        subType === "신용카드";
+        kind.subType === "신용카드";
 
     return {
         ...current,
-        accountType,
-        subType,
+        accountType: kind.accountType,
+        subType: kind.subType,
+        balanceMethod: kind.balanceMethod,
 
         paymentAccountId:
             isCard
@@ -302,6 +293,59 @@ function moveItem(
     ];
 
     return next;
+}
+
+function moveSubsetInOrder(
+    allOrder: string[],
+    subsetIds: string[],
+    index: number,
+    direction: -1 | 1
+) {
+    const movedSubset =
+        moveItem(
+            subsetIds,
+            index,
+            direction
+        );
+
+    if (
+        movedSubset ===
+        subsetIds
+    ) {
+        return allOrder;
+    }
+
+    const subsetSet =
+        new Set(
+            subsetIds
+        );
+
+    let cursor =
+        0;
+
+    return allOrder.map(
+        accountId => {
+            if (
+                !subsetSet.has(
+                    accountId
+                )
+            ) {
+                return accountId;
+            }
+
+            const replacement =
+                movedSubset[
+                    cursor
+                ];
+
+            cursor += 1;
+
+            return (
+                replacement ||
+                accountId
+            );
+        }
+    );
 }
 
 function getInputAccountName(
@@ -359,8 +403,7 @@ function createEmptyAccountForm(
         paymentDay: "",
         startYear: "",
         endYear: "",
-        balanceMethod:
-            "자동계산",
+        balanceMethod: "자동계산",
         paymentAccountId: ""
     };
 }
@@ -368,14 +411,22 @@ function createEmptyAccountForm(
 function accountToForm(
     account: ManagedAccount
 ): AccountFormState {
+    const kind =
+        getAccountKind(
+            account.accountType,
+            account.subType
+        );
+
     return {
         accountName:
             account.accountName,
 
         accountType:
+            kind?.accountType ||
             account.accountType,
 
         subType:
+            kind?.subType ||
             account.subType,
 
         owner:
@@ -384,38 +435,43 @@ function accountToForm(
         openingBalance:
             String(
                 account.openingBalance ??
-                0
+                    0
             ),
 
         billingCutoffDay:
-            account.billingCutoffDay === null
+            account.billingCutoffDay ===
+            null
                 ? ""
                 : String(
-                      account.billingCutoffDay
-                  ),
+                    account.billingCutoffDay
+                ),
 
         paymentDay:
-            account.paymentDay === null
+            account.paymentDay ===
+            null
                 ? ""
                 : String(
-                      account.paymentDay
-                  ),
+                    account.paymentDay
+                ),
 
         startYear:
-            account.startYear === null
+            account.startYear ===
+            null
                 ? ""
                 : String(
-                      account.startYear
-                  ),
+                    account.startYear
+                ),
 
         endYear:
-            account.endYear === null
+            account.endYear ===
+            null
                 ? ""
                 : String(
-                      account.endYear
-                  ),
+                    account.endYear
+                ),
 
         balanceMethod:
+            kind?.balanceMethod ||
             account.balanceMethod ||
             "자동계산",
 
@@ -472,7 +528,7 @@ function buildAccountPayload(
     const openingBalance =
         Number(
             form.openingBalance ||
-            0
+                0
         );
 
     if (!accountName) {
@@ -481,15 +537,12 @@ function buildAccountPayload(
         );
     }
 
-    if (!accountType) {
+    if (
+        !accountType ||
+        !subType
+    ) {
         throw new Error(
-            "계좌 유형을 입력해주세요."
-        );
-    }
-
-    if (!subType) {
-        throw new Error(
-            "세부 구분을 입력해주세요."
+            "종류를 선택해주세요."
         );
     }
 
@@ -605,43 +658,50 @@ function SettingsHome(
             ) => void;
     }
 ) {
-    const sharedItems: Array<{
-        key: SettingsView;
-        title: string;
-        description: string;
-    }> = [
-        {
-            key: "input",
-            title:
-                "입력 화면 설정",
-            description:
-                "카테고리와 계좌의 표시 순서·노출 여부"
-        },
+    const sharedItems:
+        Array<{
+            key:
+                SettingsView;
 
-        {
-            key: "categories",
             title:
-                "카테고리 관리",
-            description:
-                "추가·이름 변경·사용 중지·삭제·복원"
-        },
+                string;
 
-        {
-            key: "accounts",
-            title:
-                "계좌·카드 관리",
             description:
-                "계좌와 카드의 추가·수정·사용 종료·복원"
-        },
+                string;
+        }> = [
+            {
+                key:
+                    "categories",
 
-        {
-            key: "ledger",
-            title:
-                "가계부 운영·데이터",
-            description:
-                "가계부 시작일, 전체 거래 내보내기, 새로고침"
-        }
-    ];
+                title:
+                    "카테고리 관리",
+
+                description:
+                    "추가·이름 변경·사용 중지·삭제·복원"
+            },
+
+            {
+                key:
+                    "accounts",
+
+                title:
+                    "자산 관리",
+
+                description:
+                    "통장·카드·대출·투자계좌와 입력 화면 설정"
+            },
+
+            {
+                key:
+                    "ledger",
+
+                title:
+                    "가계부 운영·데이터",
+
+                description:
+                    "가계부 시작일, 전체 거래 내보내기, 새로고침"
+            }
+        ];
 
     return (
         <>
@@ -718,11 +778,15 @@ function SettingsHome(
                                         }
                                     >
                                         <strong>
-                                            {item.title}
+                                            {
+                                                item.title
+                                            }
                                         </strong>
 
                                         <span>
-                                            {item.description}
+                                            {
+                                                item.description
+                                            }
                                         </span>
                                     </span>
 
@@ -806,9 +870,14 @@ function DetailHeader(
         description,
         onBack
     }: {
-        title: string;
-        description: string;
-        onBack: () => void;
+        title:
+            string;
+
+        description:
+            string;
+
+        onBack:
+            () => void;
     }
 ) {
     return (
@@ -854,7 +923,30 @@ function DetailHeader(
     );
 }
 
-function InputSettings() {
+interface InputSettingsProps {
+    section:
+        | "categories"
+        | "accounts";
+
+    categories?:
+        InputCategory[];
+
+    accounts?:
+        InputAccount[];
+
+    owner?:
+        string;
+}
+
+function InputSettings(
+    {
+        section,
+        categories,
+        accounts,
+        owner
+    }:
+        InputSettingsProps
+) {
     const [
         bootstrap,
         setBootstrap
@@ -933,7 +1025,7 @@ function InputSettings() {
                         throw new Error(
                             response.error
                                 ?.message ||
-                            "설정 정보를 불러오지 못했습니다."
+                            "입력 화면 설정을 불러오지 못했습니다."
                         );
                     }
 
@@ -984,7 +1076,7 @@ function InputSettings() {
                         setError(
                             getErrorMessage(
                                 loadError,
-                                "설정 정보를 불러오지 못했습니다."
+                                "입력 화면 설정을 불러오지 못했습니다."
                             )
                         );
                     }
@@ -1004,26 +1096,73 @@ function InputSettings() {
         []
     );
 
+    const categorySource =
+        useMemo(
+            () =>
+                categories ||
+                bootstrap
+                    ?.categories ||
+                [],
+            [
+                categories,
+                bootstrap
+            ]
+        );
+
+    const accountSource =
+        useMemo(
+            () =>
+                accounts ||
+                bootstrap
+                    ?.accounts ||
+                [],
+            [
+                accounts,
+                bootstrap
+            ]
+        );
+
+    const normalizedPreferences =
+        useMemo(
+            () => {
+                if (
+                    !preferences
+                ) {
+                    return null;
+                }
+
+                return normalizeInputPreferences(
+                    preferences,
+                    categorySource,
+                    accountSource
+                );
+            },
+            [
+                preferences,
+                categorySource,
+                accountSource
+            ]
+        );
+
     const categoryItems =
         useMemo(
             () => {
                 if (
-                    !bootstrap ||
-                    !preferences
+                    !normalizedPreferences
                 ) {
                     return [];
                 }
 
                 return applyCategoryPreferences(
-                    bootstrap.categories,
+                    categorySource,
                     categoryType,
-                    preferences
+                    normalizedPreferences
                 );
             },
             [
-                bootstrap,
+                categorySource,
                 categoryType,
-                preferences
+                normalizedPreferences
             ]
         );
 
@@ -1031,20 +1170,25 @@ function InputSettings() {
         useMemo(
             () => {
                 if (
-                    !bootstrap ||
-                    !preferences
+                    !normalizedPreferences
                 ) {
                     return [];
                 }
 
                 return sortAccountsByPreferences(
-                    bootstrap.accounts,
-                    preferences
+                    accountSource,
+                    normalizedPreferences
+                ).filter(
+                    account =>
+                        !owner ||
+                        account.owner ===
+                            owner
                 );
             },
             [
-                bootstrap,
-                preferences
+                accountSource,
+                normalizedPreferences,
+                owner
             ]
         );
 
@@ -1052,12 +1196,12 @@ function InputSettings() {
         useMemo(
             () =>
                 new Set(
-                    preferences
+                    normalizedPreferences
                         ?.hiddenAccountIds ||
                     []
                 ),
             [
-                preferences
+                normalizedPreferences
             ]
         );
 
@@ -1070,20 +1214,22 @@ function InputSettings() {
         index: number,
         direction: -1 | 1
     ) {
-        if (!preferences) {
+        if (
+            !normalizedPreferences
+        ) {
             return;
         }
 
         setPreferences({
-            ...preferences,
+            ...normalizedPreferences,
 
             categoryOrder: {
-                ...preferences
+                ...normalizedPreferences
                     .categoryOrder,
 
                 [categoryType]:
                     moveItem(
-                        preferences
+                        normalizedPreferences
                             .categoryOrder[
                                 categoryType
                             ],
@@ -1100,17 +1246,26 @@ function InputSettings() {
         index: number,
         direction: -1 | 1
     ) {
-        if (!preferences) {
+        if (
+            !normalizedPreferences
+        ) {
             return;
         }
 
+        const visibleIds =
+            accountItems.map(
+                account =>
+                    account.accountId
+            );
+
         setPreferences({
-            ...preferences,
+            ...normalizedPreferences,
 
             accountOrder:
-                moveItem(
-                    preferences
+                moveSubsetInOrder(
+                    normalizedPreferences
                         .accountOrder,
+                    visibleIds,
                     index,
                     direction
                 )
@@ -1122,13 +1277,15 @@ function InputSettings() {
     function handleToggleAccount(
         accountId: string
     ) {
-        if (!preferences) {
+        if (
+            !normalizedPreferences
+        ) {
             return;
         }
 
         const hidden =
             new Set(
-                preferences
+                normalizedPreferences
                     .hiddenAccountIds
             );
 
@@ -1147,7 +1304,7 @@ function InputSettings() {
         }
 
         setPreferences({
-            ...preferences,
+            ...normalizedPreferences,
 
             hiddenAccountIds:
                 Array.from(
@@ -1160,7 +1317,7 @@ function InputSettings() {
 
     async function handleSave() {
         if (
-            !preferences ||
+            !normalizedPreferences ||
             !bootstrap ||
             saving
         ) {
@@ -1169,9 +1326,9 @@ function InputSettings() {
 
         const normalized =
             normalizeInputPreferences(
-                preferences,
-                bootstrap.categories,
-                bootstrap.accounts
+                normalizedPreferences,
+                categorySource,
+                accountSource
             );
 
         saveInputPreferences(
@@ -1192,7 +1349,8 @@ function InputSettings() {
                 >(
                     "/api/settings/input-preferences",
                     {
-                        method: "POST",
+                        method:
+                            "POST",
 
                         body:
                             JSON.stringify({
@@ -1222,8 +1380,8 @@ function InputSettings() {
                 normalizeInputPreferences(
                     response.data
                         .preferences,
-                    bootstrap.categories,
-                    bootstrap.accounts
+                    categorySource,
+                    accountSource
                 );
 
             saveInputPreferences(
@@ -1235,7 +1393,10 @@ function InputSettings() {
             );
 
             setFeedback(
-                "부부 공통 설정으로 저장했습니다."
+                section ===
+                    "categories"
+                    ? "입력 화면 카테고리 순서를 저장했습니다."
+                    : "입력 화면 계좌·카드 설정을 저장했습니다."
             );
         } catch (
             saveFailure
@@ -1251,415 +1412,398 @@ function InputSettings() {
         }
     }
 
-    function handleReset() {
-        if (
-            !bootstrap ||
-            saving
-        ) {
-            return;
-        }
-
-        setPreferences(
-            createDefaultInputPreferences(
-                bootstrap.categories,
-                bootstrap.accounts
-            )
-        );
-
-        setFeedback(
-            "기본 설정으로 되돌렸습니다. 저장을 누르면 부부 공통으로 적용됩니다."
-        );
-
-        setSaveError("");
-    }
-
     if (loading) {
         return (
-            <p
+            <section
                 className={
-                    styles.state
+                    styles.cardSection
                 }
             >
-                입력 설정을 불러오는 중입니다.
-            </p>
+                <p
+                    className={
+                        styles.state
+                    }
+                >
+                    입력 화면 설정을 불러오는 중입니다.
+                </p>
+            </section>
         );
     }
 
     if (
         error ||
         !bootstrap ||
-        !preferences
+        !normalizedPreferences
     ) {
         return (
-            <p
+            <section
                 className={
-                    styles.error
+                    styles.cardSection
                 }
-                role="alert"
             >
-                {
-                    error ||
-                    "입력 설정을 불러오지 못했습니다."
-                }
-            </p>
+                <p
+                    className={
+                        styles.error
+                    }
+                    role="alert"
+                >
+                    {
+                        error ||
+                        "입력 화면 설정을 불러오지 못했습니다."
+                    }
+                </p>
+            </section>
         );
     }
 
     return (
-        <div
+        <section
             className={
-                styles.settingsBody
+                styles.cardSection
             }
         >
+            <div
+                className={
+                    styles.sectionHeading
+                }
+            >
+                <h2>
+                    {
+                        section ===
+                            "categories"
+                            ? "입력 화면 카테고리 순서"
+                            : "입력 화면 노출·순서"
+                    }
+                </h2>
+
+                <p>
+                    {
+                        section ===
+                            "categories"
+                            ? "거래 입력 화면에 표시되는 카테고리 순서를 정합니다."
+                            : `${owner || "현재"} 항목 중 거래 입력 화면에 보일 항목과 순서를 정합니다.`
+                    }
+                </p>
+            </div>
+
             <p
                 className={
                     styles.notice
                 }
             >
-                저장한 순서와 노출 설정은
-                미영·승철 계정에 공통으로 적용됩니다.
+                저장한 설정은 미영·승철 계정에 공통으로 적용됩니다.
             </p>
 
-            <section
-                className={
-                    styles.cardSection
-                }
-            >
-                <div
-                    className={
-                        styles.sectionHeading
-                    }
-                >
-                    <h2>
-                        카테고리 순서
-                    </h2>
-
-                    <p>
-                        입력 화면에 표시되는 순서를
-                        거래 유형별로 정합니다.
-                    </p>
-                </div>
-
-                <div
-                    className={
-                        styles.segmentedControl
-                    }
-                >
-                    {
-                        CATEGORY_TYPES.map(
-                            type => (
-                                <button
-                                    type="button"
-                                    key={
-                                        type
-                                    }
-                                    className={
-                                        categoryType ===
-                                        type
-                                            ? styles
-                                                  .segmentButtonActive
-                                            : styles
-                                                  .segmentButton
-                                    }
-                                    onClick={
-                                        () =>
-                                            setCategoryType(
+            {
+                section ===
+                    "categories" && (
+                    <>
+                        <div
+                            className={
+                                styles.segmentedControl
+                            }
+                        >
+                            {
+                                CATEGORY_TYPES.map(
+                                    type => (
+                                        <button
+                                            type="button"
+                                            key={
                                                 type
-                                            )
-                                    }
-                                >
-                                    {type}
-                                </button>
-                            )
-                        )
-                    }
-                </div>
-
-                {
-                    categoryItems.length ===
-                    0
-                        ? (
-                            <p
-                                className={
-                                    styles.emptyState
-                                }
-                            >
-                                표시할 카테고리가 없습니다.
-                            </p>
-                        )
-                        : (
-                            <ul
-                                className={
-                                    styles.itemList
-                                }
-                            >
-                                {
-                                    categoryItems.map(
-                                        (
-                                            category,
-                                            index
-                                        ) => (
-                                            <li
-                                                key={
-                                                    category
-                                                        .categoryId
-                                                }
-                                                className={
-                                                    styles.orderRow
-                                                }
-                                            >
-                                                <span
-                                                    className={
-                                                        styles.orderNumber
-                                                    }
-                                                >
-                                                    {index + 1}
-                                                </span>
-
-                                                <span
-                                                    className={
-                                                        styles.primaryItemText
-                                                    }
-                                                >
-                                                    {category.name}
-                                                </span>
-
-                                                <div
-                                                    className={
-                                                        styles.compactActions
-                                                    }
-                                                >
-                                                    <button
-                                                        type="button"
-                                                        className={
-                                                            styles.iconButton
-                                                        }
-                                                        aria-label={`${category.name} 위로 이동`}
-                                                        disabled={
-                                                            index ===
-                                                            0
-                                                        }
-                                                        onClick={
-                                                            () =>
-                                                                handleMoveCategory(
-                                                                    index,
-                                                                    -1
-                                                                )
-                                                        }
-                                                    >
-                                                        ↑
-                                                    </button>
-
-                                                    <button
-                                                        type="button"
-                                                        className={
-                                                            styles.iconButton
-                                                        }
-                                                        aria-label={`${category.name} 아래로 이동`}
-                                                        disabled={
-                                                            index ===
-                                                            categoryItems.length -
-                                                                1
-                                                        }
-                                                        onClick={
-                                                            () =>
-                                                                handleMoveCategory(
-                                                                    index,
-                                                                    1
-                                                                )
-                                                        }
-                                                    >
-                                                        ↓
-                                                    </button>
-                                                </div>
-                                            </li>
-                                        )
+                                            }
+                                            className={
+                                                categoryType ===
+                                                type
+                                                    ? styles.segmentButtonActive
+                                                    : styles.segmentButton
+                                            }
+                                            onClick={
+                                                () =>
+                                                    setCategoryType(
+                                                        type
+                                                    )
+                                            }
+                                        >
+                                            {type}
+                                        </button>
                                     )
-                                }
-                            </ul>
-                        )
-                }
-            </section>
+                                )
+                            }
+                        </div>
 
-            <section
-                className={
-                    styles.cardSection
-                }
-            >
-                <div
-                    className={
-                        styles.sectionHeading
-                    }
-                >
-                    <h2>
-                        입력 화면 계좌·카드
-                    </h2>
-
-                    <p>
-                        일상 거래 입력에 필요한 항목만
-                        표시하고 순서를 정합니다.
-                    </p>
-                </div>
-
-                {
-                    accountItems.length ===
-                    0
-                        ? (
-                            <p
-                                className={
-                                    styles.emptyState
-                                }
-                            >
-                                등록된 계좌가 없습니다.
-                            </p>
-                        )
-                        : (
-                            <ul
-                                className={
-                                    styles.itemList
-                                }
-                            >
-                                {
-                                    accountItems.map(
-                                        (
-                                            account,
-                                            index
-                                        ) => {
-                                            const hidden =
-                                                hiddenAccountSet.has(
-                                                    account.accountId
-                                                );
-
-                                            return (
-                                                <li
-                                                    key={
-                                                        account.accountId
-                                                    }
-                                                    className={`${styles.orderRow} ${
-                                                        hidden
-                                                            ? styles.mutedRow
-                                                            : ""
-                                                    }`}
-                                                >
-                                                    <span
-                                                        className={
-                                                            styles.orderNumber
-                                                        }
-                                                    >
-                                                        {index + 1}
-                                                    </span>
-
-                                                    <span
-                                                        className={
-                                                            styles.itemTextGroup
-                                                        }
-                                                    >
-                                                        <strong>
-                                                            {
-                                                                getInputAccountName(
-                                                                    account
-                                                                )
-                                                            }
-                                                        </strong>
-
-                                                        <span>
-                                                            {
-                                                                [
-                                                                    account.accountType,
-                                                                    account.subType
-                                                                ]
-                                                                    .filter(
-                                                                        Boolean
-                                                                    )
-                                                                    .join(
-                                                                        " · "
-                                                                    )
-                                                            }
-                                                        </span>
-                                                    </span>
-
-                                                    <div
-                                                        className={
-                                                            styles.compactActions
-                                                        }
-                                                    >
-                                                        <button
-                                                            type="button"
-                                                            className={
-                                                                hidden
-                                                                    ? styles.visibilityButton
-                                                                    : styles.visibleButton
-                                                            }
-                                                            onClick={
-                                                                () =>
-                                                                    handleToggleAccount(
-                                                                        account.accountId
-                                                                    )
-                                                            }
-                                                        >
-                                                            {
-                                                                hidden
-                                                                    ? "숨김"
-                                                                    : "표시"
-                                                            }
-                                                        </button>
-
-                                                        <button
-                                                            type="button"
-                                                            className={
-                                                                styles.iconButton
-                                                            }
-                                                            aria-label={`${getInputAccountName(
-                                                                account
-                                                            )} 위로 이동`}
-                                                            disabled={
-                                                                index ===
-                                                                0
-                                                            }
-                                                            onClick={
-                                                                () =>
-                                                                    handleMoveAccount(
-                                                                        index,
-                                                                        -1
-                                                                    )
-                                                            }
-                                                        >
-                                                            ↑
-                                                        </button>
-
-                                                        <button
-                                                            type="button"
-                                                            className={
-                                                                styles.iconButton
-                                                            }
-                                                            aria-label={`${getInputAccountName(
-                                                                account
-                                                            )} 아래로 이동`}
-                                                            disabled={
-                                                                index ===
-                                                                accountItems.length -
-                                                                    1
-                                                            }
-                                                            onClick={
-                                                                () =>
-                                                                    handleMoveAccount(
-                                                                        index,
-                                                                        1
-                                                                    )
-                                                            }
-                                                        >
-                                                            ↓
-                                                        </button>
-                                                    </div>
-                                                </li>
-                                            );
+                        {
+                            categoryItems.length ===
+                            0
+                                ? (
+                                    <p
+                                        className={
+                                            styles.emptyState
                                         }
-                                    )
-                                }
-                            </ul>
-                        )
-                }
-            </section>
+                                    >
+                                        표시할 카테고리가 없습니다.
+                                    </p>
+                                )
+                                : (
+                                    <ul
+                                        className={
+                                            styles.itemList
+                                        }
+                                    >
+                                        {
+                                            categoryItems.map(
+                                                (
+                                                    category,
+                                                    index
+                                                ) => (
+                                                    <li
+                                                        key={
+                                                            category.categoryId
+                                                        }
+                                                        className={
+                                                            styles.orderRow
+                                                        }
+                                                    >
+                                                        <span
+                                                            className={
+                                                                styles.orderNumber
+                                                            }
+                                                        >
+                                                            {index + 1}
+                                                        </span>
+
+                                                        <span
+                                                            className={
+                                                                styles.primaryItemText
+                                                            }
+                                                        >
+                                                            {category.name}
+                                                        </span>
+
+                                                        <div
+                                                            className={
+                                                                styles.compactActions
+                                                            }
+                                                        >
+                                                            <button
+                                                                type="button"
+                                                                className={
+                                                                    styles.iconButton
+                                                                }
+                                                                aria-label={`${category.name} 위로 이동`}
+                                                                disabled={
+                                                                    saving ||
+                                                                    index ===
+                                                                    0
+                                                                }
+                                                                onClick={
+                                                                    () =>
+                                                                        handleMoveCategory(
+                                                                            index,
+                                                                            -1
+                                                                        )
+                                                                }
+                                                            >
+                                                                ↑
+                                                            </button>
+
+                                                            <button
+                                                                type="button"
+                                                                className={
+                                                                    styles.iconButton
+                                                                }
+                                                                aria-label={`${category.name} 아래로 이동`}
+                                                                disabled={
+                                                                    saving ||
+                                                                    index ===
+                                                                    categoryItems.length -
+                                                                        1
+                                                                }
+                                                                onClick={
+                                                                    () =>
+                                                                        handleMoveCategory(
+                                                                            index,
+                                                                            1
+                                                                        )
+                                                                }
+                                                            >
+                                                                ↓
+                                                            </button>
+                                                        </div>
+                                                    </li>
+                                                )
+                                            )
+                                        }
+                                    </ul>
+                                )
+                        }
+                    </>
+                )
+            }
+
+            {
+                section ===
+                    "accounts" && (
+                    <>
+                        {
+                            accountItems.length ===
+                            0
+                                ? (
+                                    <p
+                                        className={
+                                            styles.emptyState
+                                        }
+                                    >
+                                        설정할 항목이 없습니다.
+                                    </p>
+                                )
+                                : (
+                                    <ul
+                                        className={
+                                            styles.itemList
+                                        }
+                                    >
+                                        {
+                                            accountItems.map(
+                                                (
+                                                    account,
+                                                    index
+                                                ) => {
+                                                    const hidden =
+                                                        hiddenAccountSet.has(
+                                                            account.accountId
+                                                        );
+
+                                                    return (
+                                                        <li
+                                                            key={
+                                                                account.accountId
+                                                            }
+                                                            className={`${styles.orderRow} ${
+                                                                hidden
+                                                                    ? styles.mutedRow
+                                                                    : ""
+                                                            }`}
+                                                        >
+                                                            <span
+                                                                className={
+                                                                    styles.orderNumber
+                                                                }
+                                                            >
+                                                                {index + 1}
+                                                            </span>
+
+                                                            <span
+                                                                className={
+                                                                    styles.itemTextGroup
+                                                                }
+                                                            >
+                                                                <strong>
+                                                                    {
+                                                                        getInputAccountName(
+                                                                            account
+                                                                        )
+                                                                    }
+                                                                </strong>
+
+                                                                <span>
+                                                                    {
+                                                                        getAccountKindLabel(
+                                                                            account.accountType,
+                                                                            account.subType
+                                                                        )
+                                                                    }
+                                                                </span>
+                                                            </span>
+
+                                                            <div
+                                                                className={
+                                                                    styles.compactActions
+                                                                }
+                                                            >
+                                                                <button
+                                                                    type="button"
+                                                                    className={
+                                                                        hidden
+                                                                            ? styles.visibilityButton
+                                                                            : styles.visibleButton
+                                                                    }
+                                                                    disabled={
+                                                                        saving
+                                                                    }
+                                                                    onClick={
+                                                                        () =>
+                                                                            handleToggleAccount(
+                                                                                account.accountId
+                                                                            )
+                                                                    }
+                                                                >
+                                                                    {
+                                                                        hidden
+                                                                            ? "숨김"
+                                                                            : "표시"
+                                                                    }
+                                                                </button>
+
+                                                                <button
+                                                                    type="button"
+                                                                    className={
+                                                                        styles.iconButton
+                                                                    }
+                                                                    aria-label={`${getInputAccountName(
+                                                                        account
+                                                                    )} 위로 이동`}
+                                                                    disabled={
+                                                                        saving ||
+                                                                        index ===
+                                                                        0
+                                                                    }
+                                                                    onClick={
+                                                                        () =>
+                                                                            handleMoveAccount(
+                                                                                index,
+                                                                                -1
+                                                                            )
+                                                                    }
+                                                                >
+                                                                    ↑
+                                                                </button>
+
+                                                                <button
+                                                                    type="button"
+                                                                    className={
+                                                                        styles.iconButton
+                                                                    }
+                                                                    aria-label={`${getInputAccountName(
+                                                                        account
+                                                                    )} 아래로 이동`}
+                                                                    disabled={
+                                                                        saving ||
+                                                                        index ===
+                                                                        accountItems.length -
+                                                                            1
+                                                                    }
+                                                                    onClick={
+                                                                        () =>
+                                                                            handleMoveAccount(
+                                                                                index,
+                                                                                1
+                                                                            )
+                                                                    }
+                                                                >
+                                                                    ↓
+                                                                </button>
+                                                            </div>
+                                                        </li>
+                                                    );
+                                                }
+                                            )
+                                        }
+                                    </ul>
+                                )
+                        }
+                    </>
+                )
+            }
 
             {
                 feedback && (
@@ -1689,24 +1833,9 @@ function InputSettings() {
 
             <div
                 className={
-                    styles.stickyActions
+                    styles.formActions
                 }
             >
-                <button
-                    type="button"
-                    className={
-                        styles.secondaryButton
-                    }
-                    disabled={
-                        saving
-                    }
-                    onClick={
-                        handleReset
-                    }
-                >
-                    기본값
-                </button>
-
                 <button
                     type="button"
                     className={
@@ -1723,22 +1852,35 @@ function InputSettings() {
                     {
                         saving
                             ? "저장 중..."
-                            : "설정 저장"
+                            : "입력 화면 설정 저장"
                     }
                 </button>
             </div>
-        </div>
+        </section>
     );
 }
 
 function CategorySettings() {
+    const [
+        initialSnapshot
+    ] =
+        useState(
+            () =>
+                getManagedCategoriesSnapshot()
+        );
+
     const [
         categories,
         setCategories
     ] =
         useState<
             ManagedCategory[]
-        >([]);
+        >(
+            () =>
+                initialSnapshot
+                    ?.items ||
+                []
+        );
 
     const [
         selectedType,
@@ -1772,7 +1914,10 @@ function CategorySettings() {
         loading,
         setLoading
     ] =
-        useState(true);
+        useState(
+            initialSnapshot ===
+                null
+        );
 
     const [
         busyKey,
@@ -1809,7 +1954,12 @@ function CategorySettings() {
                 true;
 
             async function load() {
-                setLoading(true);
+                if (
+                    !initialSnapshot
+                ) {
+                    setLoading(true);
+                }
+
                 setError("");
 
                 try {
@@ -1827,7 +1977,10 @@ function CategorySettings() {
                 } catch (
                     loadError
                 ) {
-                    if (active) {
+                    if (
+                        active &&
+                        !initialSnapshot
+                    ) {
                         setError(
                             getErrorMessage(
                                 loadError,
@@ -1848,7 +2001,9 @@ function CategorySettings() {
                 active = false;
             };
         },
-        []
+        [
+            initialSnapshot
+        ]
     );
 
     const activeItems =
@@ -1884,7 +2039,8 @@ function CategorySettings() {
     async function runMutation(
         key: string,
         work:
-            () => Promise<unknown>,
+            () =>
+                Promise<unknown>,
         successMessage: string
     ) {
         if (busyKey) {
@@ -1971,6 +2127,7 @@ function CategorySettings() {
             category.name
         ) {
             setEditingId(null);
+
             return;
         }
 
@@ -2539,18 +2696,56 @@ function CategorySettings() {
                     }
                 </details>
             </section>
+
+            <InputSettings
+                section="categories"
+                categories={
+                    categories
+                        .filter(
+                            category =>
+                                !category.isDeleted &&
+                                category.active
+                        )
+                        .map(
+                            category => ({
+                                categoryId:
+                                    category.categoryId,
+
+                                type:
+                                    category.type as
+                                        PreferenceTransactionType,
+
+                                name:
+                                    category.name
+                            })
+                        )
+                }
+            />
         </div>
     );
 }
 
 function AccountSettings() {
     const [
+        initialSnapshot
+    ] =
+        useState(
+            () =>
+                getManagedAccountsSnapshot()
+        );
+
+    const [
         accounts,
         setAccounts
     ] =
         useState<
             ManagedAccount[]
-        >([]);
+        >(
+            () =>
+                initialSnapshot
+                    ?.items ||
+                []
+        );
 
     const [
         form,
@@ -2580,7 +2775,10 @@ function AccountSettings() {
         loading,
         setLoading
     ] =
-        useState(true);
+        useState(
+            initialSnapshot ===
+                null
+        );
 
     const [
         busyKey,
@@ -2625,7 +2823,12 @@ function AccountSettings() {
                 true;
 
             async function load() {
-                setLoading(true);
+                if (
+                    !initialSnapshot
+                ) {
+                    setLoading(true);
+                }
+
                 setError("");
 
                 try {
@@ -2643,11 +2846,14 @@ function AccountSettings() {
                 } catch (
                     loadError
                 ) {
-                    if (active) {
+                    if (
+                        active &&
+                        !initialSnapshot
+                    ) {
                         setError(
                             getErrorMessage(
                                 loadError,
-                                "계좌를 불러오지 못했습니다."
+                                "자산 정보를 불러오지 못했습니다."
                             )
                         );
                     }
@@ -2664,7 +2870,9 @@ function AccountSettings() {
                 active = false;
             };
         },
-        []
+        [
+            initialSnapshot
+        ]
     );
 
     const allActiveAccounts =
@@ -2733,28 +2941,33 @@ function AccountSettings() {
     const paymentAccountOptions =
         useMemo(
             () =>
-                allActiveAccounts.filter(
-                    account => {
-                        if (
-                            account.accountId ===
-                            editingId
-                        ) {
-                            return false;
-                        }
+                allActiveAccounts
+                    .filter(
+                        account =>
+                            account.active
+                    )
+                    .filter(
+                        account => {
+                            if (
+                                account.accountId ===
+                                editingId
+                            ) {
+                                return false;
+                            }
 
-                        return ![
-                            "체크카드",
-                            "신용카드",
-                            "주식",
-                            "대출"
-                        ].some(
-                            keyword =>
-                                account.subType.includes(
-                                    keyword
-                                )
-                        );
-                    }
-                ),
+                            return ![
+                                "체크카드",
+                                "신용카드",
+                                "주식",
+                                "대출"
+                            ].some(
+                                keyword =>
+                                    account.subType.includes(
+                                        keyword
+                                    )
+                            );
+                        }
+                    ),
             [
                 allActiveAccounts,
                 editingId
@@ -2767,13 +2980,8 @@ function AccountSettings() {
         form.subType ===
             "신용카드";
 
-    const accountTypeOptions =
-        getAccountTypeOptions(
-            form.accountType
-        );
-
-    const accountSubtypeOptions =
-        getAccountSubtypeOptions(
+    const selectedKind =
+        getAccountKind(
             form.accountType,
             form.subType
         );
@@ -2789,47 +2997,31 @@ function AccountSettings() {
         setForm(
             current => ({
                 ...current,
-                [key]: value
+                [key]:
+                    value
             })
         );
     }
 
-    function handleAccountTypeChange(
-        accountType: string
+    function handleKindChange(
+        value: string
     ) {
-        setForm(
-            current => {
-                const options =
-                    getAccountSubtypeOptions(
-                        accountType
-                    );
+        const kind =
+            ACCOUNT_KIND_OPTIONS.find(
+                option =>
+                    option.value ===
+                    value
+            );
 
-                const subType =
-                    options.includes(
-                        current.subType
-                    )
-                        ? current.subType
-                        : options[0] ||
-                          "";
+        if (!kind) {
+            return;
+        }
 
-                return applyAccountClassification(
-                    current,
-                    accountType,
-                    subType
-                );
-            }
-        );
-    }
-
-    function handleSubTypeChange(
-        subType: string
-    ) {
         setForm(
             current =>
-                applyAccountClassification(
+                applyAccountKind(
                     current,
-                    current.accountType,
-                    subType
+                    kind
                 )
         );
     }
@@ -2882,7 +3074,8 @@ function AccountSettings() {
     async function runMutation(
         key: string,
         work:
-            () => Promise<unknown>,
+            () =>
+                Promise<unknown>,
         successMessage: string
     ) {
         if (busyKey) {
@@ -2908,7 +3101,7 @@ function AccountSettings() {
             setError(
                 getErrorMessage(
                     mutationError,
-                    "계좌를 처리하지 못했습니다."
+                    "자산 정보를 처리하지 못했습니다."
                 )
             );
 
@@ -2953,7 +3146,7 @@ function AccountSettings() {
                               ...payload
                           }),
 
-                      "계좌 정보를 수정했습니다."
+                      "자산 정보를 수정했습니다."
                   )
                 : await runMutation(
                       "create",
@@ -2963,7 +3156,7 @@ function AccountSettings() {
                               payload
                           ),
 
-                      "새 계좌를 추가했습니다."
+                      "새 항목을 추가했습니다."
                   );
 
         if (completed) {
@@ -2977,7 +3170,7 @@ function AccountSettings() {
     ) {
         if (
             !window.confirm(
-                `‘${account.displayName}’ 계좌를 삭제할까요?\n\n거래나 카드 결제계좌로 사용 중이면 삭제되지 않습니다. 그 경우 사용 종료 연도를 설정해주세요.`
+                `‘${account.displayName}’ 항목을 삭제할까요?\n\n거래나 카드 결제계좌로 사용 중이면 삭제되지 않습니다. 그 경우 사용 종료 연도를 설정해주세요.`
             )
         ) {
             return;
@@ -2991,7 +3184,7 @@ function AccountSettings() {
                     account.accountId
                 ),
 
-            "계좌를 삭제했습니다."
+            "항목을 삭제했습니다."
         );
     }
 
@@ -3078,8 +3271,8 @@ function AccountSettings() {
                 }
             >
                 <p>
-                    과거 거래가 있는 계좌는
-                    삭제 대신 사용 종료 연도를 설정하세요.
+                    통장·현금·카드·대출·투자계좌를
+                    한곳에서 관리합니다.
                 </p>
 
                 <button
@@ -3091,7 +3284,7 @@ function AccountSettings() {
                         beginCreate
                     }
                 >
-                    {ownerTab} 계좌 추가
+                    {ownerTab} 항목 추가
                 </button>
             </div>
 
@@ -3111,13 +3304,13 @@ function AccountSettings() {
                                 <h2>
                                     {
                                         editingId
-                                            ? "계좌 수정"
-                                            : "새 계좌 추가"
+                                            ? "항목 수정"
+                                            : "새 항목 추가"
                                     }
                                 </h2>
 
                                 <p>
-                                    카드는 결제계좌를 반드시 연결해야 합니다.
+                                    종류만 선택하면 내부 자산·부채 분류와 잔액 방식은 앱이 자동으로 정합니다.
                                 </p>
                             </div>
 
@@ -3151,7 +3344,7 @@ function AccountSettings() {
                                 }
                             >
                                 <span>
-                                    계좌·카드 이름
+                                    이름
                                 </span>
 
                                 <input
@@ -3223,17 +3416,17 @@ function AccountSettings() {
                             </label>
 
                             <label
-                                className={
-                                    styles.field
-                                }
+                                className={`${styles.field} ${styles.fullField}`}
                             >
                                 <span>
-                                    계좌 유형
+                                    종류
                                 </span>
 
                                 <select
                                     value={
-                                        form.accountType
+                                        selectedKind
+                                            ?.value ||
+                                        "__legacy__"
                                     }
                                     disabled={
                                         Boolean(
@@ -3241,68 +3434,46 @@ function AccountSettings() {
                                         )
                                     }
                                     onChange={
-                                        event =>
-                                            handleAccountTypeChange(
+                                        event => {
+                                            if (
+                                                event.target.value ===
+                                                "__legacy__"
+                                            ) {
+                                                return;
+                                            }
+
+                                            handleKindChange(
                                                 event.target.value
-                                            )
+                                            );
+                                        }
                                     }
                                 >
                                     {
-                                        accountTypeOptions.map(
-                                            value => (
-                                                <option
-                                                    key={
-                                                        value
-                                                    }
-                                                    value={
-                                                        value
-                                                    }
-                                                >
-                                                    {value}
-                                                </option>
-                                            )
+                                        !selectedKind && (
+                                            <option
+                                                value="__legacy__"
+                                            >
+                                                기존 분류 · {
+                                                    form.subType ||
+                                                    form.accountType ||
+                                                    "기타"
+                                                }
+                                            </option>
                                         )
                                     }
-                                </select>
-                            </label>
 
-                            <label
-                                className={
-                                    styles.field
-                                }
-                            >
-                                <span>
-                                    세부 구분
-                                </span>
-
-                                <select
-                                    value={
-                                        form.subType
-                                    }
-                                    disabled={
-                                        Boolean(
-                                            busyKey
-                                        )
-                                    }
-                                    onChange={
-                                        event =>
-                                            handleSubTypeChange(
-                                                event.target.value
-                                            )
-                                    }
-                                >
                                     {
-                                        accountSubtypeOptions.map(
-                                            value => (
+                                        ACCOUNT_KIND_OPTIONS.map(
+                                            option => (
                                                 <option
                                                     key={
-                                                        value
+                                                        option.value
                                                     }
                                                     value={
-                                                        value
+                                                        option.value
                                                     }
                                                 >
-                                                    {value}
+                                                    {option.label}
                                                 </option>
                                             )
                                         )
@@ -3547,44 +3718,6 @@ function AccountSettings() {
                                     }
                                 />
                             </label>
-
-                            <label
-                                className={`${styles.field} ${styles.fullField}`}
-                            >
-                                <span>
-                                    잔액 계산 방식
-                                </span>
-
-                                <select
-                                    value={
-                                        form.balanceMethod
-                                    }
-                                    disabled={
-                                        Boolean(
-                                            busyKey
-                                        )
-                                    }
-                                    onChange={
-                                        event =>
-                                            updateForm(
-                                                "balanceMethod",
-                                                event.target.value
-                                            )
-                                    }
-                                >
-                                    <option
-                                        value="자동계산"
-                                    >
-                                        자동계산
-                                    </option>
-
-                                    <option
-                                        value="평가입력"
-                                    >
-                                        평가입력
-                                    </option>
-                                </select>
-                            </label>
                         </div>
 
                         {
@@ -3642,7 +3775,7 @@ function AccountSettings() {
                                         ? "저장 중..."
                                         : editingId
                                         ? "수정 저장"
-                                        : "계좌 추가"
+                                        : "추가"
                                 }
                             </button>
                         </div>
@@ -3688,12 +3821,12 @@ function AccountSettings() {
                     }
                 >
                     <h2>
-                        {ownerTab} 계좌·카드
+                        {ownerTab} 등록 항목
                     </h2>
 
                     <p>
-                        입력 화면 노출 여부와 순서는
-                        ‘입력 화면 설정’에서 바꿉니다.
+                        과거 거래가 있는 항목은 삭제보다
+                        사용 종료 연도를 설정하는 편이 안전합니다.
                     </p>
                 </div>
 
@@ -3705,7 +3838,7 @@ function AccountSettings() {
                                     styles.state
                                 }
                             >
-                                계좌를 불러오는 중입니다.
+                                자산 정보를 불러오는 중입니다.
                             </p>
                         )
                         : activeAccounts.length ===
@@ -3716,7 +3849,7 @@ function AccountSettings() {
                                     styles.emptyState
                                 }
                             >
-                                {ownerTab} 명의로 등록된 계좌가 없습니다.
+                                {ownerTab} 명의로 등록된 항목이 없습니다.
                             </p>
                         )
                         : (
@@ -3749,18 +3882,13 @@ function AccountSettings() {
 
                                                     <span>
                                                         {
-                                                            [
+                                                            getAccountKindLabel(
                                                                 account.accountType,
-                                                                account.subType,
-                                                                account.owner
-                                                            ]
-                                                                .filter(
-                                                                    Boolean
-                                                                )
-                                                                .join(
-                                                                    " · "
-                                                                )
+                                                                account.subType
+                                                            )
                                                         }
+                                                        {" · "}
+                                                        {account.owner}
                                                     </span>
 
                                                     <span>
@@ -3841,7 +3969,7 @@ function AccountSettings() {
                     }
                 >
                     <summary>
-                        삭제된 계좌·카드
+                        삭제된 항목
 
                         <span>
                             {deletedAccounts.length}
@@ -3857,7 +3985,7 @@ function AccountSettings() {
                                         styles.emptyState
                                     }
                                 >
-                                    {ownerTab} 명의의 삭제된 계좌가 없습니다.
+                                    {ownerTab} 명의의 삭제된 항목이 없습니다.
                                 </p>
                             )
                             : (
@@ -3901,7 +4029,7 @@ function AccountSettings() {
                                                                             account.accountId
                                                                         ),
 
-                                                                    "계좌를 복원했습니다."
+                                                                    "항목을 복원했습니다."
                                                                 )
                                                         }
                                                     >
@@ -3921,6 +4049,44 @@ function AccountSettings() {
                     }
                 </details>
             </section>
+
+            <InputSettings
+                section="accounts"
+                owner={
+                    ownerTab
+                }
+                accounts={
+                    allActiveAccounts
+                        .filter(
+                            account =>
+                                account.active
+                        )
+                        .map(
+                            account => ({
+                                accountId:
+                                    account.accountId,
+
+                                accountName:
+                                    account.accountName,
+
+                                displayName:
+                                    account.displayName,
+
+                                accountType:
+                                    account.accountType,
+
+                                subType:
+                                    account.subType,
+
+                                owner:
+                                    account.owner,
+
+                                paymentAccountId:
+                                    account.paymentAccountId
+                            })
+                        )
+                }
+            />
         </div>
     );
 }
@@ -4028,7 +4194,7 @@ function LedgerDataSettings() {
 
             setLedgerStartDateValue(
                 result.ledgerStartDate ||
-                ledgerStartDateValue
+                    ledgerStartDateValue
             );
 
             setFeedback(
@@ -4100,12 +4266,14 @@ function LedgerDataSettings() {
             const items:
                 Transaction[] = [];
 
-            let offset = 0;
+            let offset =
+                0;
 
             const limit =
                 1000;
 
-            let total = 0;
+            let total =
+                0;
 
             do {
                 const response =
@@ -4139,7 +4307,8 @@ function LedgerDataSettings() {
                     break;
                 }
             } while (
-                offset < total
+                offset <
+                total
             );
 
             const headers = [
@@ -4233,7 +4402,8 @@ function LedgerDataSettings() {
                         10
                     );
 
-            link.href = url;
+            link.href =
+                url;
 
             link.download =
                 `우리_가계부_거래_${today}.csv`;
@@ -4567,14 +4737,18 @@ function ProfileSettings() {
             return;
         }
 
-        setLoggingOut(true);
+        setLoggingOut(
+            true
+        );
 
         try {
             await logout();
 
             window.location.reload();
         } finally {
-            setLoggingOut(false);
+            setLoggingOut(
+                false
+            );
         }
     }
 
@@ -4722,14 +4896,6 @@ export default function SettingsPage() {
         >("home");
 
     const detail = {
-        input: {
-            title:
-                "입력 화면 설정",
-
-            description:
-                "자주 쓰는 항목의 순서와 노출 여부를 정합니다."
-        },
-
         categories: {
             title:
                 "카테고리 관리",
@@ -4740,10 +4906,10 @@ export default function SettingsPage() {
 
         accounts: {
             title:
-                "계좌·카드 관리",
+                "자산 관리",
 
             description:
-                "계좌와 카드의 정보와 사용 기간을 관리합니다."
+                "통장·카드·대출·투자계좌와 입력 화면 노출을 관리합니다."
         },
 
         ledger: {
@@ -4770,7 +4936,8 @@ export default function SettingsPage() {
             }
         >
             {
-                view === "home"
+                view ===
+                "home"
                     ? (
                         <SettingsHome
                             onOpen={
@@ -4798,13 +4965,6 @@ export default function SettingsPage() {
                                         )
                                 }
                             />
-
-                            {
-                                view ===
-                                    "input" && (
-                                    <InputSettings />
-                                )
-                            }
 
                             {
                                 view ===
