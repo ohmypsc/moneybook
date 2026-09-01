@@ -11,6 +11,10 @@ import {
 } from "../../api/client";
 
 import {
+  getBootstrapCacheGeneration
+} from "../../api/bootstrapCache";
+
+import {
   createTransaction
 } from "../../api/transactions";
 
@@ -125,10 +129,26 @@ let bootstrapPromise:
   Promise<BootstrapData> | null =
   null;
 
+let bootstrapPromiseGeneration =
+  -1;
+
 
 async function loadBootstrap():
   Promise<BootstrapData> {
-  if (!bootstrapPromise) {
+  const generation =
+    getBootstrapCacheGeneration();
+
+  if (
+    !bootstrapPromise ||
+    bootstrapPromiseGeneration !==
+      generation
+  ) {
+    bootstrapPromiseGeneration =
+      generation;
+
+    const requestGeneration =
+      generation;
+
     bootstrapPromise =
       apiRequest<BootstrapResponse>(
         "/api/bootstrap"
@@ -151,8 +171,13 @@ async function loadBootstrap():
         )
         .catch(
           error => {
-            bootstrapPromise =
-              null;
+            if (
+              bootstrapPromiseGeneration ===
+                requestGeneration
+            ) {
+              bootstrapPromise =
+                null;
+            }
 
             throw error;
           }
