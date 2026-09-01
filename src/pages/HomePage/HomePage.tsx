@@ -497,11 +497,33 @@ export default function HomePage(
       let cancelled =
         false;
 
-      /*
-       * 홈을 보는 동안 입력용 bootstrap을 미리 받아 둡니다.
-       * 실패해도 홈 화면에는 영향을 주지 않습니다.
-       */
-      void prefetchBootstrap();
+      let bootstrapPrefetchTimer:
+        number | null =
+          null;
+
+      function scheduleBootstrapPrefetch() {
+        if (
+          bootstrapPrefetchTimer !==
+          null
+        ) {
+          return;
+        }
+
+        bootstrapPrefetchTimer =
+          window.setTimeout(
+            () => {
+              bootstrapPrefetchTimer =
+                null;
+
+              if (
+                !cancelled
+              ) {
+                void prefetchBootstrap();
+              }
+            },
+            700
+          );
+      }
 
 
       if (
@@ -600,6 +622,13 @@ export default function HomePage(
             setLoading(
               false
             );
+
+            /*
+             * 첫 화면의 대시보드가 우선입니다.
+             * 입력용 bootstrap은 홈 표시가 끝난 뒤
+             * 조금 늦게 준비해서 초기 네트워크 경합을 줄입니다.
+             */
+            scheduleBootstrapPrefetch();
           }
         }
       }
@@ -627,6 +656,15 @@ export default function HomePage(
       return () => {
         cancelled =
           true;
+
+        if (
+          bootstrapPrefetchTimer !==
+          null
+        ) {
+          window.clearTimeout(
+            bootstrapPrefetchTimer
+          );
+        }
 
         unsubscribe();
       };
