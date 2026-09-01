@@ -22,14 +22,36 @@ const BOOTSTRAP_TTL_MS =
 const FETCH_PATCH_MARKER =
   "__moneybookBootstrapCacheFetchPatched";
 
+const MASTER_MUTATION_PATHS =
+  new Set([
+    "/api/categories",
+    "/api/categories/update",
+    "/api/categories/delete",
+    "/api/categories/restore",
+
+    "/api/accounts",
+    "/api/accounts/update",
+    "/api/accounts/delete",
+    "/api/accounts/restore"
+  ]);
+
+const BOOTSTRAP_MUTATION_PATHS =
+  new Set([
+    SETTINGS_PATH,
+    ...MASTER_MUTATION_PATHS
+  ]);
+
 const LEDGER_MUTATION_PATHS =
   new Set([
+    ...MASTER_MUTATION_PATHS,
+
     "/api/transactions",
     "/api/transactions/update",
     "/api/transactions/delete",
     "/api/transactions/restore",
 
     "/api/investments/cash-baseline",
+    "/api/investments/holdings/update",
 
     "/api/investments/trades",
     "/api/investments/trades/update",
@@ -44,6 +66,9 @@ let bootstrapCache:
 let bootstrapPrefetchPromise:
   Promise<void> | null =
     null;
+
+let bootstrapCacheGeneration =
+  0;
 
 
 function getRequestUrl(
@@ -116,6 +141,8 @@ function clearExpiredBootstrapCache() {
       Date.now()
   ) {
     bootstrapCache = null;
+    bootstrapCacheGeneration +=
+      1;
   }
 }
 
@@ -125,6 +152,16 @@ export function clearBootstrapMemoryCache() {
 
   bootstrapPrefetchPromise =
     null;
+
+  bootstrapCacheGeneration +=
+    1;
+}
+
+
+export function getBootstrapCacheGeneration() {
+  clearExpiredBootstrapCache();
+
+  return bootstrapCacheGeneration;
 }
 
 
@@ -155,9 +192,14 @@ function responseFromBootstrapCache(
 
 
 async function rememberBootstrapResponse(
-  response: Response
+  response: Response,
+  requestGeneration: number
 ) {
-  if (!response.ok) {
+  if (
+    !response.ok ||
+    requestGeneration !==
+      bootstrapCacheGeneration
+  ) {
     return;
   }
 
@@ -175,7 +217,9 @@ async function rememberBootstrapResponse(
 
     if (
       parsed?.success ===
-      false
+      false ||
+      requestGeneration !==
+        bootstrapCacheGeneration
     ) {
       return;
     }
@@ -239,18 +283,19 @@ async function inspectMutationResponse(
   response: Response,
   pathname: string
 ) {
-  const isSettingsMutation =
-    pathname ===
-    SETTINGS_PATH;
+  const invalidatesBootstrap =
+    BOOTSTRAP_MUTATION_PATHS.has(
+      pathname
+    );
 
-  const isLedgerMutation =
+  const changesLedger =
     LEDGER_MUTATION_PATHS.has(
       pathname
     );
 
   if (
-    !isSettingsMutation &&
-    !isLedgerMutation
+    !invalidatesBootstrap &&
+    !changesLedger
   ) {
     return;
   }
@@ -265,13 +310,16 @@ async function inspectMutationResponse(
   }
 
   if (
-    isSettingsMutation
+    invalidatesBootstrap
   ) {
     clearBootstrapMemoryCache();
-    return;
   }
 
-  markLedgerChanged();
+  if (
+    changesLedger
+  ) {
+    markLedgerChanged();
+  }
 }
 
 
@@ -332,11 +380,14 @@ function installBootstrapCacheFetch() {
           url
         );
 
-      if (
+      const isBootstrapRequest =
         sameOrigin &&
         method === "GET" &&
         url?.pathname ===
-          BOOTSTRAP_PATH
+          BOOTSTRAP_PATH;
+
+      if (
+        isBootstrapRequest
       ) {
         clearExpiredBootstrapCache();
 
@@ -349,6 +400,9 @@ function installBootstrapCacheFetch() {
         }
       }
 
+      const requestGeneration =
+        bootstrapCacheGeneration;
+
       const response =
         await originalFetch(
           input,
@@ -356,13 +410,11 @@ function installBootstrapCacheFetch() {
         );
 
       if (
-        sameOrigin &&
-        method === "GET" &&
-        url?.pathname ===
-          BOOTSTRAP_PATH
+        isBootstrapRequest
       ) {
         await rememberBootstrapResponse(
-          response
+          response,
+          requestGeneration
         );
       }
 
@@ -409,7 +461,7 @@ export async function prefetchBootstrap() {
     return bootstrapPrefetchPromise;
   }
 
-  bootstrapPrefetchPromise =
+  const task =
     (async () => {
       const response =
         await window.fetch(
@@ -449,15 +501,24 @@ export async function prefetchBootstrap() {
            * InputPage가 열릴 때 정상 요청을 다시 시도합니다.
            */
         }
-      )
-      .finally(
-        () => {
-          bootstrapPrefetchPromise =
-            null;
-        }
       );
 
-  return bootstrapPrefetchPromise;
+  bootstrapPrefetchPromise =
+    task;
+
+  void task.finally(
+    () => {
+      if (
+        bootstrapPrefetchPromise ===
+          task
+      ) {
+        bootstrapPrefetchPromise =
+          null;
+      }
+    }
+  );
+
+  return task;
 }
 
 
