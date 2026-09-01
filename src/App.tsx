@@ -26,9 +26,21 @@ import {
   loadCalendarMonth
 } from "./api/calendarCache";
 
+import {
+  primeDashboardPrefetch
+} from "./api/dashboard";
+
+import {
+  prefetchInvestmentTradesForAccounts
+} from "./api/investments";
+
 import type {
   User
 } from "./types/api";
+
+import type {
+  DashboardData
+} from "./types/dashboard";
 
 import LoginPage
   from "./pages/LoginPage/LoginPage";
@@ -73,15 +85,38 @@ type SplashWindow =
   };
 
 
+interface DashboardResponse {
+  success: boolean;
+
+  apiVersion?:
+    string;
+
+  data?:
+    DashboardData;
+
+  error?: {
+    code?:
+      string;
+
+    message?:
+      string;
+  };
+}
+
+
 const SPLASH_MINIMUM_MS =
   900;
 
 const PRIMARY_WARM_TIMEOUT_MS =
   4500;
 
+const SECONDARY_WARM_DELAY_MS =
+  180;
+
 
 function wait(
-  milliseconds: number
+  milliseconds:
+    number
 ) {
   return new Promise<void>(
     resolve => {
@@ -106,14 +141,18 @@ function showLaunchSplash() {
   const splash =
     getSplashElement();
 
+
   if (!splash) {
     return;
   }
 
+
   (
-    window as SplashWindow
+    window as
+      SplashWindow
   ).__moneybookSplashStartedAt =
     Date.now();
+
 
   splash.classList.remove(
     "is-hidden"
@@ -125,9 +164,11 @@ function hideLaunchSplashNow() {
   const splash =
     getSplashElement();
 
+
   if (!splash) {
     return;
   }
+
 
   splash.classList.add(
     "is-hidden"
@@ -138,17 +179,21 @@ function hideLaunchSplashNow() {
 async function waitForMinimumSplash() {
   const startedAt =
     (
-      window as SplashWindow
+      window as
+        SplashWindow
     ).__moneybookSplashStartedAt ??
     Date.now();
+
 
   const elapsed =
     Date.now() -
     startedAt;
 
+
   const remaining =
     SPLASH_MINIMUM_MS -
     elapsed;
+
 
   if (
     remaining >
@@ -174,23 +219,123 @@ function hideSplashAfterPaint() {
 }
 
 
+function getInvestmentAccountIds(
+  dashboard:
+    DashboardData |
+    null
+) {
+  if (
+    !dashboard ||
+    !dashboard.investments ||
+    !Array.isArray(
+      dashboard
+        .investments
+        .accounts
+    )
+  ) {
+    return [];
+  }
+
+
+  return dashboard
+    .investments
+    .accounts
+    .map(
+      account =>
+        account.accountId
+    )
+    .filter(
+      (
+        accountId
+      ): accountId is string =>
+        typeof accountId ===
+          "string" &&
+        accountId.length >
+          0
+    );
+}
+
+
+/*
+ * 홈이 화면에 표시된 뒤
+ * 투자계좌별 매매내역을 조용히 준비합니다.
+ *
+ * 자산 요약/투자계좌/보유종목/예수금은
+ * 이미 dashboard 응답 안에 들어 있으므로
+ * 별도 중복 요청을 하지 않습니다.
+ */
+function scheduleSecondaryWarm(
+  dashboard:
+    DashboardData |
+    null
+) {
+  if (
+    !dashboard
+  ) {
+    return;
+  }
+
+
+  const accountIds =
+    getInvestmentAccountIds(
+      dashboard
+    );
+
+
+  if (
+    accountIds.length ===
+    0
+  ) {
+    return;
+  }
+
+
+  window.setTimeout(
+    () => {
+      void prefetchInvestmentTradesForAccounts(
+        accountIds
+      );
+    },
+    SECONDARY_WARM_DELAY_MS
+  );
+}
+
+
 /*
  * 앱 시작 화면이 떠 있는 동안
- * 실제로 자주 사용하는 데이터를 준비합니다.
+ * 가장 먼저 필요한 데이터를 준비합니다.
  *
- * - 홈 대시보드
- * - 이번 달 달력 거래
- * - 입력 화면 bootstrap
+ * 1. 홈 대시보드
+ *    - 여기에는 자산/부채
+ *    - 투자계좌
+ *    - 보유종목
+ *    - 예수금
+ *      정보까지 들어 있습니다.
  *
- * bootstrap은 같이 시작하지만
- * 홈/달력 진입을 막지는 않습니다.
+ * 2. 이번 달 달력
+ *
+ * 3. 입력용 bootstrap
+ *
+ * 투자 매매내역은 홈이 뜬 직후
+ * 2차 백그라운드 로딩으로 이어집니다.
  */
-async function warmPrimaryData() {
+async function warmPrimaryData():
+  Promise<
+    DashboardData |
+    null
+  > {
+  let dashboardData:
+    DashboardData |
+    null =
+      null;
+
+
   const dashboardRequest =
     fetch(
       "/api/dashboard",
       {
-        method: "GET",
+        method:
+          "GET",
 
         credentials:
           "same-origin",
@@ -203,20 +348,52 @@ async function warmPrimaryData() {
     )
       .then(
         async response => {
+          let body:
+            DashboardResponse;
+
+
+          try {
+            body =
+              await response.json() as
+                DashboardResponse;
+
+          } catch {
+            throw new Error(
+              "홈 데이터를 읽지 못했습니다."
+            );
+          }
+
+
           if (
-            !response.ok
+            !response.ok ||
+            body.success !==
+              true ||
+            !body.data
           ) {
             throw new Error(
+              body.error
+                ?.message ||
               "홈 데이터를 준비하지 못했습니다."
             );
           }
 
+
+          dashboardData =
+            body.data;
+
+
           /*
-           * 응답 본문까지 소비해서
-           * Worker 쪽 대시보드 준비를
-           * 완전히 끝냅니다.
+           * AssetsPage가 처음 열릴 때
+           * 서버를 다시 기다리지 않도록
+           * 같은 응답을 한 번 사용할 수 있게
+           * 넘겨둡니다.
            */
-          await response.json();
+          primeDashboardPrefetch(
+            body.data
+          );
+
+
+          return body.data;
         }
       );
 
@@ -228,17 +405,18 @@ async function warmPrimaryData() {
 
 
   /*
-   * 입력 화면 데이터도 동시에 준비하되
-   * 이것 때문에 스플래시가 오래 유지되지는
-   * 않도록 기다리는 대상에서는 제외합니다.
+   * 입력 화면용 데이터도
+   * 같은 시점에 준비합니다.
+   *
+   * 이것 때문에 홈 진입이
+   * 늦어지지는 않게 합니다.
    */
   void prefetchBootstrap()
     .catch(
       () => {
         /*
-         * 입력 화면에서 필요할 때
-         * 다시 요청할 수 있으므로
-         * 앱 시작 자체는 막지 않습니다.
+         * 실패해도 입력 화면에서
+         * 다시 요청할 수 있습니다.
          */
       }
     );
@@ -254,6 +432,9 @@ async function warmPrimaryData() {
       PRIMARY_WARM_TIMEOUT_MS
     )
   ]);
+
+
+  return dashboardData;
 }
 
 
@@ -271,7 +452,10 @@ export default function App() {
     user,
     setUser
   ] =
-    useState<User | null>(
+    useState<
+      User |
+      null
+    >(
       null
     );
 
@@ -280,21 +464,27 @@ export default function App() {
     loginLoading,
     setLoginLoading
   ] =
-    useState(false);
+    useState(
+      false
+    );
 
 
   const [
     loginError,
     setLoginError
   ] =
-    useState("");
+    useState(
+      ""
+    );
 
 
   const [
     activeNavigation,
     setActiveNavigation
   ] =
-    useState<NavigationKey>(
+    useState<
+      NavigationKey
+    >(
       "home"
     );
 
@@ -322,12 +512,8 @@ export default function App() {
             session.loggedIn &&
             session.user
           ) {
-            /*
-             * 사진이 떠 있는 동안
-             * 홈과 이번 달 달력을
-             * 미리 준비합니다.
-             */
-            await warmPrimaryData();
+            const warmDashboard =
+              await warmPrimaryData();
 
 
             if (
@@ -351,20 +537,29 @@ export default function App() {
               session.user
             );
 
+
             setStatus(
               "authenticated"
             );
+
 
             setActiveNavigation(
               "home"
             );
 
 
-            /*
-             * 실제 홈이 한 번 그려진 다음
-             * 사진이 자연스럽게 사라집니다.
-             */
             hideSplashAfterPaint();
+
+
+            /*
+             * 홈이 뜨고 난 뒤
+             * 투자 매매내역까지
+             * 2차로 준비합니다.
+             */
+            scheduleSecondaryWarm(
+              warmDashboard
+            );
+
 
             return;
           }
@@ -374,9 +569,11 @@ export default function App() {
             null
           );
 
+
           setStatus(
             "guest"
           );
+
 
           await waitForMinimumSplash();
 
@@ -404,13 +601,15 @@ export default function App() {
             null
           );
 
+
           setStatus(
             "guest"
           );
 
 
           if (
-            error instanceof ApiError &&
+            error instanceof
+              ApiError &&
             error.status ===
               401
           ) {
@@ -420,7 +619,8 @@ export default function App() {
 
           } else {
             setLoginError(
-              error instanceof Error
+              error instanceof
+                Error
                 ? error.message
                 : "로그인 상태를 확인하지 못했습니다."
             );
@@ -455,12 +655,16 @@ export default function App() {
 
 
   async function handleLogin(
-    name: string,
-    password: string
+    name:
+      string,
+
+    password:
+      string
   ) {
     setLoginLoading(
       true
     );
+
 
     setLoginError(
       ""
@@ -475,18 +679,12 @@ export default function App() {
         );
 
 
-      /*
-       * 비밀번호가 맞은 경우에만
-       * 사진 화면을 다시 보여줍니다.
-       */
       showLaunchSplash();
 
 
-      /*
-       * 사진을 보는 동안
-       * 홈/달력 데이터를 준비합니다.
-       */
-      await warmPrimaryData();
+      const warmDashboard =
+        await warmPrimaryData();
+
 
       await waitForMinimumSplash();
 
@@ -495,9 +693,11 @@ export default function App() {
         result.user
       );
 
+
       setStatus(
         "authenticated"
       );
+
 
       setActiveNavigation(
         "home"
@@ -506,18 +706,20 @@ export default function App() {
 
       hideSplashAfterPaint();
 
+
+      scheduleSecondaryWarm(
+        warmDashboard
+      );
+
     } catch (
       error
     ) {
-      /*
-       * 로그인 오류가 난 경우
-       * 사진 화면이 남아 있지 않도록 합니다.
-       */
       hideLaunchSplashNow();
 
 
       setLoginError(
-        error instanceof Error
+        error instanceof
+          Error
           ? error.message
           : "로그인에 실패했습니다."
       );
@@ -539,13 +741,16 @@ export default function App() {
         null
       );
 
+
       setStatus(
         "guest"
       );
 
+
       setActiveNavigation(
         "home"
       );
+
 
       setLoginError(
         ""
@@ -554,13 +759,6 @@ export default function App() {
   }
 
 
-  /*
-   * 실제로는 index.html의 사진 스플래시가
-   * 이 화면 위를 덮고 있습니다.
-   *
-   * 혹시 정적 스플래시를 지원하지 않는 환경에서도
-   * 기존 checking 화면이 안전망으로 남습니다.
-   */
   if (
     status ===
     "checking"
@@ -669,9 +867,7 @@ export default function App() {
         setActiveNavigation
       }
     >
-      {
-        pageContent
-      }
+      {pageContent}
     </AppShell>
   );
 }
