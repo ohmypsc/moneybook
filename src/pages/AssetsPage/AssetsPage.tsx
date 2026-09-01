@@ -9,7 +9,8 @@ import {
 } from "../../api/dashboard";
 
 import {
-  setInvestmentCashBaseline
+  setInvestmentCashBaseline,
+  updateHoldingManualPrice
 } from "../../api/investments";
 
 import InvestmentTradeForm
@@ -167,6 +168,27 @@ function formatPrice(
 }
 
 
+function getToday() {
+  const now =
+    new Date();
+
+  const local =
+    new Date(
+      now.getTime() -
+        now.getTimezoneOffset() *
+          60 *
+          1000
+    );
+
+  return local
+    .toISOString()
+    .slice(
+      0,
+      10
+    );
+}
+
+
 export default function AssetsPage() {
   const [
     activeTab,
@@ -235,6 +257,47 @@ export default function AssetsPage() {
     useState(
       0
     );
+
+
+  const [
+    manualPriceDrafts,
+    setManualPriceDrafts
+  ] =
+    useState<
+      Record<
+        string,
+        string
+      >
+    >({});
+
+  const [
+    manualPriceSavingId,
+    setManualPriceSavingId
+  ] =
+    useState<
+      string |
+      null
+    >(null);
+
+  const [
+    manualPriceErrors,
+    setManualPriceErrors
+  ] =
+    useState<
+      Record<
+        string,
+        string
+      >
+    >({});
+
+  const [
+    manualPriceFeedbackId,
+    setManualPriceFeedbackId
+  ] =
+    useState<
+      string |
+      null
+    >(null);
 
 
   async function loadDashboard() {
@@ -426,6 +489,161 @@ export default function AssetsPage() {
     } finally {
       setCashSaving(
         false
+      );
+    }
+  }
+
+
+  function getManualPriceInput(
+    holdingId: string,
+    manualPrice:
+      number |
+      null |
+      undefined,
+    currentPrice:
+      number |
+      null |
+      undefined
+  ) {
+    if (
+      Object.prototype
+        .hasOwnProperty
+        .call(
+          manualPriceDrafts,
+          holdingId
+        )
+    ) {
+      return manualPriceDrafts[
+        holdingId
+      ];
+    }
+
+    const value =
+      manualPrice ??
+      currentPrice;
+
+    return (
+      value !== null &&
+      value !== undefined &&
+      Number.isFinite(value)
+    )
+      ? String(value)
+      : "";
+  }
+
+
+  function handleManualPriceChange(
+    holdingId: string,
+    value: string
+  ) {
+    setManualPriceDrafts(
+      current => ({
+        ...current,
+        [holdingId]: value
+      })
+    );
+
+    setManualPriceErrors(
+      current => ({
+        ...current,
+        [holdingId]: ""
+      })
+    );
+
+    setManualPriceFeedbackId(
+      null
+    );
+  }
+
+
+  async function handleSaveManualPrice(
+    holdingId: string,
+    manualPrice:
+      number |
+      null |
+      undefined,
+    currentPrice:
+      number |
+      null |
+      undefined
+  ) {
+    const input =
+      getManualPriceInput(
+        holdingId,
+        manualPrice,
+        currentPrice
+      );
+
+    const parsed =
+      Number(input);
+
+    if (
+      !Number.isFinite(parsed) ||
+      parsed <= 0
+    ) {
+      setManualPriceErrors(
+        current => ({
+          ...current,
+          [holdingId]:
+            "수동 시세는 0보다 큰 숫자로 입력해주세요."
+        })
+      );
+
+      return;
+    }
+
+    setManualPriceSavingId(
+      holdingId
+    );
+
+    setManualPriceErrors(
+      current => ({
+        ...current,
+        [holdingId]: ""
+      })
+    );
+
+    setManualPriceFeedbackId(
+      null
+    );
+
+    try {
+      await updateHoldingManualPrice({
+        holdingId,
+        manualPrice:
+          parsed,
+        lastUpdated:
+          getToday()
+      });
+
+      setManualPriceDrafts(
+        current => ({
+          ...current,
+          [holdingId]:
+            String(parsed)
+        })
+      );
+
+      await loadDashboard();
+
+      setManualPriceFeedbackId(
+        holdingId
+      );
+    } catch (
+      err
+    ) {
+      setManualPriceErrors(
+        current => ({
+          ...current,
+          [holdingId]:
+            err instanceof Error
+              ? err.message
+              : "수동 시세 저장에 실패했습니다."
+        })
+      );
+    } finally {
+      setManualPriceSavingId(
+        null
       );
     }
   }
@@ -1569,6 +1787,123 @@ export default function AssetsPage() {
                                               </strong>
                                             </div>
                                           </div>
+
+
+                                          {holding.quoteMode ===
+                                            "수동" && (
+                                            <details
+                                              className={
+                                                styles.baselineDetails
+                                              }
+                                            >
+                                              <summary
+                                                className={
+                                                  styles.baselineSummary
+                                                }
+                                              >
+                                                수동시세 수정
+                                              </summary>
+
+                                              <div
+                                                className={
+                                                  styles.baselineBody
+                                                }
+                                              >
+                                                <p
+                                                  className={
+                                                    styles.helperText
+                                                  }
+                                                >
+                                                  자동 시세 대신 이 평가단가를 사용합니다.
+                                                </p>
+
+                                                <div
+                                                  className={
+                                                    styles.cashForm
+                                                  }
+                                                >
+                                                  <input
+                                                    className={
+                                                      styles.cashInput
+                                                    }
+                                                    type="number"
+                                                    inputMode="decimal"
+                                                    min="0"
+                                                    step="any"
+                                                    value={
+                                                      getManualPriceInput(
+                                                        holding.holdingId,
+                                                        holding.manualPrice,
+                                                        holding.currentPrice
+                                                      )
+                                                    }
+                                                    onChange={
+                                                      event =>
+                                                        handleManualPriceChange(
+                                                          holding.holdingId,
+                                                          event.target.value
+                                                        )
+                                                    }
+                                                    placeholder={
+                                                      holding.market ===
+                                                        "국내"
+                                                        ? "평가단가(원)"
+                                                        : "평가단가"
+                                                    }
+                                                  />
+
+                                                  <button
+                                                    type="button"
+                                                    className={
+                                                      styles.cashButton
+                                                    }
+                                                    disabled={
+                                                      manualPriceSavingId ===
+                                                        holding.holdingId
+                                                    }
+                                                    onClick={
+                                                      () =>
+                                                        void handleSaveManualPrice(
+                                                          holding.holdingId,
+                                                          holding.manualPrice,
+                                                          holding.currentPrice
+                                                        )
+                                                    }
+                                                  >
+                                                    {manualPriceSavingId ===
+                                                      holding.holdingId
+                                                      ? "저장 중..."
+                                                      : "시세 저장"}
+                                                  </button>
+                                                </div>
+
+                                                {manualPriceErrors[
+                                                  holding.holdingId
+                                                ] && (
+                                                  <p
+                                                    className={
+                                                      styles.error
+                                                    }
+                                                  >
+                                                    {manualPriceErrors[
+                                                      holding.holdingId
+                                                    ]}
+                                                  </p>
+                                                )}
+
+                                                {manualPriceFeedbackId ===
+                                                  holding.holdingId && (
+                                                  <p
+                                                    className={
+                                                      styles.helperText
+                                                    }
+                                                  >
+                                                    수동시세를 저장했습니다.
+                                                  </p>
+                                                )}
+                                              </div>
+                                            </details>
+                                          )}
 
 
                                           {holding.market ===
