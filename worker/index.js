@@ -1475,16 +1475,20 @@ async function prepareBackend(
   env,
   origin
 ) {
-  await Promise.all([
-    prefetchBootstrap(
-      env,
-      origin
-    ),
+  /*
+   * 앱 첫 진입에서는 홈 대시보드가 가장 먼저 필요합니다.
+   * 대시보드를 우선 준비한 뒤 입력용 bootstrap을 채워
+   * Apps Script 냉시작 요청이 서로 경쟁하지 않게 합니다.
+   */
+  await prefetchDashboard(
+    env,
+    origin
+  );
 
-    warmAppsScript(
-      env
-    )
-  ]);
+  await prefetchBootstrap(
+    env,
+    origin
+  );
 }
 
 async function refreshAfterMutation(
