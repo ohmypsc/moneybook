@@ -11,6 +11,7 @@ import type {
 } from "./envelope";
 
 import type {
+  InvestmentTrade,
   InvestmentTradesResponse,
   SetInvestmentCashBaselinePayload,
   CreateInvestmentTradePayload
@@ -24,7 +25,7 @@ type MutationResponse =
   >;
 
 
-interface InvestmentTradeQuery {
+type InvestmentTradeQuery = {
   accountId?:
     string;
 
@@ -36,39 +37,106 @@ interface InvestmentTradeQuery {
 
   includeDeleted?:
     boolean;
-}
+};
 
 
-interface PrefetchedTradeEntry {
+type TradeCacheEntry = {
   data:
     InvestmentTradesResponse;
 
-  storedAt:
+  fetchedAt:
     number;
+};
+
+
+const TRADE_CACHE_TTL_MS =
+  30 * 1000;
+
+
+let allActiveTradesCache:
+  TradeCacheEntry |
+  null =
+    null;
+
+
+let allActiveTradesRequest:
+  Promise<InvestmentTradesResponse> |
+  null =
+    null;
+
+
+function isAllTradesCacheFresh() {
+  return !!(
+    allActiveTradesCache &&
+    Date.now() -
+      allActiveTradesCache.fetchedAt <=
+      TRADE_CACHE_TTL_MS
+  );
 }
 
 
-const TRADE_PREFETCH_TTL_MS =
-  60 * 1000;
+function filterTrades(
+  data:
+    InvestmentTradesResponse,
+
+  params:
+    InvestmentTradeQuery
+): InvestmentTradesResponse {
+  let items:
+    InvestmentTrade[] =
+      Array.isArray(
+        data.items
+      )
+        ? data.items
+        : [];
 
 
-const prefetchedTradeCache =
-  new Map<
-    string,
-    PrefetchedTradeEntry
-  >();
+  if (
+    params.accountId
+  ) {
+    items =
+      items.filter(
+        trade =>
+          trade.accountId ===
+          params.accountId
+      );
+  }
 
 
-const tradePrefetchRequests =
-  new Map<
-    string,
-    Promise<
-      InvestmentTradesResponse
-    >
-  >();
+  if (
+    params.holdingId
+  ) {
+    items =
+      items.filter(
+        trade =>
+          trade.holdingId ===
+          params.holdingId
+      );
+  }
 
 
-function createTradeQueryKey(
+  if (
+    params.tradeType
+  ) {
+    items =
+      items.filter(
+        trade =>
+          trade.tradeType ===
+          params.tradeType
+      );
+  }
+
+
+  return {
+    total:
+      items.length,
+
+    items
+  };
+}
+
+
+function buildTradesUrl(
   params:
     InvestmentTradeQuery = {}
 ) {
@@ -116,19 +184,8 @@ function createTradeQueryKey(
   }
 
 
-  return searchParams
-    .toString();
-}
-
-
-function createTradeUrl(
-  params:
-    InvestmentTradeQuery = {}
-) {
   const query =
-    createTradeQueryKey(
-      params
-    );
+    searchParams.toString();
 
 
   return query
@@ -143,12 +200,10 @@ async function requestInvestmentTrades(
 ) {
   const raw =
     await apiRequest<
-      | ApiEnvelope<
-          InvestmentTradesResponse
-        >
+      | ApiEnvelope<InvestmentTradesResponse>
       | InvestmentTradesResponse
     >(
-      createTradeUrl(
+      buildTradesUrl(
         params
       )
     );
@@ -162,184 +217,66 @@ async function requestInvestmentTrades(
 }
 
 
-function getPrefetchedTrades(
-  params:
-    InvestmentTradeQuery
-) {
-  const key =
-    createTradeQueryKey(
-      params
-    );
+export function clearInvestmentPrefetchCache() {
+  allActiveTradesCache =
+    null;
+
+  allActiveTradesRequest =
+    null;
+}
 
 
-  const cached =
-    prefetchedTradeCache.get(
-      key
-    );
-
-
-  if (!cached) {
-    return null;
+export async function prefetchInvestmentTrades() {
+  if (
+    isAllTradesCacheFresh()
+  ) {
+    return allActiveTradesCache!
+      .data;
   }
 
 
   if (
-    Date.now() -
-      cached.storedAt >
-    TRADE_PREFETCH_TTL_MS
+    allActiveTradesRequest
   ) {
-    prefetchedTradeCache.delete(
-      key
-    );
-
-    return null;
+    return allActiveTradesRequest;
   }
 
 
-  /*
-   * 시작 시 받은 매매내역은
-   * 첫 표시에서 한 번만 사용합니다.
-   *
-   * 그 뒤 수정/삭제/복원 시에는
-   * 서버에서 새로 받아오게 합니다.
-   */
-  prefetchedTradeCache.delete(
-    key
-  );
+  let request:
+    Promise<InvestmentTradesResponse>;
 
 
-  return cached.data;
-}
-
-
-export function clearInvestmentPrefetchCache() {
-  prefetchedTradeCache.clear();
-  tradePrefetchRequests.clear();
-}
-
-
-/*
- * 앱 시작 후 투자계좌별
- * 일반 매매내역을 미리 준비합니다.
- *
- * 삭제된 거래는 여기서 불러오지 않습니다.
- */
-export async function prefetchInvestmentTradesForAccounts(
-  accountIds:
-    string[]
-) {
-  const uniqueIds =
-    Array.from(
-      new Set(
-        accountIds
-          .map(
-            value =>
-              value.trim()
-          )
-          .filter(
-            Boolean
-          )
-      )
-    );
-
-
-  await Promise.allSettled(
-    uniqueIds.map(
-      async accountId => {
-        const params:
-          InvestmentTradeQuery = {
-            accountId
+  request =
+    requestInvestmentTrades()
+      .then(
+        data => {
+          allActiveTradesCache = {
+            data,
+            fetchedAt:
+              Date.now()
           };
 
-
-        const key =
-          createTradeQueryKey(
-            params
-          );
-
-
-        const existing =
-          prefetchedTradeCache.get(
-            key
-          );
-
-
-        if (
-          existing &&
-          Date.now() -
-            existing.storedAt <=
-            TRADE_PREFETCH_TTL_MS
-        ) {
-          return;
+          return data;
         }
-
-
-        const existingRequest =
-          tradePrefetchRequests.get(
-            key
-          );
-
-
-        if (
-          existingRequest
-        ) {
-          await existingRequest;
-
-          return;
+      )
+      .finally(
+        () => {
+          if (
+            allActiveTradesRequest ===
+            request
+          ) {
+            allActiveTradesRequest =
+              null;
+          }
         }
+      );
 
 
-        let request:
-          Promise<
-            InvestmentTradesResponse
-          >;
+  allActiveTradesRequest =
+    request;
 
 
-        request =
-          requestInvestmentTrades(
-            params
-          )
-            .then(
-              data => {
-                prefetchedTradeCache.set(
-                  key,
-                  {
-                    data,
-                    storedAt:
-                      Date.now()
-                  }
-                );
-
-
-                return data;
-              }
-            )
-            .finally(
-              () => {
-                if (
-                  tradePrefetchRequests.get(
-                    key
-                  ) ===
-                  request
-                ) {
-                  tradePrefetchRequests.delete(
-                    key
-                  );
-                }
-              }
-            );
-
-
-        tradePrefetchRequests.set(
-          key,
-          request
-        );
-
-
-        await request;
-      }
-    )
-  );
+  return request;
 }
 
 
@@ -355,9 +292,7 @@ async function postInvestmentMutation(
 ) {
   const raw =
     await apiRequest<
-      | ApiEnvelope<
-          MutationResponse
-        >
+      | ApiEnvelope<MutationResponse>
       | MutationResponse
     >(
       path,
@@ -386,12 +321,6 @@ async function postInvestmentMutation(
     );
 
 
-  /*
-   * 매수/매도, 예수금, 수동시세 등
-   * 투자 정보가 바뀌었으므로
-   * 시작 단계에서 받아둔 투자 캐시는
-   * 다시 사용하지 않습니다.
-   */
   clearInvestmentPrefetchCache();
 
 
@@ -462,23 +391,30 @@ export async function getInvestmentTrades(
   params:
     InvestmentTradeQuery = {}
 ) {
-  /*
-   * 삭제 거래 조회는 항상 서버에서
-   * 새로 가져옵니다.
-   */
   if (
     !params.includeDeleted
   ) {
-    const prefetched =
-      getPrefetchedTrades(
+    if (
+      isAllTradesCacheFresh() &&
+      allActiveTradesCache
+    ) {
+      return filterTrades(
+        allActiveTradesCache.data,
         params
       );
+    }
 
 
     if (
-      prefetched
+      allActiveTradesRequest
     ) {
-      return prefetched;
+      const data =
+        await allActiveTradesRequest;
+
+      return filterTrades(
+        data,
+        params
+      );
     }
   }
 
