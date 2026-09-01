@@ -5,7 +5,8 @@ import {
 } from "react";
 
 import {
-  getDashboard
+  getDashboard,
+  getDashboardSnapshot
 } from "../../api/dashboard";
 
 import {
@@ -199,20 +200,34 @@ export default function AssetsPage() {
     );
 
   const [
+    initialDashboard
+  ] =
+    useState<
+      DashboardData |
+      null
+    >(
+      () =>
+        getDashboardSnapshot()
+    );
+
+  const [
     dashboard,
     setDashboard
   ] =
     useState<
       DashboardData |
       null
-    >(null);
+    >(
+      initialDashboard
+    );
 
   const [
     loading,
     setLoading
   ] =
     useState(
-      true
+      initialDashboard ===
+        null
     );
 
   const [
@@ -301,9 +316,26 @@ export default function AssetsPage() {
 
 
   async function loadDashboard() {
-    setLoading(
-      true
-    );
+    const cachedDashboard =
+      getDashboardSnapshot();
+
+    if (
+      cachedDashboard
+    ) {
+      setDashboard(
+        cachedDashboard
+      );
+
+      setLoading(
+        false
+      );
+    } else if (
+      !dashboard
+    ) {
+      setLoading(
+        true
+      );
+    }
 
     setError(
       ""
@@ -319,11 +351,16 @@ export default function AssetsPage() {
     } catch (
       err
     ) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "자산 정보를 불러오지 못했습니다."
-      );
+      if (
+        !dashboard &&
+        !getDashboardSnapshot()
+      ) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "자산 정보를 불러오지 못했습니다."
+        );
+      }
     } finally {
       setLoading(
         false
