@@ -10,17 +10,7 @@
 
     <meta
       name="theme-color"
-      content="#ffffff"
-    />
-
-    <meta
-      name="application-name"
-      content="우리 가계부"
-    />
-
-    <meta
-      name="description"
-      content="부부가 함께 쓰는 수입·지출·자산 가계부"
+      content="#111111"
     />
 
     <meta
@@ -35,12 +25,12 @@
 
     <meta
       name="apple-mobile-web-app-status-bar-style"
-      content="default"
+      content="black-translucent"
     />
 
     <meta
       name="apple-mobile-web-app-title"
-      content="우리 가계부"
+      content="가계부"
     />
 
     <link
@@ -50,13 +40,261 @@
 
     <link
       rel="apple-touch-icon"
-      href="/apple-touch-icon.png"
+      href="/icons/icon-180.png"
+    />
+
+    <link
+      rel="preload"
+      href="/splash-photo.jpg"
+      as="image"
+      fetchpriority="high"
     />
 
     <title>우리 가계부</title>
+
+    <script>
+      window.__moneybookSplashStartedAt =
+        Date.now();
+    </script>
+
+    <style>
+      html,
+      body {
+        margin: 0;
+        min-width: 100%;
+        min-height: 100%;
+      }
+
+      body {
+        background: #111111;
+      }
+
+      #launch-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 99999;
+
+        width: 100%;
+        height: 100%;
+        height: 100dvh;
+
+        overflow: hidden;
+
+        background: #111111;
+
+        opacity: 1;
+        visibility: visible;
+
+        transition:
+          opacity 320ms ease,
+          visibility 320ms ease;
+      }
+
+      #launch-splash.is-hidden {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+
+      .launch-splash__photo {
+        position: absolute;
+        inset: 0;
+
+        width: 100%;
+        height: 100%;
+
+        object-fit: cover;
+        object-position: center center;
+
+        user-select: none;
+        -webkit-user-drag: none;
+      }
+
+      .launch-splash__shade {
+        position: absolute;
+        inset: 0;
+
+        background:
+          linear-gradient(
+            to bottom,
+            rgba(0, 0, 0, 0.04) 0%,
+            rgba(0, 0, 0, 0.03) 48%,
+            rgba(0, 0, 0, 0.3) 72%,
+            rgba(0, 0, 0, 0.7) 100%
+          );
+      }
+
+      .launch-splash__content {
+        position: absolute;
+
+        left: 0;
+        right: 0;
+        bottom: 0;
+
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+
+        padding:
+          32px
+          24px
+          calc(
+            38px +
+            env(safe-area-inset-bottom)
+          );
+
+        color: #ffffff;
+
+        text-align: center;
+
+        text-shadow:
+          0 1px 12px
+          rgba(0, 0, 0, 0.42);
+      }
+
+      .launch-splash__title {
+        margin: 0;
+
+        font-family:
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+
+        font-size: 29px;
+        font-weight: 800;
+        line-height: 1.25;
+
+        letter-spacing: -0.04em;
+      }
+
+      .launch-splash__names {
+        margin:
+          8px
+          0
+          0;
+
+        font-family:
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+
+        font-size: 15px;
+        font-weight: 650;
+        line-height: 1.4;
+
+        opacity: 0.94;
+      }
+
+      .launch-splash__loading {
+        display: flex;
+        align-items: center;
+
+        gap: 9px;
+
+        margin-top: 20px;
+
+        font-family:
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+
+        font-size: 12px;
+        font-weight: 600;
+
+        opacity: 0.86;
+      }
+
+      .launch-splash__spinner {
+        width: 14px;
+        height: 14px;
+
+        border:
+          2px solid
+          rgba(255, 255, 255, 0.34);
+
+        border-top-color:
+          rgba(255, 255, 255, 0.96);
+
+        border-radius: 50%;
+
+        animation:
+          moneybook-splash-spin
+          0.75s
+          linear
+          infinite;
+      }
+
+      @keyframes moneybook-splash-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      @media (
+        prefers-reduced-motion:
+          reduce
+      ) {
+        #launch-splash {
+          transition: none;
+        }
+
+        .launch-splash__spinner {
+          animation-duration: 1.5s;
+        }
+      }
+    </style>
   </head>
 
   <body>
+    <div
+      id="launch-splash"
+      aria-label="우리 가계부를 준비하고 있습니다."
+    >
+      <img
+        class="launch-splash__photo"
+        src="/splash-photo.jpg"
+        alt=""
+        aria-hidden="true"
+      />
+
+      <div
+        class="launch-splash__shade"
+        aria-hidden="true"
+      ></div>
+
+      <div
+        class="launch-splash__content"
+      >
+        <h1
+          class="launch-splash__title"
+        >
+          우리 가계부
+        </h1>
+
+        <p
+          class="launch-splash__names"
+        >
+          미영 ♥ 승철
+        </p>
+
+        <div
+          class="launch-splash__loading"
+        >
+          <span
+            class="launch-splash__spinner"
+            aria-hidden="true"
+          ></span>
+
+          <span>
+            가계부를 준비하고 있어요
+          </span>
+        </div>
+      </div>
+    </div>
+
     <div id="root"></div>
 
     <script
