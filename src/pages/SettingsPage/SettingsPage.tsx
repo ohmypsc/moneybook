@@ -138,23 +138,133 @@ const ACCOUNT_OWNER_TABS = [
 type AccountOwnerTab =
     typeof ACCOUNT_OWNER_TABS[number];
 
-const ACCOUNT_TYPE_SUGGESTIONS = [
+const ACCOUNT_TYPE_OPTIONS = [
     "자산",
     "부채",
     "투자"
-];
+] as const;
 
-const ACCOUNT_SUBTYPE_SUGGESTIONS = [
-    "입출금",
-    "현금",
-    "체크카드",
-    "신용카드",
-    "선불/지역화폐",
-    "예금",
-    "적금",
-    "주식",
-    "대출"
-];
+type AccountType =
+    typeof ACCOUNT_TYPE_OPTIONS[number];
+
+const ACCOUNT_SUBTYPE_OPTIONS:
+    Record<
+        AccountType,
+        readonly string[]
+    > = {
+        자산: [
+            "입출금",
+            "현금",
+            "체크카드",
+            "선불/지역화폐",
+            "예금",
+            "적금"
+        ],
+
+        부채: [
+            "신용카드",
+            "대출"
+        ],
+
+        투자: [
+            "주식"
+        ]
+    };
+
+function isAccountType(
+    value: string
+): value is AccountType {
+    return ACCOUNT_TYPE_OPTIONS.some(
+        option =>
+            option === value
+    );
+}
+
+function getAccountTypeOptions(
+    currentAccountType: string
+) {
+    const options:
+        string[] = [
+            ...ACCOUNT_TYPE_OPTIONS
+        ];
+
+    if (
+        currentAccountType &&
+        !options.includes(
+            currentAccountType
+        )
+    ) {
+        options.unshift(
+            currentAccountType
+        );
+    }
+
+    return options;
+}
+
+function getAccountSubtypeOptions(
+    accountType: string,
+    currentSubType: string = ""
+) {
+    const options =
+        isAccountType(
+            accountType
+        )
+            ? [
+                  ...ACCOUNT_SUBTYPE_OPTIONS[
+                      accountType
+                  ]
+              ]
+            : [];
+
+    if (
+        currentSubType &&
+        !options.includes(
+            currentSubType
+        )
+    ) {
+        return [
+            currentSubType,
+            ...options
+        ];
+    }
+
+    return options;
+}
+
+function applyAccountClassification(
+    current: AccountFormState,
+    accountType: string,
+    subType: string
+): AccountFormState {
+    const isCard =
+        subType === "체크카드" ||
+        subType === "신용카드";
+
+    const isCreditCard =
+        subType === "신용카드";
+
+    return {
+        ...current,
+        accountType,
+        subType,
+
+        paymentAccountId:
+            isCard
+                ? current.paymentAccountId
+                : "",
+
+        billingCutoffDay:
+            isCreditCard
+                ? current.billingCutoffDay
+                : "",
+
+        paymentDay:
+            isCreditCard
+                ? current.paymentDay
+                : ""
+    };
+}
 
 function getErrorMessage(
     error: unknown,
@@ -2657,6 +2767,17 @@ function AccountSettings() {
         form.subType ===
             "신용카드";
 
+    const accountTypeOptions =
+        getAccountTypeOptions(
+            form.accountType
+        );
+
+    const accountSubtypeOptions =
+        getAccountSubtypeOptions(
+            form.accountType,
+            form.subType
+        );
+
     function updateForm<
         K extends
             keyof AccountFormState
@@ -2670,6 +2791,46 @@ function AccountSettings() {
                 ...current,
                 [key]: value
             })
+        );
+    }
+
+    function handleAccountTypeChange(
+        accountType: string
+    ) {
+        setForm(
+            current => {
+                const options =
+                    getAccountSubtypeOptions(
+                        accountType
+                    );
+
+                const subType =
+                    options.includes(
+                        current.subType
+                    )
+                        ? current.subType
+                        : options[0] ||
+                          "";
+
+                return applyAccountClassification(
+                    current,
+                    accountType,
+                    subType
+                );
+            }
+        );
+    }
+
+    function handleSubTypeChange(
+        subType: string
+    ) {
+        setForm(
+            current =>
+                applyAccountClassification(
+                    current,
+                    current.accountType,
+                    subType
+                )
         );
     }
 
@@ -2979,44 +3140,6 @@ function AccountSettings() {
                             </button>
                         </div>
 
-                        <datalist
-                            id="account-type-suggestions"
-                        >
-                            {
-                                ACCOUNT_TYPE_SUGGESTIONS.map(
-                                    value => (
-                                        <option
-                                            key={
-                                                value
-                                            }
-                                            value={
-                                                value
-                                            }
-                                        />
-                                    )
-                                )
-                            }
-                        </datalist>
-
-                        <datalist
-                            id="account-subtype-suggestions"
-                        >
-                            {
-                                ACCOUNT_SUBTYPE_SUGGESTIONS.map(
-                                    value => (
-                                        <option
-                                            key={
-                                                value
-                                            }
-                                            value={
-                                                value
-                                            }
-                                        />
-                                    )
-                                )
-                            }
-                        </datalist>
-
                         <div
                             className={
                                 styles.formGrid
@@ -3108,14 +3231,9 @@ function AccountSettings() {
                                     계좌 유형
                                 </span>
 
-                                <input
-                                    type="text"
-                                    list="account-type-suggestions"
+                                <select
                                     value={
                                         form.accountType
-                                    }
-                                    maxLength={
-                                        30
                                     }
                                     disabled={
                                         Boolean(
@@ -3124,12 +3242,28 @@ function AccountSettings() {
                                     }
                                     onChange={
                                         event =>
-                                            updateForm(
-                                                "accountType",
+                                            handleAccountTypeChange(
                                                 event.target.value
                                             )
                                     }
-                                />
+                                >
+                                    {
+                                        accountTypeOptions.map(
+                                            value => (
+                                                <option
+                                                    key={
+                                                        value
+                                                    }
+                                                    value={
+                                                        value
+                                                    }
+                                                >
+                                                    {value}
+                                                </option>
+                                            )
+                                        )
+                                    }
+                                </select>
                             </label>
 
                             <label
@@ -3141,14 +3275,9 @@ function AccountSettings() {
                                     세부 구분
                                 </span>
 
-                                <input
-                                    type="text"
-                                    list="account-subtype-suggestions"
+                                <select
                                     value={
                                         form.subType
-                                    }
-                                    maxLength={
-                                        40
                                     }
                                     disabled={
                                         Boolean(
@@ -3157,24 +3286,28 @@ function AccountSettings() {
                                     }
                                     onChange={
                                         event =>
-                                            setForm(
-                                                current => ({
-                                                    ...current,
-
-                                                    subType:
-                                                        event.target.value,
-
-                                                    paymentAccountId:
-                                                        event.target.value ===
-                                                            "체크카드" ||
-                                                        event.target.value ===
-                                                            "신용카드"
-                                                            ? current.paymentAccountId
-                                                            : ""
-                                                })
+                                            handleSubTypeChange(
+                                                event.target.value
                                             )
                                     }
-                                />
+                                >
+                                    {
+                                        accountSubtypeOptions.map(
+                                            value => (
+                                                <option
+                                                    key={
+                                                        value
+                                                    }
+                                                    value={
+                                                        value
+                                                    }
+                                                >
+                                                    {value}
+                                                </option>
+                                            )
+                                        )
+                                    }
+                                </select>
                             </label>
 
                             <label
