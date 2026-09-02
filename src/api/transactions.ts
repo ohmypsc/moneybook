@@ -66,6 +66,9 @@ export interface Transaction {
   updatedAt:
     string | null;
 
+  updatedAtMs:
+    number | null;
+
   createdBy: string;
 
   updatedBy: string;
