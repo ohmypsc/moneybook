@@ -1438,3 +1438,73 @@ summary::after {
     text-align: left;
   }
 }
+
+
+/* =========================================================
+   모바일 터치 최적화
+   ========================================================= */
+
+@media (max-width: 560px) {
+  .backButton {
+    min-height: 44px;
+    padding-right: 12px;
+    padding-left: 8px;
+  }
+
+  .segmentButton,
+  .segmentButtonActive {
+    min-height: 44px;
+  }
+
+  .field input,
+  .field select,
+  .inlineEdit input {
+    min-height: 48px;
+    font-size: 16px;
+  }
+
+  .iconButton,
+  .closeButton {
+    width: 44px;
+    height: 44px;
+  }
+
+  .visibilityButton,
+  .visibleButton {
+    min-width: 52px;
+    min-height: 44px;
+    padding-right: 11px;
+    padding-left: 11px;
+    font-size: 11px;
+  }
+
+  .primaryButton,
+  .secondaryButton,
+  .fullWidthButton,
+  .logoutButton {
+    min-height: 48px;
+    font-size: 13px;
+  }
+
+  .primarySmallButton,
+  .secondarySmallButton,
+  .dangerSmallButton,
+  .restoreButton {
+    min-height: 44px;
+    padding-right: 12px;
+    padding-left: 12px;
+    font-size: 11px;
+  }
+
+  .deletedSection summary {
+    min-height: 44px;
+  }
+
+  .stickyActions {
+    bottom:
+      calc(
+        76px +
+        env(safe-area-inset-bottom)
+      );
+  }
+}
