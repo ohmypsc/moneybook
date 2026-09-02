@@ -6,48 +6,20 @@ import {
   useState
 } from "react";
 
-import {
-  apiRequest
-} from "../../api/client";
-
-import {
-  getBootstrapCacheGeneration
-} from "../../api/bootstrapCache";
-
-import {
-  createTransaction
-} from "../../api/transactions";
-
+import { apiRequest } from "../../api/client";
+import { getBootstrapCacheGeneration } from "../../api/bootstrapCache";
+import { createTransaction } from "../../api/transactions";
 import {
   applyAccountPreferences,
   applyCategoryPreferences,
   getInputPreferences,
   sortAccountsByPreferences
 } from "../../utils/inputPreferences";
+import styles from "./InputPage.module.css";
 
-import styles
-  from "./InputPage.module.css";
-
-
-type TransactionType =
-  | "지출"
-  | "수입"
-  | "이체";
-
-
-type InputMode =
-  | "expense"
-  | "income"
-  | "transfer"
-  | "card-payment"
-  | "card-prepayment";
-
-
-type CreateTransactionPayload =
-  Parameters<
-    typeof createTransaction
-  >[0];
-
+type TransactionType = "지출" | "수입" | "이체";
+type InputMode = "expense" | "income" | "transfer";
+type CreateTransactionPayload = Parameters<typeof createTransaction>[0];
 
 interface Account {
   accountId: string;
@@ -59,191 +31,109 @@ interface Account {
   paymentAccountId?: string | null;
 }
 
-
 interface Category {
   categoryId: string;
   type: TransactionType;
   name: string;
 }
 
-
 interface BootstrapData {
-  transactionTypes:
-    TransactionType[];
-
+  transactionTypes: TransactionType[];
   members: string[];
-
-  spendingTargets:
-    string[];
-
+  spendingTargets: string[];
   accounts: Account[];
-
   categories: Category[];
 }
 
-
 interface BootstrapResponse {
   success: boolean;
-
   apiVersion?: string;
-
   data?: BootstrapData;
-
   error?: {
     code?: string;
     message?: string;
   };
 }
-
 
 interface ApiResult {
   success?: boolean;
-
   error?: {
     code?: string;
     message?: string;
   };
 }
-
 
 interface RequestMemory {
   fingerprint: string;
   requestId: string;
 }
 
+const CARD_PAYMENT_CATEGORY = "카드정기결제";
+const CARD_PREPAYMENT_CATEGORY = "카드선결제";
 
-const CARD_PAYMENT_CATEGORY =
-  "카드정기결제";
+let bootstrapPromise: Promise<BootstrapData> | null = null;
+let bootstrapPromiseGeneration = -1;
+let bootstrapSnapshot: BootstrapData | null = null;
 
-const CARD_PREPAYMENT_CATEGORY =
-  "카드선결제";
-
-const CARD_CATEGORY_NAMES =
-  new Set([
-    CARD_PAYMENT_CATEGORY,
-    CARD_PREPAYMENT_CATEGORY
-  ]);
-
-
-let bootstrapPromise:
-  Promise<BootstrapData> | null =
-  null;
-
-let bootstrapPromiseGeneration =
-  -1;
-
-
-/*
- * InputPage는 하단 탭을 이동할 때 언마운트됩니다.
- * 마지막으로 정상 로드한 bootstrap을 모듈 메모리에 보관해 두면
- * 다시 입력 탭으로 돌아올 때 로딩 화면부터 그리지 않고
- * 직전 데이터를 즉시 사용할 수 있습니다.
- */
-let bootstrapSnapshot:
-  BootstrapData | null =
-  null;
-
-
-async function loadBootstrap():
-  Promise<BootstrapData> {
-  const generation =
-    getBootstrapCacheGeneration();
+async function loadBootstrap(): Promise<BootstrapData> {
+  const generation = getBootstrapCacheGeneration();
 
   if (
     !bootstrapPromise ||
-    bootstrapPromiseGeneration !==
-      generation
+    bootstrapPromiseGeneration !== generation
   ) {
-    bootstrapPromiseGeneration =
-      generation;
+    bootstrapPromiseGeneration = generation;
+    const requestGeneration = generation;
 
-    const requestGeneration =
-      generation;
+    bootstrapPromise = apiRequest<BootstrapResponse>("/api/bootstrap")
+      .then(async response => {
+        if (!response.success || !response.data) {
+          throw new Error(
+            response.error?.message || "입력 정보를 불러오지 못했습니다."
+          );
+        }
 
-    bootstrapPromise =
-      apiRequest<BootstrapResponse>(
-        "/api/bootstrap"
-      )
-        .then(
-          response => {
-            if (
-              !response.success ||
-              !response.data
-            ) {
-              throw new Error(
-                response.error
-                  ?.message ||
-                  "입력 정보를 불러오지 못했습니다."
-              );
-            }
+        if (getBootstrapCacheGeneration() !== requestGeneration) {
+          bootstrapPromise = null;
+          return loadBootstrap();
+        }
 
-            /*
-             * 요청 도중 카테고리/계좌 설정 변경으로
-             * bootstrap generation이 바뀌었다면 오래된 응답을
-             * 화면 스냅샷으로 남기지 않습니다.
-             */
-            if (
-              getBootstrapCacheGeneration() ===
-                requestGeneration
-            ) {
-              bootstrapSnapshot =
-                response.data;
-            }
+        bootstrapSnapshot = response.data;
+        return response.data;
+      })
+      .catch(error => {
+        if (bootstrapPromiseGeneration === requestGeneration) {
+          bootstrapPromise = null;
+        }
 
-            return response.data;
-          }
-        )
-        .catch(
-          error => {
-            if (
-              bootstrapPromiseGeneration ===
-                requestGeneration
-            ) {
-              bootstrapPromise =
-                null;
-            }
-
-            throw error;
-          }
-        );
+        throw error;
+      });
   }
 
   return bootstrapPromise;
 }
 
+function getToday() {
+  const now = new Date();
 
-function getToday():
-  string {
-  const now =
-    new Date();
-
-  const local =
-    new Date(
-      now.getTime() -
-        now.getTimezoneOffset() *
-          60 *
-          1000
-    );
+  const local = new Date(
+    now.getTime() -
+      now.getTimezoneOffset() *
+        60 *
+        1000
+  );
 
   return local
     .toISOString()
-    .slice(
-      0,
-      10
-    );
+    .slice(0, 10);
 }
 
-
-function createRequestId():
-  string {
+function createRequestId() {
   if (
     globalThis.crypto &&
-    typeof globalThis.crypto
-      .randomUUID ===
-      "function"
+    typeof globalThis.crypto.randomUUID === "function"
   ) {
-    return globalThis.crypto
-      .randomUUID();
+    return globalThis.crypto.randomUUID();
   }
 
   return [
@@ -255,11 +145,9 @@ function createRequestId():
   ].join("_");
 }
 
-
 function getErrorMessage(
   error: unknown
-):
-  string {
+) {
   if (
     error instanceof Error &&
     error.message
@@ -270,65 +158,37 @@ function getErrorMessage(
   return "저장 중 오류가 발생했습니다.";
 }
 
-
 function getBackendType(
   mode: InputMode
-):
-  TransactionType {
-  if (
-    mode ===
-      "card-payment" ||
-    mode ===
-      "card-prepayment"
-  ) {
-    return "이체";
-  }
-
-  if (
-    mode ===
-    "income"
-  ) {
+): TransactionType {
+  if (mode === "income") {
     return "수입";
   }
 
-  if (
-    mode ===
-    "transfer"
-  ) {
+  if (mode === "transfer") {
     return "이체";
   }
 
   return "지출";
 }
 
-
 function getModeLabel(
   mode: InputMode
-):
-  string {
-  switch (mode) {
-    case "income":
-      return "수입";
-
-    case "transfer":
-      return "이체";
-
-    case "card-payment":
-      return "카드값 결제";
-
-    case "card-prepayment":
-      return "카드 선결제";
-
-    default:
-      return "지출";
+) {
+  if (mode === "income") {
+    return "수입";
   }
-}
 
+  if (mode === "transfer") {
+    return "이체";
+  }
+
+  return "지출";
+}
 
 function getAccountLabel(
   account: Account
-):
-  string {
+) {
   return (
     account.displayName ||
     account.accountName ||
@@ -336,6 +196,39 @@ function getAccountLabel(
   );
 }
 
+function getCategoryLabel(
+  category: Category
+) {
+  if (
+    category.name ===
+    CARD_PAYMENT_CATEGORY
+  ) {
+    return "카드값 결제";
+  }
+
+  if (
+    category.name ===
+    CARD_PREPAYMENT_CATEGORY
+  ) {
+    return "카드 선결제";
+  }
+
+  return category.name;
+}
+
+function isCardSettlementCategory(
+  category: Category | null
+) {
+  return !!(
+    category &&
+    (
+      category.name ===
+        CARD_PAYMENT_CATEGORY ||
+      category.name ===
+        CARD_PREPAYMENT_CATEGORY
+    )
+  );
+}
 
 export default function InputPage() {
   const today =
@@ -378,7 +271,9 @@ export default function InputPage() {
     date,
     setDate
   ] =
-    useState(today);
+    useState(
+      today
+    );
 
   const [
     amount,
@@ -456,26 +351,17 @@ export default function InputPage() {
       null
     );
 
-
-  const isCardMode =
-    mode ===
-      "card-payment" ||
-    mode ===
-      "card-prepayment";
-
-
   const backendType =
     getBackendType(
       mode
     );
-
 
   useEffect(
     () => {
       let active =
         true;
 
-      loadBootstrap()
+      void loadBootstrap()
         .then(
           data => {
             if (!active) {
@@ -506,7 +392,9 @@ export default function InputPage() {
         )
         .finally(
           () => {
-            if (active) {
+            if (
+              active
+            ) {
               setBootstrapLoading(
                 false
               );
@@ -522,11 +410,12 @@ export default function InputPage() {
     []
   );
 
-
   const preferences =
     useMemo(
       () => {
-        if (!bootstrap) {
+        if (
+          !bootstrap
+        ) {
           return null;
         }
 
@@ -539,7 +428,6 @@ export default function InputPage() {
         bootstrap
       ]
     );
-
 
   const categories =
     useMemo(
@@ -555,35 +443,46 @@ export default function InputPage() {
           bootstrap.categories,
           backendType,
           preferences
-        ).filter(
-          category => {
-            if (
-              mode !==
-              "transfer"
-            ) {
-              return true;
-            }
-
-            return !CARD_CATEGORY_NAMES
-              .has(
-                category.name
-              );
-          }
         );
       },
       [
         bootstrap,
         preferences,
-        backendType,
-        mode
+        backendType
       ]
     );
 
+  const selectedCategory =
+    useMemo(
+      () =>
+        categories.find(
+          category =>
+            category.categoryId ===
+            categoryId
+        ) ??
+        null,
+      [
+        categories,
+        categoryId
+      ]
+    );
+
+  const isCardTransfer =
+    mode ===
+      "transfer" &&
+    isCardSettlementCategory(
+      selectedCategory
+    );
+
+  const cardTransferLabel =
+    selectedCategory?.name ===
+      CARD_PREPAYMENT_CATEGORY
+      ? "카드 선결제"
+      : "카드값 결제";
 
   const allAccounts =
     bootstrap?.accounts ??
     [];
-
 
   const accounts =
     useMemo(
@@ -605,7 +504,6 @@ export default function InputPage() {
       ]
     );
 
-
   const visibleAccountIds =
     useMemo(
       () =>
@@ -620,7 +518,6 @@ export default function InputPage() {
       ]
     );
 
-
   const creditCards =
     useMemo(
       () =>
@@ -633,7 +530,6 @@ export default function InputPage() {
         accounts
       ]
     );
-
 
   const selectedCard =
     useMemo(
@@ -649,7 +545,6 @@ export default function InputPage() {
         toAccountId
       ]
     );
-
 
   const cardSourceAccounts =
     useMemo(
@@ -713,7 +608,6 @@ export default function InputPage() {
       ]
     );
 
-
   const formattedAmount =
     amount
       ? Number(
@@ -723,12 +617,17 @@ export default function InputPage() {
         )
       : "";
 
-
   function clearFeedback() {
     setError("");
     setSuccess("");
   }
 
+  function resetAccountSelections() {
+    setPaymentMethodId("");
+    setSpendingTarget("");
+    setFromAccountId("");
+    setToAccountId("");
+  }
 
   function handleModeChange(
     nextMode: InputMode
@@ -738,31 +637,21 @@ export default function InputPage() {
     );
 
     setCategoryId("");
-    setPaymentMethodId("");
-    setSpendingTarget("");
-    setFromAccountId("");
-    setToAccountId("");
 
-    if (
-      nextMode ===
-        "card-payment" ||
-      nextMode ===
-        "card-prepayment"
-    ) {
-      setBillingMonth(
-        date.slice(
-          0,
-          7
-        )
-      );
-    }
+    resetAccountSelections();
+
+    setBillingMonth(
+      date.slice(
+        0,
+        7
+      )
+    );
 
     requestMemory.current =
       null;
 
     clearFeedback();
   }
-
 
   function handleDateChange(
     value: string
@@ -778,7 +667,7 @@ export default function InputPage() {
     );
 
     if (
-      isCardMode &&
+      isCardTransfer &&
       (
         !billingMonth ||
         billingMonth ===
@@ -793,9 +682,11 @@ export default function InputPage() {
       );
     }
 
+    requestMemory.current =
+      null;
+
     clearFeedback();
   }
-
 
   function handleAmountChange(
     value: string
@@ -816,9 +707,53 @@ export default function InputPage() {
       normalized
     );
 
+    requestMemory.current =
+      null;
+
     clearFeedback();
   }
 
+  function handleCategoryChange(
+    nextCategoryId: string
+  ) {
+    setCategoryId(
+      nextCategoryId
+    );
+
+    if (
+      mode ===
+      "transfer"
+    ) {
+      setFromAccountId("");
+      setToAccountId("");
+
+      const nextCategory =
+        categories.find(
+          category =>
+            category.categoryId ===
+            nextCategoryId
+        ) ??
+        null;
+
+      if (
+        isCardSettlementCategory(
+          nextCategory
+        )
+      ) {
+        setBillingMonth(
+          date.slice(
+            0,
+            7
+          )
+        );
+      }
+    }
+
+    requestMemory.current =
+      null;
+
+    clearFeedback();
+  }
 
   function handleCardChange(
     accountId: string
@@ -836,43 +771,26 @@ export default function InputPage() {
 
     setFromAccountId(
       card?.paymentAccountId ||
-        ""
+      ""
     );
+
+    requestMemory.current =
+      null;
 
     clearFeedback();
   }
 
-
-  function getCardCategory():
-    Category | undefined {
-    if (!bootstrap) {
-      return undefined;
-    }
-
-    const categoryName =
-      mode ===
-        "card-prepayment"
-        ? CARD_PREPAYMENT_CATEGORY
-        : CARD_PAYMENT_CATEGORY;
-
-    return bootstrap.categories
-      .find(
-        category =>
-          category.type ===
-            "이체" &&
-          category.name ===
-            categoryName
-      );
-  }
-
-
   function validate():
     string | null {
-    if (!bootstrap) {
+    if (
+      !bootstrap
+    ) {
       return "입력 정보를 불러오지 못했습니다.";
     }
 
-    if (!date) {
+    if (
+      !date
+    ) {
       return "날짜를 선택해주세요.";
     }
 
@@ -891,39 +809,9 @@ export default function InputPage() {
       return "금액을 입력해주세요.";
     }
 
-    if (isCardMode) {
-      if (
-        !getCardCategory()
-      ) {
-        return mode ===
-          "card-prepayment"
-          ? "카드선결제 카테고리를 찾을 수 없습니다."
-          : "카드정기결제 카테고리를 찾을 수 없습니다.";
-      }
-
-      if (!toAccountId) {
-        return "결제할 카드를 선택해주세요.";
-      }
-
-      if (!fromAccountId) {
-        return "돈이 나갈 계좌를 선택해주세요.";
-      }
-
-      if (!billingMonth) {
-        return "대상 청구월을 선택해주세요.";
-      }
-
-      if (
-        fromAccountId ===
-        toAccountId
-      ) {
-        return "출금계좌와 카드는 같을 수 없습니다.";
-      }
-
-      return null;
-    }
-
-    if (!categoryId) {
+    if (
+      !categoryId
+    ) {
       return "카테고리를 선택해주세요.";
     }
 
@@ -956,11 +844,46 @@ export default function InputPage() {
       mode ===
       "transfer"
     ) {
-      if (!fromAccountId) {
+      if (
+        isCardTransfer
+      ) {
+        if (
+          !toAccountId
+        ) {
+          return "결제할 카드를 선택해주세요.";
+        }
+
+        if (
+          !fromAccountId
+        ) {
+          return "돈이 나갈 계좌를 선택해주세요.";
+        }
+
+        if (
+          !billingMonth
+        ) {
+          return "대상 청구월을 선택해주세요.";
+        }
+
+        if (
+          fromAccountId ===
+          toAccountId
+        ) {
+          return "출금계좌와 카드는 같을 수 없습니다.";
+        }
+
+        return null;
+      }
+
+      if (
+        !fromAccountId
+      ) {
         return "보내는 수단을 선택해주세요.";
       }
 
-      if (!toAccountId) {
+      if (
+        !toAccountId
+      ) {
         return "받는 수단을 선택해주세요.";
       }
 
@@ -975,12 +898,8 @@ export default function InputPage() {
     return null;
   }
 
-
   function buildPayload(
-    resolvedCategoryId:
-      string,
-    requestId:
-      string
+    requestId: string
   ):
     CreateTransactionPayload {
     const base = {
@@ -989,8 +908,7 @@ export default function InputPage() {
       type:
         backendType,
 
-      categoryId:
-        resolvedCategoryId,
+      categoryId,
 
       amount:
         Number(
@@ -1002,7 +920,6 @@ export default function InputPage() {
 
       requestId
     };
-
 
     if (
       mode ===
@@ -1017,7 +934,6 @@ export default function InputPage() {
       };
     }
 
-
     if (
       mode ===
       "income"
@@ -1029,21 +945,6 @@ export default function InputPage() {
       };
     }
 
-
-    if (
-      mode ===
-      "transfer"
-    ) {
-      return {
-        ...base,
-
-        fromAccountId,
-
-        toAccountId
-      };
-    }
-
-
     return {
       ...base,
 
@@ -1051,10 +952,15 @@ export default function InputPage() {
 
       toAccountId,
 
-      billingMonth
+      ...(
+        isCardTransfer
+          ? {
+              billingMonth
+            }
+          : {}
+      )
     };
   }
-
 
   async function handleSubmit(
     event:
@@ -1062,7 +968,9 @@ export default function InputPage() {
   ) {
     event.preventDefault();
 
-    if (submitting) {
+    if (
+      submitting
+    ) {
       return;
     }
 
@@ -1081,34 +989,11 @@ export default function InputPage() {
       return;
     }
 
-    if (!bootstrap) {
-      return;
-    }
-
-
-    const cardCategory =
-      isCardMode
-        ? getCardCategory()
-        : undefined;
-
-
-    const resolvedCategoryId =
-      isCardMode
-        ? cardCategory
-            ?.categoryId
-        : categoryId;
-
-
     if (
-      !resolvedCategoryId
+      !bootstrap
     ) {
-      setError(
-        "카테고리 정보를 찾을 수 없습니다."
-      );
-
       return;
     }
-
 
     const fingerprint =
       JSON.stringify({
@@ -1117,8 +1002,7 @@ export default function InputPage() {
         type:
           backendType,
 
-        categoryId:
-          resolvedCategoryId,
+        categoryId,
 
         amount:
           Number(
@@ -1139,22 +1023,20 @@ export default function InputPage() {
 
         fromAccountId:
           mode ===
-            "transfer" ||
-          isCardMode
+            "transfer"
             ? fromAccountId
             : undefined,
 
         toAccountId:
           mode ===
-            "income" ||
+              "income" ||
           mode ===
-            "transfer" ||
-          isCardMode
+              "transfer"
             ? toAccountId
             : undefined,
 
         billingMonth:
-          isCardMode
+          isCardTransfer
             ? billingMonth
             : undefined,
 
@@ -1162,10 +1044,8 @@ export default function InputPage() {
           memo.trim()
       });
 
-
     let requestId:
       string;
-
 
     if (
       requestMemory.current
@@ -1185,23 +1065,16 @@ export default function InputPage() {
       };
     }
 
-
-    const payload =
-      buildPayload(
-        resolvedCategoryId,
-        requestId
-      );
-
-
     setSubmitting(
       true
     );
 
-
     try {
       const result =
         await createTransaction(
-          payload
+          buildPayload(
+            requestId
+          )
         );
 
       const apiResult =
@@ -1215,35 +1088,34 @@ export default function InputPage() {
         throw new Error(
           apiResult.error
             ?.message ||
-            "거래를 저장하지 못했습니다."
+          "거래를 저장하지 못했습니다."
         );
       }
 
+      const savedLabel =
+        isCardTransfer
+          ? cardTransferLabel
+          : getModeLabel(
+              mode
+            );
 
       setSuccess(
-        `${getModeLabel(
-          mode
-        )} 내역을 저장했습니다.`
+        `${savedLabel} 내역을 저장했습니다.`
       );
 
       setAmount("");
       setCategoryId("");
-      setPaymentMethodId("");
-      setSpendingTarget("");
-      setFromAccountId("");
-      setToAccountId("");
+
+      resetAccountSelections();
+
+      setBillingMonth(
+        date.slice(
+          0,
+          7
+        )
+      );
+
       setMemo("");
-
-
-      if (isCardMode) {
-        setBillingMonth(
-          date.slice(
-            0,
-            7
-          )
-        );
-      }
-
 
       requestMemory.current =
         null;
@@ -1261,7 +1133,6 @@ export default function InputPage() {
       );
     }
   }
-
 
   if (
     bootstrapLoading
@@ -1283,8 +1154,9 @@ export default function InputPage() {
     );
   }
 
-
-  if (!bootstrap) {
+  if (
+    !bootstrap
+  ) {
     return (
       <main
         className={
@@ -1319,8 +1191,7 @@ export default function InputPage() {
               }
               onClick={
                 () =>
-                  window.location
-                    .reload()
+                  window.location.reload()
               }
             >
               다시 시도
@@ -1330,7 +1201,6 @@ export default function InputPage() {
       </main>
     );
   }
-
 
   return (
     <main
@@ -1364,11 +1234,9 @@ export default function InputPage() {
             styles.description
           }
         >
-          수입과 지출, 계좌 이동을
-          간편하게 기록합니다.
+          수입과 지출, 계좌 이동을 간편하게 기록합니다.
         </p>
       </header>
-
 
       <div
         className={
@@ -1376,229 +1244,59 @@ export default function InputPage() {
         }
         aria-label="거래 유형"
       >
-        <button
-          type="button"
-          className={[
-            styles.typeButton,
+        {
+          (
+            [
+              [
+                "expense",
+                "지출"
+              ],
+              [
+                "income",
+                "수입"
+              ],
+              [
+                "transfer",
+                "이체"
+              ]
+            ] as const
+          ).map(
+            ([
+              value,
+              label
+            ]) => (
+              <button
+                type="button"
+                key={
+                  value
+                }
+                className={[
+                  styles.typeButton,
 
-            mode ===
-              "expense"
-              ? styles
-                  .typeButtonActive
-              : ""
-          ].join(" ")}
-          aria-pressed={
-            mode ===
-            "expense"
-          }
-          onClick={
-            () =>
-              handleModeChange(
-                "expense"
-              )
-          }
-        >
-          지출
-        </button>
-
-        <button
-          type="button"
-          className={[
-            styles.typeButton,
-
-            mode ===
-              "income"
-              ? styles
-                  .typeButtonActive
-              : ""
-          ].join(" ")}
-          aria-pressed={
-            mode ===
-            "income"
-          }
-          onClick={
-            () =>
-              handleModeChange(
-                "income"
-              )
-          }
-        >
-          수입
-        </button>
-
-        <button
-          type="button"
-          className={[
-            styles.typeButton,
-
-            mode ===
-              "transfer"
-              ? styles
-                  .typeButtonActive
-              : ""
-          ].join(" ")}
-          aria-pressed={
-            mode ===
-            "transfer"
-          }
-          onClick={
-            () =>
-              handleModeChange(
-                "transfer"
-              )
-          }
-        >
-          이체
-        </button>
-      </div>
-
-
-      <section
-        className={
-          styles.quickSection
+                  mode ===
+                    value
+                    ? styles.typeButtonActive
+                    : ""
+                ].join(
+                  " "
+                )}
+                aria-pressed={
+                  mode ===
+                  value
+                }
+                onClick={
+                  () =>
+                    handleModeChange(
+                      value
+                    )
+                }
+              >
+                {label}
+              </button>
+            )
+          )
         }
-      >
-        <div
-          className={
-            styles.quickHeader
-          }
-        >
-          <p
-            className={
-              styles.quickTitle
-            }
-          >
-            카드대금
-          </p>
-        </div>
-
-
-        <div
-          className={
-            styles.quickActions
-          }
-        >
-          <button
-            type="button"
-            className={[
-              styles
-                .quickActionButton,
-
-              mode ===
-                "card-payment"
-                ? styles
-                    .quickActionSelected
-                : ""
-            ].join(" ")}
-            aria-pressed={
-              mode ===
-              "card-payment"
-            }
-            onClick={
-              () =>
-                handleModeChange(
-                  "card-payment"
-                )
-            }
-          >
-            <span
-              className={
-                styles
-                  .quickActionIcon
-              }
-              aria-hidden="true"
-            >
-              💳
-            </span>
-
-            <span
-              className={
-                styles
-                  .quickActionText
-              }
-            >
-              <span
-                className={
-                  styles
-                    .quickActionLabel
-                }
-              >
-                카드값 결제
-              </span>
-
-              <span
-                className={
-                  styles
-                    .quickActionHint
-                }
-              >
-                결제일에 카드대금 납부
-              </span>
-            </span>
-          </button>
-
-
-          <button
-            type="button"
-            className={[
-              styles
-                .quickActionButton,
-
-              mode ===
-                "card-prepayment"
-                ? styles
-                    .quickActionSelected
-                : ""
-            ].join(" ")}
-            aria-pressed={
-              mode ===
-              "card-prepayment"
-            }
-            onClick={
-              () =>
-                handleModeChange(
-                  "card-prepayment"
-                )
-            }
-          >
-            <span
-              className={
-                styles
-                  .quickActionIcon
-              }
-              aria-hidden="true"
-            >
-              ⚡
-            </span>
-
-            <span
-              className={
-                styles
-                  .quickActionText
-              }
-            >
-              <span
-                className={
-                  styles
-                    .quickActionLabel
-                }
-              >
-                카드 선결제
-              </span>
-
-              <span
-                className={
-                  styles
-                    .quickActionHint
-                }
-              >
-                결제일 전에 미리 납부
-              </span>
-            </span>
-          </button>
-        </div>
-      </section>
-
+      </div>
 
       <form
         className={
@@ -1623,7 +1321,8 @@ export default function InputPage() {
                 styles.fieldLabel
               }
             >
-              날짜
+              날짜{" "}
+
               <span
                 className={
                   styles.required
@@ -1647,13 +1346,11 @@ export default function InputPage() {
               onChange={
                 event =>
                   handleDateChange(
-                    event.target
-                      .value
+                    event.target.value
                   )
               }
             />
           </label>
-
 
           <label
             className={
@@ -1665,7 +1362,8 @@ export default function InputPage() {
                 styles.fieldLabel
               }
             >
-              금액
+              금액{" "}
+
               <span
                 className={
                   styles.required
@@ -1697,8 +1395,7 @@ export default function InputPage() {
                 onChange={
                   event =>
                     handleAmountChange(
-                      event.target
-                        .value
+                      event.target.value
                     )
                 }
               />
@@ -1713,355 +1410,89 @@ export default function InputPage() {
             </div>
           </label>
 
-
-          {!isCardMode && (
-            <label
+          <label
+            className={
+              styles.field
+            }
+          >
+            <span
               className={
-                styles.field
+                styles.fieldLabel
               }
             >
+              카테고리{" "}
+
               <span
                 className={
-                  styles.fieldLabel
+                  styles.required
                 }
               >
-                카테고리
-                <span
-                  className={
-                    styles.required
-                  }
-                >
-                  *
-                </span>
+                *
               </span>
+            </span>
 
-              <select
-                className={
-                  styles.select
-                }
-                value={
-                  categoryId
-                }
-                disabled={
-                  submitting
-                }
-                onChange={
-                  event => {
-                    setCategoryId(
-                      event.target
-                        .value
-                    );
-
-                    clearFeedback();
-                  }
-                }
+            <select
+              className={
+                styles.select
+              }
+              value={
+                categoryId
+              }
+              disabled={
+                submitting
+              }
+              onChange={
+                event =>
+                  handleCategoryChange(
+                    event.target.value
+                  )
+              }
+            >
+              <option
+                value=""
               >
-                <option
-                  value=""
-                >
-                  선택하세요
-                </option>
+                선택하세요
+              </option>
 
-                {categories.map(
+              {
+                categories.map(
                   category => (
                     <option
                       key={
-                        category
-                          .categoryId
+                        category.categoryId
                       }
                       value={
-                        category
-                          .categoryId
+                        category.categoryId
                       }
                     >
                       {
-                        category.name
+                        getCategoryLabel(
+                          category
+                        )
                       }
                     </option>
                   )
-                )}
-              </select>
-            </label>
-          )}
-
-
-          {mode ===
-            "expense" && (
-            <div
-              className={
-                styles
-                  .conditionalSection
+                )
               }
-            >
-              <h2
-                className={
-                  styles.sectionTitle
-                }
-              >
-                지출 정보
-              </h2>
+            </select>
+          </label>
 
-              <label
-                className={
-                  styles.field
-                }
-              >
-                <span
-                  className={
-                    styles.fieldLabel
-                  }
-                >
-                  결제수단
-                  <span
-                    className={
-                      styles.required
-                    }
-                  >
-                    *
-                  </span>
-                </span>
-
-                <select
-                  className={
-                    styles.select
-                  }
-                  value={
-                    paymentMethodId
-                  }
-                  disabled={
-                    submitting
-                  }
-                  onChange={
-                    event => {
-                      setPaymentMethodId(
-                        event.target
-                          .value
-                      );
-
-                      clearFeedback();
-                    }
-                  }
-                >
-                  <option
-                    value=""
-                  >
-                    선택하세요
-                  </option>
-
-                  {accounts.map(
-                    account => (
-                      <option
-                        key={
-                          account
-                            .accountId
-                        }
-                        value={
-                          account
-                            .accountId
-                        }
-                      >
-                        {
-                          getAccountLabel(
-                            account
-                          )
-                        }
-                      </option>
-                    )
-                  )}
-                </select>
-
-                <p
-                  className={
-                    styles.helper
-                  }
-                >
-                  체크카드는 연결된
-                  통장에서 자동 출금됩니다.
-                </p>
-              </label>
-
-
-              <label
-                className={
-                  styles.field
-                }
-              >
-                <span
-                  className={
-                    styles.fieldLabel
-                  }
-                >
-                  지출대상
-                  <span
-                    className={
-                      styles.required
-                    }
-                  >
-                    *
-                  </span>
-                </span>
-
-                <select
-                  className={
-                    styles.select
-                  }
-                  value={
-                    spendingTarget
-                  }
-                  disabled={
-                    submitting
-                  }
-                  onChange={
-                    event => {
-                      setSpendingTarget(
-                        event.target
-                          .value
-                      );
-
-                      clearFeedback();
-                    }
-                  }
-                >
-                  <option
-                    value=""
-                  >
-                    선택하세요
-                  </option>
-
-                  {bootstrap
-                    .spendingTargets
-                    .map(
-                      target => (
-                        <option
-                          key={
-                            target
-                          }
-                          value={
-                            target
-                          }
-                        >
-                          {
-                            target
-                          }
-                        </option>
-                      )
-                    )}
-                </select>
-              </label>
-            </div>
-          )}
-
-
-          {mode ===
-            "income" && (
-            <div
-              className={
-                styles
-                  .conditionalSection
-              }
-            >
-              <h2
-                className={
-                  styles.sectionTitle
-                }
-              >
-                수입 정보
-              </h2>
-
-              <label
-                className={
-                  styles.field
-                }
-              >
-                <span
-                  className={
-                    styles.fieldLabel
-                  }
-                >
-                  입금수단
-                  <span
-                    className={
-                      styles.required
-                    }
-                  >
-                    *
-                  </span>
-                </span>
-
-                <select
-                  className={
-                    styles.select
-                  }
-                  value={
-                    toAccountId
-                  }
-                  disabled={
-                    submitting
-                  }
-                  onChange={
-                    event => {
-                      setToAccountId(
-                        event.target
-                          .value
-                      );
-
-                      clearFeedback();
-                    }
-                  }
-                >
-                  <option
-                    value=""
-                  >
-                    선택하세요
-                  </option>
-
-                  {accounts.map(
-                    account => (
-                      <option
-                        key={
-                          account
-                            .accountId
-                        }
-                        value={
-                          account
-                            .accountId
-                        }
-                      >
-                        {
-                          getAccountLabel(
-                            account
-                          )
-                        }
-                      </option>
-                    )
-                  )}
-                </select>
-              </label>
-            </div>
-          )}
-
-
-          {mode ===
-            "transfer" && (
-            <div
-              className={
-                styles
-                  .conditionalSection
-              }
-            >
-              <h2
-                className={
-                  styles.sectionTitle
-                }
-              >
-                이체 정보
-              </h2>
-
+          {
+            mode ===
+              "expense" && (
               <div
                 className={
-                  styles.fieldPair
+                  styles.conditionalSection
                 }
               >
+                <h2
+                  className={
+                    styles.sectionTitle
+                  }
+                >
+                  지출 정보
+                </h2>
+
                 <label
                   className={
                     styles.field
@@ -2072,7 +1503,8 @@ export default function InputPage() {
                       styles.fieldLabel
                     }
                   >
-                    보내는 수단
+                    결제수단{" "}
+
                     <span
                       className={
                         styles.required
@@ -2087,17 +1519,19 @@ export default function InputPage() {
                       styles.select
                     }
                     value={
-                      fromAccountId
+                      paymentMethodId
                     }
                     disabled={
                       submitting
                     }
                     onChange={
                       event => {
-                        setFromAccountId(
-                          event.target
-                            .value
+                        setPaymentMethodId(
+                          event.target.value
                         );
+
+                        requestMemory.current =
+                          null;
 
                         clearFeedback();
                       }
@@ -2109,29 +1543,36 @@ export default function InputPage() {
                       선택하세요
                     </option>
 
-                    {accounts.map(
-                      account => (
-                        <option
-                          key={
-                            account
-                              .accountId
-                          }
-                          value={
-                            account
-                              .accountId
-                          }
-                        >
-                          {
-                            getAccountLabel(
-                              account
-                            )
-                          }
-                        </option>
+                    {
+                      accounts.map(
+                        account => (
+                          <option
+                            key={
+                              account.accountId
+                            }
+                            value={
+                              account.accountId
+                            }
+                          >
+                            {
+                              getAccountLabel(
+                                account
+                              )
+                            }
+                          </option>
+                        )
                       )
-                    )}
+                    }
                   </select>
-                </label>
 
+                  <p
+                    className={
+                      styles.helper
+                    }
+                  >
+                    체크카드는 연결된 통장에서 자동 출금됩니다.
+                  </p>
+                </label>
 
                 <label
                   className={
@@ -2143,7 +1584,98 @@ export default function InputPage() {
                       styles.fieldLabel
                     }
                   >
-                    받는 수단
+                    지출대상{" "}
+
+                    <span
+                      className={
+                        styles.required
+                      }
+                    >
+                      *
+                    </span>
+                  </span>
+
+                  <select
+                    className={
+                      styles.select
+                    }
+                    value={
+                      spendingTarget
+                    }
+                    disabled={
+                      submitting
+                    }
+                    onChange={
+                      event => {
+                        setSpendingTarget(
+                          event.target.value
+                        );
+
+                        requestMemory.current =
+                          null;
+
+                        clearFeedback();
+                      }
+                    }
+                  >
+                    <option
+                      value=""
+                    >
+                      선택하세요
+                    </option>
+
+                    {
+                      bootstrap
+                        .spendingTargets
+                        .map(
+                          target => (
+                            <option
+                              key={
+                                target
+                              }
+                              value={
+                                target
+                              }
+                            >
+                              {target}
+                            </option>
+                          )
+                        )
+                    }
+                  </select>
+                </label>
+              </div>
+            )
+          }
+
+          {
+            mode ===
+              "income" && (
+              <div
+                className={
+                  styles.conditionalSection
+                }
+              >
+                <h2
+                  className={
+                    styles.sectionTitle
+                  }
+                >
+                  수입 정보
+                </h2>
+
+                <label
+                  className={
+                    styles.field
+                  }
+                >
+                  <span
+                    className={
+                      styles.fieldLabel
+                    }
+                  >
+                    입금수단{" "}
+
                     <span
                       className={
                         styles.required
@@ -2166,9 +1698,11 @@ export default function InputPage() {
                     onChange={
                       event => {
                         setToAccountId(
-                          event.target
-                            .value
+                          event.target.value
                         );
+
+                        requestMemory.current =
+                          null;
 
                         clearFeedback();
                       }
@@ -2180,304 +1714,458 @@ export default function InputPage() {
                       선택하세요
                     </option>
 
-                    {accounts.map(
-                      account => (
-                        <option
-                          key={
-                            account
-                              .accountId
-                          }
-                          value={
-                            account
-                              .accountId
-                          }
-                        >
-                          {
-                            getAccountLabel(
-                              account
-                            )
-                          }
-                        </option>
+                    {
+                      accounts.map(
+                        account => (
+                          <option
+                            key={
+                              account.accountId
+                            }
+                            value={
+                              account.accountId
+                            }
+                          >
+                            {
+                              getAccountLabel(
+                                account
+                              )
+                            }
+                          </option>
+                        )
                       )
-                    )}
+                    }
                   </select>
                 </label>
               </div>
-            </div>
-          )}
+            )
+          }
 
-
-          {isCardMode && (
-            <div
-              className={
-                styles
-                  .conditionalSection
-              }
-            >
-              <h2
-                className={
-                  styles.sectionTitle
-                }
-              >
-                {
-                  getModeLabel(
-                    mode
-                  )
-                }
-              </h2>
-
-
+          {
+            mode ===
+              "transfer" &&
+            !isCardTransfer && (
               <div
                 className={
-                  styles
-                    .cardPaymentNotice
+                  styles.conditionalSection
                 }
               >
-                <span
+                <h2
                   className={
-                    styles
-                      .cardPaymentNoticeIcon
-                  }
-                  aria-hidden="true"
-                >
-                  💡
-                </span>
-
-                <p
-                  className={
-                    styles
-                      .cardPaymentNoticeText
+                    styles.sectionTitle
                   }
                 >
-                  <strong>
-                    {
-                      mode ===
-                      "card-prepayment"
-                        ? "카드선결제"
-                        : "카드정기결제"
-                    }
-                  </strong>
-                  로 자동 기록됩니다.
-                  일반 이체에서 따로
-                  카테고리를 찾을 필요가
-                  없습니다.
-                </p>
-              </div>
+                  이체 정보
+                </h2>
 
-
-              <label
-                className={
-                  styles.field
-                }
-              >
-                <span
+                <div
                   className={
-                    styles.fieldLabel
+                    styles.fieldPair
                   }
                 >
-                  결제할 카드
-                  <span
+                  <label
                     className={
-                      styles.required
+                      styles.field
                     }
                   >
-                    *
-                  </span>
-                </span>
+                    <span
+                      className={
+                        styles.fieldLabel
+                      }
+                    >
+                      보내는 수단{" "}
 
-                <select
-                  className={
-                    styles.select
-                  }
-                  value={
-                    toAccountId
-                  }
-                  disabled={
-                    submitting
-                  }
-                  onChange={
-                    event =>
-                      handleCardChange(
-                        event.target
-                          .value
-                      )
-                  }
-                >
-                  <option
-                    value=""
-                  >
-                    신용카드를 선택하세요
-                  </option>
-
-                  {creditCards.map(
-                    account => (
-                      <option
-                        key={
-                          account
-                            .accountId
-                        }
-                        value={
-                          account
-                            .accountId
+                      <span
+                        className={
+                          styles.required
                         }
                       >
-                        {
-                          getAccountLabel(
-                            account
-                          )
+                        *
+                      </span>
+                    </span>
+
+                    <select
+                      className={
+                        styles.select
+                      }
+                      value={
+                        fromAccountId
+                      }
+                      disabled={
+                        submitting
+                      }
+                      onChange={
+                        event => {
+                          setFromAccountId(
+                            event.target.value
+                          );
+
+                          requestMemory.current =
+                            null;
+
+                          clearFeedback();
                         }
+                      }
+                    >
+                      <option
+                        value=""
+                      >
+                        선택하세요
                       </option>
-                    )
-                  )}
-                </select>
-              </label>
 
+                      {
+                        accounts.map(
+                          account => (
+                            <option
+                              key={
+                                account.accountId
+                              }
+                              value={
+                                account.accountId
+                              }
+                            >
+                              {
+                                getAccountLabel(
+                                  account
+                                )
+                              }
+                            </option>
+                          )
+                        )
+                      }
+                    </select>
+                  </label>
 
-              <label
+                  <label
+                    className={
+                      styles.field
+                    }
+                  >
+                    <span
+                      className={
+                        styles.fieldLabel
+                      }
+                    >
+                      받는 수단{" "}
+
+                      <span
+                        className={
+                          styles.required
+                        }
+                      >
+                        *
+                      </span>
+                    </span>
+
+                    <select
+                      className={
+                        styles.select
+                      }
+                      value={
+                        toAccountId
+                      }
+                      disabled={
+                        submitting
+                      }
+                      onChange={
+                        event => {
+                          setToAccountId(
+                            event.target.value
+                          );
+
+                          requestMemory.current =
+                            null;
+
+                          clearFeedback();
+                        }
+                      }
+                    >
+                      <option
+                        value=""
+                      >
+                        선택하세요
+                      </option>
+
+                      {
+                        accounts.map(
+                          account => (
+                            <option
+                              key={
+                                account.accountId
+                              }
+                              value={
+                                account.accountId
+                              }
+                            >
+                              {
+                                getAccountLabel(
+                                  account
+                                )
+                              }
+                            </option>
+                          )
+                        )
+                      }
+                    </select>
+                  </label>
+                </div>
+              </div>
+            )
+          }
+
+          {
+            mode ===
+              "transfer" &&
+            isCardTransfer && (
+              <div
                 className={
-                  styles.field
+                  styles.conditionalSection
                 }
               >
-                <span
+                <h2
                   className={
-                    styles.fieldLabel
+                    styles.sectionTitle
                   }
                 >
-                  돈이 나갈 계좌
+                  {cardTransferLabel}
+                </h2>
+
+                <div
+                  className={
+                    styles.cardPaymentNotice
+                  }
+                >
                   <span
                     className={
-                      styles.required
+                      styles.cardPaymentNoticeIcon
+                    }
+                    aria-hidden="true"
+                  >
+                    💡
+                  </span>
+
+                  <p
+                    className={
+                      styles.cardPaymentNoticeText
                     }
                   >
-                    *
-                  </span>
-                </span>
+                    <strong>
+                      {cardTransferLabel}
+                    </strong>
+                    는 이체로 기록되어 카드 사용 지출과 중복 집계되지 않습니다.
+                  </p>
+                </div>
 
-                <select
+                <label
                   className={
-                    styles.select
-                  }
-                  value={
-                    fromAccountId
-                  }
-                  disabled={
-                    submitting ||
-                    !toAccountId
-                  }
-                  onChange={
-                    event => {
-                      setFromAccountId(
-                        event.target
-                          .value
-                      );
-
-                      clearFeedback();
-                    }
+                    styles.field
                   }
                 >
-                  <option
-                    value=""
+                  <span
+                    className={
+                      styles.fieldLabel
+                    }
                   >
-                    선택하세요
-                  </option>
+                    결제할 카드{" "}
 
-                  {cardSourceAccounts
-                    .map(
-                      account => (
-                        <option
-                          key={
-                            account
-                              .accountId
-                          }
-                          value={
-                            account
-                              .accountId
-                          }
-                        >
-                          {
-                            getAccountLabel(
-                              account
-                            )
-                          }
-                        </option>
+                    <span
+                      className={
+                        styles.required
+                      }
+                    >
+                      *
+                    </span>
+                  </span>
+
+                  <select
+                    className={
+                      styles.select
+                    }
+                    value={
+                      toAccountId
+                    }
+                    disabled={
+                      submitting
+                    }
+                    onChange={
+                      event =>
+                        handleCardChange(
+                          event.target.value
+                        )
+                    }
+                  >
+                    <option
+                      value=""
+                    >
+                      신용카드를 선택하세요
+                    </option>
+
+                    {
+                      creditCards.map(
+                        account => (
+                          <option
+                            key={
+                              account.accountId
+                            }
+                            value={
+                              account.accountId
+                            }
+                          >
+                            {
+                              getAccountLabel(
+                                account
+                              )
+                            }
+                          </option>
+                        )
                       )
-                    )}
-                </select>
+                    }
+                  </select>
+                </label>
 
+                <label
+                  className={
+                    styles.field
+                  }
+                >
+                  <span
+                    className={
+                      styles.fieldLabel
+                    }
+                  >
+                    돈이 나갈 계좌{" "}
 
-                {selectedCard
-                  ?.paymentAccountId && (
+                    <span
+                      className={
+                        styles.required
+                      }
+                    >
+                      *
+                    </span>
+                  </span>
+
+                  <select
+                    className={
+                      styles.select
+                    }
+                    value={
+                      fromAccountId
+                    }
+                    disabled={
+                      submitting ||
+                      !toAccountId
+                    }
+                    onChange={
+                      event => {
+                        setFromAccountId(
+                          event.target.value
+                        );
+
+                        requestMemory.current =
+                          null;
+
+                        clearFeedback();
+                      }
+                    }
+                  >
+                    <option
+                      value=""
+                    >
+                      선택하세요
+                    </option>
+
+                    {
+                      cardSourceAccounts.map(
+                        account => (
+                          <option
+                            key={
+                              account.accountId
+                            }
+                            value={
+                              account.accountId
+                            }
+                          >
+                            {
+                              getAccountLabel(
+                                account
+                              )
+                            }
+                          </option>
+                        )
+                      )
+                    }
+                  </select>
+
+                  {
+                    selectedCard
+                      ?.paymentAccountId && (
+                      <p
+                        className={
+                          styles.helper
+                        }
+                      >
+                        카드에 등록된 결제계좌를 자동으로 선택했습니다. 실제 출금계좌가 다르면 변경할 수 있습니다.
+                      </p>
+                    )
+                  }
+                </label>
+
+                <label
+                  className={
+                    styles.field
+                  }
+                >
+                  <span
+                    className={
+                      styles.fieldLabel
+                    }
+                  >
+                    대상 청구월{" "}
+
+                    <span
+                      className={
+                        styles.required
+                      }
+                    >
+                      *
+                    </span>
+                  </span>
+
+                  <input
+                    type="month"
+                    className={
+                      styles.input
+                    }
+                    value={
+                      billingMonth
+                    }
+                    disabled={
+                      submitting
+                    }
+                    onChange={
+                      event => {
+                        setBillingMonth(
+                          event.target.value
+                        );
+
+                        requestMemory.current =
+                          null;
+
+                        clearFeedback();
+                      }
+                    }
+                  />
+
                   <p
                     className={
                       styles.helper
                     }
                   >
-                    카드에 등록된
-                    결제계좌를 자동으로
-                    선택했습니다. 실제
-                    출금계좌가 다르면
-                    변경할 수 있습니다.
+                    이 결제가 어느 달 카드대금에 해당하는지 선택합니다.
                   </p>
-                )}
-              </label>
-
-
-              <label
-                className={
-                  styles.field
-                }
-              >
-                <span
-                  className={
-                    styles.fieldLabel
-                  }
-                >
-                  대상 청구월
-                  <span
-                    className={
-                      styles.required
-                    }
-                  >
-                    *
-                  </span>
-                </span>
-
-                <input
-                  type="month"
-                  className={
-                    styles.input
-                  }
-                  value={
-                    billingMonth
-                  }
-                  disabled={
-                    submitting
-                  }
-                  onChange={
-                    event => {
-                      setBillingMonth(
-                        event.target
-                          .value
-                      );
-
-                      clearFeedback();
-                    }
-                  }
-                />
-
-                <p
-                  className={
-                    styles.helper
-                  }
-                >
-                  이 결제가 어느 달
-                  카드대금에 해당하는지
-                  선택합니다.
-                </p>
-              </label>
-            </div>
-          )}
-
+                </label>
+              </div>
+            )
+          }
 
           <label
             className={
@@ -2506,9 +2194,11 @@ export default function InputPage() {
               onChange={
                 event => {
                   setMemo(
-                    event.target
-                      .value
+                    event.target.value
                   );
+
+                  requestMemory.current =
+                    null;
 
                   clearFeedback();
                 }
@@ -2516,30 +2206,31 @@ export default function InputPage() {
             />
           </label>
 
+          {
+            error && (
+              <p
+                className={
+                  styles.error
+                }
+                role="alert"
+              >
+                {error}
+              </p>
+            )
+          }
 
-          {error && (
-            <p
-              className={
-                styles.error
-              }
-              role="alert"
-            >
-              {error}
-            </p>
-          )}
-
-
-          {success && (
-            <p
-              className={
-                styles.success
-              }
-              role="status"
-            >
-              {success}
-            </p>
-          )}
-
+          {
+            success && (
+              <p
+                className={
+                  styles.success
+                }
+                role="status"
+              >
+                {success}
+              </p>
+            )
+          }
 
           <div
             className={
@@ -2558,9 +2249,13 @@ export default function InputPage() {
               {
                 submitting
                   ? "저장 중..."
-                  : `${getModeLabel(
-                      mode
-                    )} 저장`
+                  : `${
+                      isCardTransfer
+                        ? cardTransferLabel
+                        : getModeLabel(
+                            mode
+                          )
+                    } 저장`
               }
             </button>
           </div>
