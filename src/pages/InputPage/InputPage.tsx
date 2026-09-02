@@ -133,6 +133,17 @@ let bootstrapPromiseGeneration =
   -1;
 
 
+/*
+ * InputPage는 하단 탭을 이동할 때 언마운트됩니다.
+ * 마지막으로 정상 로드한 bootstrap을 모듈 메모리에 보관해 두면
+ * 다시 입력 탭으로 돌아올 때 로딩 화면부터 그리지 않고
+ * 직전 데이터를 즉시 사용할 수 있습니다.
+ */
+let bootstrapSnapshot:
+  BootstrapData | null =
+  null;
+
+
 async function loadBootstrap():
   Promise<BootstrapData> {
   const generation =
@@ -164,6 +175,19 @@ async function loadBootstrap():
                   ?.message ||
                   "입력 정보를 불러오지 못했습니다."
               );
+            }
+
+            /*
+             * 요청 도중 카테고리/계좌 설정 변경으로
+             * bootstrap generation이 바뀌었다면 오래된 응답을
+             * 화면 스냅샷으로 남기지 않습니다.
+             */
+            if (
+              getBootstrapCacheGeneration() ===
+                requestGeneration
+            ) {
+              bootstrapSnapshot =
+                response.data;
             }
 
             return response.data;
@@ -322,14 +346,19 @@ export default function InputPage() {
     setBootstrap
   ] =
     useState<BootstrapData | null>(
-      null
+      () =>
+        bootstrapSnapshot
     );
 
   const [
     bootstrapLoading,
     setBootstrapLoading
   ] =
-    useState(true);
+    useState(
+      () =>
+        bootstrapSnapshot ===
+        null
+    );
 
   const [
     bootstrapError,
