@@ -593,13 +593,28 @@
     gap: 4px;
   }
 
+  .iconButton,
+  .todayButton,
+  .refreshButton {
+    min-height: 44px;
+  }
+
+  .iconButton,
+  .refreshButton {
+    width: 44px;
+  }
+
   .todayButton {
-    padding: 0 9px;
+    padding: 0 10px;
   }
 
   .refreshButton {
-    width: 40px;
     padding: 0;
+  }
+
+  .filterButton {
+    min-height: 44px;
+    padding: 0 16px;
   }
 
   .summaryGrid {
@@ -624,11 +639,11 @@
   }
 
   .dayCell {
-    padding: 5px 3px;
+    padding: 6px 4px;
   }
 
   .dayNumber {
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .transactionCount {
@@ -636,9 +651,15 @@
   }
 
   .dayIncome,
-  .dayExpense,
   .dayTransfer {
-    font-size: 8px;
+    display: none;
+  }
+
+  .dayExpense {
+    display: block;
+    margin-top: auto;
+    font-size: 9px;
+    line-height: 1.25;
   }
 
   .detailHeader {
@@ -1040,12 +1061,39 @@
     gap: 8px;
   }
 
+  .editButton,
+  .deleteButton,
+  .editCancelButton,
+  .editSaveButton,
+  .restoreButton,
+  .undoButton {
+    min-height: 44px;
+    padding-right: 14px;
+    padding-left: 14px;
+  }
+
+  .editCloseButton {
+    width: 44px;
+    height: 44px;
+  }
+
   .editGrid {
     grid-template-columns: 1fr;
   }
 
   .editMemoField {
     grid-column: auto;
+  }
+
+  .editField input,
+  .editField select {
+    min-height: 48px;
+    font-size: 16px;
+  }
+
+  .editField textarea {
+    min-height: 88px;
+    font-size: 16px;
   }
 
   .deletedSummary {
