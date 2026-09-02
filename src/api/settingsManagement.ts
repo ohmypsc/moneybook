@@ -1,210 +1,118 @@
 import {
-  clearLedgerStartDate,
-  createManagedAccount as createManagedAccountRequest,
-  createManagedCategory as createManagedCategoryRequest,
-  deleteManagedAccount as deleteManagedAccountRequest,
-  deleteManagedCategory as deleteManagedCategoryRequest,
-  getLedgerConfig,
-  getManagedAccounts as getManagedAccountsRequest,
-  getManagedCategories as getManagedCategoriesRequest,
-  restoreManagedAccount as restoreManagedAccountRequest,
-  restoreManagedCategory as restoreManagedCategoryRequest,
-  setLedgerStartDate,
-  updateManagedAccount as updateManagedAccountRequest,
-  updateManagedCategory as updateManagedCategoryRequest
+  createManagedAccount as createManagedAccountCore,
+  createManagedCategory as createManagedCategoryCore,
+  deleteManagedAccount as deleteManagedAccountCore,
+  deleteManagedCategory as deleteManagedCategoryCore,
+  getManagedAccounts as getManagedAccountsCore,
+  getManagedCategories as getManagedCategoriesCore,
+  restoreManagedAccount as restoreManagedAccountCore,
+  restoreManagedCategory as restoreManagedCategoryCore,
+  updateManagedAccount as updateManagedAccountCore,
+  updateManagedCategory as updateManagedCategoryCore
 } from "./settingsManagementCore";
 
 export * from "./settingsManagementCore";
 
-export {
-  clearLedgerStartDate,
-  getLedgerConfig,
-  setLedgerStartDate
-};
 
 type CategoryQuery =
   Parameters<
-    typeof getManagedCategoriesRequest
+    typeof getManagedCategoriesCore
   >[0];
+
 
 type AccountQuery =
   Parameters<
-    typeof getManagedAccountsRequest
+    typeof getManagedAccountsCore
   >[0];
+
 
 type CategoryResult =
   Awaited<
     ReturnType<
-      typeof getManagedCategoriesRequest
+      typeof getManagedCategoriesCore
     >
   >;
+
 
 type AccountResult =
   Awaited<
     ReturnType<
-      typeof getManagedAccountsRequest
+      typeof getManagedAccountsCore
     >
   >;
 
-type CacheEntry<T> = {
-  data: T;
-  fetchedAt: number;
-};
+
+type CategoryItem =
+  CategoryResult extends {
+    items: Array<infer T>;
+  }
+    ? T
+    : never;
+
+
+type AccountItem =
+  AccountResult extends {
+    items: Array<infer T>;
+  }
+    ? T
+    : never;
+
+
+interface CacheEntry<T> {
+  value: T;
+  updatedAt: number;
+}
+
 
 const MANAGED_SETTINGS_TTL_MS =
   30 * 1000;
 
-function createMemoryQueryCache<T>() {
-  let cache:
-    CacheEntry<T> |
-    null =
-      null;
 
-  let request:
-    Promise<T> |
-    null =
-      null;
+let categoryCache:
+  CacheEntry<CategoryResult> | null =
+  null;
 
-  let generation =
-    0;
+let accountCache:
+  CacheEntry<AccountResult> | null =
+  null;
 
-  function clear() {
-    generation += 1;
 
-    cache =
-      null;
+let categoryRequest:
+  Promise<CategoryResult> | null =
+  null;
 
-    request =
-      null;
-  }
+let accountRequest:
+  Promise<AccountResult> | null =
+  null;
 
-  /*
-   * 화면 재진입 시에는 만료된 값이라도
-   * 마지막 정상 데이터를 즉시 표시합니다.
-   *
-   * 실제 최신 여부는 get()에서 판단하고
-   * 필요하면 백그라운드 요청으로 교체됩니다.
-   */
-  function peek() {
-    return (
-      cache?.data ||
-      null
-    );
-  }
 
-  function freshSnapshot() {
-    if (
-      !cache ||
-      Date.now() -
-        cache.fetchedAt >=
-        MANAGED_SETTINGS_TTL_MS
-    ) {
-      return null;
-    }
+let categoryGeneration =
+  0;
 
-    return cache.data;
-  }
+let accountGeneration =
+  0;
 
-  function get(
-    loader:
-      () =>
-        Promise<T>
-  ) {
-    const cached =
-      freshSnapshot();
 
-    if (cached) {
-      return Promise.resolve(
-        cached
-      );
-    }
-
-    if (request) {
-      return request;
-    }
-
-    const requestGeneration =
-      generation;
-
-    const task =
-      loader()
-        .then(
-          data => {
-            if (
-              requestGeneration ===
-              generation
-            ) {
-              cache = {
-                data,
-                fetchedAt:
-                  Date.now()
-              };
-            }
-
-            return data;
-          }
-        );
-
-    request =
-      task;
-
-    const clearRequest =
-      () => {
-        if (
-          request ===
-          task
-        ) {
-          request =
-            null;
-        }
-      };
-
-    void task.then(
-      clearRequest,
-      clearRequest
-    );
-
-    return task;
-  }
-
-  return {
-    clear,
-    get,
-    peek
-  };
-}
-
-function toQueryRecord(
-  value:
-    unknown
-) {
+function asRecord(
+  value: unknown
+): Record<string, unknown> {
   if (
-    !value ||
-    typeof value !==
-      "object"
+    value &&
+    typeof value === "object"
   ) {
-    return {} as
-      Record<
-        string,
-        unknown
-      >;
+    return value as
+      Record<string, unknown>;
   }
 
-  return value as
-    Record<
-      string,
-      unknown
-    >;
+  return {};
 }
+
 
 function isFullCategoryQuery(
-  params:
-    unknown
+  params: CategoryQuery | undefined
 ) {
   const query =
-    toQueryRecord(
-      params
-    );
+    asRecord(params);
 
   return (
     query.includeDeleted ===
@@ -213,14 +121,12 @@ function isFullCategoryQuery(
   );
 }
 
+
 function isFullAccountQuery(
-  params:
-    unknown
+  params: AccountQuery | undefined
 ) {
   const query =
-    toQueryRecord(
-      params
-    );
+    asRecord(params);
 
   return (
     query.includeDeleted ===
@@ -231,230 +137,641 @@ function isFullAccountQuery(
   );
 }
 
-const categoryCache =
-  createMemoryQueryCache<
-    CategoryResult
-  >();
 
-const accountCache =
-  createMemoryQueryCache<
-    AccountResult
-  >();
-
-export function clearManagedSettingsCache() {
-  categoryCache.clear();
-  accountCache.clear();
+function isFresh<T>(
+  entry: CacheEntry<T> | null
+) {
+  return !!(
+    entry &&
+    Date.now() -
+      entry.updatedAt <
+      MANAGED_SETTINGS_TTL_MS
+  );
 }
+
+
+function invalidateCategoryCache() {
+  categoryGeneration +=
+    1;
+
+  categoryCache =
+    null;
+
+  categoryRequest =
+    null;
+}
+
+
+function invalidateAccountCache() {
+  accountGeneration +=
+    1;
+
+  accountCache =
+    null;
+
+  accountRequest =
+    null;
+}
+
+
+function extractNestedEntity<T>(
+  value: unknown,
+  key: string
+): T | null {
+  const root =
+    asRecord(value);
+
+  const direct =
+    root[key];
+
+  if (
+    direct &&
+    typeof direct === "object"
+  ) {
+    return direct as T;
+  }
+
+  const data =
+    asRecord(
+      root.data
+    );
+
+  const nested =
+    data[key];
+
+  if (
+    nested &&
+    typeof nested === "object"
+  ) {
+    return nested as T;
+  }
+
+  return null;
+}
+
+
+function replaceResultItems<
+  T extends {
+    items: unknown[];
+  }
+>(
+  result: T,
+  items: T["items"]
+): T {
+  const next = {
+    ...result,
+    items
+  } as T & {
+    total?: number;
+  };
+
+  if (
+    typeof next.total ===
+    "number"
+  ) {
+    next.total =
+      items.length;
+  }
+
+  return next;
+}
+
+
+function upsertCategoryCache(
+  category: CategoryItem
+) {
+  categoryGeneration +=
+    1;
+
+  categoryRequest =
+    null;
+
+  if (
+    !categoryCache ||
+    !Array.isArray(
+      categoryCache.value.items
+    )
+  ) {
+    categoryCache =
+      null;
+
+    return;
+  }
+
+  const categoryId =
+    asRecord(category)
+      .categoryId;
+
+  if (
+    typeof categoryId !==
+      "string" ||
+    !categoryId
+  ) {
+    categoryCache =
+      null;
+
+    return;
+  }
+
+  const currentItems =
+    categoryCache.value.items;
+
+  const index =
+    currentItems.findIndex(
+      item =>
+        asRecord(item)
+          .categoryId ===
+        categoryId
+    );
+
+  const items =
+    currentItems.slice();
+
+  if (
+    index >=
+    0
+  ) {
+    items[index] =
+      category;
+  } else {
+    items.push(
+      category
+    );
+  }
+
+  categoryCache = {
+    value:
+      replaceResultItems(
+        categoryCache.value,
+        items
+      ),
+
+    updatedAt:
+      Date.now()
+  };
+}
+
+
+function upsertAccountCache(
+  account: AccountItem
+) {
+  accountGeneration +=
+    1;
+
+  accountRequest =
+    null;
+
+  if (
+    !accountCache ||
+    !Array.isArray(
+      accountCache.value.items
+    )
+  ) {
+    accountCache =
+      null;
+
+    return;
+  }
+
+  const accountId =
+    asRecord(account)
+      .accountId;
+
+  if (
+    typeof accountId !==
+      "string" ||
+    !accountId
+  ) {
+    accountCache =
+      null;
+
+    return;
+  }
+
+  const currentItems =
+    accountCache.value.items;
+
+  const index =
+    currentItems.findIndex(
+      item =>
+        asRecord(item)
+          .accountId ===
+        accountId
+    );
+
+  const items =
+    currentItems.slice();
+
+  if (
+    index >=
+    0
+  ) {
+    items[index] =
+      account;
+  } else {
+    items.push(
+      account
+    );
+  }
+
+  accountCache = {
+    value:
+      replaceResultItems(
+        accountCache.value,
+        items
+      ),
+
+    updatedAt:
+      Date.now()
+  };
+}
+
+
+async function loadFullCategories() {
+  if (
+    isFresh(
+      categoryCache
+    )
+  ) {
+    return categoryCache!
+      .value;
+  }
+
+  if (
+    categoryRequest
+  ) {
+    return categoryRequest;
+  }
+
+  const requestGeneration =
+    categoryGeneration;
+
+  const request =
+    getManagedCategoriesCore(
+      {
+        includeDeleted:
+          true
+      } as CategoryQuery
+    )
+      .then(
+        result => {
+          if (
+            requestGeneration ===
+            categoryGeneration
+          ) {
+            categoryCache = {
+              value:
+                result,
+
+              updatedAt:
+                Date.now()
+            };
+          }
+
+          return result;
+        }
+      )
+      .finally(
+        () => {
+          if (
+            categoryRequest ===
+            request
+          ) {
+            categoryRequest =
+              null;
+          }
+        }
+      );
+
+  categoryRequest =
+    request;
+
+  return request;
+}
+
+
+async function loadFullAccounts() {
+  if (
+    isFresh(
+      accountCache
+    )
+  ) {
+    return accountCache!
+      .value;
+  }
+
+  if (
+    accountRequest
+  ) {
+    return accountRequest;
+  }
+
+  const requestGeneration =
+    accountGeneration;
+
+  const request =
+    getManagedAccountsCore(
+      {
+        includeDeleted:
+          true
+      } as AccountQuery
+    )
+      .then(
+        result => {
+          if (
+            requestGeneration ===
+            accountGeneration
+          ) {
+            accountCache = {
+              value:
+                result,
+
+              updatedAt:
+                Date.now()
+            };
+          }
+
+          return result;
+        }
+      )
+      .finally(
+        () => {
+          if (
+            accountRequest ===
+            request
+          ) {
+            accountRequest =
+              null;
+          }
+        }
+      );
+
+  accountRequest =
+    request;
+
+  return request;
+}
+
 
 export function getManagedCategoriesSnapshot() {
   return categoryCache
-    .peek();
+    ?.value ??
+    null;
 }
+
 
 export function getManagedAccountsSnapshot() {
   return accountCache
-    .peek();
+    ?.value ??
+    null;
 }
 
-export function getManagedCategories(
-  params:
-    CategoryQuery
+
+export async function getManagedCategories(
+  params?: CategoryQuery
 ) {
   if (
-    !isFullCategoryQuery(
+    isFullCategoryQuery(
       params
     )
   ) {
-    return getManagedCategoriesRequest(
-      params
-    );
+    return loadFullCategories();
   }
 
-  return categoryCache.get(
-    () =>
-      getManagedCategoriesRequest(
-        params
-      )
+  return getManagedCategoriesCore(
+    (params ?? {}) as
+      CategoryQuery
   );
 }
 
-export function getManagedAccounts(
-  params:
-    AccountQuery
+
+export async function getManagedAccounts(
+  params?: AccountQuery
 ) {
   if (
-    !isFullAccountQuery(
+    isFullAccountQuery(
       params
     )
   ) {
-    return getManagedAccountsRequest(
-      params
-    );
+    return loadFullAccounts();
   }
 
-  return accountCache.get(
-    () =>
-      getManagedAccountsRequest(
-        params
-      )
+  return getManagedAccountsCore(
+    (params ?? {}) as
+      AccountQuery
   );
 }
 
-export async function prefetchManagedSettings() {
-  await Promise.allSettled([
-    getManagedCategories({
-      includeDeleted:
-        true
-    } as CategoryQuery),
 
-    getManagedAccounts({
-      includeDeleted:
-        true
-    } as AccountQuery)
-  ]);
-}
-
-async function runMutation<T>(
-  work:
-    () =>
-      Promise<T>,
-
-  invalidate:
-    () =>
-      void
+export async function createManagedCategory(
+  ...args:
+    Parameters<
+      typeof createManagedCategoryCore
+    >
 ) {
   const result =
-    await work();
+    await createManagedCategoryCore(
+      ...args
+    );
 
-  invalidate();
+  const category =
+    extractNestedEntity<
+      CategoryItem
+    >(
+      result,
+      "category"
+    );
+
+  if (
+    category
+  ) {
+    upsertCategoryCache(
+      category
+    );
+  } else {
+    invalidateCategoryCache();
+  }
 
   return result;
 }
 
-export function createManagedCategory(
+
+export async function updateManagedCategory(
   ...args:
     Parameters<
-      typeof createManagedCategoryRequest
+      typeof updateManagedCategoryCore
     >
 ) {
-  return runMutation(
-    () =>
-      createManagedCategoryRequest(
-        ...args
-      ),
+  const result =
+    await updateManagedCategoryCore(
+      ...args
+    );
 
-    categoryCache.clear
-  );
+  const category =
+    extractNestedEntity<
+      CategoryItem
+    >(
+      result,
+      "category"
+    );
+
+  if (
+    category
+  ) {
+    upsertCategoryCache(
+      category
+    );
+  } else {
+    invalidateCategoryCache();
+  }
+
+  return result;
 }
 
-export function updateManagedCategory(
+
+export async function deleteManagedCategory(
   ...args:
     Parameters<
-      typeof updateManagedCategoryRequest
+      typeof deleteManagedCategoryCore
     >
 ) {
-  return runMutation(
-    () =>
-      updateManagedCategoryRequest(
-        ...args
-      ),
+  const result =
+    await deleteManagedCategoryCore(
+      ...args
+    );
 
-    categoryCache.clear
-  );
+  invalidateCategoryCache();
+
+  return result;
 }
 
-export function deleteManagedCategory(
+
+export async function restoreManagedCategory(
   ...args:
     Parameters<
-      typeof deleteManagedCategoryRequest
+      typeof restoreManagedCategoryCore
     >
 ) {
-  return runMutation(
-    () =>
-      deleteManagedCategoryRequest(
-        ...args
-      ),
+  const result =
+    await restoreManagedCategoryCore(
+      ...args
+    );
 
-    categoryCache.clear
-  );
+  invalidateCategoryCache();
+
+  return result;
 }
 
-export function restoreManagedCategory(
+
+export async function createManagedAccount(
   ...args:
     Parameters<
-      typeof restoreManagedCategoryRequest
+      typeof createManagedAccountCore
     >
 ) {
-  return runMutation(
-    () =>
-      restoreManagedCategoryRequest(
-        ...args
-      ),
+  const result =
+    await createManagedAccountCore(
+      ...args
+    );
 
-    categoryCache.clear
-  );
+  const account =
+    extractNestedEntity<
+      AccountItem
+    >(
+      result,
+      "account"
+    );
+
+  if (
+    account
+  ) {
+    upsertAccountCache(
+      account
+    );
+  } else {
+    invalidateAccountCache();
+  }
+
+  return result;
 }
 
-export function createManagedAccount(
+
+export async function updateManagedAccount(
   ...args:
     Parameters<
-      typeof createManagedAccountRequest
+      typeof updateManagedAccountCore
     >
 ) {
-  return runMutation(
-    () =>
-      createManagedAccountRequest(
-        ...args
-      ),
+  const result =
+    await updateManagedAccountCore(
+      ...args
+    );
 
-    accountCache.clear
-  );
+  const account =
+    extractNestedEntity<
+      AccountItem
+    >(
+      result,
+      "account"
+    );
+
+  if (
+    account
+  ) {
+    upsertAccountCache(
+      account
+    );
+  } else {
+    invalidateAccountCache();
+  }
+
+  return result;
 }
 
-export function updateManagedAccount(
+
+export async function deleteManagedAccount(
   ...args:
     Parameters<
-      typeof updateManagedAccountRequest
+      typeof deleteManagedAccountCore
     >
 ) {
-  return runMutation(
-    () =>
-      updateManagedAccountRequest(
-        ...args
-      ),
+  const result =
+    await deleteManagedAccountCore(
+      ...args
+    );
 
-    accountCache.clear
-  );
+  invalidateAccountCache();
+
+  return result;
 }
 
-export function deleteManagedAccount(
+
+export async function restoreManagedAccount(
   ...args:
     Parameters<
-      typeof deleteManagedAccountRequest
+      typeof restoreManagedAccountCore
     >
 ) {
-  return runMutation(
-    () =>
-      deleteManagedAccountRequest(
-        ...args
-      ),
+  const result =
+    await restoreManagedAccountCore(
+      ...args
+    );
 
-    accountCache.clear
-  );
+  invalidateAccountCache();
+
+  return result;
 }
 
-export function restoreManagedAccount(
-  ...args:
-    Parameters<
-      typeof restoreManagedAccountRequest
-    >
-) {
-  return runMutation(
-    () =>
-      restoreManagedAccountRequest(
-        ...args
-      ),
 
-    accountCache.clear
-  );
+export function clearManagedSettingsCache() {
+  invalidateCategoryCache();
+  invalidateAccountCache();
+}
+
+
+export async function prefetchManagedSettings() {
+  await Promise.allSettled([
+    loadFullCategories(),
+    loadFullAccounts()
+  ]);
 }
