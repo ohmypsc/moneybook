@@ -76,6 +76,9 @@ export interface TransactionItem {
   updatedAt:
     string | null;
 
+  updatedAtMs:
+    number | null;
+
   createdBy: string;
 
   updatedBy: string;
@@ -93,6 +96,14 @@ export interface TransactionItem {
 
 export interface UpdateTransactionInput {
   transactionId: string;
+
+  /*
+   * 거래를 불러온 시점의 updated_at 밀리초 값.
+   * 두 기기에서 같은 거래를 수정할 때 마지막 저장이
+   * 조용히 덮어쓰는 것을 막는 낙관적 동시성 토큰입니다.
+   */
+  expectedUpdatedAtMs:
+    number | null;
 
   date?: string;
 
