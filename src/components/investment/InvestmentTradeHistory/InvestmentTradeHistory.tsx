@@ -585,6 +585,10 @@ export default function InvestmentTradeHistory({
       investmentTradeId:
         string;
 
+      expectedUpdatedAtMs:
+        number |
+        null;
+
       date?:
         string;
 
@@ -601,7 +605,11 @@ export default function InvestmentTradeHistory({
         string;
     } = {
       investmentTradeId:
-        trade.investmentTradeId
+        trade.investmentTradeId,
+
+      expectedUpdatedAtMs:
+        trade.updatedAtMs ??
+        null
     };
 
 
@@ -664,7 +672,7 @@ export default function InvestmentTradeHistory({
       Object.keys(
         payload
       ).length ===
-      1
+      2
     ) {
       setEditingTradeId(
         null
