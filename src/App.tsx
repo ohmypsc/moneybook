@@ -97,9 +97,6 @@ const PRIMARY_WARM_TIMEOUT_MS =
 const SECONDARY_WARM_DELAY_MS =
   250;
 
-const MANAGED_SETTINGS_WARM_DELAY_MS =
-  1100;
-
 
 function wait(
   milliseconds:
@@ -208,22 +205,13 @@ function hideSplashAfterPaint() {
 
 /*
  * 스플래시가 보이는 동안
- * 첫 진입에 가장 중요한 세 가지를 준비합니다.
+ * 첫 진입에 필요한 데이터를 준비합니다.
  *
- * 1. dashboard
- *    - 홈
- *    - 현금성 자산
- *    - 투자계좌
- *    - 보유종목
- *    - 예수금
- *    을 한 번의 Apps Script dashboard 요청으로 준비합니다.
+ * dashboard와 이번 달 달력은 홈 표시 전에 기다립니다.
  *
- * 2. 이번 달 달력 거래
- *
- * 3. 입력용 bootstrap
- *
- * 같은 dashboard 응답은 브라우저 공용 캐시에 저장되어
- * HomePage와 AssetsPage가 다시 서버에서 받을 필요가 없습니다.
+ * bootstrap과 관리용 카테고리·자산 데이터는
+ * 같은 시점에 요청을 시작하되,
+ * 늦어져도 홈 화면은 기다리지 않습니다.
  */
 async function warmPrimaryData() {
   const dashboardRequest =
@@ -237,14 +225,33 @@ async function warmPrimaryData() {
 
 
   /*
-   * 입력 화면용 데이터도 동시에 준비합니다.
-   * bootstrap이 늦어져도 홈 진입은 막지 않습니다.
+   * 거래 입력 화면용 데이터.
    */
   void prefetchBootstrap()
     .catch(
       () => {
         /*
          * 입력 화면에서 필요할 때
+         * 다시 요청할 수 있습니다.
+         */
+      }
+    );
+
+
+  /*
+   * 설정의 카테고리 관리 / 자산 관리용 데이터.
+   *
+   * 이전처럼 홈 표시 후 1초 이상 기다렸다가
+   * 시작하지 않고 스플래시 단계에서 바로 요청합니다.
+   *
+   * 다만 이 요청의 완료를 기다리지는 않으므로
+   * 홈 진입 속도에는 영향을 주지 않습니다.
+   */
+  void prefetchManagedSettings()
+    .catch(
+      () => {
+        /*
+         * 설정 화면에서 필요할 때
          * 다시 요청할 수 있습니다.
          */
       }
@@ -265,14 +272,8 @@ async function warmPrimaryData() {
 
 
 /*
- * 홈이 실제로 뜬 뒤에는
- * 첫 화면에 필요하지 않은 데이터를 순서대로 준비합니다.
- *
- * 1. 투자 매매내역
- * 2. 카테고리·계좌 관리용 전체 목록
- *
- * 설정 데이터는 홈 렌더링과 경쟁하지 않도록
- * 조금 더 늦게 프리페치합니다.
+ * 홈이 실제로 뜬 뒤에만 필요한
+ * 투자 매매내역을 준비합니다.
  */
 function scheduleSecondaryWarm() {
   window.setTimeout(
@@ -288,22 +289,6 @@ function scheduleSecondaryWarm() {
         );
     },
     SECONDARY_WARM_DELAY_MS
-  );
-
-
-  window.setTimeout(
-    () => {
-      void prefetchManagedSettings()
-        .catch(
-          () => {
-            /*
-             * 실패해도 설정 화면에서
-             * 필요할 때 다시 요청합니다.
-             */
-          }
-        );
-    },
-    MANAGED_SETTINGS_WARM_DELAY_MS
   );
 }
 
@@ -600,6 +585,10 @@ export default function App() {
     );
 
 
+    /*
+     * 앱 시작 프리페치가 아직 진행 중인 경우에도
+     * 같은 요청을 재사용하므로 중복 네트워크 요청은 생기지 않습니다.
+     */
     if (
       nextNavigation ===
       "settings"
@@ -623,7 +612,9 @@ export default function App() {
 
     } finally {
       invalidateDashboardCache();
+
       clearInvestmentPrefetchCache();
+
       clearManagedSettingsCache();
 
 
