@@ -1745,7 +1745,12 @@ export default function CalendarPage() {
             UpdateTransactionInput = {
                 transactionId:
                     editingTransaction
-                        .transactionId
+                        .transactionId,
+
+                expectedUpdatedAtMs:
+                    editingTransaction
+                        .updatedAtMs ??
+                    null
             };
 
         const currentMemo =
@@ -1950,7 +1955,7 @@ export default function CalendarPage() {
             Object.keys(
                 input
             ).length ===
-            1
+            2
         ) {
             setActionFeedback(
                 "변경된 내용이 없습니다."
