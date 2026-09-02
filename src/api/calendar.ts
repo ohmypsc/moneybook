@@ -76,6 +76,9 @@ export interface CalendarTransaction {
   updatedAt:
     string | null;
 
+  updatedAtMs:
+    number | null;
+
   createdBy?: string;
 
   updatedBy?: string;
