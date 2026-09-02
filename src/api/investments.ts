@@ -455,6 +455,10 @@ export async function updateInvestmentTrade(
     investmentTradeId:
       string;
 
+    expectedUpdatedAtMs:
+      number |
+      null;
+
     date?:
       string;
 
