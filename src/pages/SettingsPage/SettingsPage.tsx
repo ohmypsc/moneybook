@@ -1,15 +1,76 @@
-import { useEffect, useMemo, useState } from "react";
-import { apiRequest } from "../../api/client";
-import { getSession, logout } from "../../api/auth";
-import { getTransactions } from "../../api/transactions";
-import type { Transaction } from "../../api/transactions";
-import { clearLedgerStartDate, createManagedAccount, createManagedCategory, deleteManagedAccount, deleteManagedCategory, getLedgerConfig, getManagedAccounts, getManagedAccountsSnapshot, getManagedCategories, getManagedCategoriesSnapshot, restoreManagedAccount, restoreManagedCategory, setLedgerStartDate, updateManagedAccount, updateManagedCategory } from "../../api/settingsManagement";
-import type { LedgerCategoryType, ManagedAccount, ManagedCategory, SaveAccountInput } from "../../api/settingsManagement";
-import { applyCategoryPreferences, getInputPreferences, normalizeInputPreferences, saveInputPreferences, sortAccountsByPreferences } from "../../utils/inputPreferences";
-import type { InputPreferences, PreferenceTransactionType, SharedInputPreferencesState } from "../../utils/inputPreferences";
-import styles from "./SettingsPage.module.css";
+import {
+    useEffect,
+    useMemo,
+    useState
+} from "react";
 
-type SettingsView = "home" | "categories" | "accounts" | "ledger" | "profile";
+import {
+    apiRequest
+} from "../../api/client";
+
+import {
+    getSession,
+    logout
+} from "../../api/auth";
+
+import {
+    getTransactions
+} from "../../api/transactions";
+
+import type {
+    Transaction
+} from "../../api/transactions";
+
+import {
+    clearLedgerStartDate,
+    createManagedAccount,
+    createManagedCategory,
+    deleteManagedAccount,
+    deleteManagedCategory,
+    getLedgerConfig,
+    getManagedAccounts,
+    getManagedAccountsSnapshot,
+    getManagedCategories,
+    getManagedCategoriesSnapshot,
+    restoreManagedAccount,
+    restoreManagedCategory,
+    setLedgerStartDate,
+    updateManagedAccount,
+    updateManagedCategory
+} from "../../api/settingsManagement";
+
+import type {
+    LedgerCategoryType,
+    ManagedAccount,
+    ManagedCategory,
+    SaveAccountInput
+} from "../../api/settingsManagement";
+
+import {
+    applyCategoryPreferences,
+    getInputPreferences,
+    normalizeInputPreferences,
+    saveInputPreferences,
+    sortAccountsByPreferences
+} from "../../utils/inputPreferences";
+
+import type {
+    InputPreferences,
+    PreferenceTransactionType,
+    SharedInputPreferencesState
+} from "../../utils/inputPreferences";
+
+import styles
+    from "./SettingsPage.module.css";
+
+
+type SettingsView =
+    | "home"
+    | "categories"
+    | "accounts"
+    | "ledger"
+    | "profile";
+
 
 interface InputAccount {
     accountId: string;
@@ -21,68 +82,130 @@ interface InputAccount {
     paymentAccountId?: string | null;
 }
 
+
 interface InputCategory {
     categoryId: string;
     type: PreferenceTransactionType;
     name: string;
 }
 
+
 interface BootstrapData {
-    transactionTypes: PreferenceTransactionType[];
-    members: string[];
-    spendingTargets: string[];
-    accounts: InputAccount[];
-    categories: InputCategory[];
-    inputPreferences?: SharedInputPreferencesState;
+    transactionTypes:
+        PreferenceTransactionType[];
+
+    members:
+        string[];
+
+    spendingTargets:
+        string[];
+
+    accounts:
+        InputAccount[];
+
+    categories:
+        InputCategory[];
+
+    inputPreferences?:
+        SharedInputPreferencesState;
 }
+
 
 interface BootstrapResponse {
-    success: boolean;
-    apiVersion?: string;
-    data?: BootstrapData;
+    success:
+        boolean;
+
+    apiVersion?:
+        string;
+
+    data?:
+        BootstrapData;
 
     error?: {
-        code?: string;
-        message?: string;
+        code?:
+            string;
+
+        message?:
+            string;
     };
 }
+
 
 interface SavePreferencesResponse {
-    success: boolean;
-    apiVersion?: string;
-    data?: SharedInputPreferencesState;
+    success:
+        boolean;
+
+    apiVersion?:
+        string;
+
+    data?:
+        SharedInputPreferencesState;
 
     error?: {
-        code?: string;
-        message?: string;
+        code?:
+            string;
+
+        message?:
+            string;
     };
 }
 
+
 interface AccountFormState {
-    accountName: string;
-    accountType: string;
-    subType: string;
-    owner: string;
-    openingBalance: string;
-    billingCutoffDay: string;
-    paymentDay: string;
-    startYear: string;
-    endYear: string;
-    balanceMethod: string;
-    paymentAccountId: string;
+    accountName:
+        string;
+
+    accountType:
+        string;
+
+    subType:
+        string;
+
+    owner:
+        string;
+
+    openingBalance:
+        string;
+
+    billingCutoffDay:
+        string;
+
+    paymentDay:
+        string;
+
+    startYear:
+        string;
+
+    endYear:
+        string;
+
+    balanceMethod:
+        string;
+
+    paymentAccountId:
+        string;
 }
 
-const CATEGORY_TYPES: PreferenceTransactionType[] = [
-    "지출",
-    "수입",
-    "이체"
-];
 
-const MANAGED_CATEGORY_TYPES: LedgerCategoryType[] = [
-    "지출",
-    "수입",
-    "이체"
-];
+interface SaveInputPreferenceOptions {
+    categories?:
+        InputCategory[];
+
+    accounts?:
+        InputAccount[];
+
+    successMessage:
+        string;
+}
+
+
+const MANAGED_CATEGORY_TYPES:
+    LedgerCategoryType[] = [
+        "지출",
+        "수입",
+        "이체"
+    ];
+
 
 const FIXED_OWNERS = [
     "공동",
@@ -90,13 +213,17 @@ const FIXED_OWNERS = [
     "승철"
 ];
 
+
 const ACCOUNT_OWNER_TABS = [
     "미영",
     "승철",
     "공동"
 ] as const;
 
-type AccountOwnerTab = typeof ACCOUNT_OWNER_TABS[number];
+
+type AccountOwnerTab =
+    typeof ACCOUNT_OWNER_TABS[number];
+
 
 type AccountKindValue =
     | "checking"
@@ -109,174 +236,213 @@ type AccountKindValue =
     | "loan"
     | "investment";
 
+
 interface AccountKindDefinition {
-    value: AccountKindValue;
-    label: string;
-    accountType: string;
-    subType: string;
-    balanceMethod: string;
+    value:
+        AccountKindValue;
+
+    label:
+        string;
+
+    accountType:
+        string;
+
+    subType:
+        string;
+
+    balanceMethod:
+        string;
 }
 
-const ACCOUNT_KIND_OPTIONS: AccountKindDefinition[] = [
-    {
-        value: "checking",
-        label: "입출금통장",
-        accountType: "자산",
-        subType: "입출금",
-        balanceMethod: "자동계산"
-    },
-    {
-        value: "cash",
-        label: "현금",
-        accountType: "자산",
-        subType: "현금",
-        balanceMethod: "자동계산"
-    },
-    {
-        value: "deposit",
-        label: "예금",
-        accountType: "자산",
-        subType: "예금",
-        balanceMethod: "자동계산"
-    },
-    {
-        value: "saving",
-        label: "적금",
-        accountType: "자산",
-        subType: "적금",
-        balanceMethod: "자동계산"
-    },
-    {
-        value: "prepaid",
-        label: "선불·지역화폐",
-        accountType: "자산",
-        subType: "선불/지역화폐",
-        balanceMethod: "자동계산"
-    },
-    {
-        value: "checkCard",
-        label: "체크카드",
-        accountType: "결제수단",
-        subType: "체크카드",
-        balanceMethod: "자동계산"
-    },
-    {
-        value: "creditCard",
-        label: "신용카드",
-        accountType: "부채",
-        subType: "신용카드",
-        balanceMethod: "자동계산"
-    },
-    {
-        value: "loan",
-        label: "대출",
-        accountType: "부채",
-        subType: "대출",
-        balanceMethod: "자동계산"
-    },
-    {
-        value: "investment",
-        label: "투자계좌",
-        accountType: "자산",
-        subType: "주식",
-        balanceMethod: "평가입력"
-    }
-];
 
-function getAccountKind(
-    accountType: string,
-    subType: string
-) {
-    /*
-     * 과거 데이터에 체크카드의 accountType이 다르게 저장된 경우가 있어
-     * 사용자 화면의 종류는 subType을 우선해 판별합니다.
-     */
-    return (
-        ACCOUNT_KIND_OPTIONS.find(
-            option =>
-                option.subType ===
-                subType
-        ) ||
-        ACCOUNT_KIND_OPTIONS.find(
-            option =>
-                option.accountType ===
-                    accountType &&
-                option.subType ===
-                    subType
-        ) ||
-        null
-    );
-}
+const ACCOUNT_KIND_OPTIONS:
+    AccountKindDefinition[] = [
+        {
+            value:
+                "checking",
 
-function getAccountKindLabel(
-    accountType: string,
-    subType: string
-) {
-    return (
-        getAccountKind(
-            accountType,
-            subType
-        )?.label ||
-        subType ||
-        accountType ||
-        "기타"
-    );
-}
+            label:
+                "입출금통장",
 
-function applyAccountKind(
-    current: AccountFormState,
-    kind: AccountKindDefinition
-): AccountFormState {
-    const isCard =
-        kind.subType === "체크카드" ||
-        kind.subType === "신용카드";
+            accountType:
+                "자산",
 
-    const isCreditCard =
-        kind.subType === "신용카드";
+            subType:
+                "입출금",
 
-    return {
-        ...current,
-        accountType: kind.accountType,
-        subType: kind.subType,
-        balanceMethod: kind.balanceMethod,
+            balanceMethod:
+                "자동계산"
+        },
 
-        paymentAccountId:
-            isCard
-                ? current.paymentAccountId
-                : "",
+        {
+            value:
+                "cash",
 
-        billingCutoffDay:
-            isCreditCard
-                ? current.billingCutoffDay
-                : "",
+            label:
+                "현금",
 
-        paymentDay:
-            isCreditCard
-                ? current.paymentDay
-                : ""
-    };
-}
+            accountType:
+                "자산",
+
+            subType:
+                "현금",
+
+            balanceMethod:
+                "자동계산"
+        },
+
+        {
+            value:
+                "deposit",
+
+            label:
+                "예금",
+
+            accountType:
+                "자산",
+
+            subType:
+                "예금",
+
+            balanceMethod:
+                "자동계산"
+        },
+
+        {
+            value:
+                "saving",
+
+            label:
+                "적금",
+
+            accountType:
+                "자산",
+
+            subType:
+                "적금",
+
+            balanceMethod:
+                "자동계산"
+        },
+
+        {
+            value:
+                "prepaid",
+
+            label:
+                "선불·지역화폐",
+
+            accountType:
+                "자산",
+
+            subType:
+                "선불/지역화폐",
+
+            balanceMethod:
+                "자동계산"
+        },
+
+        {
+            value:
+                "checkCard",
+
+            label:
+                "체크카드",
+
+            accountType:
+                "결제수단",
+
+            subType:
+                "체크카드",
+
+            balanceMethod:
+                "자동계산"
+        },
+
+        {
+            value:
+                "creditCard",
+
+            label:
+                "신용카드",
+
+            accountType:
+                "부채",
+
+            subType:
+                "신용카드",
+
+            balanceMethod:
+                "자동계산"
+        },
+
+        {
+            value:
+                "loan",
+
+            label:
+                "대출",
+
+            accountType:
+                "부채",
+
+            subType:
+                "대출",
+
+            balanceMethod:
+                "자동계산"
+        },
+
+        {
+            value:
+                "investment",
+
+            label:
+                "투자계좌",
+
+            accountType:
+                "자산",
+
+            subType:
+                "주식",
+
+            balanceMethod:
+                "평가입력"
+        }
+    ];
+
 
 function getErrorMessage(
-    error: unknown,
-    fallback: string
+    error:
+        unknown,
+
+    fallback:
+        string
 ) {
     return error instanceof Error
         ? error.message
         : fallback;
 }
 
+
 function moveItem(
-    items: string[],
-    index: number,
-    direction: -1 | 1
+    items:
+        string[],
+
+    index:
+        number,
+
+    direction:
+        -1 | 1
 ) {
     const nextIndex =
-        index + direction;
+        index +
+        direction;
 
     if (
         nextIndex < 0 ||
-        nextIndex >= items.length
+        nextIndex >=
+            items.length
     ) {
         return items;
     }
@@ -295,11 +461,19 @@ function moveItem(
     return next;
 }
 
+
 function moveSubsetInOrder(
-    allOrder: string[],
-    subsetIds: string[],
-    index: number,
-    direction: -1 | 1
+    allOrder:
+        string[],
+
+    subsetIds:
+        string[],
+
+    index:
+        number,
+
+    direction:
+        -1 | 1
 ) {
     const movedSubset =
         moveItem(
@@ -338,7 +512,8 @@ function moveSubsetInOrder(
                     cursor
                 ];
 
-            cursor += 1;
+            cursor +=
+                1;
 
             return (
                 replacement ||
@@ -348,22 +523,109 @@ function moveSubsetInOrder(
     );
 }
 
-function getInputAccountName(
-    account: InputAccount
+
+function getAccountKind(
+    accountType:
+        string,
+
+    subType:
+        string
 ) {
     return (
-        account.displayName ||
-        account.accountName ||
-        account.accountId
+        ACCOUNT_KIND_OPTIONS.find(
+            option =>
+                option.subType ===
+                subType
+        ) ||
+        ACCOUNT_KIND_OPTIONS.find(
+            option =>
+                option.accountType ===
+                    accountType &&
+                option.subType ===
+                    subType
+        ) ||
+        null
     );
 }
 
+
+function getAccountKindLabel(
+    accountType:
+        string,
+
+    subType:
+        string
+) {
+    return (
+        getAccountKind(
+            accountType,
+            subType
+        )?.label ||
+        subType ||
+        accountType ||
+        "기타"
+    );
+}
+
+
+function applyAccountKind(
+    current:
+        AccountFormState,
+
+    kind:
+        AccountKindDefinition
+): AccountFormState {
+    const isCard =
+        kind.subType ===
+            "체크카드" ||
+        kind.subType ===
+            "신용카드";
+
+    const isCreditCard =
+        kind.subType ===
+        "신용카드";
+
+    return {
+        ...current,
+
+        accountType:
+            kind.accountType,
+
+        subType:
+            kind.subType,
+
+        balanceMethod:
+            kind.balanceMethod,
+
+        paymentAccountId:
+            isCard
+                ? current.paymentAccountId
+                : "",
+
+        billingCutoffDay:
+            isCreditCard
+                ? current.billingCutoffDay
+                : "",
+
+        paymentDay:
+            isCreditCard
+                ? current.paymentDay
+                : ""
+    };
+}
+
+
 function formatKrw(
-    value: number | undefined
+    value:
+        number |
+        undefined
 ) {
     if (
-        value === undefined ||
-        !Number.isFinite(value)
+        value ===
+            undefined ||
+        !Number.isFinite(
+            value
+        )
     ) {
         return "-";
     }
@@ -375,14 +637,18 @@ function formatKrw(
     )}원`;
 }
 
+
 function csvCell(
-    value: unknown
+    value:
+        unknown
 ) {
     const text =
         value === null ||
         value === undefined
             ? ""
-            : String(value);
+            : String(
+                value
+            );
 
     return `"${text.replace(
         /"/g,
@@ -390,26 +656,51 @@ function csvCell(
     )}"`;
 }
 
+
 function createEmptyAccountForm(
-    owner: string = "공동"
+    owner:
+        string =
+            "공동"
 ): AccountFormState {
     return {
-        accountName: "",
-        accountType: "자산",
-        subType: "입출금",
+        accountName:
+            "",
+
+        accountType:
+            "자산",
+
+        subType:
+            "입출금",
+
         owner,
-        openingBalance: "0",
-        billingCutoffDay: "",
-        paymentDay: "",
-        startYear: "",
-        endYear: "",
-        balanceMethod: "자동계산",
-        paymentAccountId: ""
+
+        openingBalance:
+            "0",
+
+        billingCutoffDay:
+            "",
+
+        paymentDay:
+            "",
+
+        startYear:
+            "",
+
+        endYear:
+            "",
+
+        balanceMethod:
+            "자동계산",
+
+        paymentAccountId:
+            ""
     };
 }
 
+
 function accountToForm(
-    account: ManagedAccount
+    account:
+        ManagedAccount
 ): AccountFormState {
     const kind =
         getAccountKind(
@@ -481,26 +772,42 @@ function accountToForm(
     };
 }
 
+
 function parseOptionalInteger(
-    value: string,
-    label: string,
-    minimum: number,
-    maximum: number
+    value:
+        string,
+
+    label:
+        string,
+
+    minimum:
+        number,
+
+    maximum:
+        number
 ) {
     const text =
         value.trim();
 
-    if (!text) {
+    if (
+        !text
+    ) {
         return null;
     }
 
     const number =
-        Number(text);
+        Number(
+            text
+        );
 
     if (
-        !Number.isInteger(number) ||
-        number < minimum ||
-        number > maximum
+        !Number.isInteger(
+            number
+        ) ||
+        number <
+            minimum ||
+        number >
+            maximum
     ) {
         throw new Error(
             `${label}은 ${minimum}~${maximum} 사이의 정수여야 합니다.`
@@ -510,8 +817,10 @@ function parseOptionalInteger(
     return number;
 }
 
+
 function buildAccountPayload(
-    form: AccountFormState
+    form:
+        AccountFormState
 ): SaveAccountInput {
     const accountName =
         form.accountName.trim();
@@ -531,7 +840,9 @@ function buildAccountPayload(
                 0
         );
 
-    if (!accountName) {
+    if (
+        !accountName
+    ) {
         throw new Error(
             "계좌 이름을 입력해주세요."
         );
@@ -546,7 +857,9 @@ function buildAccountPayload(
         );
     }
 
-    if (!owner) {
+    if (
+        !owner
+    ) {
         throw new Error(
             "명의자를 선택해주세요."
         );
@@ -595,9 +908,12 @@ function buildAccountPayload(
         );
 
     if (
-        startYear !== null &&
-        endYear !== null &&
-        startYear > endYear
+        startYear !==
+            null &&
+        endYear !==
+            null &&
+        startYear >
+            endYear
     ) {
         throw new Error(
             "사용 시작 연도는 종료 연도보다 늦을 수 없습니다."
@@ -605,8 +921,10 @@ function buildAccountPayload(
     }
 
     const isCard =
-        subType === "체크카드" ||
-        subType === "신용카드";
+        subType ===
+            "체크카드" ||
+        subType ===
+            "신용카드";
 
     if (
         isCard &&
@@ -637,15 +955,323 @@ function buildAccountPayload(
                 ? form.paymentAccountId
                 : null,
 
-        /*
-         * 기존 Apps Script/시트 계약과의 호환을 위해
-         * 내부 값은 명의자와 동일하게 보냅니다.
-         * 사용자가 별도로 선택하는 항목은 아닙니다.
-         */
         assetAttribution:
             owner
     };
 }
+
+
+function useInputPreferenceData() {
+    const [
+        bootstrap,
+        setBootstrap
+    ] =
+        useState<
+            BootstrapData |
+            null
+        >(
+            null
+        );
+
+    const [
+        preferences,
+        setPreferences
+    ] =
+        useState<
+            InputPreferences |
+            null
+        >(
+            null
+        );
+
+    const [
+        loading,
+        setLoading
+    ] =
+        useState(
+            true
+        );
+
+    const [
+        error,
+        setError
+    ] =
+        useState("");
+
+    const [
+        feedback,
+        setFeedback
+    ] =
+        useState("");
+
+    const [
+        saveError,
+        setSaveError
+    ] =
+        useState("");
+
+    const [
+        saving,
+        setSaving
+    ] =
+        useState(
+            false
+        );
+
+    useEffect(
+        () => {
+            let active =
+                true;
+
+            async function load() {
+                setLoading(
+                    true
+                );
+
+                setError(
+                    ""
+                );
+
+                try {
+                    const response =
+                        await apiRequest<
+                            BootstrapResponse
+                        >(
+                            "/api/bootstrap"
+                        );
+
+                    if (
+                        !response.success ||
+                        !response.data
+                    ) {
+                        throw new Error(
+                            response.error
+                                ?.message ||
+                            "입력 화면 설정을 불러오지 못했습니다."
+                        );
+                    }
+
+                    if (
+                        !active
+                    ) {
+                        return;
+                    }
+
+                    const data =
+                        response.data;
+
+                    const sharedPreferences =
+                        data.inputPreferences
+                            ?.configured ===
+                            true &&
+                        data.inputPreferences
+                            .preferences
+                            ? data
+                                .inputPreferences
+                                .preferences
+                            : null;
+
+                    const nextPreferences =
+                        sharedPreferences
+                            ? normalizeInputPreferences(
+                                sharedPreferences,
+                                data.categories,
+                                data.accounts
+                            )
+                            : getInputPreferences(
+                                data.categories,
+                                data.accounts
+                            );
+
+                    if (
+                        sharedPreferences
+                    ) {
+                        saveInputPreferences(
+                            nextPreferences
+                        );
+                    }
+
+                    setBootstrap(
+                        data
+                    );
+
+                    setPreferences(
+                        nextPreferences
+                    );
+                } catch (
+                    loadError
+                ) {
+                    if (
+                        active
+                    ) {
+                        setError(
+                            getErrorMessage(
+                                loadError,
+                                "입력 화면 설정을 불러오지 못했습니다."
+                            )
+                        );
+                    }
+                } finally {
+                    if (
+                        active
+                    ) {
+                        setLoading(
+                            false
+                        );
+                    }
+                }
+            }
+
+            void load();
+
+            return () => {
+                active =
+                    false;
+            };
+        },
+        []
+    );
+
+    function clearMessages() {
+        setFeedback(
+            ""
+        );
+
+        setSaveError(
+            ""
+        );
+    }
+
+    async function savePreferencesToServer(
+        nextPreferences:
+            InputPreferences,
+
+        options:
+            SaveInputPreferenceOptions
+    ) {
+        if (
+            !bootstrap ||
+            saving
+        ) {
+            return false;
+        }
+
+        const categorySource =
+            options.categories ||
+            bootstrap.categories;
+
+        const accountSource =
+            options.accounts ||
+            bootstrap.accounts;
+
+        const normalized =
+            normalizeInputPreferences(
+                nextPreferences,
+                categorySource,
+                accountSource
+            );
+
+        saveInputPreferences(
+            normalized
+        );
+
+        setPreferences(
+            normalized
+        );
+
+        setSaving(
+            true
+        );
+
+        clearMessages();
+
+        try {
+            const response =
+                await apiRequest<
+                    SavePreferencesResponse
+                >(
+                    "/api/settings/input-preferences",
+                    {
+                        method:
+                            "POST",
+
+                        body:
+                            JSON.stringify({
+                                preferences:
+                                    normalized
+                            })
+                    }
+                );
+
+            if (
+                !response.success ||
+                !response.data ||
+                response.data
+                    .configured !==
+                    true ||
+                !response.data
+                    .preferences
+            ) {
+                throw new Error(
+                    response.error
+                        ?.message ||
+                    "부부 공통 설정을 저장하지 못했습니다."
+                );
+            }
+
+            const saved =
+                normalizeInputPreferences(
+                    response.data
+                        .preferences,
+                    categorySource,
+                    accountSource
+                );
+
+            saveInputPreferences(
+                saved
+            );
+
+            setPreferences(
+                saved
+            );
+
+            setFeedback(
+                options.successMessage
+            );
+
+            return true;
+        } catch (
+            saveFailure
+        ) {
+            setSaveError(
+                `공통 서버 저장에 실패했습니다. 현재 브라우저에는 저장했습니다. (${getErrorMessage(
+                    saveFailure,
+                    "알 수 없는 오류"
+                )})`
+            );
+
+            return false;
+        } finally {
+            setSaving(
+                false
+            );
+        }
+    }
+
+    return {
+        bootstrap,
+        preferences,
+        setPreferences,
+        loading,
+        error,
+        feedback,
+        saveError,
+        saving,
+        clearMessages,
+        savePreferencesToServer
+    };
+}
+
 
 function SettingsHome(
     {
@@ -677,7 +1303,7 @@ function SettingsHome(
                     "카테고리 관리",
 
                 description:
-                    "추가·이름 변경·사용 중지·삭제·복원"
+                    "카테고리 추가·수정과 입력 화면 순서"
             },
 
             {
@@ -864,6 +1490,7 @@ function SettingsHome(
     );
 }
 
+
 function DetailHeader(
     {
         title,
@@ -923,942 +1550,6 @@ function DetailHeader(
     );
 }
 
-interface InputSettingsProps {
-    section:
-        | "categories"
-        | "accounts";
-
-    categories?:
-        InputCategory[];
-
-    accounts?:
-        InputAccount[];
-
-    owner?:
-        string;
-}
-
-function InputSettings(
-    {
-        section,
-        categories,
-        accounts,
-        owner
-    }:
-        InputSettingsProps
-) {
-    const [
-        bootstrap,
-        setBootstrap
-    ] =
-        useState<
-            BootstrapData | null
-        >(null);
-
-    const [
-        preferences,
-        setPreferences
-    ] =
-        useState<
-            InputPreferences | null
-        >(null);
-
-    const [
-        categoryType,
-        setCategoryType
-    ] =
-        useState<
-            PreferenceTransactionType
-        >("지출");
-
-    const [
-        loading,
-        setLoading
-    ] =
-        useState(true);
-
-    const [
-        error,
-        setError
-    ] =
-        useState("");
-
-    const [
-        feedback,
-        setFeedback
-    ] =
-        useState("");
-
-    const [
-        saveError,
-        setSaveError
-    ] =
-        useState("");
-
-    const [
-        saving,
-        setSaving
-    ] =
-        useState(false);
-
-    useEffect(
-        () => {
-            let active =
-                true;
-
-            async function load() {
-                setLoading(true);
-                setError("");
-
-                try {
-                    const response =
-                        await apiRequest<
-                            BootstrapResponse
-                        >(
-                            "/api/bootstrap"
-                        );
-
-                    if (
-                        !response.success ||
-                        !response.data
-                    ) {
-                        throw new Error(
-                            response.error
-                                ?.message ||
-                            "입력 화면 설정을 불러오지 못했습니다."
-                        );
-                    }
-
-                    if (!active) {
-                        return;
-                    }
-
-                    const data =
-                        response.data;
-
-                    const sharedPreferences =
-                        data.inputPreferences
-                            ?.configured ===
-                            true
-                            ? data
-                                  .inputPreferences
-                                  .preferences
-                            : null;
-
-                    const nextPreferences =
-                        sharedPreferences
-                            ? normalizeInputPreferences(
-                                  sharedPreferences,
-                                  data.categories,
-                                  data.accounts
-                              )
-                            : getInputPreferences(
-                                  data.categories,
-                                  data.accounts
-                              );
-
-                    if (
-                        sharedPreferences
-                    ) {
-                        saveInputPreferences(
-                            nextPreferences
-                        );
-                    }
-
-                    setBootstrap(data);
-                    setPreferences(
-                        nextPreferences
-                    );
-                } catch (
-                    loadError
-                ) {
-                    if (active) {
-                        setError(
-                            getErrorMessage(
-                                loadError,
-                                "입력 화면 설정을 불러오지 못했습니다."
-                            )
-                        );
-                    }
-                } finally {
-                    if (active) {
-                        setLoading(false);
-                    }
-                }
-            }
-
-            void load();
-
-            return () => {
-                active = false;
-            };
-        },
-        []
-    );
-
-    const categorySource =
-        useMemo(
-            () =>
-                categories ||
-                bootstrap
-                    ?.categories ||
-                [],
-            [
-                categories,
-                bootstrap
-            ]
-        );
-
-    const accountSource =
-        useMemo(
-            () =>
-                accounts ||
-                bootstrap
-                    ?.accounts ||
-                [],
-            [
-                accounts,
-                bootstrap
-            ]
-        );
-
-    const normalizedPreferences =
-        useMemo(
-            () => {
-                if (
-                    !preferences
-                ) {
-                    return null;
-                }
-
-                return normalizeInputPreferences(
-                    preferences,
-                    categorySource,
-                    accountSource
-                );
-            },
-            [
-                preferences,
-                categorySource,
-                accountSource
-            ]
-        );
-
-    const categoryItems =
-        useMemo(
-            () => {
-                if (
-                    !normalizedPreferences
-                ) {
-                    return [];
-                }
-
-                return applyCategoryPreferences(
-                    categorySource,
-                    categoryType,
-                    normalizedPreferences
-                );
-            },
-            [
-                categorySource,
-                categoryType,
-                normalizedPreferences
-            ]
-        );
-
-    const accountItems =
-        useMemo(
-            () => {
-                if (
-                    !normalizedPreferences
-                ) {
-                    return [];
-                }
-
-                return sortAccountsByPreferences(
-                    accountSource,
-                    normalizedPreferences
-                ).filter(
-                    account =>
-                        !owner ||
-                        account.owner ===
-                            owner
-                );
-            },
-            [
-                accountSource,
-                normalizedPreferences,
-                owner
-            ]
-        );
-
-    const hiddenAccountSet =
-        useMemo(
-            () =>
-                new Set(
-                    normalizedPreferences
-                        ?.hiddenAccountIds ||
-                    []
-                ),
-            [
-                normalizedPreferences
-            ]
-        );
-
-    function clearMessages() {
-        setFeedback("");
-        setSaveError("");
-    }
-
-    function handleMoveCategory(
-        index: number,
-        direction: -1 | 1
-    ) {
-        if (
-            !normalizedPreferences
-        ) {
-            return;
-        }
-
-        setPreferences({
-            ...normalizedPreferences,
-
-            categoryOrder: {
-                ...normalizedPreferences
-                    .categoryOrder,
-
-                [categoryType]:
-                    moveItem(
-                        normalizedPreferences
-                            .categoryOrder[
-                                categoryType
-                            ],
-                        index,
-                        direction
-                    )
-            }
-        });
-
-        clearMessages();
-    }
-
-    function handleMoveAccount(
-        index: number,
-        direction: -1 | 1
-    ) {
-        if (
-            !normalizedPreferences
-        ) {
-            return;
-        }
-
-        const visibleIds =
-            accountItems.map(
-                account =>
-                    account.accountId
-            );
-
-        setPreferences({
-            ...normalizedPreferences,
-
-            accountOrder:
-                moveSubsetInOrder(
-                    normalizedPreferences
-                        .accountOrder,
-                    visibleIds,
-                    index,
-                    direction
-                )
-        });
-
-        clearMessages();
-    }
-
-    function handleToggleAccount(
-        accountId: string
-    ) {
-        if (
-            !normalizedPreferences
-        ) {
-            return;
-        }
-
-        const hidden =
-            new Set(
-                normalizedPreferences
-                    .hiddenAccountIds
-            );
-
-        if (
-            hidden.has(
-                accountId
-            )
-        ) {
-            hidden.delete(
-                accountId
-            );
-        } else {
-            hidden.add(
-                accountId
-            );
-        }
-
-        setPreferences({
-            ...normalizedPreferences,
-
-            hiddenAccountIds:
-                Array.from(
-                    hidden
-                )
-        });
-
-        clearMessages();
-    }
-
-    async function handleSave() {
-        if (
-            !normalizedPreferences ||
-            !bootstrap ||
-            saving
-        ) {
-            return;
-        }
-
-        const normalized =
-            normalizeInputPreferences(
-                normalizedPreferences,
-                categorySource,
-                accountSource
-            );
-
-        saveInputPreferences(
-            normalized
-        );
-
-        setPreferences(
-            normalized
-        );
-
-        setSaving(true);
-        clearMessages();
-
-        try {
-            const response =
-                await apiRequest<
-                    SavePreferencesResponse
-                >(
-                    "/api/settings/input-preferences",
-                    {
-                        method:
-                            "POST",
-
-                        body:
-                            JSON.stringify({
-                                preferences:
-                                    normalized
-                            })
-                    }
-                );
-
-            if (
-                !response.success ||
-                !response.data ||
-                response.data
-                    .configured !==
-                    true ||
-                !response.data
-                    .preferences
-            ) {
-                throw new Error(
-                    response.error
-                        ?.message ||
-                    "부부 공통 설정을 저장하지 못했습니다."
-                );
-            }
-
-            const saved =
-                normalizeInputPreferences(
-                    response.data
-                        .preferences,
-                    categorySource,
-                    accountSource
-                );
-
-            saveInputPreferences(
-                saved
-            );
-
-            setPreferences(
-                saved
-            );
-
-            setFeedback(
-                section ===
-                    "categories"
-                    ? "입력 화면 카테고리 순서를 저장했습니다."
-                    : "입력 화면 계좌·카드 설정을 저장했습니다."
-            );
-        } catch (
-            saveFailure
-        ) {
-            setSaveError(
-                `공통 서버 저장에 실패했습니다. 현재 브라우저에는 저장했습니다. (${getErrorMessage(
-                    saveFailure,
-                    "알 수 없는 오류"
-                )})`
-            );
-        } finally {
-            setSaving(false);
-        }
-    }
-
-    if (loading) {
-        return (
-            <section
-                className={
-                    styles.cardSection
-                }
-            >
-                <p
-                    className={
-                        styles.state
-                    }
-                >
-                    입력 화면 설정을 불러오는 중입니다.
-                </p>
-            </section>
-        );
-    }
-
-    if (
-        error ||
-        !bootstrap ||
-        !normalizedPreferences
-    ) {
-        return (
-            <section
-                className={
-                    styles.cardSection
-                }
-            >
-                <p
-                    className={
-                        styles.error
-                    }
-                    role="alert"
-                >
-                    {
-                        error ||
-                        "입력 화면 설정을 불러오지 못했습니다."
-                    }
-                </p>
-            </section>
-        );
-    }
-
-    return (
-        <section
-            className={
-                styles.cardSection
-            }
-        >
-            <div
-                className={
-                    styles.sectionHeading
-                }
-            >
-                <h2>
-                    {
-                        section ===
-                            "categories"
-                            ? "입력 화면 카테고리 순서"
-                            : "입력 화면 노출·순서"
-                    }
-                </h2>
-
-                <p>
-                    {
-                        section ===
-                            "categories"
-                            ? "거래 입력 화면에 표시되는 카테고리 순서를 정합니다."
-                            : `${owner || "현재"} 항목 중 거래 입력 화면에 보일 항목과 순서를 정합니다.`
-                    }
-                </p>
-            </div>
-
-            <p
-                className={
-                    styles.notice
-                }
-            >
-                저장한 설정은 미영·승철 계정에 공통으로 적용됩니다.
-            </p>
-
-            {
-                section ===
-                    "categories" && (
-                    <>
-                        <div
-                            className={
-                                styles.segmentedControl
-                            }
-                        >
-                            {
-                                CATEGORY_TYPES.map(
-                                    type => (
-                                        <button
-                                            type="button"
-                                            key={
-                                                type
-                                            }
-                                            className={
-                                                categoryType ===
-                                                type
-                                                    ? styles.segmentButtonActive
-                                                    : styles.segmentButton
-                                            }
-                                            onClick={
-                                                () =>
-                                                    setCategoryType(
-                                                        type
-                                                    )
-                                            }
-                                        >
-                                            {type}
-                                        </button>
-                                    )
-                                )
-                            }
-                        </div>
-
-                        {
-                            categoryItems.length ===
-                            0
-                                ? (
-                                    <p
-                                        className={
-                                            styles.emptyState
-                                        }
-                                    >
-                                        표시할 카테고리가 없습니다.
-                                    </p>
-                                )
-                                : (
-                                    <ul
-                                        className={
-                                            styles.itemList
-                                        }
-                                    >
-                                        {
-                                            categoryItems.map(
-                                                (
-                                                    category,
-                                                    index
-                                                ) => (
-                                                    <li
-                                                        key={
-                                                            category.categoryId
-                                                        }
-                                                        className={
-                                                            styles.orderRow
-                                                        }
-                                                    >
-                                                        <span
-                                                            className={
-                                                                styles.orderNumber
-                                                            }
-                                                        >
-                                                            {index + 1}
-                                                        </span>
-
-                                                        <span
-                                                            className={
-                                                                styles.primaryItemText
-                                                            }
-                                                        >
-                                                            {category.name}
-                                                        </span>
-
-                                                        <div
-                                                            className={
-                                                                styles.compactActions
-                                                            }
-                                                        >
-                                                            <button
-                                                                type="button"
-                                                                className={
-                                                                    styles.iconButton
-                                                                }
-                                                                aria-label={`${category.name} 위로 이동`}
-                                                                disabled={
-                                                                    saving ||
-                                                                    index ===
-                                                                    0
-                                                                }
-                                                                onClick={
-                                                                    () =>
-                                                                        handleMoveCategory(
-                                                                            index,
-                                                                            -1
-                                                                        )
-                                                                }
-                                                            >
-                                                                ↑
-                                                            </button>
-
-                                                            <button
-                                                                type="button"
-                                                                className={
-                                                                    styles.iconButton
-                                                                }
-                                                                aria-label={`${category.name} 아래로 이동`}
-                                                                disabled={
-                                                                    saving ||
-                                                                    index ===
-                                                                    categoryItems.length -
-                                                                        1
-                                                                }
-                                                                onClick={
-                                                                    () =>
-                                                                        handleMoveCategory(
-                                                                            index,
-                                                                            1
-                                                                        )
-                                                                }
-                                                            >
-                                                                ↓
-                                                            </button>
-                                                        </div>
-                                                    </li>
-                                                )
-                                            )
-                                        }
-                                    </ul>
-                                )
-                        }
-                    </>
-                )
-            }
-
-            {
-                section ===
-                    "accounts" && (
-                    <>
-                        {
-                            accountItems.length ===
-                            0
-                                ? (
-                                    <p
-                                        className={
-                                            styles.emptyState
-                                        }
-                                    >
-                                        설정할 항목이 없습니다.
-                                    </p>
-                                )
-                                : (
-                                    <ul
-                                        className={
-                                            styles.itemList
-                                        }
-                                    >
-                                        {
-                                            accountItems.map(
-                                                (
-                                                    account,
-                                                    index
-                                                ) => {
-                                                    const hidden =
-                                                        hiddenAccountSet.has(
-                                                            account.accountId
-                                                        );
-
-                                                    return (
-                                                        <li
-                                                            key={
-                                                                account.accountId
-                                                            }
-                                                            className={`${styles.orderRow} ${
-                                                                hidden
-                                                                    ? styles.mutedRow
-                                                                    : ""
-                                                            }`}
-                                                        >
-                                                            <span
-                                                                className={
-                                                                    styles.orderNumber
-                                                                }
-                                                            >
-                                                                {index + 1}
-                                                            </span>
-
-                                                            <span
-                                                                className={
-                                                                    styles.itemTextGroup
-                                                                }
-                                                            >
-                                                                <strong>
-                                                                    {
-                                                                        getInputAccountName(
-                                                                            account
-                                                                        )
-                                                                    }
-                                                                </strong>
-
-                                                                <span>
-                                                                    {
-                                                                        getAccountKindLabel(
-                                                                            account.accountType,
-                                                                            account.subType
-                                                                        )
-                                                                    }
-                                                                </span>
-                                                            </span>
-
-                                                            <div
-                                                                className={
-                                                                    styles.compactActions
-                                                                }
-                                                            >
-                                                                <button
-                                                                    type="button"
-                                                                    className={
-                                                                        hidden
-                                                                            ? styles.visibilityButton
-                                                                            : styles.visibleButton
-                                                                    }
-                                                                    disabled={
-                                                                        saving
-                                                                    }
-                                                                    onClick={
-                                                                        () =>
-                                                                            handleToggleAccount(
-                                                                                account.accountId
-                                                                            )
-                                                                    }
-                                                                >
-                                                                    {
-                                                                        hidden
-                                                                            ? "숨김"
-                                                                            : "표시"
-                                                                    }
-                                                                </button>
-
-                                                                <button
-                                                                    type="button"
-                                                                    className={
-                                                                        styles.iconButton
-                                                                    }
-                                                                    aria-label={`${getInputAccountName(
-                                                                        account
-                                                                    )} 위로 이동`}
-                                                                    disabled={
-                                                                        saving ||
-                                                                        index ===
-                                                                        0
-                                                                    }
-                                                                    onClick={
-                                                                        () =>
-                                                                            handleMoveAccount(
-                                                                                index,
-                                                                                -1
-                                                                            )
-                                                                    }
-                                                                >
-                                                                    ↑
-                                                                </button>
-
-                                                                <button
-                                                                    type="button"
-                                                                    className={
-                                                                        styles.iconButton
-                                                                    }
-                                                                    aria-label={`${getInputAccountName(
-                                                                        account
-                                                                    )} 아래로 이동`}
-                                                                    disabled={
-                                                                        saving ||
-                                                                        index ===
-                                                                        accountItems.length -
-                                                                            1
-                                                                    }
-                                                                    onClick={
-                                                                        () =>
-                                                                            handleMoveAccount(
-                                                                                index,
-                                                                                1
-                                                                            )
-                                                                    }
-                                                                >
-                                                                    ↓
-                                                                </button>
-                                                            </div>
-                                                        </li>
-                                                    );
-                                                }
-                                            )
-                                        }
-                                    </ul>
-                                )
-                        }
-                    </>
-                )
-            }
-
-            {
-                feedback && (
-                    <p
-                        className={
-                            styles.feedback
-                        }
-                        role="status"
-                    >
-                        {feedback}
-                    </p>
-                )
-            }
-
-            {
-                saveError && (
-                    <p
-                        className={
-                            styles.error
-                        }
-                        role="alert"
-                    >
-                        {saveError}
-                    </p>
-                )
-            }
-
-            <div
-                className={
-                    styles.formActions
-                }
-            >
-                <button
-                    type="button"
-                    className={
-                        styles.primaryButton
-                    }
-                    disabled={
-                        saving
-                    }
-                    onClick={
-                        () =>
-                            void handleSave()
-                    }
-                >
-                    {
-                        saving
-                            ? "저장 중..."
-                            : "입력 화면 설정 저장"
-                    }
-                </button>
-            </div>
-        </section>
-    );
-}
 
 function CategorySettings() {
     const [
@@ -1888,7 +1579,9 @@ function CategorySettings() {
     ] =
         useState<
             LedgerCategoryType
-        >("지출");
+        >(
+            "지출"
+        );
 
     const [
         newName,
@@ -1901,14 +1594,36 @@ function CategorySettings() {
         setEditingId
     ] =
         useState<
-            string | null
-        >(null);
+            string |
+            null
+        >(
+            null
+        );
 
     const [
         editingName,
         setEditingName
     ] =
         useState("");
+
+    const [
+        menuCategoryId,
+        setMenuCategoryId
+    ] =
+        useState<
+            string |
+            null
+        >(
+            null
+        );
+
+    const [
+        reordering,
+        setReordering
+    ] =
+        useState(
+            false
+        );
 
     const [
         loading,
@@ -1937,16 +1652,22 @@ function CategorySettings() {
     ] =
         useState("");
 
+    const inputPreference =
+        useInputPreferenceData();
+
+
     async function refresh() {
         const result =
             await getManagedCategories({
-                includeDeleted: true
+                includeDeleted:
+                    true
             });
 
         setCategories(
             result.items
         );
     }
+
 
     useEffect(
         () => {
@@ -1957,10 +1678,14 @@ function CategorySettings() {
                 if (
                     !initialSnapshot
                 ) {
-                    setLoading(true);
+                    setLoading(
+                        true
+                    );
                 }
 
-                setError("");
+                setError(
+                    ""
+                );
 
                 try {
                     const result =
@@ -1969,7 +1694,9 @@ function CategorySettings() {
                                 true
                         });
 
-                    if (active) {
+                    if (
+                        active
+                    ) {
                         setCategories(
                             result.items
                         );
@@ -1989,8 +1716,12 @@ function CategorySettings() {
                         );
                     }
                 } finally {
-                    if (active) {
-                        setLoading(false);
+                    if (
+                        active
+                    ) {
+                        setLoading(
+                            false
+                        );
                     }
                 }
             }
@@ -1998,7 +1729,8 @@ function CategorySettings() {
             void load();
 
             return () => {
-                active = false;
+                active =
+                    false;
             };
         },
         [
@@ -2006,7 +1738,8 @@ function CategorySettings() {
         ]
     );
 
-    const activeItems =
+
+    const currentItems =
         useMemo(
             () =>
                 categories.filter(
@@ -2020,6 +1753,7 @@ function CategorySettings() {
                 selectedType
             ]
         );
+
 
     const deletedItems =
         useMemo(
@@ -2036,23 +1770,209 @@ function CategorySettings() {
             ]
         );
 
+
+    const preferenceCategories =
+        useMemo<
+            InputCategory[]
+        >(
+            () =>
+                categories
+                    .filter(
+                        category =>
+                            !category.isDeleted &&
+                            category.active
+                    )
+                    .map(
+                        category => ({
+                            categoryId:
+                                category.categoryId,
+
+                            type:
+                                category.type as
+                                    PreferenceTransactionType,
+
+                            name:
+                                category.name
+                        })
+                    ),
+            [
+                categories
+            ]
+        );
+
+
+    const normalizedPreferences =
+        useMemo(
+            () => {
+                if (
+                    !inputPreference.preferences ||
+                    !inputPreference.bootstrap
+                ) {
+                    return null;
+                }
+
+                return normalizeInputPreferences(
+                    inputPreference.preferences,
+                    preferenceCategories,
+                    inputPreference
+                        .bootstrap
+                        .accounts
+                );
+            },
+            [
+                inputPreference.preferences,
+                inputPreference.bootstrap,
+                preferenceCategories
+            ]
+        );
+
+
+    const orderedActiveItems =
+        useMemo(
+            () => {
+                const active =
+                    currentItems.filter(
+                        category =>
+                            category.active
+                    );
+
+                if (
+                    !normalizedPreferences
+                ) {
+                    return active;
+                }
+
+                const inputItems =
+                    active.map(
+                        category => ({
+                            categoryId:
+                                category.categoryId,
+
+                            type:
+                                category.type as
+                                    PreferenceTransactionType,
+
+                            name:
+                                category.name
+                        })
+                    );
+
+                const ordered =
+                    applyCategoryPreferences(
+                        inputItems,
+                        selectedType as
+                            PreferenceTransactionType,
+                        normalizedPreferences
+                    );
+
+                const byId =
+                    new Map(
+                        active.map(
+                            category => [
+                                category.categoryId,
+                                category
+                            ] as const
+                        )
+                    );
+
+                return ordered
+                    .map(
+                        category =>
+                            byId.get(
+                                category.categoryId
+                            )
+                    )
+                    .filter(
+                        (
+                            category
+                        ): category is ManagedCategory =>
+                            Boolean(
+                                category
+                            )
+                    );
+            },
+            [
+                currentItems,
+                normalizedPreferences,
+                selectedType
+            ]
+        );
+
+
+    const inactiveItems =
+        useMemo(
+            () =>
+                currentItems
+                    .filter(
+                        category =>
+                            !category.active
+                    )
+                    .slice()
+                    .sort(
+                        (
+                            a,
+                            b
+                        ) =>
+                            a.name.localeCompare(
+                                b.name,
+                                "ko"
+                            )
+                    ),
+            [
+                currentItems
+            ]
+        );
+
+
+    const managementItems =
+        useMemo(
+            () => [
+                ...orderedActiveItems,
+                ...inactiveItems
+            ],
+            [
+                orderedActiveItems,
+                inactiveItems
+            ]
+        );
+
+
     async function runMutation(
-        key: string,
+        key:
+            string,
+
         work:
             () =>
                 Promise<unknown>,
-        successMessage: string
+
+        successMessage:
+            string
     ) {
-        if (busyKey) {
+        if (
+            busyKey
+        ) {
             return false;
         }
 
-        setBusyKey(key);
-        setError("");
-        setFeedback("");
+        setBusyKey(
+            key
+        );
+
+        setError(
+            ""
+        );
+
+        setFeedback(
+            ""
+        );
+
+        setMenuCategoryId(
+            null
+        );
 
         try {
             await work();
+
             await refresh();
 
             setFeedback(
@@ -2072,15 +1992,20 @@ function CategorySettings() {
 
             return false;
         } finally {
-            setBusyKey("");
+            setBusyKey(
+                ""
+            );
         }
     }
+
 
     async function handleCreate() {
         const name =
             newName.trim();
 
-        if (!name) {
+        if (
+            !name
+        ) {
             setError(
                 "추가할 카테고리 이름을 입력해주세요."
             );
@@ -2096,16 +2021,22 @@ function CategorySettings() {
                     createManagedCategory({
                         type:
                             selectedType,
+
                         name
                     }),
 
                 `${selectedType} 카테고리를 추가했습니다.`
             );
 
-        if (completed) {
-            setNewName("");
+        if (
+            completed
+        ) {
+            setNewName(
+                ""
+            );
         }
     }
+
 
     async function handleRename(
         category:
@@ -2114,7 +2045,9 @@ function CategorySettings() {
         const name =
             editingName.trim();
 
-        if (!name) {
+        if (
+            !name
+        ) {
             setError(
                 "카테고리 이름을 입력해주세요."
             );
@@ -2126,7 +2059,9 @@ function CategorySettings() {
             name ===
             category.name
         ) {
-            setEditingId(null);
+            setEditingId(
+                null
+            );
 
             return;
         }
@@ -2139,17 +2074,26 @@ function CategorySettings() {
                     updateManagedCategory({
                         categoryId:
                             category.categoryId,
+
                         name
                     }),
 
                 "카테고리 이름을 변경했습니다."
             );
 
-        if (completed) {
-            setEditingId(null);
-            setEditingName("");
+        if (
+            completed
+        ) {
+            setEditingId(
+                null
+            );
+
+            setEditingName(
+                ""
+            );
         }
     }
+
 
     async function handleDelete(
         category:
@@ -2174,6 +2118,90 @@ function CategorySettings() {
             "카테고리를 삭제했습니다."
         );
     }
+
+
+    function handleMoveCategory(
+        index:
+            number,
+
+        direction:
+            -1 | 1
+    ) {
+        if (
+            !normalizedPreferences
+        ) {
+            return;
+        }
+
+        const currentIds =
+            orderedActiveItems.map(
+                category =>
+                    category.categoryId
+            );
+
+        const nextOrder =
+            moveSubsetInOrder(
+                normalizedPreferences
+                    .categoryOrder[
+                        selectedType as
+                            PreferenceTransactionType
+                    ],
+                currentIds,
+                index,
+                direction
+            );
+
+        inputPreference.setPreferences({
+            ...normalizedPreferences,
+
+            categoryOrder: {
+                ...normalizedPreferences
+                    .categoryOrder,
+
+                [selectedType]:
+                    nextOrder
+            }
+        });
+
+        inputPreference.clearMessages();
+    }
+
+
+    async function handleFinishReordering() {
+        if (
+            !normalizedPreferences ||
+            !inputPreference.bootstrap
+        ) {
+            return;
+        }
+
+        const saved =
+            await inputPreference
+                .savePreferencesToServer(
+                    normalizedPreferences,
+                    {
+                        categories:
+                            preferenceCategories,
+
+                        accounts:
+                            inputPreference
+                                .bootstrap
+                                .accounts,
+
+                        successMessage:
+                            "카테고리 순서를 저장했습니다."
+                    }
+                );
+
+        if (
+            saved
+        ) {
+            setReordering(
+                false
+            );
+        }
+    }
+
 
     return (
         <div
@@ -2208,7 +2236,8 @@ function CategorySettings() {
                                     disabled={
                                         Boolean(
                                             busyKey
-                                        )
+                                        ) ||
+                                        inputPreference.saving
                                     }
                                     onClick={
                                         () => {
@@ -2220,8 +2249,20 @@ function CategorySettings() {
                                                 null
                                             );
 
-                                            setError("");
-                                            setFeedback("");
+                                            setMenuCategoryId(
+                                                null
+                                            );
+
+                                            setError(
+                                                ""
+                                            );
+
+                                            setFeedback(
+                                                ""
+                                            );
+
+                                            inputPreference
+                                                .clearMessages();
                                         }
                                     }
                                 >
@@ -2234,79 +2275,149 @@ function CategorySettings() {
 
                 <div
                     className={
-                        styles.createRow
+                        styles.topActionRow
                     }
                 >
-                    <label
-                        className={
-                            styles.field
+                    <p>
+                        {
+                            reordering
+                                ? "입력 화면에 표시되는 순서를 조정합니다."
+                                : "카테고리를 관리하거나 입력 화면 순서를 바꿀 수 있습니다."
                         }
-                    >
-                        <span>
-                            새 {selectedType} 카테고리
-                        </span>
-
-                        <input
-                            type="text"
-                            value={
-                                newName
-                            }
-                            maxLength={
-                                40
-                            }
-                            placeholder="예: 식비"
-                            disabled={
-                                Boolean(
-                                    busyKey
-                                )
-                            }
-                            onChange={
-                                event =>
-                                    setNewName(
-                                        event
-                                            .target
-                                            .value
-                                    )
-                            }
-                            onKeyDown={
-                                event => {
-                                    if (
-                                        event.key ===
-                                        "Enter"
-                                    ) {
-                                        event.preventDefault();
-
-                                        void handleCreate();
-                                    }
-                                }
-                            }
-                        />
-                    </label>
+                    </p>
 
                     <button
                         type="button"
                         className={
-                            styles.primaryButton
+                            reordering
+                                ? styles.primaryButton
+                                : styles.secondaryButton
                         }
                         disabled={
                             Boolean(
                                 busyKey
                             ) ||
-                            !newName.trim()
+                            inputPreference.loading ||
+                            Boolean(
+                                inputPreference.error
+                            ) ||
+                            !normalizedPreferences ||
+                            inputPreference.saving
                         }
                         onClick={
-                            () =>
-                                void handleCreate()
+                            () => {
+                                if (
+                                    reordering
+                                ) {
+                                    void handleFinishReordering();
+
+                                    return;
+                                }
+
+                                setEditingId(
+                                    null
+                                );
+
+                                setMenuCategoryId(
+                                    null
+                                );
+
+                                setReordering(
+                                    true
+                                );
+
+                                inputPreference
+                                    .clearMessages();
+                            }
                         }
                     >
                         {
-                            busyKey ===
-                            "create"
-                                ? "추가 중..."
-                                : "추가"
+                            inputPreference.saving
+                                ? "저장 중..."
+                                : reordering
+                                    ? "완료"
+                                    : "순서 변경"
                         }
                     </button>
                 </div>
+
+                {
+                    !reordering && (
+                        <div
+                            className={
+                                styles.createRow
+                            }
+                        >
+                            <label
+                                className={
+                                    styles.field
+                                }
+                            >
+                                <span>
+                                    새 {selectedType} 카테고리
+                                </span>
+
+                                <input
+                                    type="text"
+                                    value={
+                                        newName
+                                    }
+                                    maxLength={
+                                        40
+                                    }
+                                    placeholder="예: 식비"
+                                    disabled={
+                                        Boolean(
+                                            busyKey
+                                        )
+                                    }
+                                    onChange={
+                                        event =>
+                                            setNewName(
+                                                event.target.value
+                                            )
+                                    }
+                                    onKeyDown={
+                                        event => {
+                                            if (
+                                                event.key ===
+                                                "Enter"
+                                            ) {
+                                                event.preventDefault();
+
+                                                void handleCreate();
+                                            }
+                                        }
+                                    }
+                                />
+                            </label>
+
+                            <button
+                                type="button"
+                                className={
+                                    styles.primaryButton
+                                }
+                                disabled={
+                                    Boolean(
+                                        busyKey
+                                    ) ||
+                                    !newName.trim()
+                                }
+                                onClick={
+                                    () =>
+                                        void handleCreate()
+                                }
+                            >
+                                {
+                                    busyKey ===
+                                    "create"
+                                        ? "추가 중..."
+                                        : "추가"
+                                }
+                            </button>
+                        </div>
+                    )
+                }
 
                 {
                     error && (
@@ -2335,6 +2446,36 @@ function CategorySettings() {
                 }
 
                 {
+                    inputPreference.feedback && (
+                        <p
+                            className={
+                                styles.feedback
+                            }
+                            role="status"
+                        >
+                            {
+                                inputPreference.feedback
+                            }
+                        </p>
+                    )
+                }
+
+                {
+                    inputPreference.saveError && (
+                        <p
+                            className={
+                                styles.error
+                            }
+                            role="alert"
+                        >
+                            {
+                                inputPreference.saveError
+                            }
+                        </p>
+                    )
+                }
+
+                {
                     loading
                         ? (
                             <p
@@ -2345,385 +2486,434 @@ function CategorySettings() {
                                 카테고리를 불러오는 중입니다.
                             </p>
                         )
-                        : activeItems.length ===
-                          0
-                        ? (
-                            <p
-                                className={
-                                    styles.emptyState
-                                }
-                            >
-                                등록된 {selectedType} 카테고리가 없습니다.
-                            </p>
-                        )
-                        : (
-                            <ul
-                                className={
-                                    styles.itemList
-                                }
-                            >
-                                {
-                                    activeItems.map(
-                                        category => {
-                                            const editing =
-                                                editingId ===
-                                                category.categoryId;
-
-                                            const rowBusy =
-                                                busyKey.endsWith(
-                                                    category.categoryId
-                                                );
-
-                                            return (
-                                                <li
-                                                    key={
-                                                        category.categoryId
-                                                    }
-                                                    className={`${styles.managementRow} ${
-                                                        !category.active
-                                                            ? styles.mutedRow
-                                                            : ""
-                                                    }`}
-                                                >
-                                                    {
-                                                        editing
-                                                            ? (
-                                                                <div
-                                                                    className={
-                                                                        styles.inlineEdit
-                                                                    }
-                                                                >
-                                                                    <input
-                                                                        type="text"
-                                                                        value={
-                                                                            editingName
-                                                                        }
-                                                                        maxLength={
-                                                                            40
-                                                                        }
-                                                                        disabled={
-                                                                            Boolean(
-                                                                                busyKey
-                                                                            )
-                                                                        }
-                                                                        aria-label={`${category.name} 새 이름`}
-                                                                        onChange={
-                                                                            event =>
-                                                                                setEditingName(
-                                                                                    event
-                                                                                        .target
-                                                                                        .value
-                                                                                )
-                                                                        }
-                                                                        onKeyDown={
-                                                                            event => {
-                                                                                if (
-                                                                                    event.key ===
-                                                                                    "Enter"
-                                                                                ) {
-                                                                                    event.preventDefault();
-
-                                                                                    void handleRename(
-                                                                                        category
-                                                                                    );
-                                                                                }
-
-                                                                                if (
-                                                                                    event.key ===
-                                                                                    "Escape"
-                                                                                ) {
-                                                                                    setEditingId(
-                                                                                        null
-                                                                                    );
-                                                                                }
-                                                                            }
-                                                                        }
-                                                                    />
-
-                                                                    <button
-                                                                        type="button"
-                                                                        className={
-                                                                            styles.secondarySmallButton
-                                                                        }
-                                                                        disabled={
-                                                                            Boolean(
-                                                                                busyKey
-                                                                            )
-                                                                        }
-                                                                        onClick={
-                                                                            () =>
-                                                                                setEditingId(
-                                                                                    null
-                                                                                )
-                                                                        }
-                                                                    >
-                                                                        취소
-                                                                    </button>
-
-                                                                    <button
-                                                                        type="button"
-                                                                        className={
-                                                                            styles.primarySmallButton
-                                                                        }
-                                                                        disabled={
-                                                                            Boolean(
-                                                                                busyKey
-                                                                            ) ||
-                                                                            !editingName.trim()
-                                                                        }
-                                                                        onClick={
-                                                                            () =>
-                                                                                void handleRename(
-                                                                                    category
-                                                                                )
-                                                                        }
-                                                                    >
-                                                                        {
-                                                                            rowBusy
-                                                                                ? "저장 중..."
-                                                                                : "저장"
-                                                                        }
-                                                                    </button>
-                                                                </div>
-                                                            )
-                                                            : (
-                                                                <>
-                                                                    <span
-                                                                        className={
-                                                                            styles.itemTextGroup
-                                                                        }
-                                                                    >
-                                                                        <strong>
-                                                                            {category.name}
-                                                                        </strong>
-
-                                                                        <span>
-                                                                            {
-                                                                                category.active
-                                                                                    ? "사용 중"
-                                                                                    : "사용 중지"
-                                                                            }
-                                                                        </span>
-                                                                    </span>
-
-                                                                    <div
-                                                                        className={
-                                                                            styles.rowActions
-                                                                        }
-                                                                    >
-                                                                        <button
-                                                                            type="button"
-                                                                            className={
-                                                                                styles.secondarySmallButton
-                                                                            }
-                                                                            disabled={
-                                                                                Boolean(
-                                                                                    busyKey
-                                                                                )
-                                                                            }
-                                                                            onClick={
-                                                                                () => {
-                                                                                    setEditingId(
-                                                                                        category.categoryId
-                                                                                    );
-
-                                                                                    setEditingName(
-                                                                                        category.name
-                                                                                    );
-
-                                                                                    setError("");
-                                                                                    setFeedback("");
-                                                                                }
-                                                                            }
-                                                                        >
-                                                                            이름 변경
-                                                                        </button>
-
-                                                                        <button
-                                                                            type="button"
-                                                                            className={
-                                                                                styles.secondarySmallButton
-                                                                            }
-                                                                            disabled={
-                                                                                Boolean(
-                                                                                    busyKey
-                                                                                )
-                                                                            }
-                                                                            onClick={
-                                                                                () =>
-                                                                                    void runMutation(
-                                                                                        `active:${category.categoryId}`,
-
-                                                                                        () =>
-                                                                                            updateManagedCategory({
-                                                                                                categoryId:
-                                                                                                    category.categoryId,
-
-                                                                                                active:
-                                                                                                    !category.active
-                                                                                            }),
-
-                                                                                        category.active
-                                                                                            ? "카테고리를 사용 중지했습니다."
-                                                                                            : "카테고리를 다시 사용합니다."
-                                                                                    )
-                                                                            }
-                                                                        >
-                                                                            {
-                                                                                rowBusy
-                                                                                    ? "처리 중..."
-                                                                                    : category.active
-                                                                                    ? "사용 중지"
-                                                                                    : "다시 사용"
-                                                                            }
-                                                                        </button>
-
-                                                                        <button
-                                                                            type="button"
-                                                                            className={
-                                                                                styles.dangerSmallButton
-                                                                            }
-                                                                            disabled={
-                                                                                Boolean(
-                                                                                    busyKey
-                                                                                )
-                                                                            }
-                                                                            onClick={
-                                                                                () =>
-                                                                                    void handleDelete(
-                                                                                        category
-                                                                                    )
-                                                                            }
-                                                                        >
-                                                                            삭제
-                                                                        </button>
-                                                                    </div>
-                                                                </>
-                                                            )
-                                                    }
-                                                </li>
-                                            );
+                        : reordering
+                            ? orderedActiveItems.length ===
+                                0
+                                ? (
+                                    <p
+                                        className={
+                                            styles.emptyState
                                         }
-                                    )
-                                }
-                            </ul>
-                        )
-                }
-
-                <details
-                    className={
-                        styles.deletedSection
-                    }
-                >
-                    <summary>
-                        삭제된 {selectedType} 카테고리
-
-                        <span>
-                            {deletedItems.length}
-                        </span>
-                    </summary>
-
-                    {
-                        deletedItems.length ===
-                        0
-                            ? (
-                                <p
-                                    className={
-                                        styles.emptyState
-                                    }
-                                >
-                                    삭제된 카테고리가 없습니다.
-                                </p>
-                            )
-                            : (
-                                <ul
-                                    className={
-                                        styles.itemList
-                                    }
-                                >
-                                    {
-                                        deletedItems.map(
-                                            category => (
-                                                <li
-                                                    key={
-                                                        category.categoryId
-                                                    }
-                                                    className={
-                                                        styles.deletedRow
-                                                    }
-                                                >
-                                                    <span>
-                                                        {category.name}
-                                                    </span>
-
-                                                    <button
-                                                        type="button"
+                                    >
+                                        순서를 변경할 카테고리가 없습니다.
+                                    </p>
+                                )
+                                : (
+                                    <ul
+                                        className={
+                                            styles.itemList
+                                        }
+                                    >
+                                        {
+                                            orderedActiveItems.map(
+                                                (
+                                                    category,
+                                                    index
+                                                ) => (
+                                                    <li
+                                                        key={
+                                                            category.categoryId
+                                                        }
                                                         className={
-                                                            styles.restoreButton
-                                                        }
-                                                        disabled={
-                                                            Boolean(
-                                                                busyKey
-                                                            )
-                                                        }
-                                                        onClick={
-                                                            () =>
-                                                                void runMutation(
-                                                                    `restore:${category.categoryId}`,
-
-                                                                    () =>
-                                                                        restoreManagedCategory(
-                                                                            category.categoryId
-                                                                        ),
-
-                                                                    "카테고리를 복원했습니다."
-                                                                )
+                                                            styles.orderRow
                                                         }
                                                     >
-                                                        {
-                                                            busyKey ===
-                                                            `restore:${category.categoryId}`
-                                                                ? "복원 중..."
-                                                                : "복원"
-                                                        }
-                                                    </button>
-                                                </li>
+                                                        <span
+                                                            className={
+                                                                styles.orderNumber
+                                                            }
+                                                        >
+                                                            {
+                                                                index +
+                                                                1
+                                                            }
+                                                        </span>
+
+                                                        <span
+                                                            className={
+                                                                styles.primaryItemText
+                                                            }
+                                                        >
+                                                            {
+                                                                category.name
+                                                            }
+                                                        </span>
+
+                                                        <div
+                                                            className={
+                                                                styles.compactActions
+                                                            }
+                                                        >
+                                                            <button
+                                                                type="button"
+                                                                className={
+                                                                    styles.iconButton
+                                                                }
+                                                                disabled={
+                                                                    index ===
+                                                                        0 ||
+                                                                    inputPreference.saving
+                                                                }
+                                                                onClick={
+                                                                    () =>
+                                                                        handleMoveCategory(
+                                                                            index,
+                                                                            -1
+                                                                        )
+                                                                }
+                                                            >
+                                                                ↑
+                                                            </button>
+
+                                                            <button
+                                                                type="button"
+                                                                className={
+                                                                    styles.iconButton
+                                                                }
+                                                                disabled={
+                                                                    index ===
+                                                                        orderedActiveItems.length -
+                                                                            1 ||
+                                                                    inputPreference.saving
+                                                                }
+                                                                onClick={
+                                                                    () =>
+                                                                        handleMoveCategory(
+                                                                            index,
+                                                                            1
+                                                                        )
+                                                                }
+                                                            >
+                                                                ↓
+                                                            </button>
+                                                        </div>
+                                                    </li>
+                                                )
                                             )
-                                        )
-                                    }
-                                </ul>
-                            )
-                    }
-                </details>
-            </section>
+                                        }
+                                    </ul>
+                                )
+                            : managementItems.length ===
+                                0
+                                ? (
+                                    <p
+                                        className={
+                                            styles.emptyState
+                                        }
+                                    >
+                                        등록된 {selectedType} 카테고리가 없습니다.
+                                    </p>
+                                )
+                                : (
+                                    <ul
+                                        className={
+                                            styles.itemList
+                                        }
+                                    >
+                                        {
+                                            managementItems.map(
+                                                category => {
+                                                    const editing =
+                                                        editingId ===
+                                                        category.categoryId;
 
-            <InputSettings
-                section="categories"
-                categories={
-                    categories
-                        .filter(
-                            category =>
-                                !category.isDeleted &&
-                                category.active
-                        )
-                        .map(
-                            category => ({
-                                categoryId:
-                                    category.categoryId,
+                                                    const menuOpen =
+                                                        menuCategoryId ===
+                                                        category.categoryId;
 
-                                type:
-                                    category.type as
-                                        PreferenceTransactionType,
+                                                    return (
+                                                        <li
+                                                            key={
+                                                                category.categoryId
+                                                            }
+                                                            className={`${styles.managementRow} ${
+                                                                !category.active
+                                                                    ? styles.mutedRow
+                                                                    : ""
+                                                            }`}
+                                                        >
+                                                            {
+                                                                editing
+                                                                    ? (
+                                                                        <div
+                                                                            className={
+                                                                                styles.inlineEdit
+                                                                            }
+                                                                        >
+                                                                            <input
+                                                                                type="text"
+                                                                                value={
+                                                                                    editingName
+                                                                                }
+                                                                                maxLength={
+                                                                                    40
+                                                                                }
+                                                                                onChange={
+                                                                                    event =>
+                                                                                        setEditingName(
+                                                                                            event.target.value
+                                                                                        )
+                                                                                }
+                                                                            />
 
-                                name:
-                                    category.name
-                            })
-                        )
+                                                                            <button
+                                                                                type="button"
+                                                                                className={
+                                                                                    styles.secondarySmallButton
+                                                                                }
+                                                                                onClick={
+                                                                                    () =>
+                                                                                        setEditingId(
+                                                                                            null
+                                                                                        )
+                                                                                }
+                                                                            >
+                                                                                취소
+                                                                            </button>
+
+                                                                            <button
+                                                                                type="button"
+                                                                                className={
+                                                                                    styles.primarySmallButton
+                                                                                }
+                                                                                onClick={
+                                                                                    () =>
+                                                                                        void handleRename(
+                                                                                            category
+                                                                                        )
+                                                                                }
+                                                                            >
+                                                                                저장
+                                                                            </button>
+                                                                        </div>
+                                                                    )
+                                                                    : (
+                                                                        <>
+                                                                            <span
+                                                                                className={
+                                                                                    styles.itemTextGroup
+                                                                                }
+                                                                            >
+                                                                                <strong>
+                                                                                    {
+                                                                                        category.name
+                                                                                    }
+                                                                                </strong>
+
+                                                                                <span>
+                                                                                    {
+                                                                                        category.active
+                                                                                            ? "사용 중"
+                                                                                            : "사용 중지"
+                                                                                    }
+                                                                                </span>
+                                                                            </span>
+
+                                                                            <div
+                                                                                className={
+                                                                                    styles.rowActions
+                                                                                }
+                                                                            >
+                                                                                {
+                                                                                    menuOpen && (
+                                                                                        <>
+                                                                                            <button
+                                                                                                type="button"
+                                                                                                className={
+                                                                                                    styles.secondarySmallButton
+                                                                                                }
+                                                                                                onClick={
+                                                                                                    () => {
+                                                                                                        setEditingId(
+                                                                                                            category.categoryId
+                                                                                                        );
+
+                                                                                                        setEditingName(
+                                                                                                            category.name
+                                                                                                        );
+
+                                                                                                        setMenuCategoryId(
+                                                                                                            null
+                                                                                                        );
+                                                                                                    }
+                                                                                                }
+                                                                                            >
+                                                                                                이름 변경
+                                                                                            </button>
+
+                                                                                            <button
+                                                                                                type="button"
+                                                                                                className={
+                                                                                                    styles.secondarySmallButton
+                                                                                                }
+                                                                                                onClick={
+                                                                                                    () =>
+                                                                                                        void runMutation(
+                                                                                                            `active:${category.categoryId}`,
+
+                                                                                                            () =>
+                                                                                                                updateManagedCategory({
+                                                                                                                    categoryId:
+                                                                                                                        category.categoryId,
+
+                                                                                                                    active:
+                                                                                                                        !category.active
+                                                                                                                }),
+
+                                                                                                            category.active
+                                                                                                                ? "카테고리를 사용 중지했습니다."
+                                                                                                                : "카테고리를 다시 사용합니다."
+                                                                                                        )
+                                                                                                }
+                                                                                            >
+                                                                                                {
+                                                                                                    category.active
+                                                                                                        ? "사용 중지"
+                                                                                                        : "다시 사용"
+                                                                                                }
+                                                                                            </button>
+
+                                                                                            <button
+                                                                                                type="button"
+                                                                                                className={
+                                                                                                    styles.dangerSmallButton
+                                                                                                }
+                                                                                                onClick={
+                                                                                                    () =>
+                                                                                                        void handleDelete(
+                                                                                                            category
+                                                                                                        )
+                                                                                                }
+                                                                                            >
+                                                                                                삭제
+                                                                                            </button>
+                                                                                        </>
+                                                                                    )
+                                                                                }
+
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className={
+                                                                                        styles.secondarySmallButton
+                                                                                    }
+                                                                                    onClick={
+                                                                                        () =>
+                                                                                            setMenuCategoryId(
+                                                                                                current =>
+                                                                                                    current ===
+                                                                                                    category.categoryId
+                                                                                                        ? null
+                                                                                                        : category.categoryId
+                                                                                            )
+                                                                                    }
+                                                                                >
+                                                                                    {
+                                                                                        menuOpen
+                                                                                            ? "닫기"
+                                                                                            : "⋮"
+                                                                                    }
+                                                                                </button>
+                                                                            </div>
+                                                                        </>
+                                                                    )
+                                                            }
+                                                        </li>
+                                                    );
+                                                }
+                                            )
+                                        }
+                                    </ul>
+                                )
                 }
-            />
+
+                {
+                    !reordering && (
+                        <details
+                            className={
+                                styles.deletedSection
+                            }
+                        >
+                            <summary>
+                                삭제된 {selectedType} 카테고리
+
+                                <span>
+                                    {
+                                        deletedItems.length
+                                    }
+                                </span>
+                            </summary>
+
+                            {
+                                deletedItems.length ===
+                                0
+                                    ? (
+                                        <p
+                                            className={
+                                                styles.emptyState
+                                            }
+                                        >
+                                            삭제된 카테고리가 없습니다.
+                                        </p>
+                                    )
+                                    : (
+                                        <ul
+                                            className={
+                                                styles.itemList
+                                            }
+                                        >
+                                            {
+                                                deletedItems.map(
+                                                    category => (
+                                                        <li
+                                                            key={
+                                                                category.categoryId
+                                                            }
+                                                            className={
+                                                                styles.deletedRow
+                                                            }
+                                                        >
+                                                            <span>
+                                                                {
+                                                                    category.name
+                                                                }
+                                                            </span>
+
+                                                            <button
+                                                                type="button"
+                                                                className={
+                                                                    styles.restoreButton
+                                                                }
+                                                                onClick={
+                                                                    () =>
+                                                                        void runMutation(
+                                                                            `restore:${category.categoryId}`,
+
+                                                                            () =>
+                                                                                restoreManagedCategory(
+                                                                                    category.categoryId
+                                                                                ),
+
+                                                                            "카테고리를 복원했습니다."
+                                                                        )
+                                                                }
+                                                            >
+                                                                복원
+                                                            </button>
+                                                        </li>
+                                                    )
+                                                )
+                                            }
+                                        </ul>
+                                    )
+                            }
+                        </details>
+                    )
+                }
+            </section>
         </div>
     );
 }
+
 
 function AccountSettings() {
     const [
@@ -2762,14 +2952,38 @@ function AccountSettings() {
         setEditingId
     ] =
         useState<
-            string | null
-        >(null);
+            string |
+            null
+        >(
+            null
+        );
+
+    const [
+        menuAccountId,
+        setMenuAccountId
+    ] =
+        useState<
+            string |
+            null
+        >(
+            null
+        );
 
     const [
         showForm,
         setShowForm
     ] =
-        useState(false);
+        useState(
+            false
+        );
+
+    const [
+        reordering,
+        setReordering
+    ] =
+        useState(
+            false
+        );
 
     const [
         loading,
@@ -2804,18 +3018,26 @@ function AccountSettings() {
     ] =
         useState<
             AccountOwnerTab
-        >("미영");
+        >(
+            "미영"
+        );
+
+    const inputPreference =
+        useInputPreferenceData();
+
 
     async function refresh() {
         const result =
             await getManagedAccounts({
-                includeDeleted: true
+                includeDeleted:
+                    true
             });
 
         setAccounts(
             result.items
         );
     }
+
 
     useEffect(
         () => {
@@ -2826,10 +3048,14 @@ function AccountSettings() {
                 if (
                     !initialSnapshot
                 ) {
-                    setLoading(true);
+                    setLoading(
+                        true
+                    );
                 }
 
-                setError("");
+                setError(
+                    ""
+                );
 
                 try {
                     const result =
@@ -2838,7 +3064,9 @@ function AccountSettings() {
                                 true
                         });
 
-                    if (active) {
+                    if (
+                        active
+                    ) {
                         setAccounts(
                             result.items
                         );
@@ -2858,8 +3086,12 @@ function AccountSettings() {
                         );
                     }
                 } finally {
-                    if (active) {
-                        setLoading(false);
+                    if (
+                        active
+                    ) {
+                        setLoading(
+                            false
+                        );
                     }
                 }
             }
@@ -2867,7 +3099,8 @@ function AccountSettings() {
             void load();
 
             return () => {
-                active = false;
+                active =
+                    false;
             };
         },
         [
@@ -2875,7 +3108,8 @@ function AccountSettings() {
         ]
     );
 
-    const allActiveAccounts =
+
+    const nonDeletedAccounts =
         useMemo(
             () =>
                 accounts.filter(
@@ -2887,19 +3121,21 @@ function AccountSettings() {
             ]
         );
 
-    const activeAccounts =
+
+    const ownerAccounts =
         useMemo(
             () =>
-                allActiveAccounts.filter(
+                nonDeletedAccounts.filter(
                     account =>
                         account.owner ===
                         ownerTab
                 ),
             [
-                allActiveAccounts,
+                nonDeletedAccounts,
                 ownerTab
             ]
         );
+
 
     const deletedAccounts =
         useMemo(
@@ -2915,6 +3151,185 @@ function AccountSettings() {
                 ownerTab
             ]
         );
+
+
+    const inputAccounts =
+        useMemo<
+            InputAccount[]
+        >(
+            () =>
+                nonDeletedAccounts
+                    .filter(
+                        account =>
+                            account.active
+                    )
+                    .map(
+                        account => ({
+                            accountId:
+                                account.accountId,
+
+                            accountName:
+                                account.accountName,
+
+                            displayName:
+                                account.displayName,
+
+                            accountType:
+                                account.accountType,
+
+                            subType:
+                                account.subType,
+
+                            owner:
+                                account.owner,
+
+                            paymentAccountId:
+                                account.paymentAccountId
+                        })
+                    ),
+            [
+                nonDeletedAccounts
+            ]
+        );
+
+
+    const normalizedPreferences =
+        useMemo(
+            () => {
+                if (
+                    !inputPreference.preferences ||
+                    !inputPreference.bootstrap
+                ) {
+                    return null;
+                }
+
+                return normalizeInputPreferences(
+                    inputPreference.preferences,
+                    inputPreference
+                        .bootstrap
+                        .categories,
+                    inputAccounts
+                );
+            },
+            [
+                inputPreference.preferences,
+                inputPreference.bootstrap,
+                inputAccounts
+            ]
+        );
+
+
+    const orderedActiveAccounts =
+        useMemo(
+            () => {
+                const active =
+                    ownerAccounts.filter(
+                        account =>
+                            account.active
+                    );
+
+                if (
+                    !normalizedPreferences
+                ) {
+                    return active;
+                }
+
+                const orderedInput =
+                    sortAccountsByPreferences(
+                        inputAccounts,
+                        normalizedPreferences
+                    ).filter(
+                        account =>
+                            account.owner ===
+                            ownerTab
+                    );
+
+                const byId =
+                    new Map(
+                        active.map(
+                            account => [
+                                account.accountId,
+                                account
+                            ] as const
+                        )
+                    );
+
+                return orderedInput
+                    .map(
+                        account =>
+                            byId.get(
+                                account.accountId
+                            )
+                    )
+                    .filter(
+                        (
+                            account
+                        ): account is ManagedAccount =>
+                            Boolean(
+                                account
+                            )
+                    );
+            },
+            [
+                ownerAccounts,
+                inputAccounts,
+                normalizedPreferences,
+                ownerTab
+            ]
+        );
+
+
+    const inactiveAccounts =
+        useMemo(
+            () =>
+                ownerAccounts
+                    .filter(
+                        account =>
+                            !account.active
+                    )
+                    .slice()
+                    .sort(
+                        (
+                            a,
+                            b
+                        ) =>
+                            a.displayName.localeCompare(
+                                b.displayName,
+                                "ko"
+                            )
+                    ),
+            [
+                ownerAccounts
+            ]
+        );
+
+
+    const managementItems =
+        useMemo(
+            () => [
+                ...orderedActiveAccounts,
+                ...inactiveAccounts
+            ],
+            [
+                orderedActiveAccounts,
+                inactiveAccounts
+            ]
+        );
+
+
+    const hiddenAccountSet =
+        useMemo(
+            () =>
+                new Set(
+                    normalizedPreferences
+                        ?.hiddenAccountIds ||
+                    []
+                ),
+            [
+                normalizedPreferences
+            ]
+        );
+
 
     const ownerOptions =
         useMemo(
@@ -2938,10 +3353,11 @@ function AccountSettings() {
             ]
         );
 
+
     const paymentAccountOptions =
         useMemo(
             () =>
-                allActiveAccounts
+                nonDeletedAccounts
                     .filter(
                         account =>
                             account.active
@@ -2969,10 +3385,11 @@ function AccountSettings() {
                         }
                     ),
             [
-                allActiveAccounts,
+                nonDeletedAccounts,
                 editingId
             ]
         );
+
 
     const isCard =
         form.subType ===
@@ -2980,31 +3397,38 @@ function AccountSettings() {
         form.subType ===
             "신용카드";
 
+
     const selectedKind =
         getAccountKind(
             form.accountType,
             form.subType
         );
 
+
     function updateForm<
         K extends
             keyof AccountFormState
     >(
-        key: K,
+        key:
+            K,
+
         value:
             AccountFormState[K]
     ) {
         setForm(
             current => ({
                 ...current,
+
                 [key]:
                     value
             })
         );
     }
 
+
     function handleKindChange(
-        value: string
+        value:
+            string
     ) {
         const kind =
             ACCOUNT_KIND_OPTIONS.find(
@@ -3013,7 +3437,9 @@ function AccountSettings() {
                     value
             );
 
-        if (!kind) {
+        if (
+            !kind
+        ) {
             return;
         }
 
@@ -3026,8 +3452,15 @@ function AccountSettings() {
         );
     }
 
+
     function beginCreate() {
-        setEditingId(null);
+        setEditingId(
+            null
+        );
+
+        setMenuAccountId(
+            null
+        );
 
         setForm(
             createEmptyAccountForm(
@@ -3035,10 +3468,19 @@ function AccountSettings() {
             )
         );
 
-        setShowForm(true);
-        setError("");
-        setFeedback("");
+        setShowForm(
+            true
+        );
+
+        setError(
+            ""
+        );
+
+        setFeedback(
+            ""
+        );
     }
+
 
     function beginEdit(
         account:
@@ -3048,19 +3490,34 @@ function AccountSettings() {
             account.accountId
         );
 
+        setMenuAccountId(
+            null
+        );
+
         setForm(
             accountToForm(
                 account
             )
         );
 
-        setShowForm(true);
-        setError("");
-        setFeedback("");
+        setShowForm(
+            true
+        );
+
+        setError(
+            ""
+        );
+
+        setFeedback(
+            ""
+        );
     }
 
+
     function closeForm() {
-        setEditingId(null);
+        setEditingId(
+            null
+        );
 
         setForm(
             createEmptyAccountForm(
@@ -3068,26 +3525,48 @@ function AccountSettings() {
             )
         );
 
-        setShowForm(false);
+        setShowForm(
+            false
+        );
     }
 
+
     async function runMutation(
-        key: string,
+        key:
+            string,
+
         work:
             () =>
                 Promise<unknown>,
-        successMessage: string
+
+        successMessage:
+            string
     ) {
-        if (busyKey) {
+        if (
+            busyKey
+        ) {
             return false;
         }
 
-        setBusyKey(key);
-        setError("");
-        setFeedback("");
+        setBusyKey(
+            key
+        );
+
+        setError(
+            ""
+        );
+
+        setFeedback(
+            ""
+        );
+
+        setMenuAccountId(
+            null
+        );
 
         try {
             await work();
+
             await refresh();
 
             setFeedback(
@@ -3107,9 +3586,12 @@ function AccountSettings() {
 
             return false;
         } finally {
-            setBusyKey("");
+            setBusyKey(
+                ""
+            );
         }
     }
+
 
     async function handleSave() {
         let payload:
@@ -3136,33 +3618,36 @@ function AccountSettings() {
         const completed =
             editingId
                 ? await runMutation(
-                      `save:${editingId}`,
+                    `save:${editingId}`,
 
-                      () =>
-                          updateManagedAccount({
-                              accountId:
-                                  editingId,
+                    () =>
+                        updateManagedAccount({
+                            accountId:
+                                editingId,
 
-                              ...payload
-                          }),
+                            ...payload
+                        }),
 
-                      "자산 정보를 수정했습니다."
-                  )
+                    "자산 정보를 수정했습니다."
+                )
                 : await runMutation(
-                      "create",
+                    "create",
 
-                      () =>
-                          createManagedAccount(
-                              payload
-                          ),
+                    () =>
+                        createManagedAccount(
+                            payload
+                        ),
 
-                      "새 항목을 추가했습니다."
-                  );
+                    "새 항목을 추가했습니다."
+                );
 
-        if (completed) {
+        if (
+            completed
+        ) {
             closeForm();
         }
     }
+
 
     async function handleDelete(
         account:
@@ -3187,6 +3672,151 @@ function AccountSettings() {
             "항목을 삭제했습니다."
         );
     }
+
+
+    function handleMoveAccount(
+        index:
+            number,
+
+        direction:
+            -1 | 1
+    ) {
+        if (
+            !normalizedPreferences
+        ) {
+            return;
+        }
+
+        const ownerIds =
+            orderedActiveAccounts.map(
+                account =>
+                    account.accountId
+            );
+
+        const nextOrder =
+            moveSubsetInOrder(
+                normalizedPreferences
+                    .accountOrder,
+                ownerIds,
+                index,
+                direction
+            );
+
+        inputPreference.setPreferences({
+            ...normalizedPreferences,
+
+            accountOrder:
+                nextOrder
+        });
+
+        inputPreference.clearMessages();
+    }
+
+
+    async function handleFinishReordering() {
+        if (
+            !normalizedPreferences ||
+            !inputPreference.bootstrap
+        ) {
+            return;
+        }
+
+        const saved =
+            await inputPreference
+                .savePreferencesToServer(
+                    normalizedPreferences,
+                    {
+                        categories:
+                            inputPreference
+                                .bootstrap
+                                .categories,
+
+                        accounts:
+                            inputAccounts,
+
+                        successMessage:
+                            "입력 화면 자산 순서를 저장했습니다."
+                    }
+                );
+
+        if (
+            saved
+        ) {
+            setReordering(
+                false
+            );
+        }
+    }
+
+
+    async function handleToggleInputVisibility(
+        account:
+            ManagedAccount
+    ) {
+        if (
+            !normalizedPreferences ||
+            !inputPreference.bootstrap
+        ) {
+            return;
+        }
+
+        const hidden =
+            new Set(
+                normalizedPreferences
+                    .hiddenAccountIds
+            );
+
+        const wasHidden =
+            hidden.has(
+                account.accountId
+            );
+
+        if (
+            wasHidden
+        ) {
+            hidden.delete(
+                account.accountId
+            );
+        } else {
+            hidden.add(
+                account.accountId
+            );
+        }
+
+        const nextPreferences:
+            InputPreferences = {
+                ...normalizedPreferences,
+
+                hiddenAccountIds:
+                    Array.from(
+                        hidden
+                    )
+            };
+
+        setMenuAccountId(
+            null
+        );
+
+        await inputPreference
+            .savePreferencesToServer(
+                nextPreferences,
+                {
+                    categories:
+                        inputPreference
+                            .bootstrap
+                            .categories,
+
+                    accounts:
+                        inputAccounts,
+
+                    successMessage:
+                        wasHidden
+                            ? "입력 화면에 표시합니다."
+                            : "입력 화면에서 숨겼습니다."
+                }
+            );
+    }
+
 
     return (
         <div
@@ -3221,7 +3851,8 @@ function AccountSettings() {
                                     disabled={
                                         Boolean(
                                             busyKey
-                                        )
+                                        ) ||
+                                        inputPreference.saving
                                     }
                                     onClick={
                                         () => {
@@ -3230,6 +3861,10 @@ function AccountSettings() {
                                             );
 
                                             setEditingId(
+                                                null
+                                            );
+
+                                            setMenuAccountId(
                                                 null
                                             );
 
@@ -3243,8 +3878,13 @@ function AccountSettings() {
                                                 )
                                             );
 
-                                            setError("");
-                                            setFeedback("");
+                                            setError(
+                                                ""
+                                            );
+
+                                            setFeedback(
+                                                ""
+                                            );
                                         }
                                     }
                                 >
@@ -3271,24 +3911,101 @@ function AccountSettings() {
                 }
             >
                 <p>
-                    통장·현금·카드·대출·투자계좌를
-                    한곳에서 관리합니다.
+                    {
+                        reordering
+                            ? `${ownerTab} 항목의 입력 화면 순서를 조정합니다.`
+                            : "통장·현금·카드·대출·투자계좌를 한곳에서 관리합니다."
+                    }
                 </p>
 
-                <button
-                    type="button"
+                <div
                     className={
-                        styles.primaryButton
-                    }
-                    onClick={
-                        beginCreate
+                        styles.rowActions
                     }
                 >
-                    {ownerTab} 항목 추가
-                </button>
+                    {
+                        !reordering && (
+                            <button
+                                type="button"
+                                className={
+                                    styles.primaryButton
+                                }
+                                disabled={
+                                    Boolean(
+                                        busyKey
+                                    )
+                                }
+                                onClick={
+                                    beginCreate
+                                }
+                            >
+                                항목 추가
+                            </button>
+                        )
+                    }
+
+                    <button
+                        type="button"
+                        className={
+                            reordering
+                                ? styles.primaryButton
+                                : styles.secondaryButton
+                        }
+                        disabled={
+                            Boolean(
+                                busyKey
+                            ) ||
+                            inputPreference.loading ||
+                            Boolean(
+                                inputPreference.error
+                            ) ||
+                            !normalizedPreferences ||
+                            inputPreference.saving
+                        }
+                        onClick={
+                            () => {
+                                if (
+                                    reordering
+                                ) {
+                                    void handleFinishReordering();
+
+                                    return;
+                                }
+
+                                setShowForm(
+                                    false
+                                );
+
+                                setEditingId(
+                                    null
+                                );
+
+                                setMenuAccountId(
+                                    null
+                                );
+
+                                inputPreference
+                                    .clearMessages();
+
+                                setReordering(
+                                    true
+                                );
+                            }
+                        }
+                    >
+                        {
+                            inputPreference.saving
+                                ? "저장 중..."
+                                : reordering
+                                    ? "완료"
+                                    : "순서 변경"
+                        }
+                    </button>
+                </div>
             </div>
 
             {
+                !reordering &&
                 showForm && (
                     <section
                         className={
@@ -3473,7 +4190,9 @@ function AccountSettings() {
                                                         option.value
                                                     }
                                                 >
-                                                    {option.label}
+                                                    {
+                                                        option.label
+                                                    }
                                                 </option>
                                             )
                                         )
@@ -3554,7 +4273,9 @@ function AccountSettings() {
                                                                 account.accountId
                                                             }
                                                         >
-                                                            {account.displayName}
+                                                            {
+                                                                account.displayName
+                                                            }
                                                         </option>
                                                     )
                                                 )
@@ -3579,7 +4300,6 @@ function AccountSettings() {
 
                                             <input
                                                 type="number"
-                                                inputMode="numeric"
                                                 min={
                                                     1
                                                 }
@@ -3590,11 +4310,6 @@ function AccountSettings() {
                                                     form.billingCutoffDay
                                                 }
                                                 placeholder="1~31"
-                                                disabled={
-                                                    Boolean(
-                                                        busyKey
-                                                    )
-                                                }
                                                 onChange={
                                                     event =>
                                                         updateForm(
@@ -3616,7 +4331,6 @@ function AccountSettings() {
 
                                             <input
                                                 type="number"
-                                                inputMode="numeric"
                                                 min={
                                                     1
                                                 }
@@ -3627,11 +4341,6 @@ function AccountSettings() {
                                                     form.paymentDay
                                                 }
                                                 placeholder="1~31"
-                                                disabled={
-                                                    Boolean(
-                                                        busyKey
-                                                    )
-                                                }
                                                 onChange={
                                                     event =>
                                                         updateForm(
@@ -3656,7 +4365,6 @@ function AccountSettings() {
 
                                 <input
                                     type="number"
-                                    inputMode="numeric"
                                     min={
                                         1900
                                     }
@@ -3667,11 +4375,6 @@ function AccountSettings() {
                                         form.startYear
                                     }
                                     placeholder="선택 입력"
-                                    disabled={
-                                        Boolean(
-                                            busyKey
-                                        )
-                                    }
                                     onChange={
                                         event =>
                                             updateForm(
@@ -3693,7 +4396,6 @@ function AccountSettings() {
 
                                 <input
                                     type="number"
-                                    inputMode="numeric"
                                     min={
                                         1900
                                     }
@@ -3704,11 +4406,6 @@ function AccountSettings() {
                                         form.endYear
                                     }
                                     placeholder="사용 중이면 비워두기"
-                                    disabled={
-                                        Boolean(
-                                            busyKey
-                                        )
-                                    }
                                     onChange={
                                         event =>
                                             updateForm(
@@ -3726,7 +4423,6 @@ function AccountSettings() {
                                     className={
                                         styles.error
                                     }
-                                    role="alert"
                                 >
                                     {error}
                                 </p>
@@ -3743,11 +4439,6 @@ function AccountSettings() {
                                 className={
                                     styles.secondaryButton
                                 }
-                                disabled={
-                                    Boolean(
-                                        busyKey
-                                    )
-                                }
                                 onClick={
                                     closeForm
                                 }
@@ -3760,11 +4451,6 @@ function AccountSettings() {
                                 className={
                                     styles.primaryButton
                                 }
-                                disabled={
-                                    Boolean(
-                                        busyKey
-                                    )
-                                }
                                 onClick={
                                     () =>
                                         void handleSave()
@@ -3774,8 +4460,8 @@ function AccountSettings() {
                                     busyKey
                                         ? "저장 중..."
                                         : editingId
-                                        ? "수정 저장"
-                                        : "추가"
+                                            ? "수정 저장"
+                                            : "추가"
                                 }
                             </button>
                         </div>
@@ -3784,13 +4470,12 @@ function AccountSettings() {
             }
 
             {
-                !showForm &&
-                error && (
+                error &&
+                !showForm && (
                     <p
                         className={
                             styles.error
                         }
-                        role="alert"
                     >
                         {error}
                     </p>
@@ -3803,9 +4488,36 @@ function AccountSettings() {
                         className={
                             styles.feedback
                         }
-                        role="status"
                     >
                         {feedback}
+                    </p>
+                )
+            }
+
+            {
+                inputPreference.feedback && (
+                    <p
+                        className={
+                            styles.feedback
+                        }
+                    >
+                        {
+                            inputPreference.feedback
+                        }
+                    </p>
+                )
+            }
+
+            {
+                inputPreference.saveError && (
+                    <p
+                        className={
+                            styles.error
+                        }
+                    >
+                        {
+                            inputPreference.saveError
+                        }
                     </p>
                 )
             }
@@ -3815,21 +4527,6 @@ function AccountSettings() {
                     styles.cardSection
                 }
             >
-                <div
-                    className={
-                        styles.sectionHeading
-                    }
-                >
-                    <h2>
-                        {ownerTab} 등록 항목
-                    </h2>
-
-                    <p>
-                        과거 거래가 있는 항목은 삭제보다
-                        사용 종료 연도를 설정하는 편이 안전합니다.
-                    </p>
-                </div>
-
                 {
                     loading
                         ? (
@@ -3841,255 +4538,409 @@ function AccountSettings() {
                                 자산 정보를 불러오는 중입니다.
                             </p>
                         )
-                        : activeAccounts.length ===
-                          0
-                        ? (
-                            <p
-                                className={
-                                    styles.emptyState
-                                }
-                            >
-                                {ownerTab} 명의로 등록된 항목이 없습니다.
-                            </p>
-                        )
-                        : (
-                            <ul
-                                className={
-                                    styles.itemList
-                                }
-                            >
-                                {
-                                    activeAccounts.map(
-                                        account => (
-                                            <li
-                                                key={
-                                                    account.accountId
+                        : reordering
+                            ? orderedActiveAccounts.length ===
+                                0
+                                ? (
+                                    <p
+                                        className={
+                                            styles.emptyState
+                                        }
+                                    >
+                                        순서를 변경할 사용 중인 항목이 없습니다.
+                                    </p>
+                                )
+                                : (
+                                    <ul
+                                        className={
+                                            styles.itemList
+                                        }
+                                    >
+                                        {
+                                            orderedActiveAccounts.map(
+                                                (
+                                                    account,
+                                                    index
+                                                ) => {
+                                                    const hidden =
+                                                        hiddenAccountSet.has(
+                                                            account.accountId
+                                                        );
+
+                                                    return (
+                                                        <li
+                                                            key={
+                                                                account.accountId
+                                                            }
+                                                            className={`${styles.orderRow} ${
+                                                                hidden
+                                                                    ? styles.mutedRow
+                                                                    : ""
+                                                            }`}
+                                                        >
+                                                            <span
+                                                                className={
+                                                                    styles.orderNumber
+                                                                }
+                                                            >
+                                                                {
+                                                                    index +
+                                                                    1
+                                                                }
+                                                            </span>
+
+                                                            <span
+                                                                className={
+                                                                    styles.itemTextGroup
+                                                                }
+                                                            >
+                                                                <strong>
+                                                                    {
+                                                                        account.displayName
+                                                                    }
+                                                                </strong>
+
+                                                                <span>
+                                                                    {
+                                                                        getAccountKindLabel(
+                                                                            account.accountType,
+                                                                            account.subType
+                                                                        )
+                                                                    }
+                                                                    {
+                                                                        hidden
+                                                                            ? " · 입력 숨김"
+                                                                            : ""
+                                                                    }
+                                                                </span>
+                                                            </span>
+
+                                                            <div
+                                                                className={
+                                                                    styles.compactActions
+                                                                }
+                                                            >
+                                                                <button
+                                                                    type="button"
+                                                                    className={
+                                                                        styles.iconButton
+                                                                    }
+                                                                    disabled={
+                                                                        index ===
+                                                                            0 ||
+                                                                        inputPreference.saving
+                                                                    }
+                                                                    onClick={
+                                                                        () =>
+                                                                            handleMoveAccount(
+                                                                                index,
+                                                                                -1
+                                                                            )
+                                                                    }
+                                                                >
+                                                                    ↑
+                                                                </button>
+
+                                                                <button
+                                                                    type="button"
+                                                                    className={
+                                                                        styles.iconButton
+                                                                    }
+                                                                    disabled={
+                                                                        index ===
+                                                                            orderedActiveAccounts.length -
+                                                                                1 ||
+                                                                        inputPreference.saving
+                                                                    }
+                                                                    onClick={
+                                                                        () =>
+                                                                            handleMoveAccount(
+                                                                                index,
+                                                                                1
+                                                                            )
+                                                                    }
+                                                                >
+                                                                    ↓
+                                                                </button>
+                                                            </div>
+                                                        </li>
+                                                    );
                                                 }
-                                                className={`${styles.managementRow} ${
-                                                    !account.active
-                                                        ? styles.mutedRow
-                                                        : ""
-                                                }`}
-                                            >
-                                                <span
-                                                    className={
-                                                        styles.itemTextGroup
-                                                    }
-                                                >
-                                                    <strong>
-                                                        {account.displayName}
-                                                    </strong>
-
-                                                    <span>
-                                                        {
-                                                            getAccountKindLabel(
-                                                                account.accountType,
-                                                                account.subType
-                                                            )
-                                                        }
-                                                        {" · "}
-                                                        {account.owner}
-                                                    </span>
-
-                                                    <span>
-                                                        현재 잔액{" "}
-                                                        {formatKrw(
-                                                            account.currentBalance
-                                                        )}
-
-                                                        {
-                                                            !account.active
-                                                                ? " · 사용 종료"
-                                                                : ""
-                                                        }
-                                                    </span>
-                                                </span>
-
-                                                <div
-                                                    className={
-                                                        styles.rowActions
-                                                    }
-                                                >
-                                                    <button
-                                                        type="button"
-                                                        className={
-                                                            styles.secondarySmallButton
-                                                        }
-                                                        disabled={
-                                                            Boolean(
-                                                                busyKey
-                                                            )
-                                                        }
-                                                        onClick={
-                                                            () =>
-                                                                beginEdit(
-                                                                    account
-                                                                )
-                                                        }
-                                                    >
-                                                        수정
-                                                    </button>
-
-                                                    <button
-                                                        type="button"
-                                                        className={
-                                                            styles.dangerSmallButton
-                                                        }
-                                                        disabled={
-                                                            Boolean(
-                                                                busyKey
-                                                            )
-                                                        }
-                                                        onClick={
-                                                            () =>
-                                                                void handleDelete(
-                                                                    account
-                                                                )
-                                                        }
-                                                    >
-                                                        {
-                                                            busyKey ===
-                                                            `delete:${account.accountId}`
-                                                                ? "처리 중..."
-                                                                : "삭제"
-                                                        }
-                                                    </button>
-                                                </div>
-                                            </li>
-                                        )
-                                    )
-                                }
-                            </ul>
-                        )
-                }
-
-                <details
-                    className={
-                        styles.deletedSection
-                    }
-                >
-                    <summary>
-                        삭제된 항목
-
-                        <span>
-                            {deletedAccounts.length}
-                        </span>
-                    </summary>
-
-                    {
-                        deletedAccounts.length ===
-                        0
-                            ? (
-                                <p
-                                    className={
-                                        styles.emptyState
-                                    }
-                                >
-                                    {ownerTab} 명의의 삭제된 항목이 없습니다.
-                                </p>
-                            )
-                            : (
-                                <ul
-                                    className={
-                                        styles.itemList
-                                    }
-                                >
-                                    {
-                                        deletedAccounts.map(
-                                            account => (
-                                                <li
-                                                    key={
-                                                        account.accountId
-                                                    }
-                                                    className={
-                                                        styles.deletedRow
-                                                    }
-                                                >
-                                                    <span>
-                                                        {account.displayName}
-                                                    </span>
-
-                                                    <button
-                                                        type="button"
-                                                        className={
-                                                            styles.restoreButton
-                                                        }
-                                                        disabled={
-                                                            Boolean(
-                                                                busyKey
-                                                            )
-                                                        }
-                                                        onClick={
-                                                            () =>
-                                                                void runMutation(
-                                                                    `restore:${account.accountId}`,
-
-                                                                    () =>
-                                                                        restoreManagedAccount(
-                                                                            account.accountId
-                                                                        ),
-
-                                                                    "항목을 복원했습니다."
-                                                                )
-                                                        }
-                                                    >
-                                                        {
-                                                            busyKey ===
-                                                            `restore:${account.accountId}`
-                                                                ? "복원 중..."
-                                                                : "복원"
-                                                        }
-                                                    </button>
-                                                </li>
                                             )
-                                        )
+                                        }
+                                    </ul>
+                                )
+                            : managementItems.length ===
+                                0
+                                ? (
+                                    <p
+                                        className={
+                                            styles.emptyState
+                                        }
+                                    >
+                                        {ownerTab} 명의로 등록된 항목이 없습니다.
+                                    </p>
+                                )
+                                : (
+                                    <ul
+                                        className={
+                                            styles.itemList
+                                        }
+                                    >
+                                        {
+                                            managementItems.map(
+                                                account => {
+                                                    const menuOpen =
+                                                        menuAccountId ===
+                                                        account.accountId;
+
+                                                    const hidden =
+                                                        hiddenAccountSet.has(
+                                                            account.accountId
+                                                        );
+
+                                                    return (
+                                                        <li
+                                                            key={
+                                                                account.accountId
+                                                            }
+                                                            className={`${styles.managementRow} ${
+                                                                !account.active
+                                                                    ? styles.mutedRow
+                                                                    : ""
+                                                            }`}
+                                                        >
+                                                            <span
+                                                                className={
+                                                                    styles.itemTextGroup
+                                                                }
+                                                            >
+                                                                <strong>
+                                                                    {
+                                                                        account.displayName
+                                                                    }
+                                                                </strong>
+
+                                                                <span>
+                                                                    {
+                                                                        getAccountKindLabel(
+                                                                            account.accountType,
+                                                                            account.subType
+                                                                        )
+                                                                    }
+                                                                    {" · "}
+                                                                    {
+                                                                        account.owner
+                                                                    }
+                                                                </span>
+
+                                                                <span>
+                                                                    현재 잔액{" "}
+                                                                    {
+                                                                        formatKrw(
+                                                                            account.currentBalance
+                                                                        )
+                                                                    }
+
+                                                                    {
+                                                                        !account.active
+                                                                            ? " · 사용 종료"
+                                                                            : hidden
+                                                                                ? " · 입력 숨김"
+                                                                                : " · 입력 표시"
+                                                                    }
+                                                                </span>
+                                                            </span>
+
+                                                            <div
+                                                                className={
+                                                                    styles.rowActions
+                                                                }
+                                                            >
+                                                                {
+                                                                    menuOpen && (
+                                                                        <>
+                                                                            <button
+                                                                                type="button"
+                                                                                className={
+                                                                                    styles.secondarySmallButton
+                                                                                }
+                                                                                onClick={
+                                                                                    () =>
+                                                                                        beginEdit(
+                                                                                            account
+                                                                                        )
+                                                                                }
+                                                                            >
+                                                                                수정
+                                                                            </button>
+
+                                                                            {
+                                                                                account.active &&
+                                                                                normalizedPreferences &&
+                                                                                inputPreference.bootstrap && (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        className={
+                                                                                            styles.secondarySmallButton
+                                                                                        }
+                                                                                        disabled={
+                                                                                            inputPreference.saving
+                                                                                        }
+                                                                                        onClick={
+                                                                                            () =>
+                                                                                                void handleToggleInputVisibility(
+                                                                                                    account
+                                                                                                )
+                                                                                        }
+                                                                                    >
+                                                                                        {
+                                                                                            hidden
+                                                                                                ? "입력 표시"
+                                                                                                : "입력 숨김"
+                                                                                        }
+                                                                                    </button>
+                                                                                )
+                                                                            }
+
+                                                                            <button
+                                                                                type="button"
+                                                                                className={
+                                                                                    styles.dangerSmallButton
+                                                                                }
+                                                                                onClick={
+                                                                                    () =>
+                                                                                        void handleDelete(
+                                                                                            account
+                                                                                        )
+                                                                                }
+                                                                            >
+                                                                                삭제
+                                                                            </button>
+                                                                        </>
+                                                                    )
+                                                                }
+
+                                                                <button
+                                                                    type="button"
+                                                                    className={
+                                                                        styles.secondarySmallButton
+                                                                    }
+                                                                    onClick={
+                                                                        () =>
+                                                                            setMenuAccountId(
+                                                                                current =>
+                                                                                    current ===
+                                                                                    account.accountId
+                                                                                        ? null
+                                                                                        : account.accountId
+                                                                            )
+                                                                    }
+                                                                >
+                                                                    {
+                                                                        menuOpen
+                                                                            ? "닫기"
+                                                                            : "⋮"
+                                                                    }
+                                                                </button>
+                                                            </div>
+                                                        </li>
+                                                    );
+                                                }
+                                            )
+                                        }
+                                    </ul>
+                                )
+                }
+
+                {
+                    !reordering && (
+                        <details
+                            className={
+                                styles.deletedSection
+                            }
+                        >
+                            <summary>
+                                삭제된 항목
+
+                                <span>
+                                    {
+                                        deletedAccounts.length
                                     }
-                                </ul>
-                            )
-                    }
-                </details>
+                                </span>
+                            </summary>
+
+                            {
+                                deletedAccounts.length ===
+                                0
+                                    ? (
+                                        <p
+                                            className={
+                                                styles.emptyState
+                                            }
+                                        >
+                                            삭제된 항목이 없습니다.
+                                        </p>
+                                    )
+                                    : (
+                                        <ul
+                                            className={
+                                                styles.itemList
+                                            }
+                                        >
+                                            {
+                                                deletedAccounts.map(
+                                                    account => (
+                                                        <li
+                                                            key={
+                                                                account.accountId
+                                                            }
+                                                            className={
+                                                                styles.deletedRow
+                                                            }
+                                                        >
+                                                            <span>
+                                                                {
+                                                                    account.displayName
+                                                                }
+                                                            </span>
+
+                                                            <button
+                                                                type="button"
+                                                                className={
+                                                                    styles.restoreButton
+                                                                }
+                                                                onClick={
+                                                                    () =>
+                                                                        void runMutation(
+                                                                            `restore:${account.accountId}`,
+
+                                                                            () =>
+                                                                                restoreManagedAccount(
+                                                                                    account.accountId
+                                                                                ),
+
+                                                                            "항목을 복원했습니다."
+                                                                        )
+                                                                }
+                                                            >
+                                                                복원
+                                                            </button>
+                                                        </li>
+                                                    )
+                                                )
+                                            }
+                                        </ul>
+                                    )
+                            }
+                        </details>
+                    )
+                }
             </section>
-
-            <InputSettings
-                section="accounts"
-                owner={
-                    ownerTab
-                }
-                accounts={
-                    allActiveAccounts
-                        .filter(
-                            account =>
-                                account.active
-                        )
-                        .map(
-                            account => ({
-                                accountId:
-                                    account.accountId,
-
-                                accountName:
-                                    account.accountName,
-
-                                displayName:
-                                    account.displayName,
-
-                                accountType:
-                                    account.accountType,
-
-                                subType:
-                                    account.subType,
-
-                                owner:
-                                    account.owner,
-
-                                paymentAccountId:
-                                    account.paymentAccountId
-                            })
-                        )
-                }
-            />
         </div>
     );
 }
+
 
 function LedgerDataSettings() {
     const [
@@ -4102,7 +4953,9 @@ function LedgerDataSettings() {
         loading,
         setLoading
     ] =
-        useState(true);
+        useState(
+            true
+        );
 
     const [
         busyKey,
@@ -4122,29 +4975,35 @@ function LedgerDataSettings() {
     ] =
         useState("");
 
+
     useEffect(
         () => {
             let active =
                 true;
 
             async function load() {
-                setLoading(true);
-                setError("");
+                setLoading(
+                    true
+                );
 
                 try {
                     const result =
                         await getLedgerConfig();
 
-                    if (active) {
+                    if (
+                        active
+                    ) {
                         setLedgerStartDateValue(
                             result.ledgerStartDate ||
-                            ""
+                                ""
                         );
                     }
                 } catch (
                     loadError
                 ) {
-                    if (active) {
+                    if (
+                        active
+                    ) {
                         setError(
                             getErrorMessage(
                                 loadError,
@@ -4153,8 +5012,12 @@ function LedgerDataSettings() {
                         );
                     }
                 } finally {
-                    if (active) {
-                        setLoading(false);
+                    if (
+                        active
+                    ) {
+                        setLoading(
+                            false
+                        );
                     }
                 }
             }
@@ -4162,11 +5025,13 @@ function LedgerDataSettings() {
             void load();
 
             return () => {
-                active = false;
+                active =
+                    false;
             };
         },
         []
     );
+
 
     async function handleSaveStartDate() {
         if (
@@ -4183,9 +5048,6 @@ function LedgerDataSettings() {
             "start-date"
         );
 
-        setError("");
-        setFeedback("");
-
         try {
             const result =
                 await setLedgerStartDate(
@@ -4194,7 +5056,7 @@ function LedgerDataSettings() {
 
             setLedgerStartDateValue(
                 result.ledgerStartDate ||
-                    ledgerStartDateValue
+                ledgerStartDateValue
             );
 
             setFeedback(
@@ -4210,9 +5072,12 @@ function LedgerDataSettings() {
                 )
             );
         } finally {
-            setBusyKey("");
+            setBusyKey(
+                ""
+            );
         }
     }
+
 
     async function handleClearStartDate() {
         if (
@@ -4226,9 +5091,6 @@ function LedgerDataSettings() {
         setBusyKey(
             "clear-date"
         );
-
-        setError("");
-        setFeedback("");
 
         try {
             await clearLedgerStartDate();
@@ -4250,17 +5112,17 @@ function LedgerDataSettings() {
                 )
             );
         } finally {
-            setBusyKey("");
+            setBusyKey(
+                ""
+            );
         }
     }
+
 
     async function handleExport() {
         setBusyKey(
             "export"
         );
-
-        setError("");
-        setFeedback("");
 
         try {
             const items:
@@ -4368,9 +5230,13 @@ function LedgerDataSettings() {
                                 .map(
                                     csvCell
                                 )
-                                .join(",")
+                                .join(
+                                    ","
+                                )
                     )
-                    .join("\r\n");
+                    .join(
+                        "\r\n"
+                    );
 
             const blob =
                 new Blob(
@@ -4394,25 +5260,23 @@ function LedgerDataSettings() {
                     "a"
                 );
 
-            const today =
-                new Date()
-                    .toISOString()
-                    .slice(
-                        0,
-                        10
-                    );
-
             link.href =
                 url;
 
             link.download =
-                `우리_가계부_거래_${today}.csv`;
+                `우리_가계부_거래_${new Date()
+                    .toISOString()
+                    .slice(
+                        0,
+                        10
+                    )}.csv`;
 
             document.body.appendChild(
                 link
             );
 
             link.click();
+
             link.remove();
 
             URL.revokeObjectURL(
@@ -4434,9 +5298,12 @@ function LedgerDataSettings() {
                 )
             );
         } finally {
-            setBusyKey("");
+            setBusyKey(
+                ""
+            );
         }
     }
+
 
     return (
         <div
@@ -4450,7 +5317,6 @@ function LedgerDataSettings() {
                         className={
                             styles.error
                         }
-                        role="alert"
                     >
                         {error}
                     </p>
@@ -4463,7 +5329,6 @@ function LedgerDataSettings() {
                         className={
                             styles.feedback
                         }
-                        role="status"
                     >
                         {feedback}
                     </p>
@@ -4521,11 +5386,6 @@ function LedgerDataSettings() {
                                         value={
                                             ledgerStartDateValue
                                         }
-                                        disabled={
-                                            Boolean(
-                                                busyKey
-                                            )
-                                        }
                                         onChange={
                                             event =>
                                                 setLedgerStartDateValue(
@@ -4548,8 +5408,7 @@ function LedgerDataSettings() {
                                         disabled={
                                             Boolean(
                                                 busyKey
-                                            ) ||
-                                            !ledgerStartDateValue
+                                            )
                                         }
                                         onClick={
                                             () =>
@@ -4567,20 +5426,14 @@ function LedgerDataSettings() {
                                         disabled={
                                             Boolean(
                                                 busyKey
-                                            ) ||
-                                            !ledgerStartDateValue
+                                            )
                                         }
                                         onClick={
                                             () =>
                                                 void handleSaveStartDate()
                                         }
                                     >
-                                        {
-                                            busyKey ===
-                                            "start-date"
-                                                ? "저장 중..."
-                                                : "시작일 저장"
-                                        }
+                                        시작일 저장
                                     </button>
                                 </div>
                             </div>
@@ -4593,21 +5446,6 @@ function LedgerDataSettings() {
                     styles.cardSection
                 }
             >
-                <div
-                    className={
-                        styles.sectionHeading
-                    }
-                >
-                    <h2>
-                        거래 데이터 내보내기
-                    </h2>
-
-                    <p>
-                        현재 저장된 거래를 엑셀에서도 열 수 있는
-                        CSV 파일로 받습니다.
-                    </p>
-                </div>
-
                 <button
                     type="button"
                     className={
@@ -4623,12 +5461,7 @@ function LedgerDataSettings() {
                             void handleExport()
                     }
                 >
-                    {
-                        busyKey ===
-                        "export"
-                            ? "내보내는 중..."
-                            : "전체 거래 CSV로 내보내기"
-                    }
+                    전체 거래 CSV로 내보내기
                 </button>
             </section>
 
@@ -4637,30 +5470,10 @@ function LedgerDataSettings() {
                     styles.cardSection
                 }
             >
-                <div
-                    className={
-                        styles.sectionHeading
-                    }
-                >
-                    <h2>
-                        앱 데이터 다시 불러오기
-                    </h2>
-
-                    <p>
-                        다른 계정에서 바꾼 내용이 보이지 않을 때
-                        최신 데이터를 다시 읽습니다.
-                    </p>
-                </div>
-
                 <button
                     type="button"
                     className={
                         styles.fullWidthButton
-                    }
-                    disabled={
-                        Boolean(
-                            busyKey
-                        )
                     }
                     onClick={
                         () =>
@@ -4674,6 +5487,7 @@ function LedgerDataSettings() {
     );
 }
 
+
 function ProfileSettings() {
     const [
         userName,
@@ -4685,13 +5499,18 @@ function ProfileSettings() {
         loading,
         setLoading
     ] =
-        useState(true);
+        useState(
+            true
+        );
 
     const [
         loggingOut,
         setLoggingOut
     ] =
-        useState(false);
+        useState(
+            false
+        );
+
 
     useEffect(
         () => {
@@ -4713,8 +5532,12 @@ function ProfileSettings() {
                         );
                     }
                 } finally {
-                    if (active) {
-                        setLoading(false);
+                    if (
+                        active
+                    ) {
+                        setLoading(
+                            false
+                        );
                     }
                 }
             }
@@ -4722,11 +5545,13 @@ function ProfileSettings() {
             void loadSession();
 
             return () => {
-                active = false;
+                active =
+                    false;
             };
         },
         []
     );
+
 
     async function handleLogout() {
         if (
@@ -4752,6 +5577,7 @@ function ProfileSettings() {
         }
     }
 
+
     return (
         <div
             className={
@@ -4772,7 +5598,6 @@ function ProfileSettings() {
                         className={
                             styles.avatar
                         }
-                        aria-hidden="true"
                     >
                         {
                             (
@@ -4795,7 +5620,7 @@ function ProfileSettings() {
                                 loading
                                     ? "확인 중..."
                                     : userName ||
-                                      "로그인 사용자"
+                                        "로그인 사용자"
                             }
                         </strong>
 
@@ -4886,6 +5711,7 @@ function ProfileSettings() {
     );
 }
 
+
 export default function SettingsPage() {
     const [
         view,
@@ -4893,7 +5719,10 @@ export default function SettingsPage() {
     ] =
         useState<
             SettingsView
-        >("home");
+        >(
+            "home"
+        );
+
 
     const detail = {
         categories: {
@@ -4901,7 +5730,7 @@ export default function SettingsPage() {
                 "카테고리 관리",
 
             description:
-                "수입·지출·이체 카테고리를 직접 관리합니다."
+                "카테고리를 관리하고 입력 화면 순서를 정합니다."
         },
 
         accounts: {
@@ -4909,7 +5738,7 @@ export default function SettingsPage() {
                 "자산 관리",
 
             description:
-                "통장·카드·대출·투자계좌와 입력 화면 노출을 관리합니다."
+                "자산을 관리하고 입력 화면 노출과 순서를 정합니다."
         },
 
         ledger: {
@@ -4928,6 +5757,7 @@ export default function SettingsPage() {
                 "현재 로그인 정보와 앱의 저장 방식을 확인합니다."
         }
     } as const;
+
 
     return (
         <main
