@@ -78,6 +78,10 @@ export interface InvestmentTrade {
     string |
     null;
 
+  updatedAtMs:
+    number |
+    null;
+
   isDeleted: boolean;
 }
 
