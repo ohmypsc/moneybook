@@ -1296,6 +1296,17 @@ function SettingsHome(
                 string;
         }> = [
             {
+              key:
+                    "accounts",
+
+                title:
+                    "자산 관리",
+
+                description:
+                    "통장·카드·대출·투자계좌와 입력 화면 설정"  
+            },
+
+            {
                 key:
                     "categories",
 
@@ -1304,17 +1315,6 @@ function SettingsHome(
 
                 description:
                     "카테고리 추가·수정과 입력 화면 순서"
-            },
-
-            {
-                key:
-                    "accounts",
-
-                title:
-                    "자산 관리",
-
-                description:
-                    "통장·카드·대출·투자계좌와 입력 화면 설정"
             },
 
             {
