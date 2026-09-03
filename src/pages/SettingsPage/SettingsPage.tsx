@@ -1,7 +1,13 @@
 import {
+    Fragment,
     useEffect,
     useMemo,
+    useRef,
     useState
+} from "react";
+
+import type {
+    PointerEvent as ReactPointerEvent
 } from "react";
 
 import {
@@ -425,24 +431,22 @@ function getErrorMessage(
 }
 
 
-function moveItem(
+function moveItemToIndex(
     items:
         string[],
 
-    index:
+    fromIndex:
         number,
 
-    direction:
-        -1 | 1
+    toIndex:
+        number
 ) {
-    const nextIndex =
-        index +
-        direction;
-
     if (
-        nextIndex < 0 ||
-        nextIndex >=
-            items.length
+        fromIndex === toIndex ||
+        fromIndex < 0 ||
+        toIndex < 0 ||
+        fromIndex >= items.length ||
+        toIndex >= items.length
     ) {
         return items;
     }
@@ -450,36 +454,40 @@ function moveItem(
     const next =
         items.slice();
 
-    [
-        next[index],
-        next[nextIndex]
-    ] = [
-        next[nextIndex],
-        next[index]
-    ];
+    const [moved] =
+        next.splice(
+            fromIndex,
+            1
+        );
+
+    next.splice(
+        toIndex,
+        0,
+        moved
+    );
 
     return next;
 }
 
 
-function moveSubsetInOrder(
+function moveSubsetToIndex(
     allOrder:
         string[],
 
     subsetIds:
         string[],
 
-    index:
+    fromIndex:
         number,
 
-    direction:
-        -1 | 1
+    toIndex:
+        number
 ) {
     const movedSubset =
-        moveItem(
+        moveItemToIndex(
             subsetIds,
-            index,
-            direction
+            fromIndex,
+            toIndex
         );
 
     if (
@@ -498,13 +506,13 @@ function moveSubsetInOrder(
         0;
 
     return allOrder.map(
-        accountId => {
+        itemId => {
             if (
                 !subsetSet.has(
-                    accountId
+                    itemId
                 )
             ) {
-                return accountId;
+                return itemId;
             }
 
             const replacement =
@@ -517,10 +525,41 @@ function moveSubsetInOrder(
 
             return (
                 replacement ||
-                accountId
+                itemId
             );
         }
     );
+}
+
+
+function autoScrollForPointer(
+    clientY:
+        number
+) {
+    const edge =
+        84;
+
+    const step =
+        24;
+
+    if (
+        clientY <
+        edge
+    ) {
+        window.scrollBy(
+            0,
+            -step
+        );
+    } else if (
+        clientY >
+        window.innerHeight -
+            edge
+    ) {
+        window.scrollBy(
+            0,
+            step
+        );
+    }
 }
 
 
@@ -1626,6 +1665,25 @@ function CategorySettings() {
         );
 
     const [
+        draggingCategoryId,
+        setDraggingCategoryId
+    ] =
+        useState<
+            string |
+            null
+        >(
+            null
+        );
+
+    const categoryDragPointerId =
+        useRef<
+            number |
+            null
+        >(
+            null
+        );
+
+    const [
         loading,
         setLoading
     ] =
@@ -2120,15 +2178,17 @@ function CategorySettings() {
     }
 
 
-    function handleMoveCategory(
-        index:
-            number,
+    function reorderCategory(
+        draggedId:
+            string,
 
-        direction:
-            -1 | 1
+        targetId:
+            string
     ) {
         if (
-            !normalizedPreferences
+            !normalizedPreferences ||
+            draggedId ===
+                targetId
         ) {
             return;
         }
@@ -2139,16 +2199,33 @@ function CategorySettings() {
                     category.categoryId
             );
 
+        const fromIndex =
+            currentIds.indexOf(
+                draggedId
+            );
+
+        const toIndex =
+            currentIds.indexOf(
+                targetId
+            );
+
+        if (
+            fromIndex < 0 ||
+            toIndex < 0
+        ) {
+            return;
+        }
+
         const nextOrder =
-            moveSubsetInOrder(
+            moveSubsetToIndex(
                 normalizedPreferences
                     .categoryOrder[
                         selectedType as
                             PreferenceTransactionType
                     ],
                 currentIds,
-                index,
-                direction
+                fromIndex,
+                toIndex
             );
 
         inputPreference.setPreferences({
@@ -2164,6 +2241,93 @@ function CategorySettings() {
         });
 
         inputPreference.clearMessages();
+    }
+
+
+    function handleCategoryDragStart(
+        event:
+            ReactPointerEvent<HTMLButtonElement>,
+
+        categoryId:
+            string
+    ) {
+        if (
+            inputPreference.saving
+        ) {
+            return;
+        }
+
+        categoryDragPointerId.current =
+            event.pointerId;
+
+        event.currentTarget.setPointerCapture(
+            event.pointerId
+        );
+
+        setDraggingCategoryId(
+            categoryId
+        );
+    }
+
+
+    function handleCategoryDragMove(
+        event:
+            ReactPointerEvent<HTMLButtonElement>
+    ) {
+        if (
+            draggingCategoryId ===
+                null ||
+            categoryDragPointerId.current !==
+                event.pointerId
+        ) {
+            return;
+        }
+
+        event.preventDefault();
+        autoScrollForPointer(
+            event.clientY
+        );
+
+        const target =
+            document
+                .elementFromPoint(
+                    event.clientX,
+                    event.clientY
+                )
+                ?.closest<HTMLElement>(
+                    "[data-category-reorder-id]"
+                );
+
+        const targetId =
+            target?.dataset
+                .categoryReorderId;
+
+        if (
+            targetId
+        ) {
+            reorderCategory(
+                draggingCategoryId,
+                targetId
+            );
+        }
+    }
+
+
+    function handleCategoryDragEnd(
+        event:
+            ReactPointerEvent<HTMLButtonElement>
+    ) {
+        if (
+            categoryDragPointerId.current ===
+                event.pointerId
+        ) {
+            categoryDragPointerId.current =
+                null;
+
+            setDraggingCategoryId(
+                null
+            );
+        }
     }
 
 
@@ -2281,7 +2445,7 @@ function CategorySettings() {
                     <p>
                         {
                             reordering
-                                ? "입력 화면에 표시되는 순서를 조정합니다."
+                                ? "≡ 손잡이를 잡고 원하는 위치로 끌어 순서를 조정합니다."
                                 : "카테고리를 관리하거나 입력 화면 순서를 바꿀 수 있습니다."
                         }
                     </p>
@@ -2514,10 +2678,45 @@ function CategorySettings() {
                                                         key={
                                                             category.categoryId
                                                         }
-                                                        className={
-                                                            styles.orderRow
+                                                        data-category-reorder-id={
+                                                            category.categoryId
                                                         }
+                                                        className={`${styles.orderRow} ${
+                                                            draggingCategoryId ===
+                                                            category.categoryId
+                                                                ? styles.draggingRow
+                                                                : ""
+                                                        }`}
                                                     >
+                                                        <button
+                                                            type="button"
+                                                            className={
+                                                                styles.dragHandle
+                                                            }
+                                                            aria-label={`${category.name} 순서 이동`}
+                                                            disabled={
+                                                                inputPreference.saving
+                                                            }
+                                                            onPointerDown={
+                                                                event =>
+                                                                    handleCategoryDragStart(
+                                                                        event,
+                                                                        category.categoryId
+                                                                    )
+                                                            }
+                                                            onPointerMove={
+                                                                handleCategoryDragMove
+                                                            }
+                                                            onPointerUp={
+                                                                handleCategoryDragEnd
+                                                            }
+                                                            onPointerCancel={
+                                                                handleCategoryDragEnd
+                                                            }
+                                                        >
+                                                            ≡
+                                                        </button>
+
                                                         <span
                                                             className={
                                                                 styles.orderNumber
@@ -2538,55 +2737,6 @@ function CategorySettings() {
                                                                 category.name
                                                             }
                                                         </span>
-
-                                                        <div
-                                                            className={
-                                                                styles.compactActions
-                                                            }
-                                                        >
-                                                            <button
-                                                                type="button"
-                                                                className={
-                                                                    styles.iconButton
-                                                                }
-                                                                disabled={
-                                                                    index ===
-                                                                        0 ||
-                                                                    inputPreference.saving
-                                                                }
-                                                                onClick={
-                                                                    () =>
-                                                                        handleMoveCategory(
-                                                                            index,
-                                                                            -1
-                                                                        )
-                                                                }
-                                                            >
-                                                                ↑
-                                                            </button>
-
-                                                            <button
-                                                                type="button"
-                                                                className={
-                                                                    styles.iconButton
-                                                                }
-                                                                disabled={
-                                                                    index ===
-                                                                        orderedActiveItems.length -
-                                                                            1 ||
-                                                                    inputPreference.saving
-                                                                }
-                                                                onClick={
-                                                                    () =>
-                                                                        handleMoveCategory(
-                                                                            index,
-                                                                            1
-                                                                        )
-                                                                }
-                                                            >
-                                                                ↓
-                                                            </button>
-                                                        </div>
                                                     </li>
                                                 )
                                             )
@@ -2986,6 +3136,25 @@ function AccountSettings() {
         );
 
     const [
+        draggingAccountId,
+        setDraggingAccountId
+    ] =
+        useState<
+            string |
+            null
+        >(
+            null
+        );
+
+    const accountDragPointerId =
+        useRef<
+            number |
+            null
+        >(
+            null
+        );
+
+    const [
         loading,
         setLoading
     ] =
@@ -3098,7 +3267,7 @@ function AccountSettings() {
 
             void load();
 
-            return () => {
+    return () => {
                 active =
                     false;
             };
@@ -3674,15 +3843,17 @@ function AccountSettings() {
     }
 
 
-    function handleMoveAccount(
-        index:
-            number,
+    function reorderAccount(
+        draggedId:
+            string,
 
-        direction:
-            -1 | 1
+        targetId:
+            string
     ) {
         if (
-            !normalizedPreferences
+            !normalizedPreferences ||
+            draggedId ===
+                targetId
         ) {
             return;
         }
@@ -3693,13 +3864,30 @@ function AccountSettings() {
                     account.accountId
             );
 
+        const fromIndex =
+            ownerIds.indexOf(
+                draggedId
+            );
+
+        const toIndex =
+            ownerIds.indexOf(
+                targetId
+            );
+
+        if (
+            fromIndex < 0 ||
+            toIndex < 0
+        ) {
+            return;
+        }
+
         const nextOrder =
-            moveSubsetInOrder(
+            moveSubsetToIndex(
                 normalizedPreferences
                     .accountOrder,
                 ownerIds,
-                index,
-                direction
+                fromIndex,
+                toIndex
             );
 
         inputPreference.setPreferences({
@@ -3710,6 +3898,93 @@ function AccountSettings() {
         });
 
         inputPreference.clearMessages();
+    }
+
+
+    function handleAccountDragStart(
+        event:
+            ReactPointerEvent<HTMLButtonElement>,
+
+        accountId:
+            string
+    ) {
+        if (
+            inputPreference.saving
+        ) {
+            return;
+        }
+
+        accountDragPointerId.current =
+            event.pointerId;
+
+        event.currentTarget.setPointerCapture(
+            event.pointerId
+        );
+
+        setDraggingAccountId(
+            accountId
+        );
+    }
+
+
+    function handleAccountDragMove(
+        event:
+            ReactPointerEvent<HTMLButtonElement>
+    ) {
+        if (
+            draggingAccountId ===
+                null ||
+            accountDragPointerId.current !==
+                event.pointerId
+        ) {
+            return;
+        }
+
+        event.preventDefault();
+        autoScrollForPointer(
+            event.clientY
+        );
+
+        const target =
+            document
+                .elementFromPoint(
+                    event.clientX,
+                    event.clientY
+                )
+                ?.closest<HTMLElement>(
+                    "[data-account-reorder-id]"
+                );
+
+        const targetId =
+            target?.dataset
+                .accountReorderId;
+
+        if (
+            targetId
+        ) {
+            reorderAccount(
+                draggingAccountId,
+                targetId
+            );
+        }
+    }
+
+
+    function handleAccountDragEnd(
+        event:
+            ReactPointerEvent<HTMLButtonElement>
+    ) {
+        if (
+            accountDragPointerId.current ===
+                event.pointerId
+        ) {
+            accountDragPointerId.current =
+                null;
+
+            setDraggingAccountId(
+                null
+            );
+        }
     }
 
 
@@ -3818,6 +4093,471 @@ function AccountSettings() {
     }
 
 
+    function renderAccountForm() {
+        return (
+            <section
+                                                className={
+                                                    styles.formCard
+                                                }
+                                            >
+                                                <div
+                                                    className={
+                                                        styles.formHeader
+                                                    }
+                                                >
+                                                    <div>
+                                                        <h2>
+                                                            {
+                                                                editingId
+                                                                    ? "항목 수정"
+                                                                    : "새 항목 추가"
+                                                            }
+                                                        </h2>
+
+                                                        <p>
+                                                            종류만 선택하면 내부 자산·부채 분류와 잔액 방식은 앱이 자동으로 정합니다.
+                                                        </p>
+                                                    </div>
+
+                                                    <button
+                                                        type="button"
+                                                        className={
+                                                            styles.closeButton
+                                                        }
+                                                        aria-label="입력창 닫기"
+                                                        disabled={
+                                                            Boolean(
+                                                                busyKey
+                                                            )
+                                                        }
+                                                        onClick={
+                                                            closeForm
+                                                        }
+                                                    >
+                                                        ×
+                                                    </button>
+                                                </div>
+
+                                                <div
+                                                    className={
+                                                        styles.formGrid
+                                                    }
+                                                >
+                                                    <label
+                                                        className={
+                                                            styles.field
+                                                        }
+                                                    >
+                                                        <span>
+                                                            이름
+                                                        </span>
+
+                                                        <input
+                                                            type="text"
+                                                            value={
+                                                                form.accountName
+                                                            }
+                                                            maxLength={
+                                                                60
+                                                            }
+                                                            disabled={
+                                                                Boolean(
+                                                                    busyKey
+                                                                )
+                                                            }
+                                                            onChange={
+                                                                event =>
+                                                                    updateForm(
+                                                                        "accountName",
+                                                                        event.target.value
+                                                                    )
+                                                            }
+                                                        />
+                                                    </label>
+
+                                                    <label
+                                                        className={
+                                                            styles.field
+                                                        }
+                                                    >
+                                                        <span>
+                                                            명의자
+                                                        </span>
+
+                                                        <select
+                                                            value={
+                                                                form.owner
+                                                            }
+                                                            disabled={
+                                                                Boolean(
+                                                                    busyKey
+                                                                )
+                                                            }
+                                                            onChange={
+                                                                event =>
+                                                                    updateForm(
+                                                                        "owner",
+                                                                        event.target.value
+                                                                    )
+                                                            }
+                                                        >
+                                                            {
+                                                                ownerOptions.map(
+                                                                    owner => (
+                                                                        <option
+                                                                            key={
+                                                                                owner
+                                                                            }
+                                                                            value={
+                                                                                owner
+                                                                            }
+                                                                        >
+                                                                            {owner}
+                                                                        </option>
+                                                                    )
+                                                                )
+                                                            }
+                                                        </select>
+                                                    </label>
+
+                                                    <label
+                                                        className={`${styles.field} ${styles.fullField}`}
+                                                    >
+                                                        <span>
+                                                            종류
+                                                        </span>
+
+                                                        <select
+                                                            value={
+                                                                selectedKind
+                                                                    ?.value ||
+                                                                "__legacy__"
+                                                            }
+                                                            disabled={
+                                                                Boolean(
+                                                                    busyKey
+                                                                )
+                                                            }
+                                                            onChange={
+                                                                event => {
+                                                                    if (
+                                                                        event.target.value ===
+                                                                        "__legacy__"
+                                                                    ) {
+                                                                        return;
+                                                                    }
+
+                                                                    handleKindChange(
+                                                                        event.target.value
+                                                                    );
+                                                                }
+                                                            }
+                                                        >
+                                                            {
+                                                                !selectedKind && (
+                                                                    <option
+                                                                        value="__legacy__"
+                                                                    >
+                                                                        기존 분류 · {
+                                                                            form.subType ||
+                                                                            form.accountType ||
+                                                                            "기타"
+                                                                        }
+                                                                    </option>
+                                                                )
+                                                            }
+
+                                                            {
+                                                                ACCOUNT_KIND_OPTIONS.map(
+                                                                    option => (
+                                                                        <option
+                                                                            key={
+                                                                                option.value
+                                                                            }
+                                                                            value={
+                                                                                option.value
+                                                                            }
+                                                                        >
+                                                                            {
+                                                                                option.label
+                                                                            }
+                                                                        </option>
+                                                                    )
+                                                                )
+                                                            }
+                                                        </select>
+                                                    </label>
+
+                                                    <label
+                                                        className={
+                                                            styles.field
+                                                        }
+                                                    >
+                                                        <span>
+                                                            시작 잔액
+                                                        </span>
+
+                                                        <input
+                                                            type="number"
+                                                            inputMode="numeric"
+                                                            value={
+                                                                form.openingBalance
+                                                            }
+                                                            disabled={
+                                                                Boolean(
+                                                                    busyKey
+                                                                )
+                                                            }
+                                                            onChange={
+                                                                event =>
+                                                                    updateForm(
+                                                                        "openingBalance",
+                                                                        event.target.value
+                                                                    )
+                                                            }
+                                                        />
+                                                    </label>
+
+                                                    {
+                                                        isCard && (
+                                                            <label
+                                                                className={`${styles.field} ${styles.fullField}`}
+                                                            >
+                                                                <span>
+                                                                    카드 결제계좌
+                                                                </span>
+
+                                                                <select
+                                                                    value={
+                                                                        form.paymentAccountId
+                                                                    }
+                                                                    disabled={
+                                                                        Boolean(
+                                                                            busyKey
+                                                                        )
+                                                                    }
+                                                                    onChange={
+                                                                        event =>
+                                                                            updateForm(
+                                                                                "paymentAccountId",
+                                                                                event.target.value
+                                                                            )
+                                                                    }
+                                                                >
+                                                                    <option
+                                                                        value=""
+                                                                    >
+                                                                        선택해주세요
+                                                                    </option>
+
+                                                                    {
+                                                                        paymentAccountOptions.map(
+                                                                            account => (
+                                                                                <option
+                                                                                    key={
+                                                                                        account.accountId
+                                                                                    }
+                                                                                    value={
+                                                                                        account.accountId
+                                                                                    }
+                                                                                >
+                                                                                    {
+                                                                                        account.displayName
+                                                                                    }
+                                                                                </option>
+                                                                            )
+                                                                        )
+                                                                    }
+                                                                </select>
+                                                            </label>
+                                                        )
+                                                    }
+
+                                                    {
+                                                        form.subType ===
+                                                            "신용카드" && (
+                                                            <>
+                                                                <label
+                                                                    className={
+                                                                        styles.field
+                                                                    }
+                                                                >
+                                                                    <span>
+                                                                        청구 마감일
+                                                                    </span>
+
+                                                                    <input
+                                                                        type="number"
+                                                                        min={
+                                                                            1
+                                                                        }
+                                                                        max={
+                                                                            31
+                                                                        }
+                                                                        value={
+                                                                            form.billingCutoffDay
+                                                                        }
+                                                                        placeholder="1~31"
+                                                                        onChange={
+                                                                            event =>
+                                                                                updateForm(
+                                                                                    "billingCutoffDay",
+                                                                                    event.target.value
+                                                                                )
+                                                                        }
+                                                                    />
+                                                                </label>
+
+                                                                <label
+                                                                    className={
+                                                                        styles.field
+                                                                    }
+                                                                >
+                                                                    <span>
+                                                                        결제일
+                                                                    </span>
+
+                                                                    <input
+                                                                        type="number"
+                                                                        min={
+                                                                            1
+                                                                        }
+                                                                        max={
+                                                                            31
+                                                                        }
+                                                                        value={
+                                                                            form.paymentDay
+                                                                        }
+                                                                        placeholder="1~31"
+                                                                        onChange={
+                                                                            event =>
+                                                                                updateForm(
+                                                                                    "paymentDay",
+                                                                                    event.target.value
+                                                                                )
+                                                                        }
+                                                                    />
+                                                                </label>
+                                                            </>
+                                                        )
+                                                    }
+
+                                                    <label
+                                                        className={
+                                                            styles.field
+                                                        }
+                                                    >
+                                                        <span>
+                                                            사용 시작 연도
+                                                        </span>
+
+                                                        <input
+                                                            type="number"
+                                                            min={
+                                                                1900
+                                                            }
+                                                            max={
+                                                                2200
+                                                            }
+                                                            value={
+                                                                form.startYear
+                                                            }
+                                                            placeholder="선택 입력"
+                                                            onChange={
+                                                                event =>
+                                                                    updateForm(
+                                                                        "startYear",
+                                                                        event.target.value
+                                                                    )
+                                                            }
+                                                        />
+                                                    </label>
+
+                                                    <label
+                                                        className={
+                                                            styles.field
+                                                        }
+                                                    >
+                                                        <span>
+                                                            사용 종료 연도
+                                                        </span>
+
+                                                        <input
+                                                            type="number"
+                                                            min={
+                                                                1900
+                                                            }
+                                                            max={
+                                                                2200
+                                                            }
+                                                            value={
+                                                                form.endYear
+                                                            }
+                                                            placeholder="사용 중이면 비워두기"
+                                                            onChange={
+                                                                event =>
+                                                                    updateForm(
+                                                                        "endYear",
+                                                                        event.target.value
+                                                                    )
+                                                            }
+                                                        />
+                                                    </label>
+                                                </div>
+
+                                                {
+                                                    error && (
+                                                        <p
+                                                            className={
+                                                                styles.error
+                                                            }
+                                                        >
+                                                            {error}
+                                                        </p>
+                                                    )
+                                                }
+
+                                                <div
+                                                    className={
+                                                        styles.formActions
+                                                    }
+                                                >
+                                                    <button
+                                                        type="button"
+                                                        className={
+                                                            styles.secondaryButton
+                                                        }
+                                                        onClick={
+                                                            closeForm
+                                                        }
+                                                    >
+                                                        취소
+                                                    </button>
+
+                                                    <button
+                                                        type="button"
+                                                        className={
+                                                            styles.primaryButton
+                                                        }
+                                                        onClick={
+                                                            () =>
+                                                                void handleSave()
+                                                        }
+                                                    >
+                                                        {
+                                                            busyKey
+                                                                ? "저장 중..."
+                                                                : editingId
+                                                                    ? "수정 저장"
+                                                                    : "추가"
+                                                        }
+                                                    </button>
+                                                </div>
+                                            </section>
+        );
+    }
+
+
     return (
         <div
             className={
@@ -3913,7 +4653,7 @@ function AccountSettings() {
                 <p>
                     {
                         reordering
-                            ? `${ownerTab} 항목의 입력 화면 순서를 조정합니다.`
+                            ? `≡ 손잡이를 잡고 ${ownerTab} 항목을 원하는 위치로 끌어 놓으세요.`
                             : "통장·현금·카드·대출·투자계좌를 한곳에서 관리합니다."
                     }
                 </p>
@@ -4006,467 +4746,9 @@ function AccountSettings() {
 
             {
                 !reordering &&
-                showForm && (
-                    <section
-                        className={
-                            styles.formCard
-                        }
-                    >
-                        <div
-                            className={
-                                styles.formHeader
-                            }
-                        >
-                            <div>
-                                <h2>
-                                    {
-                                        editingId
-                                            ? "항목 수정"
-                                            : "새 항목 추가"
-                                    }
-                                </h2>
-
-                                <p>
-                                    종류만 선택하면 내부 자산·부채 분류와 잔액 방식은 앱이 자동으로 정합니다.
-                                </p>
-                            </div>
-
-                            <button
-                                type="button"
-                                className={
-                                    styles.closeButton
-                                }
-                                aria-label="입력창 닫기"
-                                disabled={
-                                    Boolean(
-                                        busyKey
-                                    )
-                                }
-                                onClick={
-                                    closeForm
-                                }
-                            >
-                                ×
-                            </button>
-                        </div>
-
-                        <div
-                            className={
-                                styles.formGrid
-                            }
-                        >
-                            <label
-                                className={
-                                    styles.field
-                                }
-                            >
-                                <span>
-                                    이름
-                                </span>
-
-                                <input
-                                    type="text"
-                                    value={
-                                        form.accountName
-                                    }
-                                    maxLength={
-                                        60
-                                    }
-                                    disabled={
-                                        Boolean(
-                                            busyKey
-                                        )
-                                    }
-                                    onChange={
-                                        event =>
-                                            updateForm(
-                                                "accountName",
-                                                event.target.value
-                                            )
-                                    }
-                                />
-                            </label>
-
-                            <label
-                                className={
-                                    styles.field
-                                }
-                            >
-                                <span>
-                                    명의자
-                                </span>
-
-                                <select
-                                    value={
-                                        form.owner
-                                    }
-                                    disabled={
-                                        Boolean(
-                                            busyKey
-                                        )
-                                    }
-                                    onChange={
-                                        event =>
-                                            updateForm(
-                                                "owner",
-                                                event.target.value
-                                            )
-                                    }
-                                >
-                                    {
-                                        ownerOptions.map(
-                                            owner => (
-                                                <option
-                                                    key={
-                                                        owner
-                                                    }
-                                                    value={
-                                                        owner
-                                                    }
-                                                >
-                                                    {owner}
-                                                </option>
-                                            )
-                                        )
-                                    }
-                                </select>
-                            </label>
-
-                            <label
-                                className={`${styles.field} ${styles.fullField}`}
-                            >
-                                <span>
-                                    종류
-                                </span>
-
-                                <select
-                                    value={
-                                        selectedKind
-                                            ?.value ||
-                                        "__legacy__"
-                                    }
-                                    disabled={
-                                        Boolean(
-                                            busyKey
-                                        )
-                                    }
-                                    onChange={
-                                        event => {
-                                            if (
-                                                event.target.value ===
-                                                "__legacy__"
-                                            ) {
-                                                return;
-                                            }
-
-                                            handleKindChange(
-                                                event.target.value
-                                            );
-                                        }
-                                    }
-                                >
-                                    {
-                                        !selectedKind && (
-                                            <option
-                                                value="__legacy__"
-                                            >
-                                                기존 분류 · {
-                                                    form.subType ||
-                                                    form.accountType ||
-                                                    "기타"
-                                                }
-                                            </option>
-                                        )
-                                    }
-
-                                    {
-                                        ACCOUNT_KIND_OPTIONS.map(
-                                            option => (
-                                                <option
-                                                    key={
-                                                        option.value
-                                                    }
-                                                    value={
-                                                        option.value
-                                                    }
-                                                >
-                                                    {
-                                                        option.label
-                                                    }
-                                                </option>
-                                            )
-                                        )
-                                    }
-                                </select>
-                            </label>
-
-                            <label
-                                className={
-                                    styles.field
-                                }
-                            >
-                                <span>
-                                    시작 잔액
-                                </span>
-
-                                <input
-                                    type="number"
-                                    inputMode="numeric"
-                                    value={
-                                        form.openingBalance
-                                    }
-                                    disabled={
-                                        Boolean(
-                                            busyKey
-                                        )
-                                    }
-                                    onChange={
-                                        event =>
-                                            updateForm(
-                                                "openingBalance",
-                                                event.target.value
-                                            )
-                                    }
-                                />
-                            </label>
-
-                            {
-                                isCard && (
-                                    <label
-                                        className={`${styles.field} ${styles.fullField}`}
-                                    >
-                                        <span>
-                                            카드 결제계좌
-                                        </span>
-
-                                        <select
-                                            value={
-                                                form.paymentAccountId
-                                            }
-                                            disabled={
-                                                Boolean(
-                                                    busyKey
-                                                )
-                                            }
-                                            onChange={
-                                                event =>
-                                                    updateForm(
-                                                        "paymentAccountId",
-                                                        event.target.value
-                                                    )
-                                            }
-                                        >
-                                            <option
-                                                value=""
-                                            >
-                                                선택해주세요
-                                            </option>
-
-                                            {
-                                                paymentAccountOptions.map(
-                                                    account => (
-                                                        <option
-                                                            key={
-                                                                account.accountId
-                                                            }
-                                                            value={
-                                                                account.accountId
-                                                            }
-                                                        >
-                                                            {
-                                                                account.displayName
-                                                            }
-                                                        </option>
-                                                    )
-                                                )
-                                            }
-                                        </select>
-                                    </label>
-                                )
-                            }
-
-                            {
-                                form.subType ===
-                                    "신용카드" && (
-                                    <>
-                                        <label
-                                            className={
-                                                styles.field
-                                            }
-                                        >
-                                            <span>
-                                                청구 마감일
-                                            </span>
-
-                                            <input
-                                                type="number"
-                                                min={
-                                                    1
-                                                }
-                                                max={
-                                                    31
-                                                }
-                                                value={
-                                                    form.billingCutoffDay
-                                                }
-                                                placeholder="1~31"
-                                                onChange={
-                                                    event =>
-                                                        updateForm(
-                                                            "billingCutoffDay",
-                                                            event.target.value
-                                                        )
-                                                }
-                                            />
-                                        </label>
-
-                                        <label
-                                            className={
-                                                styles.field
-                                            }
-                                        >
-                                            <span>
-                                                결제일
-                                            </span>
-
-                                            <input
-                                                type="number"
-                                                min={
-                                                    1
-                                                }
-                                                max={
-                                                    31
-                                                }
-                                                value={
-                                                    form.paymentDay
-                                                }
-                                                placeholder="1~31"
-                                                onChange={
-                                                    event =>
-                                                        updateForm(
-                                                            "paymentDay",
-                                                            event.target.value
-                                                        )
-                                                }
-                                            />
-                                        </label>
-                                    </>
-                                )
-                            }
-
-                            <label
-                                className={
-                                    styles.field
-                                }
-                            >
-                                <span>
-                                    사용 시작 연도
-                                </span>
-
-                                <input
-                                    type="number"
-                                    min={
-                                        1900
-                                    }
-                                    max={
-                                        2200
-                                    }
-                                    value={
-                                        form.startYear
-                                    }
-                                    placeholder="선택 입력"
-                                    onChange={
-                                        event =>
-                                            updateForm(
-                                                "startYear",
-                                                event.target.value
-                                            )
-                                    }
-                                />
-                            </label>
-
-                            <label
-                                className={
-                                    styles.field
-                                }
-                            >
-                                <span>
-                                    사용 종료 연도
-                                </span>
-
-                                <input
-                                    type="number"
-                                    min={
-                                        1900
-                                    }
-                                    max={
-                                        2200
-                                    }
-                                    value={
-                                        form.endYear
-                                    }
-                                    placeholder="사용 중이면 비워두기"
-                                    onChange={
-                                        event =>
-                                            updateForm(
-                                                "endYear",
-                                                event.target.value
-                                            )
-                                    }
-                                />
-                            </label>
-                        </div>
-
-                        {
-                            error && (
-                                <p
-                                    className={
-                                        styles.error
-                                    }
-                                >
-                                    {error}
-                                </p>
-                            )
-                        }
-
-                        <div
-                            className={
-                                styles.formActions
-                            }
-                        >
-                            <button
-                                type="button"
-                                className={
-                                    styles.secondaryButton
-                                }
-                                onClick={
-                                    closeForm
-                                }
-                            >
-                                취소
-                            </button>
-
-                            <button
-                                type="button"
-                                className={
-                                    styles.primaryButton
-                                }
-                                onClick={
-                                    () =>
-                                        void handleSave()
-                                }
-                            >
-                                {
-                                    busyKey
-                                        ? "저장 중..."
-                                        : editingId
-                                            ? "수정 저장"
-                                            : "추가"
-                                }
-                            </button>
-                        </div>
-                    </section>
-                )
+                showForm &&
+                !editingId &&
+                renderAccountForm()
             }
 
             {
@@ -4572,12 +4854,49 @@ function AccountSettings() {
                                                             key={
                                                                 account.accountId
                                                             }
+                                                            data-account-reorder-id={
+                                                                account.accountId
+                                                            }
                                                             className={`${styles.orderRow} ${
                                                                 hidden
                                                                     ? styles.mutedRow
                                                                     : ""
+                                                            } ${
+                                                                draggingAccountId ===
+                                                                account.accountId
+                                                                    ? styles.draggingRow
+                                                                    : ""
                                                             }`}
                                                         >
+                                                            <button
+                                                                type="button"
+                                                                className={
+                                                                    styles.dragHandle
+                                                                }
+                                                                aria-label={`${account.displayName} 순서 이동`}
+                                                                disabled={
+                                                                    inputPreference.saving
+                                                                }
+                                                                onPointerDown={
+                                                                    event =>
+                                                                        handleAccountDragStart(
+                                                                            event,
+                                                                            account.accountId
+                                                                        )
+                                                                }
+                                                                onPointerMove={
+                                                                    handleAccountDragMove
+                                                                }
+                                                                onPointerUp={
+                                                                    handleAccountDragEnd
+                                                                }
+                                                                onPointerCancel={
+                                                                    handleAccountDragEnd
+                                                                }
+                                                            >
+                                                                ≡
+                                                            </button>
+
                                                             <span
                                                                 className={
                                                                     styles.orderNumber
@@ -4614,55 +4933,6 @@ function AccountSettings() {
                                                                     }
                                                                 </span>
                                                             </span>
-
-                                                            <div
-                                                                className={
-                                                                    styles.compactActions
-                                                                }
-                                                            >
-                                                                <button
-                                                                    type="button"
-                                                                    className={
-                                                                        styles.iconButton
-                                                                    }
-                                                                    disabled={
-                                                                        index ===
-                                                                            0 ||
-                                                                        inputPreference.saving
-                                                                    }
-                                                                    onClick={
-                                                                        () =>
-                                                                            handleMoveAccount(
-                                                                                index,
-                                                                                -1
-                                                                            )
-                                                                    }
-                                                                >
-                                                                    ↑
-                                                                </button>
-
-                                                                <button
-                                                                    type="button"
-                                                                    className={
-                                                                        styles.iconButton
-                                                                    }
-                                                                    disabled={
-                                                                        index ===
-                                                                            orderedActiveAccounts.length -
-                                                                                1 ||
-                                                                        inputPreference.saving
-                                                                    }
-                                                                    onClick={
-                                                                        () =>
-                                                                            handleMoveAccount(
-                                                                                index,
-                                                                                1
-                                                                            )
-                                                                    }
-                                                                >
-                                                                    ↓
-                                                                </button>
-                                                            </div>
                                                         </li>
                                                     );
                                                 }
@@ -4699,152 +4969,172 @@ function AccountSettings() {
                                                             account.accountId
                                                         );
 
+                                                    const editing =
+                                                        editingId ===
+                                                        account.accountId;
+
                                                     return (
-                                                        <li
-                                                            key={
-                                                                account.accountId
-                                                            }
-                                                            className={`${styles.managementRow} ${
-                                                                !account.active
-                                                                    ? styles.mutedRow
-                                                                    : ""
-                                                            }`}
-                                                        >
-                                                            <span
-                                                                className={
-                                                                    styles.itemTextGroup
-                                                                }
-                                                            >
-                                                                <strong>
-                                                                    {
-                                                                        account.displayName
-                                                                    }
-                                                                </strong>
-
-                                                                <span>
-                                                                    {
-                                                                        getAccountKindLabel(
-                                                                            account.accountType,
-                                                                            account.subType
-                                                                        )
-                                                                    }
-                                                                    {" · "}
-                                                                    {
-                                                                        account.owner
-                                                                    }
-                                                                </span>
-
-                                                                <span>
-                                                                    현재 잔액{" "}
-                                                                    {
-                                                                        formatKrw(
-                                                                            account.currentBalance
-                                                                        )
-                                                                    }
-
-                                                                    {
-                                                                        !account.active
-                                                                            ? " · 사용 종료"
-                                                                            : hidden
-                                                                                ? " · 입력 숨김"
-                                                                                : " · 입력 표시"
-                                                                    }
-                                                                </span>
-                                                            </span>
-
-                                                            <div
-                                                                className={
-                                                                    styles.rowActions
-                                                                }
-                                                            >
-                                                                {
-                                                                    menuOpen && (
-                                                                        <>
-                                                                            <button
-                                                                                type="button"
-                                                                                className={
-                                                                                    styles.secondarySmallButton
-                                                                                }
-                                                                                onClick={
-                                                                                    () =>
-                                                                                        beginEdit(
-                                                                                            account
-                                                                                        )
-                                                                                }
-                                                                            >
-                                                                                수정
-                                                                            </button>
-
-                                                                            {
-                                                                                account.active &&
-                                                                                normalizedPreferences &&
-                                                                                inputPreference.bootstrap && (
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        className={
-                                                                                            styles.secondarySmallButton
-                                                                                        }
-                                                                                        disabled={
-                                                                                            inputPreference.saving
-                                                                                        }
-                                                                                        onClick={
-                                                                                            () =>
-                                                                                                void handleToggleInputVisibility(
-                                                                                                    account
-                                                                                                )
-                                                                                        }
-                                                                                    >
-                                                                                        {
-                                                                                            hidden
-                                                                                                ? "입력 표시"
-                                                                                                : "입력 숨김"
-                                                                                        }
-                                                                                    </button>
-                                                                                )
-                                                                            }
-
-                                                                            <button
-                                                                                type="button"
-                                                                                className={
-                                                                                    styles.dangerSmallButton
-                                                                                }
-                                                                                onClick={
-                                                                                    () =>
-                                                                                        void handleDelete(
-                                                                                            account
-                                                                                        )
-                                                                                }
-                                                                            >
-                                                                                삭제
-                                                                            </button>
-                                                                        </>
-                                                                    )
-                                                                }
-
-                                                                <button
-                                                                    type="button"
-                                                                    className={
-                                                                        styles.secondarySmallButton
-                                                                    }
-                                                                    onClick={
-                                                                        () =>
-                                                                            setMenuAccountId(
-                                                                                current =>
-                                                                                    current ===
-                                                                                    account.accountId
-                                                                                        ? null
-                                                                                        : account.accountId
-                                                                            )
-                                                                    }
-                                                                >
-                                                                    {
-                                                                        menuOpen
-                                                                            ? "닫기"
-                                                                            : "⋮"
-                                                                    }
-                                                                </button>
-                                                            </div>
-                                                        </li>
+                                                        <Fragment
+                                                                                                                    key={
+                                                                                                                        account.accountId
+                                                                                                                    }
+                                                                                                                >
+                                                            <li
+                                                                                                                        className={`${styles.managementRow} ${
+                                                                                                                            !account.active
+                                                                                                                                ? styles.mutedRow
+                                                                                                                                : ""
+                                                                                                                        }`}
+                                                                                                                    >
+                                                                                                                        <span
+                                                                                                                            className={
+                                                                                                                                styles.itemTextGroup
+                                                                                                                            }
+                                                                                                                        >
+                                                                                                                            <strong>
+                                                                                                                                {
+                                                                                                                                    account.displayName
+                                                                                                                                }
+                                                                                                                            </strong>
+                                                            
+                                                                                                                            <span>
+                                                                                                                                {
+                                                                                                                                    getAccountKindLabel(
+                                                                                                                                        account.accountType,
+                                                                                                                                        account.subType
+                                                                                                                                    )
+                                                                                                                                }
+                                                                                                                                {" · "}
+                                                                                                                                {
+                                                                                                                                    account.owner
+                                                                                                                                }
+                                                                                                                            </span>
+                                                            
+                                                                                                                            <span>
+                                                                                                                                현재 잔액{" "}
+                                                                                                                                {
+                                                                                                                                    formatKrw(
+                                                                                                                                        account.currentBalance
+                                                                                                                                    )
+                                                                                                                                }
+                                                            
+                                                                                                                                {
+                                                                                                                                    !account.active
+                                                                                                                                        ? " · 사용 종료"
+                                                                                                                                        : hidden
+                                                                                                                                            ? " · 입력 숨김"
+                                                                                                                                            : " · 입력 표시"
+                                                                                                                                }
+                                                                                                                            </span>
+                                                                                                                        </span>
+                                                            
+                                                                                                                        <div
+                                                                                                                            className={
+                                                                                                                                styles.rowActions
+                                                                                                                            }
+                                                                                                                        >
+                                                                                                                            {
+                                                                                                                                menuOpen && (
+                                                                                                                                    <>
+                                                                                                                                        <button
+                                                                                                                                            type="button"
+                                                                                                                                            className={
+                                                                                                                                                styles.secondarySmallButton
+                                                                                                                                            }
+                                                                                                                                            onClick={
+                                                                                                                                                () =>
+                                                                                                                                                    beginEdit(
+                                                                                                                                                        account
+                                                                                                                                                    )
+                                                                                                                                            }
+                                                                                                                                        >
+                                                                                                                                            수정
+                                                                                                                                        </button>
+                                                            
+                                                                                                                                        {
+                                                                                                                                            account.active &&
+                                                                                                                                            normalizedPreferences &&
+                                                                                                                                            inputPreference.bootstrap && (
+                                                                                                                                                <button
+                                                                                                                                                    type="button"
+                                                                                                                                                    className={
+                                                                                                                                                        styles.secondarySmallButton
+                                                                                                                                                    }
+                                                                                                                                                    disabled={
+                                                                                                                                                        inputPreference.saving
+                                                                                                                                                    }
+                                                                                                                                                    onClick={
+                                                                                                                                                        () =>
+                                                                                                                                                            void handleToggleInputVisibility(
+                                                                                                                                                                account
+                                                                                                                                                            )
+                                                                                                                                                    }
+                                                                                                                                                >
+                                                                                                                                                    {
+                                                                                                                                                        hidden
+                                                                                                                                                            ? "입력 표시"
+                                                                                                                                                            : "입력 숨김"
+                                                                                                                                                    }
+                                                                                                                                                </button>
+                                                                                                                                            )
+                                                                                                                                        }
+                                                            
+                                                                                                                                        <button
+                                                                                                                                            type="button"
+                                                                                                                                            className={
+                                                                                                                                                styles.dangerSmallButton
+                                                                                                                                            }
+                                                                                                                                            onClick={
+                                                                                                                                                () =>
+                                                                                                                                                    void handleDelete(
+                                                                                                                                                        account
+                                                                                                                                                    )
+                                                                                                                                            }
+                                                                                                                                        >
+                                                                                                                                            삭제
+                                                                                                                                        </button>
+                                                                                                                                    </>
+                                                                                                                                )
+                                                                                                                            }
+                                                            
+                                                                                                                            <button
+                                                                                                                                type="button"
+                                                                                                                                className={
+                                                                                                                                    styles.secondarySmallButton
+                                                                                                                                }
+                                                                                                                                onClick={
+                                                                                                                                    () =>
+                                                                                                                                        setMenuAccountId(
+                                                                                                                                            current =>
+                                                                                                                                                current ===
+                                                                                                                                                account.accountId
+                                                                                                                                                    ? null
+                                                                                                                                                    : account.accountId
+                                                                                                                                        )
+                                                                                                                                }
+                                                                                                                            >
+                                                                                                                                {
+                                                                                                                                    menuOpen
+                                                                                                                                        ? "닫기"
+                                                                                                                                        : "⋮"
+                                                                                                                                }
+                                                                                                                            </button>
+                                                                                                                        </div>
+                                                                                                                    </li>
+                                                        
+                                                                                                                    {
+                                                                                                                        showForm &&
+                                                                                                                        editing && (
+                                                                                                                            <li
+                                                                                                                                className={
+                                                                                                                                    styles.inlineFormListItem
+                                                                                                                                }
+                                                                                                                            >
+                                                                                                                                {renderAccountForm()}
+                                                                                                                            </li>
+                                                                                                                        )
+                                                                                                                    }
+                                                                                                                </Fragment>
                                                     );
                                                 }
                                             )
