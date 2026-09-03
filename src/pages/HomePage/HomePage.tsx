@@ -140,9 +140,9 @@ function formatMonth(
 
 
 const TOGETHER_START = {
-  year: 2026,
-  monthIndex: 6,
-  day: 11
+  year: 2024,
+  monthIndex: 10,
+  day: 2
 };
 
 function getTogetherDays() {
@@ -773,19 +773,28 @@ export default function HomePage({
           <h1 className={styles.togetherValue}>
             {new Intl.NumberFormat("ko-KR").format(togetherDays)}일
           </h1>
-          <p className={styles.togetherDate}>2026.07.11 ~ 오늘</p>
+          <p className={styles.togetherDate}>2024.11.02 ~ 오늘</p>
         </div>
 
-        <button
-          type="button"
-          className={styles.refreshButton}
-          aria-label="홈 새로고침"
-          title="새로고침"
-          disabled={refreshing}
-          onClick={() => void handleManualRefresh()}
-        >
-          <span aria-hidden="true" className={refreshing ? styles.refreshing : ""}>↻</span>
-        </button>
+        <div className={styles.headerVisual}>
+          <img
+            className={styles.couplePhoto}
+            src="/splash-photo.jpg"
+            alt=""
+            aria-hidden="true"
+          />
+
+          <button
+            type="button"
+            className={styles.refreshButton}
+            aria-label="홈 새로고침"
+            title="새로고침"
+            disabled={refreshing}
+            onClick={() => void handleManualRefresh()}
+          >
+            <span aria-hidden="true" className={refreshing ? styles.refreshing : ""}>↻</span>
+          </button>
+        </div>
       </header>
 
       <section className={styles.summaryCard}>
