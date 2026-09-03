@@ -983,3 +983,11 @@
 
   cursor: pointer;
 }
+
+/* v2.2.16 - 종목 검색 결과를 더 많이 보여주되 화면 안에서 스크롤 */
+.searchPanel {
+  max-height: min(58dvh, 560px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
