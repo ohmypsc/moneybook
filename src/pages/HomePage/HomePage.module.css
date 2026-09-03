@@ -29,14 +29,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
+  gap: 24px;
   min-width: 0;
 }
 
 .homePhoto {
-  width: 58px;
-  height: 58px;
-  flex: 0 0 58px;
+  width: 72px;
+  height: 72px;
+  flex: 0 0 72px;
   border: 1px solid rgba(126, 155, 158, 0.42);
   border-radius: 18px;
   object-fit: cover;
@@ -218,12 +218,14 @@
 @media (max-width: 390px) {
   .page { padding-right: 14px; padding-left: 14px; }
   .header { min-height: 126px; padding: 20px 16px 18px; }
-  .togetherBlock { gap: 13px; }
+  .togetherBlock {
+    gap: 20px;
+  }
   .homePhoto {
-    width: 52px;
-    height: 52px;
-    flex-basis: 52px;
-    border-radius: 16px;
+    width: 68px;
+    height: 68px;
+    flex-basis: 68px;
+    border-radius: 18px;
   }
   .summaryCard { padding: 16px; }
   .summaryRow strong { font-size: 15px; }
