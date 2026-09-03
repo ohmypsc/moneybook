@@ -7,7 +7,10 @@ import {
 } from "react";
 
 import { apiRequest } from "../../api/client";
-import { getBootstrapCacheGeneration } from "../../api/bootstrapCache";
+import {
+  getBootstrapCacheGeneration,
+  getCachedBootstrapPayload
+} from "../../api/bootstrapCache";
 import { createTransaction } from "../../api/transactions";
 import {
   applyAccountPreferences,
@@ -104,6 +107,31 @@ interface PickerItem {
 let bootstrapPromise: Promise<BootstrapData> | null = null;
 let bootstrapPromiseGeneration = -1;
 let bootstrapSnapshot: BootstrapData | null = null;
+let bootstrapSnapshotGeneration = -1;
+
+function getInitialBootstrapSnapshot() {
+  const generation = getBootstrapCacheGeneration();
+
+  if (
+    bootstrapSnapshot &&
+    bootstrapSnapshotGeneration === generation
+  ) {
+    return bootstrapSnapshot;
+  }
+
+  const cached =
+    getCachedBootstrapPayload<BootstrapResponse>();
+
+  if (cached?.success && cached.data) {
+    bootstrapSnapshot = cached.data;
+    bootstrapSnapshotGeneration = generation;
+    return cached.data;
+  }
+
+  bootstrapSnapshot = null;
+  bootstrapSnapshotGeneration = generation;
+  return null;
+}
 
 async function loadBootstrap(): Promise<BootstrapData> {
   const generation = getBootstrapCacheGeneration();
@@ -129,6 +157,7 @@ async function loadBootstrap(): Promise<BootstrapData> {
         }
 
         bootstrapSnapshot = response.data;
+        bootstrapSnapshotGeneration = requestGeneration;
         return response.data;
       })
       .catch(error => {
@@ -273,7 +302,7 @@ export default function InputPage({
   ] =
     useState<BootstrapData | null>(
       () =>
-        bootstrapSnapshot
+        getInitialBootstrapSnapshot()
     );
 
   const [
@@ -282,7 +311,7 @@ export default function InputPage({
   ] =
     useState(
       () =>
-        bootstrapSnapshot ===
+        getInitialBootstrapSnapshot() ===
         null
     );
 
