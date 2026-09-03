@@ -11,6 +11,10 @@ const SESSION_MAX_AGE = 60 * 60 * 24 * 400;
 const BOOTSTRAP_TTL_MS = 5 * 60 * 1000;
 const DASHBOARD_TTL_MS = 30 * 1000;
 const BACKEND_WARM_INTERVAL_MS = 2 * 60 * 1000;
+const SYMBOL_LOOKUP_TTL_MS = 24 * 60 * 60 * 1000;
+const SYMBOL_LOOKUP_MAX_ENTRIES = 200;
+const SYMBOL_SEARCH_TTL_MS = 6 * 60 * 60 * 1000;
+const SYMBOL_SEARCH_MAX_ENTRIES = 120;
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -29,6 +33,9 @@ let dashboardGeneration = 0;
 
 let lastAppsScriptActivityAt = 0;
 let warmPromise = null;
+
+const symbolLookupMemory = new Map();
+const symbolSearchMemory = new Map();
 
 const GET_ROUTES = {
   "/api/categories": {
@@ -2016,6 +2023,743 @@ async function handleInvestmentCashBaseline(
   );
 }
 
+function normalizeInvestmentLookupCode(value) {
+  const code = String(value || "")
+    .trim()
+    .toUpperCase();
+
+  if (!code) {
+    return "";
+  }
+
+  if (!/^[A-Z0-9.^_-]{1,24}$/.test(code)) {
+    return "";
+  }
+
+  return code;
+}
+
+function inferInvestmentMarket(code) {
+  return /^\d+$/.test(code)
+    ? "국내"
+    : "해외";
+}
+
+function normalizeYahooSymbol(symbol) {
+  return String(symbol || "")
+    .trim()
+    .toUpperCase();
+}
+
+function yahooBaseSymbol(symbol) {
+  return normalizeYahooSymbol(symbol)
+    .replace(/\.(KS|KQ)$/i, "");
+}
+
+function yahooQuoteName(quote) {
+  return String(
+    quote?.longname ||
+    quote?.shortname ||
+    quote?.displayName ||
+    ""
+  ).trim();
+}
+
+function scoreYahooQuote(quote, code) {
+  const symbol = normalizeYahooSymbol(
+    quote?.symbol
+  );
+
+  const base = yahooBaseSymbol(symbol);
+  const exchange = String(
+    quote?.exchange || ""
+  ).toUpperCase();
+  const quoteType = String(
+    quote?.quoteType || ""
+  ).toUpperCase();
+
+  let score = 0;
+
+  if (symbol === code) score += 100;
+  if (base === code) score += 90;
+
+  if (
+    /^\d+$/.test(code) &&
+    (exchange === "KSC" ||
+      exchange === "KOE" ||
+      /\.(KS|KQ)$/.test(symbol))
+  ) {
+    score += 30;
+  }
+
+  if (
+    [
+      "EQUITY",
+      "ETF",
+      "MUTUALFUND",
+      "FUND"
+    ].includes(quoteType)
+  ) {
+    score += 15;
+  }
+
+  if (yahooQuoteName(quote)) {
+    score += 5;
+  }
+
+  return score;
+}
+
+function chooseYahooQuote(quotes, code) {
+  return (Array.isArray(quotes) ? quotes : [])
+    .filter(quote => yahooQuoteName(quote))
+    .map(quote => ({
+      quote,
+      score: scoreYahooQuote(quote, code)
+    }))
+    .filter(item => item.score > 0)
+    .sort((a, b) => b.score - a.score)[0]
+    ?.quote || null;
+}
+
+async function fetchYahooSymbolSearch(query) {
+  const endpoint = new URL(
+    "https://query1.finance.yahoo.com/v1/finance/search"
+  );
+
+  endpoint.searchParams.set("q", query);
+  endpoint.searchParams.set("quotesCount", "8");
+  endpoint.searchParams.set("newsCount", "0");
+  endpoint.searchParams.set("listsCount", "0");
+  endpoint.searchParams.set("lang", "ko-KR");
+  endpoint.searchParams.set("region", "KR");
+  endpoint.searchParams.set(
+    "enableFuzzyQuery",
+    "false"
+  );
+
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(),
+    3500
+  );
+
+  let response;
+
+  try {
+    response = await fetch(
+      endpoint.toString(),
+      {
+        headers: {
+          "Accept": "application/json",
+          "User-Agent":
+            "Mozilla/5.0 moneybook-symbol-lookup"
+        },
+        signal: controller.signal
+      }
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  if (!response.ok) {
+    return [];
+  }
+
+  const data = await response.json();
+  return Array.isArray(data?.quotes)
+    ? data.quotes
+    : [];
+}
+
+function rememberSymbolLookup(code, data) {
+  symbolLookupMemory.set(
+    code,
+    {
+      data,
+      expiresAt:
+        Date.now() + SYMBOL_LOOKUP_TTL_MS
+    }
+  );
+
+  if (
+    symbolLookupMemory.size >
+    SYMBOL_LOOKUP_MAX_ENTRIES
+  ) {
+    const oldestKey =
+      symbolLookupMemory.keys().next().value;
+
+    if (oldestKey) {
+      symbolLookupMemory.delete(oldestKey);
+    }
+  }
+}
+
+async function lookupInvestmentSymbol(code) {
+  const cached =
+    symbolLookupMemory.get(code);
+
+  if (
+    cached &&
+    cached.expiresAt > Date.now()
+  ) {
+    return cached.data;
+  }
+
+  const inferredMarket =
+    inferInvestmentMarket(code);
+
+  let quotes = [];
+
+  try {
+    quotes = await fetchYahooSymbolSearch(code);
+
+    let match = chooseYahooQuote(
+      quotes,
+      code
+    );
+
+    if (
+      !match &&
+      inferredMarket === "국내"
+    ) {
+      const fallbackResults =
+        await Promise.all([
+          fetchYahooSymbolSearch(`${code}.KS`),
+          fetchYahooSymbolSearch(`${code}.KQ`)
+        ]);
+
+      match = chooseYahooQuote(
+        fallbackResults.flat(),
+        code
+      );
+    }
+
+    if (match) {
+      const symbol = normalizeYahooSymbol(
+        match.symbol
+      );
+      const exchange = String(
+        match.exchange ||
+        match.exchDisp ||
+        ""
+      ).trim();
+
+      const domestic =
+        /^\d+$/.test(code) ||
+        /\.(KS|KQ)$/.test(symbol) ||
+        ["KSC", "KOE"].includes(
+          String(match.exchange || "")
+            .toUpperCase()
+        );
+
+      const result = {
+        found: true,
+        stockCode: code,
+        stockName: yahooQuoteName(match),
+        market: domestic ? "국내" : "해외",
+        symbol,
+        exchange,
+        source: "yahoo-finance"
+      };
+
+      rememberSymbolLookup(code, result);
+      return result;
+    }
+  } catch {
+    // 외부 조회 실패는 매매 기록 자체를 막지 않는다.
+  }
+
+  const result = {
+    found: false,
+    stockCode: code,
+    stockName: "",
+    market: inferredMarket,
+    source: "fallback"
+  };
+
+  // 실패 결과는 짧게만 캐시해서 일시 장애가 오래 남지 않게 한다.
+  symbolLookupMemory.set(
+    code,
+    {
+      data: result,
+      expiresAt: Date.now() + 5 * 60 * 1000
+    }
+  );
+
+  return result;
+}
+
+async function handleInvestmentSymbolLookup(url) {
+  const code = normalizeInvestmentLookupCode(
+    url.searchParams.get("code")
+  );
+
+  if (!code) {
+    return errorResponse(
+      "INVALID_STOCK_CODE",
+      "종목코드 형식이 올바르지 않습니다.",
+      400
+    );
+  }
+
+  const data =
+    await lookupInvestmentSymbol(code);
+
+  return jsonResponse(
+    {
+      success: true,
+      data
+    },
+    200,
+    {
+      "Cache-Control":
+        data.found
+          ? "private, max-age=86400"
+          : "private, max-age=300"
+    }
+  );
+}
+
+function normalizeInvestmentSearchQuery(value) {
+  return String(value || "")
+    .normalize("NFKC")
+    .replace(/[\u0000-\u001f\u007f]/g, "")
+    .trim()
+    .slice(0, 60);
+}
+
+function applyKoreanFundAliases(value) {
+  let query = String(value || "");
+
+  const replacements = [
+    [/코덱스/gi, "KODEX"],
+    [/타이거/gi, "TIGER"],
+    [/에이스/gi, "ACE"],
+    [/라이즈/gi, "RISE"],
+    [/솔/gi, "SOL"],
+    [/플러스/gi, "PLUS"],
+    [/타임폴리오/gi, "TIMEFOLIO"]
+  ];
+
+  for (const [pattern, replacement] of replacements) {
+    query = query.replace(pattern, replacement);
+  }
+
+  return query;
+}
+
+function compactInvestmentSearchText(value) {
+  return String(value || "")
+    .normalize("NFKC")
+    .toUpperCase()
+    .replace(/\s+/g, "");
+}
+
+function normalizeKrxShortCode(value) {
+  const raw = String(value || "")
+    .trim()
+    .toUpperCase();
+
+  if (/^A\d{6}$/.test(raw)) {
+    return raw.slice(1);
+  }
+
+  return raw;
+}
+
+function krxFinderRows(data) {
+  if (Array.isArray(data?.block1)) return data.block1;
+  if (Array.isArray(data?.output)) return data.output;
+  return [];
+}
+
+async function fetchKrxFinder(query, bld, assetType) {
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(),
+    3500
+  );
+
+  const body = new URLSearchParams();
+  body.set("locale", "ko_KR");
+  body.set("mktsel", "ALL");
+  body.set("typeNo", "0");
+  body.set("searchText", query);
+  body.set("bld", bld);
+
+  let response;
+
+  try {
+    response = await fetch(
+      "https://data.krx.co.kr/comm/bldAttendant/getJsonData.cmd",
+      {
+        method: "POST",
+        headers: {
+          "Accept": "application/json, text/plain, */*",
+          "Content-Type":
+            "application/x-www-form-urlencoded; charset=UTF-8",
+          "Referer": "https://data.krx.co.kr/",
+          "User-Agent":
+            "Mozilla/5.0 moneybook-krx-symbol-search"
+        },
+        body: body.toString(),
+        signal: controller.signal
+      }
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  if (!response.ok) return [];
+
+  let data;
+
+  try {
+    data = await response.json();
+  } catch {
+    return [];
+  }
+
+  return krxFinderRows(data)
+    .map(row => {
+      const stockCode = normalizeKrxShortCode(
+        row?.short_code ||
+          row?.shortCode ||
+          row?.ISU_SRT_CD ||
+          row?.isuSrtCd ||
+          ""
+      );
+
+      const stockName = String(
+        row?.codeName ||
+          row?.isuNm ||
+          row?.ISU_NM ||
+          row?.ISU_ABBRV ||
+          ""
+      ).trim();
+
+      if (!stockCode || !stockName) return null;
+
+      return {
+        stockCode,
+        stockName,
+        market: "국내",
+        symbol: stockCode,
+        exchange: String(
+          row?.marketName ||
+            row?.marketEngName ||
+            row?.MKT_NM ||
+            "KRX"
+        ).trim(),
+        assetType,
+        source: "krx"
+      };
+    })
+    .filter(Boolean);
+}
+
+function yahooSearchItem(quote) {
+  const symbol = normalizeYahooSymbol(
+    quote?.symbol
+  );
+
+  const stockName = yahooQuoteName(quote);
+  const exchangeCode = String(
+    quote?.exchange || ""
+  ).toUpperCase();
+  const exchange = String(
+    quote?.exchDisp || quote?.exchange || ""
+  ).trim();
+  const quoteType = String(
+    quote?.quoteType || ""
+  ).toUpperCase();
+
+  if (!symbol || !stockName) return null;
+
+  if (
+    ![
+      "EQUITY",
+      "ETF",
+      "MUTUALFUND",
+      "FUND"
+    ].includes(quoteType)
+  ) {
+    return null;
+  }
+
+  const domestic =
+    /\.(KS|KQ)$/.test(symbol) ||
+    ["KSC", "KOE"].includes(exchangeCode);
+
+  const stockCode = domestic
+    ? yahooBaseSymbol(symbol)
+    : symbol;
+
+  return {
+    stockCode,
+    stockName,
+    market: domestic ? "국내" : "해외",
+    symbol,
+    exchange,
+    assetType:
+      quoteType === "ETF"
+        ? "ETF"
+        : quoteType === "EQUITY"
+          ? "주식"
+          : "펀드",
+    source: "yahoo-finance"
+  };
+}
+
+function scoreInvestmentSearchItem(item, query) {
+  const rawQuery = compactInvestmentSearchText(query);
+  const aliasedText = applyKoreanFundAliases(query);
+  const aliasQuery = compactInvestmentSearchText(
+    aliasedText
+  );
+  const name = compactInvestmentSearchText(
+    item.stockName
+  );
+  const code = compactInvestmentSearchText(
+    item.stockCode
+  );
+  const haystack = `${name}${code}`;
+
+  const tokenTerms = aliasedText
+    .split(/\s+/)
+    .map(compactInvestmentSearchText)
+    .filter(Boolean);
+
+  let score = item.source === "krx" ? 25 : 0;
+
+  for (const term of new Set([rawQuery, aliasQuery])) {
+    if (!term) continue;
+
+    if (code === term) score = Math.max(score, 220);
+    if (name === term) score = Math.max(score, 210);
+    if (name.startsWith(term)) score = Math.max(score, 180);
+    if (name.includes(term)) score = Math.max(score, 150);
+    if (code.startsWith(term)) score = Math.max(score, 140);
+    if (code.includes(term)) score = Math.max(score, 120);
+  }
+
+  if (
+    tokenTerms.length > 1 &&
+    tokenTerms.every(term => haystack.includes(term))
+  ) {
+    score = Math.max(score, 170);
+  }
+
+  return score;
+}
+
+function buildKrxSearchQueries(query) {
+  const full = applyKoreanFundAliases(query).trim();
+  const knownBrands = new Set([
+    "KODEX",
+    "TIGER",
+    "ACE",
+    "RISE",
+    "SOL",
+    "PLUS",
+    "TIMEFOLIO"
+  ]);
+
+  const tokens = full
+    .split(/\s+/)
+    .map(token => token.trim())
+    .filter(Boolean);
+
+  const fallbackToken = tokens
+    .filter(token => !knownBrands.has(token.toUpperCase()))
+    .sort((a, b) => b.length - a.length)[0];
+
+  return Array.from(
+    new Set(
+      [full, fallbackToken]
+        .filter(Boolean)
+    )
+  ).slice(0, 2);
+}
+
+function dedupeInvestmentSearchItems(items, query) {
+  const byKey = new Map();
+
+  for (const item of items) {
+    if (!item?.stockCode || !item?.stockName) continue;
+
+    const key = `${item.market}:${String(
+      item.stockCode
+    ).toUpperCase()}`;
+
+    const existing = byKey.get(key);
+
+    if (!existing) {
+      byKey.set(key, item);
+      continue;
+    }
+
+    // 동일 국내 종목이면 KRX의 한글 정식 종목명을 우선한다.
+    if (
+      existing.source !== "krx" &&
+      item.source === "krx"
+    ) {
+      byKey.set(key, item);
+    }
+  }
+
+  return Array.from(byKey.values())
+    .map(item => ({
+      item,
+      score: scoreInvestmentSearchItem(item, query)
+    }))
+    .filter(entry => entry.score > 0)
+    .sort((a, b) =>
+      b.score - a.score ||
+      a.item.stockName.localeCompare(
+        b.item.stockName,
+        "ko"
+      )
+    )
+    .slice(0, 12)
+    .map(entry => entry.item);
+}
+
+function rememberSymbolSearch(key, data) {
+  symbolSearchMemory.set(
+    key,
+    {
+      data,
+      expiresAt: Date.now() + SYMBOL_SEARCH_TTL_MS
+    }
+  );
+
+  if (
+    symbolSearchMemory.size >
+    SYMBOL_SEARCH_MAX_ENTRIES
+  ) {
+    const oldestKey =
+      symbolSearchMemory.keys().next().value;
+
+    if (oldestKey) {
+      symbolSearchMemory.delete(oldestKey);
+    }
+  }
+}
+
+async function searchInvestmentSymbols(query) {
+  const normalized = normalizeInvestmentSearchQuery(
+    query
+  );
+
+  if (!normalized) {
+    return { query: "", items: [] };
+  }
+
+  const cacheKey = normalized.toLocaleLowerCase("ko");
+  const cached = symbolSearchMemory.get(cacheKey);
+
+  if (
+    cached &&
+    cached.expiresAt > Date.now()
+  ) {
+    return cached.data;
+  }
+
+  const domesticQuery =
+    applyKoreanFundAliases(normalized);
+  const krxQueries = buildKrxSearchQueries(
+    normalized
+  );
+
+  const tasks = [
+    ...krxQueries.flatMap(krxQuery => [
+      fetchKrxFinder(
+        krxQuery,
+        "dbms/comm/finder/finder_stkisu",
+        "주식"
+      ),
+      fetchKrxFinder(
+        krxQuery,
+        "dbms/comm/finder/finder_secuprodisu",
+        "ETF·ETN"
+      )
+    ]),
+    fetchYahooSymbolSearch(domesticQuery).then(
+      quotes =>
+        quotes
+          .map(yahooSearchItem)
+          .filter(Boolean)
+    )
+  ];
+
+  const settled = await Promise.allSettled(tasks);
+  const combined = settled.flatMap(result =>
+    result.status === "fulfilled"
+      ? result.value
+      : []
+  );
+
+  const data = {
+    query: normalized,
+    items: dedupeInvestmentSearchItems(
+      combined,
+      normalized
+    )
+  };
+
+  // 외부 제공처가 모두 일시 실패한 경우에는 짧게만 캐시한다.
+  if (combined.length === 0) {
+    symbolSearchMemory.set(
+      cacheKey,
+      {
+        data,
+        expiresAt: Date.now() + 2 * 60 * 1000
+      }
+    );
+  } else {
+    rememberSymbolSearch(cacheKey, data);
+  }
+
+  return data;
+}
+
+async function handleInvestmentSymbolSearch(url) {
+  const query = normalizeInvestmentSearchQuery(
+    url.searchParams.get("q")
+  );
+
+  if (!query) {
+    return jsonResponse(
+      {
+        success: true,
+        data: {
+          query: "",
+          items: []
+        }
+      },
+      200,
+      {
+        "Cache-Control": "private, max-age=60"
+      }
+    );
+  }
+
+  const data = await searchInvestmentSymbols(query);
+
+  return jsonResponse(
+    {
+      success: true,
+      data
+    },
+    200,
+    {
+      "Cache-Control": "private, max-age=300"
+    }
+  );
+}
+
 async function handleBackendTest(
   env,
   session
@@ -2221,6 +2965,28 @@ export default {
         !session
       ) {
         return unauthorized();
+      }
+
+      if (
+        request.method ===
+          "GET" &&
+        url.pathname ===
+          "/api/investments/symbol-search"
+      ) {
+        return handleInvestmentSymbolSearch(
+          url
+        );
+      }
+
+      if (
+        request.method ===
+          "GET" &&
+        url.pathname ===
+          "/api/investments/symbol-lookup"
+      ) {
+        return handleInvestmentSymbolLookup(
+          url
+        );
       }
 
       if (
