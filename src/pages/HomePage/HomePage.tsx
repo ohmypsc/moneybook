@@ -140,9 +140,9 @@ function formatMonth(
 
 
 const TOGETHER_START = {
-  year: 2024,
-  monthIndex: 10,
-  day: 2
+  year: 2026,
+  monthIndex: 6,
+  day: 11
 };
 
 function getTogetherDays() {
@@ -244,15 +244,6 @@ export default function HomePage({
     );
 
 
-  const [
-    refreshing,
-    setRefreshing
-  ] =
-    useState(
-      false
-    );
-
-
   async function loadDashboard() {
     const cachedDashboard =
       getDashboardSnapshot();
@@ -315,66 +306,6 @@ export default function HomePage({
 
     } finally {
       setLoading(
-        false
-      );
-    }
-  }
-
-
-  async function handleManualRefresh() {
-    if (
-      refreshing
-    ) {
-      return;
-    }
-
-    setRefreshing(
-      true
-    );
-
-    try {
-      const data =
-        await getDashboard(
-          undefined,
-          {
-            forceRefresh:
-              true
-          }
-        );
-
-      setDashboard(
-        data
-      );
-
-      clearLedgerDirty();
-
-      setErrorMessage(
-        ""
-      );
-
-    } catch (
-      error
-    ) {
-      if (
-        !dashboard
-      ) {
-        setErrorMessage(
-          error instanceof Error
-            ? error.message
-            : "가계부 데이터를 불러오지 못했습니다."
-        );
-
-        return;
-      }
-
-      window.alert(
-        error instanceof Error
-          ? error.message
-          : "새로고침에 실패했습니다."
-      );
-
-    } finally {
-      setRefreshing(
         false
       );
     }
@@ -768,33 +699,23 @@ export default function HomePage({
   return (
     <main className={styles.page}>
       <header className={styles.header}>
-        <div>
-          <p className={styles.togetherLabel}>함께한 지</p>
-          <h1 className={styles.togetherValue}>
-            {new Intl.NumberFormat("ko-KR").format(togetherDays)}일
-          </h1>
-          <p className={styles.togetherDate}>2024.11.02 ~ 오늘</p>
-        </div>
-
-        <div className={styles.headerVisual}>
+        <div className={styles.togetherBlock}>
           <img
-            className={styles.couplePhoto}
             src="/splash-photo.jpg"
             alt=""
+            className={styles.homePhoto}
             aria-hidden="true"
           />
 
-          <button
-            type="button"
-            className={styles.refreshButton}
-            aria-label="홈 새로고침"
-            title="새로고침"
-            disabled={refreshing}
-            onClick={() => void handleManualRefresh()}
-          >
-            <span aria-hidden="true" className={refreshing ? styles.refreshing : ""}>↻</span>
-          </button>
+          <div>
+            <p className={styles.togetherLabel}>함께한 지</p>
+            <h1 className={styles.togetherValue}>
+              {new Intl.NumberFormat("ko-KR").format(togetherDays)}일
+            </h1>
+            <p className={styles.togetherDate}>2026.07.11 ~ 오늘</p>
+          </div>
         </div>
+
       </header>
 
       <section className={styles.summaryCard}>
