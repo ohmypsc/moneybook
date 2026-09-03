@@ -24,18 +24,6 @@ import styles
   from "./HomePage.module.css";
 
 
-interface DashboardSummary {
-  assets: number;
-  liabilities: number;
-  netWorth: number;
-  investmentValue: number;
-  cashLikeValue: number;
-  monthIncome: number;
-  monthExpense: number;
-  monthNetCashFlow: number;
-}
-
-
 interface DashboardAccount {
   accountId: string;
   displayName: string;
@@ -60,14 +48,9 @@ interface DashboardCardView
 }
 
 
-interface SpendingSummary {
-  name: string;
-  amount: number;
-}
-
-
-type HomePageProps =
-  Record<string, unknown>;
+type HomePageProps = {
+  onOpenHistory?: () => void;
+};
 
 
 function formatWon(
@@ -155,9 +138,59 @@ function formatMonth(
 }
 
 
-export default function HomePage(
-  _props: HomePageProps
-) {
+
+const TOGETHER_START = {
+  year: 2026,
+  monthIndex: 6,
+  day: 11
+};
+
+function getTogetherDays() {
+  const now = new Date();
+  const todayUtc = Date.UTC(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate()
+  );
+  const startUtc = Date.UTC(
+    TOGETHER_START.year,
+    TOGETHER_START.monthIndex,
+    TOGETHER_START.day
+  );
+  const difference = Math.floor(
+    (todayUtc - startUtc) / 86400000
+  );
+
+  return Math.max(1, difference + 1);
+}
+
+function formatShortDate(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return value;
+  return `${Number(match[2])}.${Number(match[3])}`;
+}
+
+function getRecentTitle(transaction: DashboardData["recentTransactions"][number]) {
+  return transaction.memo || transaction.category || transaction.type;
+}
+
+function getRecentMeta(transaction: DashboardData["recentTransactions"][number]) {
+  if (transaction.type === "수입") {
+    return transaction.toAccount || "입금";
+  }
+
+  if (transaction.type === "이체") {
+    const from = transaction.fromAccount || "출금";
+    const to = transaction.toAccount || "입금";
+    return `${from} → ${to}`;
+  }
+
+  return transaction.paymentMethod || transaction.fromAccount || transaction.category || "지출";
+}
+
+export default function HomePage({
+  onOpenHistory
+}: HomePageProps) {
   const [
     needsInitialRefresh
   ] =
@@ -603,77 +636,6 @@ export default function HomePage(
     );
 
 
-  const spendingTargets =
-    useMemo(
-      () => {
-        if (
-          !dashboard
-        ) {
-          return [];
-        }
-
-
-        const rows =
-          (
-            Array.isArray(
-              dashboard
-                .spendingTargetExpense
-            )
-              ? dashboard
-                  .spendingTargetExpense
-              : []
-          )
-            .filter(
-              item =>
-                Number(
-                  item.amount
-                ) > 0
-            );
-
-
-        const total =
-          rows.reduce(
-            (
-              sum,
-              item
-            ) =>
-              sum +
-              (
-                Number(
-                  item.amount
-                ) ||
-                0
-              ),
-            0
-          );
-
-
-        return rows.map(
-          item => ({
-            ...item,
-
-            ratio:
-              total > 0
-                ? Math.min(
-                    100,
-                    (
-                      Number(
-                        item.amount
-                      ) /
-                      total
-                    ) *
-                    100
-                  )
-                : 0
-          })
-        );
-      },
-      [
-        dashboard
-      ]
-    );
-
-
   if (
     loading
   ) {
@@ -796,423 +758,132 @@ export default function HomePage(
     monthIncome,
     monthExpense,
     monthNetCashFlow
-  } =
-    dashboard.summary;
+  } = dashboard.summary;
 
+  const togetherDays = getTogetherDays();
+  const recentTransactions = Array.isArray(dashboard.recentTransactions)
+    ? dashboard.recentTransactions.slice(0, 5)
+    : [];
 
   return (
-    <main
-      className={
-        styles.page
-      }
-    >
-      <header
-        className={
-          styles.header
-        }
-        style={{
-          position:
-            "relative"
-        }}
-      >
-        <p
-          className={
-            styles.monthLabel
-          }
-        >
-          이번 달
-        </p>
-
-        <h1>
-          {
-            formatMonth(
-              dashboard.month
-            )
-          }
-        </h1>
+    <main className={styles.page}>
+      <header className={styles.header}>
+        <div>
+          <p className={styles.togetherLabel}>함께한 지</p>
+          <h1 className={styles.togetherValue}>
+            {new Intl.NumberFormat("ko-KR").format(togetherDays)}일
+          </h1>
+          <p className={styles.togetherDate}>2026.07.11 ~ 오늘</p>
+        </div>
 
         <button
           type="button"
+          className={styles.refreshButton}
           aria-label="홈 새로고침"
           title="새로고침"
-          disabled={
-            refreshing
-          }
-          onClick={
-            () =>
-              void handleManualRefresh()
-          }
-          style={{
-            position:
-              "absolute",
-
-            top: 0,
-            right: 0,
-
-            width:
-              "36px",
-
-            height:
-              "36px",
-
-            display:
-              "grid",
-
-            placeItems:
-              "center",
-
-            padding: 0,
-
-            border:
-              "1px solid var(--color-border)",
-
-            borderRadius:
-              "var(--radius-md)",
-
-            background:
-              "var(--color-surface)",
-
-            color:
-              "var(--color-text-secondary)",
-
-            font:
-              "inherit",
-
-            fontSize:
-              "18px",
-
-            fontWeight:
-              700,
-
-            cursor:
-              refreshing
-                ? "default"
-                : "pointer",
-
-            opacity:
-              refreshing
-                ? 0.55
-                : 1
-          }}
+          disabled={refreshing}
+          onClick={() => void handleManualRefresh()}
         >
-          <span
-            aria-hidden="true"
-            style={{
-              display:
-                "block",
-
-              transform:
-                refreshing
-                  ? "rotate(180deg)"
-                  : "rotate(0deg)",
-
-              transition:
-                "transform 180ms ease"
-            }}
-          >
-            ↻
-          </span>
+          <span aria-hidden="true" className={refreshing ? styles.refreshing : ""}>↻</span>
         </button>
       </header>
 
-
-      <section
-        className={
-          styles.summaryCard
-        }
-      >
-        <div
-          className={
-            styles.primarySummary
-          }
-        >
-          <span
-            className={
-              styles.summaryLabel
-            }
-          >
-            지출
-          </span>
-
-          <strong
-            className={
-              styles.expenseAmount
-            }
-          >
-            {
-              formatWon(
-                monthExpense
-              )
-            }
-          </strong>
+      <section className={styles.summaryCard}>
+        <div className={styles.summaryHeader}>
+          <h2>이번 달 요약</h2>
+          <span>{formatMonth(dashboard.month)}</span>
         </div>
 
-
-        <div
-          className={
-            styles.summaryDivider
-          }
-        />
-
-
-        <div
-          className={
-            styles.summaryGrid
-          }
-        >
-          <div
-            className={
-              styles.summaryItem
-            }
-          >
-            <span>
-              수입
-            </span>
-
-            <strong>
-              {
-                formatWon(
-                  monthIncome
-                )
-              }
-            </strong>
+        <div className={styles.summaryRows}>
+          <div className={styles.summaryRow}>
+            <span className={styles.summaryLabel}>수입</span>
+            <strong className={styles.incomeAmount}>{formatWon(monthIncome)}</strong>
           </div>
-
-
-          <div
-            className={
-              styles.summaryItem
-            }
-          >
-            <span>
-              차액
-            </span>
-
-            <strong>
-              {
-                formatSignedWon(
-                  monthNetCashFlow
-                )
-              }
+          <div className={styles.summaryRow}>
+            <span className={styles.summaryLabel}>지출</span>
+            <strong className={styles.expenseAmount}>{formatWon(monthExpense)}</strong>
+          </div>
+          <div className={styles.summaryRow}>
+            <span className={styles.summaryLabel}>남은 금액</span>
+            <strong className={monthNetCashFlow < 0 ? styles.negativeAmount : styles.netAmount}>
+              {formatSignedWon(monthNetCashFlow)}
             </strong>
           </div>
         </div>
       </section>
 
-
-      <section
-        className={
-          styles.section
-        }
-      >
-        <div
-          className={
-            styles.sectionHeader
-          }
-        >
-          <h2>
-            카드 결제 예정
-          </h2>
-
-          <strong
-            className={
-              styles.sectionTotal
-            }
-          >
-            {
-              formatWon(
-                cardSummary.total
-              )
-            }
-          </strong>
+      <section className={styles.section}>
+        <div className={styles.sectionHeader}>
+          <div>
+            <h2>카드 결제 예정</h2>
+            <span className={styles.sectionHint}>이번 달 남은 결제액</span>
+          </div>
+          <strong className={styles.sectionTotal}>{formatWon(cardSummary.total)}</strong>
         </div>
 
-
-        <div
-          className={
-            styles.cardList
-          }
-        >
-          {
-            cardSummary.cards
-              .length >
-            0
-              ? (
-                  cardSummary.cards
-                    .map(
-                      card => (
-                        <div
-                          key={
-                            card.accountId
-                          }
-                          className={
-                            styles.cardRow
-                          }
-                        >
-                          <div
-                            className={
-                              styles.cardName
-                            }
-                          >
-                            <span
-                              className={
-                                styles.cardIcon
-                              }
-                              aria-hidden="true"
-                            >
-                              ₩
-                            </span>
-
-                            <div>
-                              <strong>
-                                {
-                                  card.name
-                                }
-                              </strong>
-
-                              <span>
-                                {
-                                  card.paymentDay
-                                    ? `${card.paymentDay}일 결제`
-                                    : "결제일 미설정"
-                                }
-                              </span>
-                            </div>
-                          </div>
-
-                          <strong
-                            className={
-                              styles.cardAmount
-                            }
-                          >
-                            {
-                              formatWon(
-                                card
-                                  .estimatedRemaining
-                              )
-                            }
-                          </strong>
-                        </div>
-                      )
-                    )
-                )
-              : (
-                  <p
-                    className={
-                      styles.emptyText
-                    }
-                  >
-                    이번 달 결제 예정액이 없습니다.
-                  </p>
-                )
-          }
+        <div className={styles.cardList}>
+          {cardSummary.cards.length > 0 ? (
+            cardSummary.cards.map(card => (
+              <div key={card.accountId} className={styles.cardRow}>
+                <div className={styles.cardName}>
+                  <span className={styles.cardIcon} aria-hidden="true">₩</span>
+                  <div>
+                    <strong>{card.name}</strong>
+                    <span>
+                      {card.paymentDay ? `${card.paymentDay}일 결제` : "결제일 미설정"}
+                    </span>
+                  </div>
+                </div>
+                <strong className={styles.cardAmount}>
+                  {formatWon(card.estimatedRemaining)}
+                </strong>
+              </div>
+            ))
+          ) : (
+            <p className={styles.emptyText}>이번 달 결제 예정액이 없습니다.</p>
+          )}
         </div>
       </section>
 
-
-      <section
-        className={
-          styles.section
-        }
-      >
-        <div
-          className={
-            styles.sectionHeader
-          }
-        >
-          <h2>
-            지출대상
-          </h2>
+      <section className={styles.section}>
+        <div className={styles.sectionHeader}>
+          <div>
+            <h2>최근 내역</h2>
+            <span className={styles.sectionHint}>최근 기록 5건</span>
+          </div>
+          {onOpenHistory && (
+            <button type="button" className={styles.sectionLink} onClick={onOpenHistory}>
+              더보기
+            </button>
+          )}
         </div>
 
+        <div className={styles.recentList}>
+          {recentTransactions.length > 0 ? (
+            recentTransactions.map(transaction => {
+              const amountClass = transaction.type === "수입"
+                ? styles.recentIncome
+                : transaction.type === "지출"
+                  ? styles.recentExpense
+                  : styles.recentTransfer;
+              const prefix = transaction.type === "수입" ? "+" : transaction.type === "지출" ? "-" : "";
 
-        <div
-          className={
-            styles.targetCard
-          }
-        >
-          {
-            spendingTargets
-              .length >
-            0
-              ? (
-                  spendingTargets
-                    .map(
-                      target => (
-                        <div
-                          key={
-                            target.name
-                          }
-                          className={
-                            styles.targetRow
-                          }
-                        >
-                          <div
-                            className={
-                              styles.targetTop
-                            }
-                          >
-                            <strong>
-                              {
-                                target.name
-                              }
-                            </strong>
-
-                            <div
-                              className={
-                                styles.targetNumbers
-                              }
-                            >
-                              <span>
-                                {
-                                  Math.round(
-                                    target.ratio
-                                  )
-                                }
-                                %
-                              </span>
-
-                              <strong>
-                                {
-                                  formatWon(
-                                    target.amount
-                                  )
-                                }
-                              </strong>
-                            </div>
-                          </div>
-
-
-                          <div
-                            className={
-                              styles.progressTrack
-                            }
-                            aria-hidden="true"
-                          >
-                            <div
-                              className={
-                                styles.progressBar
-                              }
-                              style={{
-                                width:
-                                  `${target.ratio}%`
-                              }}
-                            />
-                          </div>
-                        </div>
-                      )
-                    )
-                )
-              : (
-                  <p
-                    className={
-                      styles.emptyText
-                    }
-                  >
-                    이번 달 지출 기록이 없습니다.
-                  </p>
-                )
-          }
+              return (
+                <div key={transaction.transactionId} className={styles.recentRow}>
+                  <span className={styles.recentDate}>{formatShortDate(transaction.date)}</span>
+                  <div className={styles.recentText}>
+                    <strong>{getRecentTitle(transaction)}</strong>
+                    <span>{getRecentMeta(transaction)}</span>
+                  </div>
+                  <strong className={`${styles.recentAmount} ${amountClass}`}>
+                    {prefix}{formatWon(transaction.amount)}
+                  </strong>
+                </div>
+              );
+            })
+          ) : (
+            <p className={styles.emptyText}>최근 거래가 없습니다.</p>
+          )}
         </div>
       </section>
     </main>
