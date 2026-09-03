@@ -55,6 +55,34 @@ function formatCurrency(
 }
 
 
+function formatCompactCurrency(
+  value: number | undefined | null
+) {
+  if (
+    value === undefined ||
+    value === null ||
+    !Number.isFinite(value)
+  ) {
+    return "-";
+  }
+
+  const sign = value < 0 ? "-" : "";
+  const absolute = Math.abs(value);
+
+  if (absolute >= 100000000) {
+    const billions = absolute / 100000000;
+    const digits = billions >= 10 ? 1 : 2;
+    return `${sign}${billions.toFixed(digits).replace(/\.0+$|(?<=\.[0-9])0+$/, "")}억`;
+  }
+
+  if (absolute >= 10000000) {
+    return `${sign}${(absolute / 10000).toFixed(0)}만`;
+  }
+
+  return `${sign}${Math.round(absolute).toLocaleString("ko-KR")}원`;
+}
+
+
 function formatSignedCurrency(
   value:
     number |
@@ -692,26 +720,8 @@ export default function AssetsPage() {
         styles.page
       }
     >
-      <header
-        className={
-          styles.header
-        }
-      >
-        <p
-          className={
-            styles.eyebrow
-          }
-        >
-          자산
-        </p>
-
-        <h1
-          className={
-            styles.title
-          }
-        >
-          우리 가계부 자산
-        </h1>
+      <header className={styles.header}>
+        <h1 className={styles.title}>자산</h1>
       </header>
 
 
@@ -746,90 +756,28 @@ export default function AssetsPage() {
         {!loading &&
           !error &&
           summary && (
-            <div
-              className={
-                styles.summaryGrid
-              }
-            >
-              <div
-                className={
-                  styles.summaryItem
-                }
+            <div className={styles.summaryHero}>
+              <span className={styles.summaryHeroLabel}>순자산</span>
+              <strong
+                className={`${styles.summaryHeroValue} ${summary.netWorth < 0 ? styles.summaryHeroNegative : ""}`}
+                title={formatCurrency(summary.netWorth)}
               >
-                <span
-                  className={
-                    styles.summaryLabel
-                  }
-                >
-                  총자산
-                </span>
+                {formatCompactCurrency(summary.netWorth)}
+              </strong>
 
-                <strong
-                  className={
-                    styles.summaryValue
-                  }
-                >
-                  {formatCurrency(
-                    summary.assets
-                  )}
-                </strong>
-              </div>
-
-
-              <div
-                className={
-                  styles.summaryItem
-                }
-              >
-                <span
-                  className={
-                    styles.summaryLabel
-                  }
-                >
-                  총부채
-                </span>
-
-                <strong
-                  className={
-                    styles.summaryValue
-                  }
-                >
-                  {formatCurrency(
-                    summary.liabilities
-                  )}
-                </strong>
-              </div>
-
-
-              <div
-                className={
-                  styles.summaryItem
-                }
-              >
-                <span
-                  className={
-                    styles.summaryLabel
-                  }
-                >
-                  순자산
-                </span>
-
-                <strong
-                  className={
-                    styles.summaryValue
-                  }
-                  style={{
-                    color:
-                      summary.netWorth <
-                      0
-                        ? "var(--color-error)"
-                        : undefined
-                  }}
-                >
-                  {formatCurrency(
-                    summary.netWorth
-                  )}
-                </strong>
+              <div className={styles.summarySecondary}>
+                <div>
+                  <span>총자산</span>
+                  <strong title={formatCurrency(summary.assets)}>
+                    {formatCompactCurrency(summary.assets)}
+                  </strong>
+                </div>
+                <div>
+                  <span>총부채</span>
+                  <strong title={formatCurrency(summary.liabilities)}>
+                    {formatCompactCurrency(summary.liabilities)}
+                  </strong>
+                </div>
               </div>
             </div>
           )}
@@ -905,13 +853,7 @@ export default function AssetsPage() {
             styles.section
           }
         >
-          <h2
-            className={
-              styles.sectionTitle
-            }
-          >
-            현금성자산
-          </h2>
+          <h2 className={styles.sectionTitle}>현금성자산</h2>
 
 
           {!loading &&
@@ -926,7 +868,7 @@ export default function AssetsPage() {
                     styles.summaryLabel
                   }
                 >
-                  현금성자산 합계
+                  합계
                 </span>
 
                 <strong
@@ -1084,7 +1026,7 @@ export default function AssetsPage() {
                       styles.summaryLabel
                     }
                   >
-                    투자자산 합계
+                    합계
                   </span>
 
                   <strong
