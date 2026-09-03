@@ -1,746 +1,253 @@
-/* =========================================================
- * HomePage
- * =========================================================
- */
-
 .page {
   width: 100%;
   max-width: var(--content-width);
-
   min-height: 100vh;
   min-height: 100dvh;
-
   margin: 0 auto;
-
-  padding:
-    28px
-    18px
-    calc(
-      110px +
-      env(safe-area-inset-bottom)
-    );
+  padding: 22px 18px calc(110px + env(safe-area-inset-bottom));
 }
-
-
-/* =========================================================
- * 헤더
- * =========================================================
- */
 
 .header {
-  margin-bottom: var(--space-5);
-}
-
-
-.monthLabel {
-  margin:
-    0
-    0
-    var(--space-1);
-
-  color:
-    var(
-      --color-text-secondary
-    );
-
-  font-size: 13px;
-  font-weight: 700;
-}
-
-
-.header h1 {
-  margin: 0;
-
-  font-size: 28px;
-  line-height: 1.25;
-
-  letter-spacing: -0.03em;
-}
-
-
-/* =========================================================
- * 월간 요약
- * =========================================================
- */
-
-.summaryCard {
-  padding: 22px;
-
-  background:
-    var(
-      --color-surface
-    );
-
-  border:
-    1px
-    solid
-    var(
-      --color-border
-    );
-
-  border-radius:
-    var(
-      --radius-lg
-    );
-
-  box-shadow:
-    var(
-      --shadow-card
-    );
-}
-
-
-.primarySummary {
+  position: relative;
+  min-height: 138px;
   display: flex;
-  flex-direction: column;
-
-  gap: var(--space-2);
-}
-
-
-.summaryLabel {
-  color:
-    var(
-      --color-text-secondary
-    );
-
-  font-size: 14px;
-  font-weight: 700;
-}
-
-
-.expenseAmount {
-  font-size: 30px;
-  line-height: 1.2;
-
-  letter-spacing: -0.04em;
-
-  font-variant-numeric:
-    tabular-nums;
-}
-
-
-.summaryDivider {
-  width: 100%;
-  height: 1px;
-
-  margin:
-    var(--space-5)
-    0;
-
-  background:
-    var(
-      --color-border
-    );
-}
-
-
-.summaryGrid {
-  display: grid;
-
-  grid-template-columns:
-    repeat(
-      2,
-      minmax(
-        0,
-        1fr
-      )
-    );
-
-  gap: var(--space-4);
-}
-
-
-.summaryItem {
-  min-width: 0;
-
-  display: flex;
-  flex-direction: column;
-
-  gap: var(--space-2);
-}
-
-
-.summaryItem span {
-  color:
-    var(
-      --color-text-secondary
-    );
-
-  font-size: 13px;
-  font-weight: 600;
-}
-
-
-.summaryItem strong {
-  overflow: hidden;
-
-  font-size: 16px;
-  line-height: 1.35;
-
-  letter-spacing: -0.02em;
-
-  text-overflow: ellipsis;
-  white-space: nowrap;
-
-  font-variant-numeric:
-    tabular-nums;
-}
-
-
-/* =========================================================
- * 공통 섹션
- * =========================================================
- */
-
-.section {
-  margin-top: 28px;
-}
-
-
-.sectionHeader {
-  min-height: 28px;
-
-  display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
-
-  gap: var(--space-3);
-
-  margin-bottom: var(--space-3);
-
-  padding:
-    0
-    2px;
-}
-
-
-.sectionHeader h2 {
-  margin: 0;
-
-  font-size: 17px;
-  line-height: 1.4;
-
-  letter-spacing: -0.02em;
-}
-
-
-.sectionTotal {
-  font-size: 15px;
-
-  font-variant-numeric:
-    tabular-nums;
-}
-
-
-/* =========================================================
- * 카드 결제 예정
- * =========================================================
- */
-
-.cardList {
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 24px 22px 20px;
   overflow: hidden;
-
+  border: 1px solid rgba(207, 222, 220, 0.86);
+  border-radius: var(--radius-xl);
   background:
-    var(
-      --color-surface
-    );
-
-  border:
-    1px
-    solid
-    var(
-      --color-border
-    );
-
-  border-radius:
-    var(
-      --radius-lg
-    );
+    radial-gradient(circle at 88% 16%, rgba(185, 216, 207, 0.68) 0 7%, transparent 7.5%),
+    radial-gradient(circle at 94% 39%, rgba(142, 169, 151, 0.36) 0 5%, transparent 5.5%),
+    linear-gradient(145deg, #f8fbfa 0%, #e9f2f2 100%);
 }
 
-
-.cardRow {
-  min-height: 68px;
-
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-
-  gap: var(--space-4);
-
-  padding:
-    14px
-    16px;
-
-  border-bottom:
-    1px
-    solid
-    var(
-      --color-border
-    );
-}
-
-
-.cardRow:last-child {
-  border-bottom: 0;
-}
-
-
-.cardName {
-  min-width: 0;
-
-  display: flex;
-  align-items: center;
-
-  gap: var(--space-3);
-}
-
-
-.cardIcon {
-  width: 34px;
-  height: 34px;
-
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-
-  flex:
-    0
-    0
-    34px;
-
+.header::after {
+  content: "";
+  position: absolute;
+  right: -22px;
+  bottom: -34px;
+  width: 126px;
+  height: 126px;
+  border: 1px solid rgba(71, 106, 132, 0.12);
   border-radius: 50%;
+}
 
-  background:
-    var(
-      --color-surface-soft
-    );
+.togetherLabel,
+.togetherDate {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
 
-  color:
-    var(
-      --color-text-secondary
-    );
+.togetherValue {
+  margin: 4px 0 5px;
+  color: var(--color-primary);
+  font-size: clamp(32px, 9vw, 42px);
+  line-height: 1;
+  letter-spacing: -0.045em;
+  font-variant-numeric: tabular-nums;
+}
 
-  font-size: 14px;
+.refreshButton {
+  position: relative;
+  z-index: 2;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 38px;
+  padding: 0;
+  border: 1px solid rgba(71, 106, 132, 0.16);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.74);
+  color: var(--color-primary);
+  font-size: 18px;
   font-weight: 800;
 }
 
+.refreshButton:disabled { opacity: 0.55; }
+.refreshing { display: block; animation: homeSpin 0.7s linear infinite; }
+@keyframes homeSpin { to { transform: rotate(360deg); } }
 
-.cardName div {
-  min-width: 0;
+.summaryCard {
+  padding: 18px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
 
+.summaryHeader {
   display: flex;
-  flex-direction: column;
-
-  gap: 3px;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
 }
 
+.summaryHeader h2 { margin: 0; font-size: 16px; }
+.summaryHeader span { color: var(--color-text-secondary); font-size: 12px; }
 
-.cardName strong {
-  overflow: hidden;
-
-  font-size: 14px;
-
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-
-.cardName div > span {
-  color:
-    var(
-      --color-text-secondary
-    );
-
-  font-size: 12px;
-}
-
-
-.cardAmount {
-  flex:
-    0
-    0
-    auto;
-
-  font-size: 14px;
-
-  font-variant-numeric:
-    tabular-nums;
-}
-
-
-/* =========================================================
- * 지출대상
- * =========================================================
- */
-
-.targetCard {
-  display: grid;
-
-  gap: 20px;
-
-  padding:
-    18px
-    16px;
-
-  background:
-    var(
-      --color-surface
-    );
-
-  border:
-    1px
-    solid
-    var(
-      --color-border
-    );
-
-  border-radius:
-    var(
-      --radius-lg
-    );
-}
-
-
-.targetRow {
-  display: grid;
-
-  gap: 9px;
-}
-
-
-.targetTop {
+.summaryRows { display: grid; }
+.summaryRow {
+  min-height: 47px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-
-  gap: var(--space-3);
+  gap: 16px;
+  border-top: 1px solid rgba(220, 229, 229, 0.72);
 }
-
-
-.targetTop > strong {
+.summaryRow:first-child { border-top: 0; }
+.summaryLabel { color: var(--color-text-secondary); font-size: 13px; font-weight: 700; }
+.summaryRow strong {
   min-width: 0;
-
-  overflow: hidden;
-
-  font-size: 14px;
-
-  text-overflow: ellipsis;
+  font-size: 16px;
+  line-height: 1.2;
+  text-align: right;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
+.incomeAmount { color: var(--color-income); }
+.expenseAmount { color: var(--color-expense); }
+.netAmount { color: var(--color-positive); }
+.negativeAmount { color: var(--color-error); }
 
-
-.targetNumbers {
-  flex:
-    0
-    0
-    auto;
-
+.section { margin-top: 26px; }
+.sectionHeader {
+  min-height: 34px;
   display: flex;
-  align-items: baseline;
-
-  gap: var(--space-2);
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 10px;
+  padding: 0 2px;
 }
+.sectionHeader > div { min-width: 0; display: grid; gap: 2px; }
+.sectionHeader h2 { margin: 0; font-size: 17px; letter-spacing: -0.02em; }
+.sectionHint { color: var(--color-text-secondary); font-size: 11px; }
+.sectionTotal { flex: 0 0 auto; font-size: 15px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
-
-.targetNumbers span {
-  color:
-    var(
-      --color-text-secondary
-    );
-
-  font-size: 12px;
-
-  font-variant-numeric:
-    tabular-nums;
-}
-
-
-.targetNumbers strong {
-  font-size: 14px;
-
-  font-variant-numeric:
-    tabular-nums;
-}
-
-
-.progressTrack {
-  width: 100%;
-  height: 8px;
-
+.cardList,
+.recentList {
   overflow: hidden;
-
-  border-radius: 999px;
-
-  background:
-    var(
-      --color-surface-soft
-    );
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
 }
 
-
-.progressBar {
-  height: 100%;
-
-  border-radius: inherit;
-
-  background:
-    var(
-      --color-primary
-    );
-
-  transition:
-    width
-    0.25s
-    ease;
+.cardRow,
+.recentRow {
+  min-height: 66px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 15px;
+  border-bottom: 1px solid rgba(220, 229, 229, 0.72);
 }
+.cardRow:last-child,
+.recentRow:last-child { border-bottom: 0; }
+.cardRow { justify-content: space-between; }
 
+.cardName { min-width: 0; display: flex; align-items: center; gap: 11px; }
+.cardIcon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 34px;
+  border-radius: 50%;
+  background: var(--color-surface-blue);
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 800;
+}
+.cardName div { min-width: 0; display: grid; gap: 3px; }
+.cardName strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.cardName span { color: var(--color-text-secondary); font-size: 11px; }
+.cardAmount { flex: 0 0 auto; font-size: 14px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
-/* =========================================================
- * 빈 상태
- * =========================================================
- */
+.recentDate {
+  width: 32px;
+  flex: 0 0 32px;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.recentText { min-width: 0; flex: 1 1 auto; display: grid; gap: 3px; }
+.recentText strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.recentText span { overflow: hidden; color: var(--color-text-secondary); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.recentAmount { flex: 0 0 auto; font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.recentIncome { color: var(--color-income); }
+.recentExpense { color: var(--color-text); }
+.recentTransfer { color: var(--color-text-secondary); }
 
 .emptyText {
   margin: 0;
-
-  padding:
-    20px
-    16px;
-
-  color:
-    var(
-      --color-text-secondary
-    );
-
+  padding: 20px 16px;
+  color: var(--color-text-secondary);
   font-size: 13px;
   line-height: 1.5;
-
   text-align: center;
 }
 
-
-/* =========================================================
- * 로딩
- * =========================================================
- */
-
-.loadingCard {
-  padding: 22px;
-
-  background:
-    var(
-      --color-surface
-    );
-
-  border:
-    1px
-    solid
-    var(
-      --color-border
-    );
-
-  border-radius:
-    var(
-      --radius-lg
-    );
-}
-
-
-.loadingLineShort,
-.loadingLineLong,
-.loadingGrid div {
-  border-radius:
-    var(
-      --radius-sm
-    );
-
-  background:
-    var(
-      --color-surface-soft
-    );
-}
-
-
-.loadingLineShort {
-  width: 72px;
-  height: 14px;
-}
-
-
-.loadingLineLong {
-  width: 180px;
-  max-width: 70%;
-  height: 30px;
-
-  margin-top:
-    var(
-      --space-3
-    );
-}
-
-
-.loadingGrid {
-  display: grid;
-
-  grid-template-columns:
-    repeat(
-      2,
-      minmax(
-        0,
-        1fr
-      )
-    );
-
-  gap: var(--space-4);
-
-  margin-top:
-    var(
-      --space-6
-    );
-}
-
-
-.loadingGrid div {
-  height: 48px;
-}
-
-
-/* =========================================================
- * 오류
- * =========================================================
- */
-
+.loadingCard,
 .errorCard {
   padding: 20px;
-
-  background:
-    var(
-      --color-surface
-    );
-
-  border:
-    1px
-    solid
-    var(
-      --color-border
-    );
-
-  border-radius:
-    var(
-      --radius-lg
-    );
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
 }
-
-
-.errorCard p {
-  margin: 0;
-
-  color:
-    var(
-      --color-error
-    );
-
-  font-size: 14px;
-  line-height: 1.6;
-}
-
-
+.loadingLineShort,
+.loadingLineLong,
+.loadingGrid div { border-radius: var(--radius-sm); background: var(--color-surface-soft); }
+.loadingLineShort { width: 72px; height: 14px; }
+.loadingLineLong { width: 180px; max-width: 70%; height: 30px; margin-top: 12px; }
+.loadingGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 24px; }
+.loadingGrid div { height: 48px; }
+.errorCard p { margin: 0; color: var(--color-error); font-size: 14px; line-height: 1.6; }
 .retryButton {
   width: 100%;
   min-height: 46px;
-
-  margin-top:
-    var(
-      --space-4
-    );
-
-  padding:
-    0
-    16px;
-
+  margin-top: 16px;
+  padding: 0 16px;
   border: 0;
-
-  border-radius:
-    var(
-      --radius-md
-    );
-
-  background:
-    var(
-      --color-primary
-    );
-
-  color:
-    var(
-      --color-primary-text
-    );
-
+  border-radius: var(--radius-md);
+  background: var(--color-primary);
+  color: var(--color-primary-text);
   font: inherit;
   font-weight: 700;
-
-  cursor: pointer;
 }
 
+/* 로딩/오류 화면의 기존 헤더 클래스 호환 */
+.monthLabel { margin: 0 0 4px; color: var(--color-text-secondary); font-size: 13px; font-weight: 700; }
+.header h1:not(.togetherValue) { margin: 0; font-size: 26px; }
 
-.retryButton:hover {
-  background:
-    var(
-      --color-primary-hover
-    );
+@media (max-width: 390px) {
+  .page { padding-right: 14px; padding-left: 14px; }
+  .header { min-height: 126px; padding: 20px 18px 18px; }
+  .summaryCard { padding: 16px; }
+  .summaryRow strong { font-size: 15px; }
+  .cardRow,
+  .recentRow { padding-right: 13px; padding-left: 13px; }
+  .cardAmount,
+  .recentAmount { font-size: 12.5px; }
 }
 
-
-.retryButton:focus-visible {
-  outline:
-    2px
-    solid
-    var(
-      --color-primary
-    );
-
-  outline-offset: 3px;
-}
-
-
-/* =========================================================
- * 모바일
- * =========================================================
- */
-
-@media (
-  max-width: 480px
-) {
-  .page {
-    padding-right: 16px;
-    padding-left: 16px;
-  }
-
-
-  .header h1 {
-    font-size: 26px;
-  }
-
-
-  .summaryCard {
-    padding: 20px 18px;
-  }
-
-
-  .expenseAmount {
-    font-size: 28px;
-  }
-
-
-  .cardRow {
-    padding-right: 14px;
-    padding-left: 14px;
-  }
-
-
-  .targetCard {
-    padding-right: 14px;
-    padding-left: 14px;
-  }
+.sectionLink {
+  flex: 0 0 auto;
+  padding: 4px 2px;
+  border: 0;
+  background: transparent;
+  color: var(--color-primary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
 }
