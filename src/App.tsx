@@ -98,6 +98,67 @@ const SECONDARY_WARM_DELAY_MS =
   250;
 
 
+type AppHistoryState = {
+  moneybook?: boolean;
+  navigation?: NavigationKey;
+  inputInitialDate?: string | null;
+  moneybookSettingsView?: string;
+};
+
+
+const PRIMARY_NAVIGATION_KEYS =
+  new Set<NavigationKey>([
+    "home",
+    "calendar",
+    "input",
+    "assets",
+    "settings"
+  ]);
+
+
+function isPrimaryNavigation(
+  value: unknown
+): value is NavigationKey {
+  return (
+    typeof value === "string" &&
+    PRIMARY_NAVIGATION_KEYS.has(
+      value as NavigationKey
+    )
+  );
+}
+
+
+function createHistoryState(
+  navigation: NavigationKey,
+  inputInitialDate: string | null = null
+): AppHistoryState {
+  return {
+    moneybook: true,
+    navigation,
+    inputInitialDate:
+      navigation === "input"
+        ? inputInitialDate
+        : null
+  };
+}
+
+
+function scrollToPageTop() {
+  window.requestAnimationFrame(
+    () => {
+      window.scrollTo({
+        top: 0,
+        left: 0,
+        behavior: "auto"
+      });
+
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    }
+  );
+}
+
+
 function wait(
   milliseconds:
     number
@@ -355,6 +416,81 @@ export default function App() {
 
   useEffect(
     () => {
+      if (
+        status !== "authenticated" ||
+        !user
+      ) {
+        return;
+      }
+
+      /*
+       * 앱을 새로 연 시점에는 화면도 home으로 시작하므로
+       * 현재 history entry도 home과 맞춰 둡니다.
+       */
+      window.history.replaceState(
+        createHistoryState("home"),
+        ""
+      );
+
+      function handlePopState(
+        event: PopStateEvent
+      ) {
+        const state =
+          event.state as
+            AppHistoryState | null;
+
+        const nextNavigation =
+          isPrimaryNavigation(
+            state?.navigation
+          )
+            ? state.navigation
+            : "home";
+
+        setInputInitialDate(
+          nextNavigation === "input"
+            ? state?.inputInitialDate ?? null
+            : null
+        );
+
+        setActiveNavigation(
+          nextNavigation
+        );
+      }
+
+      window.addEventListener(
+        "popstate",
+        handlePopState
+      );
+
+      return () => {
+        window.removeEventListener(
+          "popstate",
+          handlePopState
+        );
+      };
+    },
+    [
+      status,
+      user
+    ]
+  );
+
+
+  useEffect(
+    () => {
+      if (status === "authenticated") {
+        scrollToPageTop();
+      }
+    },
+    [
+      activeNavigation,
+      status
+    ]
+  );
+
+
+  useEffect(
+    () => {
       let cancelled =
         false;
 
@@ -585,27 +721,53 @@ export default function App() {
   }
 
 
-  function handleNavigate(
-    nextNavigation:
-      NavigationKey
+  function navigateTo(
+    nextNavigation: NavigationKey,
+    nextInputDate: string | null = null
   ) {
-    if (nextNavigation === "input") {
-      setInputInitialDate(null);
+    const normalizedInputDate =
+      nextNavigation === "input"
+        ? nextInputDate
+        : null;
+
+    setInputInitialDate(
+      normalizedInputDate
+    );
+
+    const currentState =
+      window.history.state as
+        AppHistoryState | null;
+
+    const sameDestination =
+      currentState?.moneybook === true &&
+      currentState.navigation === nextNavigation &&
+      (
+        nextNavigation !== "input" ||
+        (currentState.inputInitialDate ?? null) ===
+          normalizedInputDate
+      );
+
+    if (!sameDestination) {
+      window.history.pushState(
+        createHistoryState(
+          nextNavigation,
+          normalizedInputDate
+        ),
+        ""
+      );
     }
 
     setActiveNavigation(
       nextNavigation
     );
 
+    scrollToPageTop();
 
     /*
      * 앱 시작 프리페치가 아직 진행 중인 경우에도
      * 같은 요청을 재사용하므로 중복 네트워크 요청은 생기지 않습니다.
      */
-    if (
-      nextNavigation ===
-      "settings"
-    ) {
+    if (nextNavigation === "settings") {
       void prefetchManagedSettings()
         .catch(
           () => {
@@ -616,7 +778,25 @@ export default function App() {
           }
         );
     }
+
+    if (nextNavigation === "input") {
+      void prefetchBootstrap()
+        .catch(() => {
+          /* InputPage에서 정상 재시도 */
+        });
+    }
   }
+
+
+  function handleNavigate(
+    nextNavigation: NavigationKey
+  ) {
+    navigateTo(
+      nextNavigation,
+      null
+    );
+  }
+
 
 
   async function handleLogout() {
@@ -647,6 +827,11 @@ export default function App() {
 
 
       setLoginError(
+        ""
+      );
+
+      window.history.replaceState(
+        {},
         ""
       );
     }
@@ -712,7 +897,7 @@ export default function App() {
   ) {
     pageContent = (
       <HomePage
-        onOpenHistory={() => setActiveNavigation("calendar")}
+        onOpenHistory={() => navigateTo("calendar")}
       />
     );
 
@@ -724,8 +909,10 @@ export default function App() {
       <CalendarPage
         onAddTransaction={
           date => {
-            setInputInitialDate(date);
-            setActiveNavigation("input");
+            navigateTo(
+              "input",
+              date
+            );
           }
         }
       />
