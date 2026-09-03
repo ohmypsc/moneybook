@@ -600,3 +600,386 @@
       minmax(0, 1fr);
   }
 }
+
+/* =========================================================
+   종목코드 자동 조회
+   ========================================================= */
+
+.lookupBox,
+.lookupResult,
+.manualMetaBox {
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius:
+    var(--radius-md);
+}
+
+.lookupBox {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+
+  min-height: 44px;
+  padding: 0 12px;
+
+  background:
+    var(--color-surface);
+
+  color:
+    var(--color-text-secondary);
+
+  font-size: 13px;
+}
+
+.lookupSpinner {
+  width: 14px;
+  height: 14px;
+
+  border:
+    2px solid
+    var(--color-border);
+  border-top-color:
+    var(--color-primary);
+  border-radius: 999px;
+
+  animation:
+    investmentLookupSpin
+    0.8s linear infinite;
+}
+
+@keyframes investmentLookupSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.lookupResult {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+
+  padding: 12px;
+
+  background:
+    var(--color-surface);
+}
+
+.lookupResult > div {
+  min-width: 0;
+
+  display: grid;
+  gap: 3px;
+}
+
+.lookupResult strong {
+  overflow: hidden;
+
+  font-size: 15px;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lookupResult span {
+  color:
+    var(--color-text-secondary);
+
+  font-size: 12px;
+}
+
+.metaEditButton {
+  flex-shrink: 0;
+
+  min-height: 34px;
+  padding: 0 10px;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius:
+    var(--radius-sm);
+
+  background:
+    var(--color-surface-soft);
+
+  color:
+    var(--color-text-secondary);
+
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+
+  cursor: pointer;
+}
+
+.manualMetaBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+
+  padding: 12px;
+
+  background:
+    var(--color-surface);
+}
+
+.lookupNotice {
+  margin: 0;
+
+  color:
+    var(--color-text-secondary);
+
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* =========================================================
+   v2.2.9 종목이름 검색형 매매 기록
+   ========================================================= */
+
+.searchSection {
+  position: relative;
+}
+
+.searchInputWrap {
+  position: relative;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+
+  color: var(--color-text-secondary);
+  font-size: 19px;
+  line-height: 1;
+
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  min-height: 48px;
+  box-sizing: border-box;
+
+  padding: 0 13px 0 40px;
+
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+
+  font: inherit;
+  font-size: 15px;
+  outline: none;
+}
+
+.searchInput:focus {
+  border-color: var(--color-primary);
+}
+
+.searchPanel {
+  overflow: hidden;
+
+  margin-top: 8px;
+
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.resultGroup + .resultGroup {
+  border-top: 1px solid var(--color-border);
+}
+
+.resultGroupTitle {
+  padding: 9px 12px 7px;
+
+  background: var(--color-surface-soft);
+  color: var(--color-text-secondary);
+
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.resultItem {
+  width: 100%;
+
+  display: grid;
+  gap: 4px;
+
+  padding: 11px 12px;
+
+  border: 0;
+  border-top: 1px solid var(--color-border);
+
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.resultGroupTitle + .resultItem {
+  border-top: 0;
+}
+
+.resultItem:active {
+  background: var(--color-surface-soft);
+}
+
+.resultName {
+  overflow: hidden;
+
+  font-size: 15px;
+  font-weight: 800;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resultMeta {
+  overflow: hidden;
+
+  color: var(--color-text-secondary);
+  font-size: 12px;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.searchState {
+  min-height: 46px;
+
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  padding: 0 12px;
+
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.manualLink {
+  width: 100%;
+  min-height: 40px;
+
+  border: 0;
+  border-top: 1px solid var(--color-border);
+
+  background: var(--color-surface-soft);
+  color: var(--color-text-secondary);
+
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+
+  cursor: pointer;
+}
+
+.selectedInstrument {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+
+  padding: 13px 14px;
+
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+
+  background: var(--color-surface-soft);
+}
+
+.selectedInstrumentMain {
+  min-width: 0;
+
+  display: grid;
+  gap: 4px;
+}
+
+.selectedInstrumentMain strong {
+  overflow: hidden;
+
+  font-size: 16px;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selectedInstrumentMain span {
+  overflow: hidden;
+
+  color: var(--color-text-secondary);
+  font-size: 12px;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.changeInstrumentButton,
+.textButton {
+  flex-shrink: 0;
+
+  border: 0;
+  background: transparent;
+
+  color: var(--color-primary);
+
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+
+  cursor: pointer;
+}
+
+.manualBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+
+  padding: 14px;
+
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+
+  background: var(--color-surface-soft);
+}
+
+.manualHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.manualHeader strong {
+  font-size: 14px;
+}
+
+.secondaryButton {
+  min-height: 44px;
+
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+
+  cursor: pointer;
+}
