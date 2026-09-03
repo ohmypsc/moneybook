@@ -721,7 +721,11 @@ export default function App() {
     "input"
   ) {
     pageContent = (
-      <InputPage />
+      <InputPage
+        userName={
+          user.name
+        }
+      />
     );
 
   } else if (
