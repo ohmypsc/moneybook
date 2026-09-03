@@ -66,6 +66,10 @@ import type {
     SharedInputPreferencesState
 } from "../../utils/inputPreferences";
 
+import {
+    markLedgerChanged
+} from "../../utils/ledgerEvents";
+
 import styles
     from "./SettingsPage.module.css";
 
@@ -1367,17 +1371,6 @@ function SettingsHome(
             description:
                 string;
         }> = [
-            {
-              key:
-                    "accounts",
-
-                title:
-                    "자산 관리",
-
-                description:
-                    "통장·카드·대출·투자계좌와 입력 화면 설정"  
-            },
-
             {
                 key:
                     "categories",
@@ -3171,7 +3164,7 @@ function CategorySettings() {
 }
 
 
-function AccountSettings() {
+export function AccountSettings() {
     const [
         initialSnapshot
     ] =
@@ -3876,6 +3869,8 @@ function AccountSettings() {
             await work();
 
             await refresh();
+
+            markLedgerChanged();
 
             setFeedback(
                 successMessage
