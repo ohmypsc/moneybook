@@ -15,6 +15,15 @@ import {
   getInputPreferences,
   sortAccountsByPreferences
 } from "../../utils/inputPreferences";
+import {
+  enqueuePendingTransaction,
+  getLastPendingTransactionCompletion,
+  getPendingTransactions,
+  retryAllFailedPendingTransactions,
+  retryPendingTransaction,
+  startPendingTransactionQueue,
+  subscribePendingTransactions
+} from "../../utils/pendingTransactionQueue";
 import styles from "./InputPage.module.css";
 
 type TransactionType = "지출" | "수입" | "이체";
@@ -70,6 +79,10 @@ interface RequestMemory {
 
 const CARD_PAYMENT_CATEGORY = "카드정기결제";
 const CARD_PREPAYMENT_CATEGORY = "카드선결제";
+
+interface InputPageProps {
+  userName: string;
+}
 
 let bootstrapPromise: Promise<BootstrapData> | null = null;
 let bootstrapPromiseGeneration = -1;
@@ -230,7 +243,9 @@ function isCardSettlementCategory(
   );
 }
 
-export default function InputPage() {
+export default function InputPage({
+  userName
+}: InputPageProps) {
   const today =
     getToday();
 
@@ -346,6 +361,18 @@ export default function InputPage() {
   ] =
     useState("");
 
+  const [
+    queueVersion,
+    setQueueVersion
+  ] =
+    useState(0);
+
+  const lastCompletionId =
+    useRef("");
+
+  const submitGuard =
+    useRef(false);
+
   const requestMemory =
     useRef<RequestMemory | null>(
       null
@@ -408,6 +435,82 @@ export default function InputPage() {
       };
     },
     []
+  );
+
+  useEffect(
+    () => {
+      const unsubscribe =
+        subscribePendingTransactions(
+          () => {
+            setQueueVersion(
+              value =>
+                value + 1
+            );
+          }
+        );
+
+      startPendingTransactionQueue(
+        userName
+      );
+
+      return unsubscribe;
+    },
+    [
+      userName
+    ]
+  );
+
+  const pendingTransactions =
+    useMemo(
+      () =>
+        getPendingTransactions(
+          userName
+        ),
+      [
+        userName,
+        queueVersion
+      ]
+    );
+
+  const savingCount =
+    pendingTransactions.filter(
+      item =>
+        item.status === "pending" ||
+        item.status === "saving"
+    ).length;
+
+  const failedTransactions =
+    pendingTransactions.filter(
+      item =>
+        item.status === "failed"
+    );
+
+  useEffect(
+    () => {
+      const completion =
+        getLastPendingTransactionCompletion(
+          userName
+        );
+
+      if (
+        !completion ||
+        completion.id ===
+          lastCompletionId.current
+      ) {
+        return;
+      }
+
+      lastCompletionId.current =
+        completion.id;
+
+      setSuccess(
+        `${completion.label} 저장 완료 ✓`
+      );
+    },
+    [
+      userName,
+      queueVersion
+    ]
   );
 
   const preferences =
@@ -962,14 +1065,14 @@ export default function InputPage() {
     };
   }
 
-  async function handleSubmit(
+  function handleSubmit(
     event:
       FormEvent<HTMLFormElement>
   ) {
     event.preventDefault();
 
     if (
-      submitting
+      submitGuard.current
     ) {
       return;
     }
@@ -1065,43 +1168,56 @@ export default function InputPage() {
       };
     }
 
+    const payload =
+      buildPayload(
+        requestId
+      );
+
+    const savedLabel =
+      isCardTransfer
+        ? cardTransferLabel
+        : getModeLabel(
+            mode
+          );
+
+    const categoryLabel =
+      selectedCategory
+        ? getCategoryLabel(
+            selectedCategory
+          )
+        : "";
+
+    const queueLabel =
+      [
+        savedLabel,
+        `${Number(amount).toLocaleString("ko-KR")}원`,
+        categoryLabel
+      ]
+        .filter(Boolean)
+        .join(" · ");
+
+    submitGuard.current =
+      true;
+
     setSubmitting(
       true
     );
 
     try {
-      const result =
-        await createTransaction(
-          buildPayload(
-            requestId
-          )
-        );
+      /*
+       * 폼을 비우기 전에 브라우저 저장소에 먼저 기록합니다.
+       * 이 함수가 성공한 순간부터 앱을 닫아도 같은 requestId로
+       * 다시 저장할 수 있습니다.
+       */
+      enqueuePendingTransaction({
+        owner:
+          userName,
 
-      const apiResult =
-        result as ApiResult;
+        label:
+          queueLabel,
 
-      if (
-        apiResult
-          ?.success ===
-        false
-      ) {
-        throw new Error(
-          apiResult.error
-            ?.message ||
-          "거래를 저장하지 못했습니다."
-        );
-      }
-
-      const savedLabel =
-        isCardTransfer
-          ? cardTransferLabel
-          : getModeLabel(
-              mode
-            );
-
-      setSuccess(
-        `${savedLabel} 내역을 저장했습니다.`
-      );
+        payload
+      });
 
       setAmount("");
       setCategoryId("");
@@ -1130,6 +1246,14 @@ export default function InputPage() {
     } finally {
       setSubmitting(
         false
+      );
+
+      window.setTimeout(
+        () => {
+          submitGuard.current =
+            false;
+        },
+        250
       );
     }
   }
@@ -2207,6 +2331,116 @@ export default function InputPage() {
           </label>
 
           {
+            savingCount > 0 && (
+              <div
+                className={
+                  styles.queueStatus
+                }
+                role="status"
+              >
+                <strong>
+                  저장 중 · {savingCount}건
+                </strong>
+
+                <span>
+                  입력은 계속할 수 있어요. 서버 확인 후 완료됩니다.
+                </span>
+              </div>
+            )
+          }
+
+          {
+            failedTransactions.length > 0 && (
+              <div
+                className={
+                  styles.queueFailure
+                }
+                role="alert"
+              >
+                <div
+                  className={
+                    styles.queueFailureHeader
+                  }
+                >
+                  <strong>
+                    저장 실패 · {failedTransactions.length}건
+                  </strong>
+
+                  {
+                    failedTransactions.length > 1 && (
+                      <button
+                        type="button"
+                        className={
+                          styles.queueRetryButton
+                        }
+                        onClick={
+                          () =>
+                            retryAllFailedPendingTransactions(
+                              userName
+                            )
+                        }
+                      >
+                        모두 다시 시도
+                      </button>
+                    )
+                  }
+                </div>
+
+                {
+                  failedTransactions
+                    .slice(0, 3)
+                    .map(
+                      item => (
+                        <div
+                          key={
+                            item.id
+                          }
+                          className={
+                            styles.queueFailureItem
+                          }
+                        >
+                          <div>
+                            <span
+                              className={
+                                styles.queueFailureLabel
+                              }
+                            >
+                              {item.label}
+                            </span>
+
+                            <span
+                              className={
+                                styles.queueFailureMessage
+                              }
+                            >
+                              {item.error}
+                            </span>
+                          </div>
+
+                          <button
+                            type="button"
+                            className={
+                              styles.queueRetryButton
+                            }
+                            onClick={
+                              () =>
+                                retryPendingTransaction(
+                                  userName,
+                                  item.id
+                                )
+                            }
+                          >
+                            다시 시도
+                          </button>
+                        </div>
+                      )
+                    )
+                }
+              </div>
+            )
+          }
+
+          {
             error && (
               <p
                 className={
@@ -2247,15 +2481,13 @@ export default function InputPage() {
               }
             >
               {
-                submitting
-                  ? "저장 중..."
-                  : `${
-                      isCardTransfer
-                        ? cardTransferLabel
-                        : getModeLabel(
-                            mode
-                          )
-                    } 저장`
+                `${
+                  isCardTransfer
+                    ? cardTransferLabel
+                    : getModeLabel(
+                        mode
+                      )
+                } 저장`
               }
             </button>
           </div>
