@@ -806,7 +806,7 @@
 
 .amountInput {
   min-width: 0;
-  padding-left: 0;
+  padding: 0 6px 0 0;
   border: 0;
   background: transparent;
   color: var(--color-primary);
@@ -1047,7 +1047,7 @@
   }
 
   .amountInput {
-    font-size: 34px;
+    font-size: clamp(30px, 9.2vw, 34px);
   }
 
   .fieldPair {
@@ -1058,7 +1058,7 @@
 /* amount legacy absolute-unit reset */
 .amountInput {
   flex: 1 1 auto;
-  padding: 0;
+  padding: 0 6px 0 0;
   text-align: right;
 }
 
