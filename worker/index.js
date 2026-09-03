@@ -2543,7 +2543,7 @@ function scoreInvestmentSearchItem(item, query) {
     .map(compactInvestmentSearchText)
     .filter(Boolean);
 
-  let score = item.source === "krx" || item.source === "krx-gold" ? 25 : 0;
+  let score = 0;
 
   for (const term of new Set([rawQuery, aliasQuery])) {
     if (!term) continue;
@@ -2561,6 +2561,17 @@ function scoreInvestmentSearchItem(item, query) {
     tokenTerms.every(term => haystack.includes(term))
   ) {
     score = Math.max(score, 170);
+  }
+
+  /*
+   * KRX라는 이유만으로 무관한 종목을 검색 결과에 남기지 않습니다.
+   * 실제 검색어와 일치한 경우에만 국내 공식 데이터에 작은 가산점을 줍니다.
+   */
+  if (
+    score > 0 &&
+    (item.source === "krx" || item.source === "krx-gold")
+  ) {
+    score += 25;
   }
 
   return score;
@@ -2634,7 +2645,7 @@ function dedupeInvestmentSearchItems(items, query) {
         "ko"
       )
     )
-    .slice(0, 12)
+    .slice(0, 40)
     .map(entry => entry.item);
 }
 
