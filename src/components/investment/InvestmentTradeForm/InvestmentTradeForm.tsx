@@ -780,7 +780,7 @@ export default function InvestmentTradeForm({
                 }}
                 placeholder={
                   tradeType === "매수"
-                    ? "종목이름 검색 · 예: 코덱스 나스닥"
+                    ? "종목이름 검색"
                     : "보유종목 이름 검색"
                 }
                 autoComplete="off"
