@@ -56,7 +56,7 @@ const LEFT_ITEMS:
         "calendar",
 
       label:
-        "달력"
+        "내역"
     }
   ];
 
