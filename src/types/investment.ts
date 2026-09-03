@@ -13,6 +13,34 @@ export type InvestmentTradeType =
   | "매도";
 
 
+export interface InvestmentSymbolLookupResult {
+  found: boolean;
+  stockCode: string;
+  stockName: string;
+  market: Market;
+  symbol?: string;
+  exchange?: string;
+  source?: string;
+}
+
+
+export interface InvestmentSymbolSearchItem {
+  stockCode: string;
+  stockName: string;
+  market: Market;
+  symbol?: string;
+  exchange?: string;
+  assetType?: string;
+  source?: string;
+}
+
+
+export interface InvestmentSymbolSearchResponse {
+  query: string;
+  items: InvestmentSymbolSearchItem[];
+}
+
+
 /*
  * =========================================================
  * 투자거래 조회 결과
