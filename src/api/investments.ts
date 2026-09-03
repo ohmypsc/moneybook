@@ -13,6 +13,8 @@ import type {
 import type {
   InvestmentTrade,
   InvestmentTradesResponse,
+  InvestmentSymbolLookupResult,
+  InvestmentSymbolSearchResponse,
   SetInvestmentCashBaselinePayload,
   CreateInvestmentTradePayload
 } from "../types/investment";
@@ -421,6 +423,54 @@ export async function getInvestmentTrades(
 
   return requestInvestmentTrades(
     params
+  );
+}
+
+
+/*
+ * =========================================================
+ * 종목코드 → 종목명 자동 조회
+ * =========================================================
+ */
+
+export async function lookupInvestmentSymbol(
+  stockCode: string
+) {
+  const raw =
+    await apiRequest<
+      | ApiEnvelope<InvestmentSymbolLookupResult>
+      | InvestmentSymbolLookupResult
+    >(
+      `/api/investments/symbol-lookup?code=${encodeURIComponent(stockCode)}`
+    );
+
+  return unwrapEnvelope<InvestmentSymbolLookupResult>(
+    raw
+  );
+}
+
+
+/*
+ * =========================================================
+ * 종목이름/코드 검색
+ * - 국내: KRX 한글 종목명 우선
+ * - 해외: Yahoo Finance 검색
+ * =========================================================
+ */
+
+export async function searchInvestmentSymbols(
+  query: string
+) {
+  const raw =
+    await apiRequest<
+      | ApiEnvelope<InvestmentSymbolSearchResponse>
+      | InvestmentSymbolSearchResponse
+    >(
+      `/api/investments/symbol-search?q=${encodeURIComponent(query)}`
+    );
+
+  return unwrapEnvelope<InvestmentSymbolSearchResponse>(
+    raw
   );
 }
 
