@@ -398,6 +398,27 @@ function installBootstrapCacheFetch() {
             bootstrapCache
           );
         }
+
+        /*
+         * 로그인 직후 App의 bootstrap 프리페치가 아직 진행 중이면
+         * InputPage가 같은 /api/bootstrap 요청을 하나 더 보내지 않습니다.
+         * 기존 프리페치가 끝날 때까지 기다린 뒤 메모리 캐시를 재사용합니다.
+         */
+        if (
+          bootstrapPrefetchPromise
+        ) {
+          await bootstrapPrefetchPromise;
+
+          clearExpiredBootstrapCache();
+
+          if (
+            bootstrapCache
+          ) {
+            return responseFromBootstrapCache(
+              bootstrapCache
+            );
+          }
+        }
       }
 
       const requestGeneration =
