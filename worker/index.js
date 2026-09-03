@@ -2361,7 +2361,7 @@ function normalizeKrxShortCode(value) {
     .trim()
     .toUpperCase();
 
-  if (/^A\d{6}$/.test(raw)) {
+  if (/^A[0-9A-Z]{6}$/.test(raw)) {
     return raw.slice(1);
   }
 
@@ -2459,6 +2459,18 @@ async function fetchKrxFinder(query, bld, assetType) {
     .filter(Boolean);
 }
 
+function krxGoldSpotSearchItem() {
+  return {
+    stockCode: "04020000",
+    stockName: "금 현물 99.99_1Kg",
+    market: "국내",
+    symbol: "04020000",
+    exchange: "KRX 금시장",
+    assetType: "금현물",
+    source: "krx-gold"
+  };
+}
+
 function yahooSearchItem(quote) {
   const symbol = normalizeYahooSymbol(
     quote?.symbol
@@ -2524,14 +2536,14 @@ function scoreInvestmentSearchItem(item, query) {
   const code = compactInvestmentSearchText(
     item.stockCode
   );
-  const haystack = `${name}${code}`;
+  const haystack = `${name}${code}${compactInvestmentSearchText(item.exchange || "")}${compactInvestmentSearchText(item.assetType || "")}`;
 
   const tokenTerms = aliasedText
     .split(/\s+/)
     .map(compactInvestmentSearchText)
     .filter(Boolean);
 
-  let score = item.source === "krx" ? 25 : 0;
+  let score = item.source === "krx" || item.source === "krx-gold" ? 25 : 0;
 
   for (const term of new Set([rawQuery, aliasQuery])) {
     if (!term) continue;
@@ -2695,11 +2707,14 @@ async function searchInvestmentSymbols(query) {
   ];
 
   const settled = await Promise.allSettled(tasks);
-  const combined = settled.flatMap(result =>
-    result.status === "fulfilled"
-      ? result.value
-      : []
-  );
+  const combined = [
+    krxGoldSpotSearchItem(),
+    ...settled.flatMap(result =>
+      result.status === "fulfilled"
+        ? result.value
+        : []
+    )
+  ];
 
   const data = {
     query: normalized,
