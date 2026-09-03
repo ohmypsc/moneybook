@@ -1,993 +1,2144 @@
-.form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
+import {
+  Fragment,
+  useEffect,
+  useState
+} from "react";
 
-  margin-top: var(--space-5);
-  padding-top: var(--space-5);
+import {
+  getDashboard,
+  getDashboardSnapshot
+} from "../../api/dashboard";
 
-  border-top:
-    1px solid
-    var(--color-border);
+import {
+  setInvestmentCashBaseline,
+  updateHoldingManualPrice
+} from "../../api/investments";
+
+import InvestmentTradeForm
+  from "../../components/investment/InvestmentTradeForm/InvestmentTradeForm";
+
+import InvestmentTradeHistory
+  from "../../components/investment/InvestmentTradeHistory/InvestmentTradeHistory";
+
+import {
+  AccountSettings
+} from "../SettingsPage/SettingsPage";
+
+import type {
+  DashboardData
+} from "../../types/dashboard";
+
+import styles
+  from "./AssetsPage.module.css";
+
+
+type AssetsTab =
+  | "cash"
+  | "investment";
+
+
+type AssetsView =
+  | "overview"
+  | "manage";
+
+
+type AssetsHistoryState = {
+  moneybook?: boolean;
+  navigation?: string;
+  moneybookAssetView?: AssetsView;
+};
+
+
+function isAssetsView(
+  value: unknown
+): value is AssetsView {
+  return (
+    value === "overview" ||
+    value === "manage"
+  );
 }
 
 
-/* =========================================================
-   상단
-   ========================================================= */
+function historyAssetsView() {
+  const state =
+    window.history.state as
+      AssetsHistoryState | null;
 
-.header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-3);
+  return (
+    state?.navigation === "assets" &&
+    isAssetsView(
+      state.moneybookAssetView
+    )
+  )
+    ? state.moneybookAssetView
+    : "overview";
 }
 
 
-.titleGroup {
-  min-width: 0;
-}
-
-
-.title {
-  margin: 0;
-
-  font-size: 17px;
-  line-height: 1.4;
-}
-
-
-.description {
-  margin:
-    var(--space-1)
-    0
-    0;
-
-  color:
-    var(--color-text-secondary);
-
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-
-.cash {
-  flex-shrink: 0;
-
-  display: grid;
-  gap: 2px;
-
-  color:
-    var(--color-text-secondary);
-
-  font-size: 12px;
-  text-align: right;
-}
-
-
-.cash strong {
-  color:
-    var(--color-text-primary);
-
-  font-size: 14px;
-}
-
-
-/* =========================================================
-   매수 / 매도 탭
-   ========================================================= */
-
-.tradeTabs {
-  display: grid;
-  grid-template-columns:
-    repeat(
-      2,
-      minmax(0, 1fr)
-    );
-
-  gap: 4px;
-
-  padding: 4px;
-
-  background:
-    var(--color-surface-soft);
-
-  border:
-    1px solid
-    var(--color-border);
-
-  border-radius:
-    var(--radius-md);
-}
-
-
-.tradeTab {
-  min-height: 42px;
-
-  padding:
-    0
-    12px;
-
-  border: 0;
-
-  border-radius:
-    calc(
-      var(--radius-md) -
-      4px
-    );
-
-  background:
-    transparent;
-
-  color:
-    var(--color-text-secondary);
-
-  font: inherit;
-  font-size: 14px;
-  font-weight: 700;
-
-  cursor: pointer;
-
-  -webkit-tap-highlight-color:
-    transparent;
-}
-
-
-.tradeTab:active {
-  transform:
-    scale(0.98);
-}
-
-
-.tradeTabActive {
-  background:
-    var(--color-surface);
-
-  color:
-    var(--color-text-primary);
-
-  box-shadow:
-    var(--shadow-card);
-}
-
-
-/* =========================================================
-   입력
-   ========================================================= */
-
-.grid {
-  display: grid;
-  grid-template-columns:
-    repeat(
-      2,
-      minmax(0, 1fr)
-    );
-
-  gap: var(--space-3);
-}
-
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-
-  min-width: 0;
-}
-
-
-.label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-
-  color:
-    var(--color-text-primary);
-
-  font-size: 13px;
-  font-weight: 700;
-}
-
-
-.optional {
-  color:
-    var(--color-text-secondary);
-
-  font-size: 11px;
-  font-weight: 600;
-}
-
-
-.input,
-.select {
-  width: 100%;
-  min-width: 0;
-  min-height: 44px;
-
-  box-sizing: border-box;
-
-  padding:
-    0
-    12px;
-
-  border:
-    1px solid
-    var(--color-border);
-
-  border-radius:
-    var(--radius-md);
-
-  background:
-    var(--color-surface);
-
-  color:
-    var(--color-text-primary);
-
-  font: inherit;
-  font-size: 15px;
-
-  outline: none;
-}
-
-
-.input:focus,
-.select:focus {
-  border-color:
-    var(--color-primary);
-}
-
-
-.input:disabled,
-.select:disabled {
-  opacity: 0.6;
-}
-
-
-.fieldHint {
-  color:
-    var(--color-text-secondary);
-
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-
-/* =========================================================
-   신규 종목
-   ========================================================= */
-
-.newHoldingBox {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-
-  padding:
-    var(--space-4);
-
-  background:
-    var(--color-surface-soft);
-
-  border:
-    1px solid
-    var(--color-border);
-
-  border-radius:
-    var(--radius-md);
-}
-
-
-.subTitle {
-  margin: 0;
-
-  font-size: 14px;
-  font-weight: 800;
-}
-
-
-/* =========================================================
-   기존 보유종목 요약
-   ========================================================= */
-
-.holdingPreview {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-
-  padding:
-    12px;
-
-  border:
-    1px solid
-    var(--color-border);
-
-  border-radius:
-    var(--radius-md);
-
-  background:
-    var(--color-surface-soft);
-}
-
-
-.holdingPreview > div:first-child {
-  min-width: 0;
-
-  display: grid;
-  gap: 2px;
-}
-
-
-.holdingPreview strong {
-  overflow: hidden;
-
-  font-size: 14px;
-
-  text-overflow:
-    ellipsis;
-
-  white-space:
-    nowrap;
-}
-
-
-.holdingPreview span {
-  color:
-    var(--color-text-secondary);
-
-  font-size: 12px;
-}
-
-
-.holdingQuantity {
-  flex-shrink: 0;
-
-  color:
-    var(--color-text-primary);
-
-  font-size: 13px;
-  font-weight: 700;
-}
-
-
-/* =========================================================
-   상세 입력
-   ========================================================= */
-
-.details {
-  overflow: hidden;
-
-  border:
-    1px solid
-    var(--color-border);
-
-  border-radius:
-    var(--radius-md);
-
-  background:
-    var(--color-surface);
-}
-
-
-.detailsSummary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-
-  padding:
-    12px;
-
-  font-size: 13px;
-  font-weight: 700;
-
-  cursor: pointer;
-
-  user-select: none;
-}
-
-
-.detailsSummary span {
-  color:
-    var(--color-text-secondary);
-
-  font-size: 12px;
-  font-weight: 600;
-}
-
-
-.detailsContent {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-
-  padding:
-    0
-    12px
-    12px;
-}
-
-
-.detailsHelp {
-  margin: 0;
-
-  color:
-    var(--color-text-secondary);
-
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-
-/* =========================================================
-   예상 결제금액
-   ========================================================= */
-
-.settlementBox {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-
-  padding:
-    13px
-    14px;
-
-  background:
-    var(--color-surface-soft);
-
-  border:
-    1px solid
-    var(--color-border);
-
-  border-radius:
-    var(--radius-md);
-}
-
-
-.settlementRow,
-.settlementSubRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-
-
-.settlementRow {
-  font-size: 14px;
-}
-
-
-.settlementRow strong {
-  color:
-    var(--color-primary);
-
-  font-size: 17px;
-}
-
-
-.settlementSubRow {
-  color:
-    var(--color-text-secondary);
-
-  font-size: 12px;
-}
-
-
-/* =========================================================
-   상태
-   ========================================================= */
-
-.error,
-.success,
-.empty {
-  margin: 0;
-
-  padding:
-    10px
-    12px;
-
-  border-radius:
-    var(--radius-md);
-
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-
-.error {
-  color:
-    var(--color-error);
-
-  background:
-    var(--color-surface-soft);
-}
-
-
-.success {
-  color:
-    var(--color-primary);
-
-  background:
-    var(--color-surface-soft);
-}
-
-
-.empty {
-  color:
-    var(--color-text-secondary);
-
-  background:
-    var(--color-surface-soft);
-}
-
-
-/* =========================================================
-   저장 버튼
-   ========================================================= */
-
-.submitButton {
-  width: 100%;
-  min-height: 48px;
-
-  border: 0;
-
-  border-radius:
-    var(--radius-md);
-
-  background:
-    var(--color-primary);
-
-  color:
-    var(--color-primary-text);
-
-  font: inherit;
-  font-size: 15px;
-  font-weight: 800;
-
-  cursor: pointer;
-
-  -webkit-tap-highlight-color:
-    transparent;
-}
-
-
-.submitButton:active:not(:disabled) {
-  transform:
-    scale(0.99);
-}
-
-
-.submitButton:disabled {
-  opacity: 0.55;
-
-  cursor: default;
-}
-
-
-/* =========================================================
-   작은 화면
-   ========================================================= */
-
-@media (
-  max-width:
-    520px
+function formatCurrency(
+  value:
+    number |
+    undefined |
+    null
 ) {
-  .header {
-    flex-direction: column;
+  if (
+    value === undefined ||
+    value === null ||
+    !Number.isFinite(value)
+  ) {
+    return "-";
+  }
+
+  return (
+    Math.round(value)
+      .toLocaleString("ko-KR") +
+    "원"
+  );
+}
+
+
+function formatSignedCurrency(
+  value:
+    number |
+    undefined |
+    null
+) {
+  if (
+    value === undefined ||
+    value === null ||
+    !Number.isFinite(value)
+  ) {
+    return "-";
+  }
+
+  const sign =
+    value > 0
+      ? "+"
+      : "";
+
+  return (
+    sign +
+    Math.round(value)
+      .toLocaleString("ko-KR") +
+    "원"
+  );
+}
+
+
+function formatPercent(
+  value:
+    number |
+    undefined |
+    null
+) {
+  if (
+    value === undefined ||
+    value === null ||
+    !Number.isFinite(value)
+  ) {
+    return "-";
+  }
+
+  const sign =
+    value > 0
+      ? "+"
+      : "";
+
+  return (
+    sign +
+    (
+      value *
+      100
+    ).toFixed(2) +
+    "%"
+  );
+}
+
+
+function formatQuantity(
+  value:
+    number |
+    undefined |
+    null
+) {
+  if (
+    value === undefined ||
+    value === null ||
+    !Number.isFinite(value)
+  ) {
+    return "-";
+  }
+
+  return value.toLocaleString(
+    "ko-KR",
+    {
+      maximumFractionDigits:
+        8
+    }
+  );
+}
+
+
+function formatPrice(
+  value:
+    number |
+    undefined |
+    null,
+  market:
+    string
+) {
+  if (
+    value === undefined ||
+    value === null ||
+    !Number.isFinite(value)
+  ) {
+    return "-";
+  }
+
+  const formatted =
+    value.toLocaleString(
+      "ko-KR",
+      {
+        maximumFractionDigits:
+          8
+      }
+    );
+
+  return market ===
+    "국내"
+    ? `${formatted}원`
+    : formatted;
+}
+
+
+function getToday() {
+  const now =
+    new Date();
+
+  const local =
+    new Date(
+      now.getTime() -
+        now.getTimezoneOffset() *
+          60 *
+          1000
+    );
+
+  return local
+    .toISOString()
+    .slice(
+      0,
+      10
+    );
+}
+
+
+export default function AssetsPage() {
+  const [
+    view,
+    setView
+  ] =
+    useState<AssetsView>(
+      () =>
+        historyAssetsView()
+    );
+
+  const [
+    activeTab,
+    setActiveTab
+  ] =
+    useState<AssetsTab>(
+      "cash"
+    );
+
+  const [
+    initialDashboard
+  ] =
+    useState<
+      DashboardData |
+      null
+    >(
+      () =>
+        getDashboardSnapshot()
+    );
+
+  const [
+    dashboard,
+    setDashboard
+  ] =
+    useState<
+      DashboardData |
+      null
+    >(
+      initialDashboard
+    );
+
+  const [
+    loading,
+    setLoading
+  ] =
+    useState(
+      initialDashboard ===
+        null
+    );
+
+  const [
+    error,
+    setError
+  ] =
+    useState("");
+
+  const [
+    selectedAccountId,
+    setSelectedAccountId
+  ] =
+    useState<
+      string |
+      null
+    >(null);
+
+  const [
+    cashInput,
+    setCashInput
+  ] =
+    useState("");
+
+  const [
+    cashSaving,
+    setCashSaving
+  ] =
+    useState(
+      false
+    );
+
+  const [
+    cashError,
+    setCashError
+  ] =
+    useState("");
+
+  const [
+    tradeHistoryRefreshKey,
+    setTradeHistoryRefreshKey
+  ] =
+    useState(
+      0
+    );
+
+
+  const [
+    manualPriceDrafts,
+    setManualPriceDrafts
+  ] =
+    useState<
+      Record<
+        string,
+        string
+      >
+    >({});
+
+  const [
+    manualPriceSavingId,
+    setManualPriceSavingId
+  ] =
+    useState<
+      string |
+      null
+    >(null);
+
+  const [
+    manualPriceErrors,
+    setManualPriceErrors
+  ] =
+    useState<
+      Record<
+        string,
+        string
+      >
+    >({});
+
+  const [
+    manualPriceFeedbackId,
+    setManualPriceFeedbackId
+  ] =
+    useState<
+      string |
+      null
+    >(null);
+
+
+  async function loadDashboard() {
+    const cachedDashboard =
+      getDashboardSnapshot();
+
+    if (
+      cachedDashboard
+    ) {
+      setDashboard(
+        cachedDashboard
+      );
+
+      setLoading(
+        false
+      );
+    } else if (
+      !dashboard
+    ) {
+      setLoading(
+        true
+      );
+    }
+
+    setError(
+      ""
+    );
+
+    try {
+      const data =
+        await getDashboard();
+
+      setDashboard(
+        data
+      );
+    } catch (
+      err
+    ) {
+      if (
+        !dashboard &&
+        !getDashboardSnapshot()
+      ) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "자산 정보를 불러오지 못했습니다."
+        );
+      }
+    } finally {
+      setLoading(
+        false
+      );
+    }
   }
 
 
-  .cash {
-    width: 100%;
+  async function handleInvestmentSaved() {
+    setTradeHistoryRefreshKey(
+      current =>
+        current +
+        1
+    );
 
-    grid-template-columns:
-      auto
-      1fr;
-
-    align-items: center;
-
-    text-align: left;
+    await loadDashboard();
   }
 
 
-  .cash strong {
-    text-align: right;
+  useEffect(
+    () => {
+      function handlePopState(
+        event: PopStateEvent
+      ) {
+        const state =
+          event.state as
+            AssetsHistoryState | null;
+
+        if (
+          state?.navigation !==
+            "assets"
+        ) {
+          return;
+        }
+
+        const nextView =
+          isAssetsView(
+            state.moneybookAssetView
+          )
+            ? state.moneybookAssetView
+            : "overview";
+
+        setView(
+          nextView
+        );
+
+        if (
+          nextView ===
+            "overview"
+        ) {
+          void loadDashboard();
+        }
+      }
+
+      window.addEventListener(
+        "popstate",
+        handlePopState
+      );
+
+      return () => {
+        window.removeEventListener(
+          "popstate",
+          handlePopState
+        );
+      };
+    },
+    []
+  );
+
+
+  useEffect(
+    () => {
+      void loadDashboard();
+    },
+    []
+  );
+
+
+  function openAssetManagement() {
+    const currentState =
+      window.history.state as
+        AssetsHistoryState | null;
+
+    if (
+      currentState?.navigation ===
+        "assets" &&
+      currentState.moneybookAssetView ===
+        "manage"
+    ) {
+      setView(
+        "manage"
+      );
+
+      return;
+    }
+
+    window.history.pushState(
+      {
+        ...(currentState || {}),
+        moneybook: true,
+        navigation: "assets",
+        moneybookAssetView: "manage"
+      } satisfies AssetsHistoryState,
+      ""
+    );
+
+    setView(
+      "manage"
+    );
+
+    window.scrollTo({
+      top: 0,
+      left: 0,
+      behavior: "auto"
+    });
   }
 
 
-  .grid {
-    grid-template-columns:
-      minmax(0, 1fr);
+  function closeAssetManagement() {
+    const currentState =
+      window.history.state as
+        AssetsHistoryState | null;
+
+    if (
+      currentState?.navigation ===
+        "assets" &&
+      currentState.moneybookAssetView ===
+        "manage"
+    ) {
+      window.history.back();
+
+      return;
+    }
+
+    setView(
+      "overview"
+    );
+
+    void loadDashboard();
   }
-}
 
-/* =========================================================
-   종목코드 자동 조회
-   ========================================================= */
 
-.lookupBox,
-.lookupResult,
-.manualMetaBox {
-  border:
-    1px solid
-    var(--color-border);
+  const summary =
+    dashboard?.summary;
 
-  border-radius:
-    var(--radius-md);
-}
 
-.lookupBox {
-  display: flex;
-  align-items: center;
-  gap: 9px;
+  const cashLikeAccounts =
+    dashboard?.accounts.filter(
+      account =>
+        account.accountType ===
+          "자산" &&
+        account.balanceMethod !==
+          "평가입력"
+    ) || [];
 
-  min-height: 44px;
-  padding: 0 12px;
 
-  background:
-    var(--color-surface);
+  const investmentAccounts =
+    dashboard
+      ?.investments
+      .accounts ||
+    [];
 
-  color:
-    var(--color-text-secondary);
 
-  font-size: 13px;
-}
+  const investmentHoldings =
+    dashboard
+      ?.investments
+      .holdings ||
+    [];
 
-.lookupSpinner {
-  width: 14px;
-  height: 14px;
 
-  border:
-    2px solid
-    var(--color-border);
-  border-top-color:
-    var(--color-primary);
-  border-radius: 999px;
+  const selectedAccount =
+    investmentAccounts.find(
+      account =>
+        account.accountId ===
+        selectedAccountId
+    );
 
-  animation:
-    investmentLookupSpin
-    0.8s linear infinite;
-}
 
-@keyframes investmentLookupSpin {
-  to {
-    transform: rotate(360deg);
+  const holdingsForSelected =
+    investmentHoldings.filter(
+      holding =>
+        holding.accountId ===
+        selectedAccountId
+    );
+
+
+  useEffect(
+    () => {
+      if (
+        !selectedAccount
+      ) {
+        setCashInput(
+          ""
+        );
+
+        return;
+      }
+
+      setCashInput(
+        selectedAccount
+          .cashBaselineKrw !==
+          null
+          ? String(
+              selectedAccount
+                .cashBaselineKrw
+            )
+          : ""
+      );
+    },
+    [
+      selectedAccountId,
+      selectedAccount
+        ?.cashBaselineKrw
+    ]
+  );
+
+
+  async function handleSaveCashBaseline() {
+    if (
+      !selectedAccountId
+    ) {
+      return;
+    }
+
+
+    const parsed =
+      Number(
+        cashInput
+      );
+
+
+    if (
+      !Number.isFinite(
+        parsed
+      ) ||
+      parsed <
+        0
+    ) {
+      setCashError(
+        "올바른 금액을 입력해주세요."
+      );
+
+      return;
+    }
+
+
+    setCashSaving(
+      true
+    );
+
+    setCashError(
+      ""
+    );
+
+
+    try {
+      await setInvestmentCashBaseline({
+        accountId:
+          selectedAccountId,
+
+        cashBaselineKrw:
+          parsed,
+
+        force:
+          true
+      });
+
+
+      await loadDashboard();
+    } catch (
+      err
+    ) {
+      setCashError(
+        err instanceof Error
+          ? err.message
+          : "예수금 기준값 저장에 실패했습니다."
+      );
+    } finally {
+      setCashSaving(
+        false
+      );
+    }
   }
-}
 
-.lookupResult {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
 
-  padding: 12px;
-
-  background:
-    var(--color-surface);
-}
-
-.lookupResult > div {
-  min-width: 0;
-
-  display: grid;
-  gap: 3px;
-}
-
-.lookupResult strong {
-  overflow: hidden;
-
-  font-size: 15px;
-
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.lookupResult span {
-  color:
-    var(--color-text-secondary);
-
-  font-size: 12px;
-}
-
-.metaEditButton {
-  flex-shrink: 0;
-
-  min-height: 34px;
-  padding: 0 10px;
-
-  border:
-    1px solid
-    var(--color-border);
-
-  border-radius:
-    var(--radius-sm);
-
-  background:
-    var(--color-surface-soft);
-
-  color:
-    var(--color-text-secondary);
-
-  font: inherit;
-  font-size: 12px;
-  font-weight: 700;
-
-  cursor: pointer;
-}
-
-.manualMetaBox {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-
-  padding: 12px;
-
-  background:
-    var(--color-surface);
-}
-
-.lookupNotice {
-  margin: 0;
-
-  color:
-    var(--color-text-secondary);
-
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-/* =========================================================
-   v2.2.9 종목이름 검색형 매매 기록
-   ========================================================= */
-
-.searchSection {
-  position: relative;
-}
-
-.searchInputWrap {
-  position: relative;
-}
-
-.searchIcon {
-  position: absolute;
-  left: 13px;
-  top: 50%;
-  transform: translateY(-50%);
-
-  color: var(--color-text-secondary);
-  font-size: 19px;
-  line-height: 1;
-
-  pointer-events: none;
-}
-
-.searchInput {
-  width: 100%;
-  min-height: 48px;
-  box-sizing: border-box;
-
-  padding: 0 13px 0 40px;
-
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-
-  font: inherit;
-  font-size: 15px;
-  outline: none;
-}
-
-.searchInput:focus {
-  border-color: var(--color-primary);
-}
-
-.searchPanel {
-  overflow: hidden;
-
-  margin-top: 8px;
-
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-
-  background: var(--color-surface);
-  box-shadow: var(--shadow-card);
-}
-
-.resultGroup + .resultGroup {
-  border-top: 1px solid var(--color-border);
-}
-
-.resultGroupTitle {
-  padding: 9px 12px 7px;
-
-  background: var(--color-surface-soft);
-  color: var(--color-text-secondary);
-
-  font-size: 11px;
-  font-weight: 800;
-}
-
-.resultItem {
-  width: 100%;
-
-  display: grid;
-  gap: 4px;
-
-  padding: 11px 12px;
-
-  border: 0;
-  border-top: 1px solid var(--color-border);
-
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.resultGroupTitle + .resultItem {
-  border-top: 0;
-}
-
-.resultItem:active {
-  background: var(--color-surface-soft);
-}
-
-.resultName {
-  overflow: hidden;
-
-  font-size: 15px;
-  font-weight: 800;
-
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.resultMeta {
-  overflow: hidden;
-
-  color: var(--color-text-secondary);
-  font-size: 12px;
-
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.searchState {
-  min-height: 46px;
-
-  display: flex;
-  align-items: center;
-  gap: 8px;
-
-  padding: 0 12px;
-
-  color: var(--color-text-secondary);
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-.manualLink {
-  width: 100%;
-  min-height: 40px;
-
-  border: 0;
-  border-top: 1px solid var(--color-border);
-
-  background: var(--color-surface-soft);
-  color: var(--color-text-secondary);
-
-  font: inherit;
-  font-size: 12px;
-  font-weight: 700;
-
-  cursor: pointer;
-}
-
-.selectedInstrument {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-
-  padding: 13px 14px;
-
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-
-  background: var(--color-surface-soft);
-}
-
-.selectedInstrumentMain {
-  min-width: 0;
-
-  display: grid;
-  gap: 4px;
-}
-
-.selectedInstrumentMain strong {
-  overflow: hidden;
-
-  font-size: 16px;
-
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.selectedInstrumentMain span {
-  overflow: hidden;
-
-  color: var(--color-text-secondary);
-  font-size: 12px;
-
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.changeInstrumentButton,
-.textButton {
-  flex-shrink: 0;
-
-  border: 0;
-  background: transparent;
-
-  color: var(--color-primary);
-
-  font: inherit;
-  font-size: 12px;
-  font-weight: 800;
-
-  cursor: pointer;
-}
-
-.manualBox {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-
-  padding: 14px;
-
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-
-  background: var(--color-surface-soft);
-}
-
-.manualHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-
-.manualHeader strong {
-  font-size: 14px;
-}
-
-.secondaryButton {
-  min-height: 44px;
-
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-
-  font: inherit;
-  font-size: 14px;
-  font-weight: 800;
-
-  cursor: pointer;
-}
-
-/* v2.2.16 - 종목 검색 결과를 더 많이 보여주되 화면 안에서 스크롤 */
-.searchPanel {
-  max-height: min(58dvh, 560px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
+  function getManualPriceInput(
+    holdingId: string,
+    manualPrice:
+      number |
+      null |
+      undefined,
+    currentPrice:
+      number |
+      null |
+      undefined
+  ) {
+    if (
+      Object.prototype
+        .hasOwnProperty
+        .call(
+          manualPriceDrafts,
+          holdingId
+        )
+    ) {
+      return manualPriceDrafts[
+        holdingId
+      ];
+    }
+
+    const value =
+      manualPrice ??
+      currentPrice;
+
+    return (
+      value !== null &&
+      value !== undefined &&
+      Number.isFinite(value)
+    )
+      ? String(value)
+      : "";
+  }
+
+
+  function handleManualPriceChange(
+    holdingId: string,
+    value: string
+  ) {
+    setManualPriceDrafts(
+      current => ({
+        ...current,
+        [holdingId]: value
+      })
+    );
+
+    setManualPriceErrors(
+      current => ({
+        ...current,
+        [holdingId]: ""
+      })
+    );
+
+    setManualPriceFeedbackId(
+      null
+    );
+  }
+
+
+  async function handleSaveManualPrice(
+    holdingId: string,
+    manualPrice:
+      number |
+      null |
+      undefined,
+    currentPrice:
+      number |
+      null |
+      undefined
+  ) {
+    const input =
+      getManualPriceInput(
+        holdingId,
+        manualPrice,
+        currentPrice
+      );
+
+    const parsed =
+      Number(input);
+
+    if (
+      !Number.isFinite(parsed) ||
+      parsed <= 0
+    ) {
+      setManualPriceErrors(
+        current => ({
+          ...current,
+          [holdingId]:
+            "수동 시세는 0보다 큰 숫자로 입력해주세요."
+        })
+      );
+
+      return;
+    }
+
+    setManualPriceSavingId(
+      holdingId
+    );
+
+    setManualPriceErrors(
+      current => ({
+        ...current,
+        [holdingId]: ""
+      })
+    );
+
+    setManualPriceFeedbackId(
+      null
+    );
+
+    try {
+      await updateHoldingManualPrice({
+        holdingId,
+        manualPrice:
+          parsed,
+        lastUpdated:
+          getToday()
+      });
+
+      setManualPriceDrafts(
+        current => ({
+          ...current,
+          [holdingId]:
+            String(parsed)
+        })
+      );
+
+      await loadDashboard();
+
+      setManualPriceFeedbackId(
+        holdingId
+      );
+    } catch (
+      err
+    ) {
+      setManualPriceErrors(
+        current => ({
+          ...current,
+          [holdingId]:
+            err instanceof Error
+              ? err.message
+              : "수동 시세 저장에 실패했습니다."
+        })
+      );
+    } finally {
+      setManualPriceSavingId(
+        null
+      );
+    }
+  }
+
+
+  if (
+    view === "manage"
+  ) {
+    return (
+      <main
+        className={
+          styles.page
+        }
+      >
+        <header
+          className={
+            styles.manageHeader
+          }
+        >
+          <button
+            type="button"
+            className={
+              styles.backButton
+            }
+            onClick={
+              closeAssetManagement
+            }
+            aria-label="자산 현황으로 돌아가기"
+          >
+            <span
+              aria-hidden="true"
+            >
+              ‹
+            </span>
+            자산
+          </button>
+
+          <h1
+            className={
+              styles.title
+            }
+          >
+            자산 관리
+          </h1>
+        </header>
+
+        <AccountSettings />
+      </main>
+    );
+  }
+
+
+  return (
+    <main
+      className={
+        styles.page
+      }
+    >
+      <header className={styles.header}>
+        <h1 className={styles.title}>자산</h1>
+
+        <button
+          type="button"
+          className={
+            styles.manageButton
+          }
+          onClick={
+            openAssetManagement
+          }
+        >
+          관리
+        </button>
+      </header>
+
+
+      <section
+        className={
+          styles.summaryCard
+        }
+      >
+        {loading && (
+          <p
+            className={
+              styles.loading
+            }
+          >
+            순자산 요약을 불러오는 중입니다.
+          </p>
+        )}
+
+
+        {!loading &&
+          error && (
+            <p
+              className={
+                styles.error
+              }
+            >
+              {error}
+            </p>
+          )}
+
+
+        {!loading &&
+          !error &&
+          summary && (
+            <div className={styles.summaryHero}>
+              <span className={styles.summaryHeroLabel}>순자산</span>
+              <strong
+                className={`${styles.summaryHeroValue} ${summary.netWorth < 0 ? styles.summaryHeroNegative : ""}`}
+                title={formatCurrency(summary.netWorth)}
+              >
+                {formatCurrency(summary.netWorth)}
+              </strong>
+
+              <div className={styles.summarySecondary}>
+                <div>
+                  <span>총자산</span>
+                  <strong title={formatCurrency(summary.assets)}>
+                    {formatCurrency(summary.assets)}
+                  </strong>
+                </div>
+                <div>
+                  <span>총부채</span>
+                  <strong title={formatCurrency(summary.liabilities)}>
+                    {formatCurrency(summary.liabilities)}
+                  </strong>
+                </div>
+              </div>
+            </div>
+          )}
+      </section>
+
+
+      <div
+        className={
+          styles.tabs
+        }
+      >
+        <button
+          type="button"
+          className={[
+            styles.tabButton,
+
+            activeTab ===
+            "cash"
+              ? styles
+                  .tabButtonActive
+              : ""
+          ]
+            .filter(
+              Boolean
+            )
+            .join(
+              " "
+            )}
+          onClick={
+            () =>
+              setActiveTab(
+                "cash"
+              )
+          }
+        >
+          현금성자산
+        </button>
+
+
+        <button
+          type="button"
+          className={[
+            styles.tabButton,
+
+            activeTab ===
+            "investment"
+              ? styles
+                  .tabButtonActive
+              : ""
+          ]
+            .filter(
+              Boolean
+            )
+            .join(
+              " "
+            )}
+          onClick={
+            () =>
+              setActiveTab(
+                "investment"
+              )
+          }
+        >
+          투자
+        </button>
+      </div>
+
+
+      {activeTab ===
+        "cash" && (
+        <section
+          className={
+            styles.section
+          }
+        >
+          <h2 className={styles.sectionTitle}>현금성자산</h2>
+
+
+          {!loading &&
+            summary && (
+              <div
+                className={
+                  styles.cashSummary
+                }
+              >
+                <span
+                  className={
+                    styles.summaryLabel
+                  }
+                >
+                  합계
+                </span>
+
+                <strong
+                  className={
+                    styles.summaryValue
+                  }
+                >
+                  {formatCurrency(
+                    summary
+                      .cashLikeValue
+                  )}
+                </strong>
+              </div>
+            )}
+
+
+          {loading && (
+            <p
+              className={
+                styles.loading
+              }
+            >
+              불러오는 중입니다.
+            </p>
+          )}
+
+
+          {!loading &&
+            cashLikeAccounts
+              .length ===
+              0 && (
+              <p
+                className={
+                  styles.emptyState
+                }
+              >
+                표시할 현금성 계좌가 없습니다.
+              </p>
+            )}
+
+
+          {!loading &&
+            cashLikeAccounts
+              .length >
+              0 && (
+              <ul
+                className={
+                  styles.cashAccountList
+                }
+              >
+                {cashLikeAccounts.map(
+                  account => (
+                    <li
+                      key={
+                        account.accountId
+                      }
+                      className={
+                        styles.cashAccountRow
+                      }
+                    >
+                      <div
+                        className={
+                          styles.cashAccountInfo
+                        }
+                      >
+                        <strong
+                          className={
+                            styles.cashAccountName
+                          }
+                        >
+                          {
+                            account.displayName
+                          }
+                        </strong>
+
+                        <span
+                          className={
+                            styles.cashAccountMeta
+                          }
+                        >
+                          {
+                            account.subType
+                          }
+                        </span>
+                      </div>
+
+
+                      <strong
+                        className={
+                          styles.cashAccountValue
+                        }
+                      >
+                        {formatCurrency(
+                          account.currentBalance
+                        )}
+                      </strong>
+                    </li>
+                  )
+                )}
+              </ul>
+            )}
+        </section>
+      )}
+
+
+      {activeTab ===
+        "investment" && (
+        <section
+          className={
+            styles.section
+          }
+        >
+          <div
+            className={
+              styles.sectionHeading
+            }
+          >
+            <h2
+              className={
+                styles.sectionTitle
+              }
+            >
+              투자자산
+            </h2>
+
+            {!loading &&
+              investmentAccounts
+                .length >
+                0 && (
+                <span
+                  className={
+                    styles.sectionCount
+                  }
+                >
+                  {
+                    investmentAccounts
+                      .length
+                  }
+                  개 계좌
+                </span>
+              )}
+          </div>
+
+
+          {!loading &&
+            summary && (
+              <div
+                className={
+                  styles.investmentSummary
+                }
+              >
+                <div>
+                  <span
+                    className={
+                      styles.summaryLabel
+                    }
+                  >
+                    합계
+                  </span>
+
+                  <strong
+                    className={
+                      styles.investmentSummaryValue
+                    }
+                  >
+                    {formatCurrency(
+                      summary
+                        .investmentValue
+                    )}
+                  </strong>
+                </div>
+
+
+                <div
+                  className={
+                    styles.investmentSummarySub
+                  }
+                >
+                  <span>
+                    예수금{" "}
+                    <strong>
+                      {formatCurrency(
+                        dashboard
+                          ?.investments
+                          .cashTotal
+                      )}
+                    </strong>
+                  </span>
+
+                  <span>
+                    실현손익{" "}
+                    <strong
+                      style={{
+                        color:
+                          (
+                            dashboard
+                              ?.investments
+                              .realizedPnlTotal ??
+                            0
+                          ) <
+                          0
+                            ? "var(--color-error)"
+                            : undefined
+                      }}
+                    >
+                      {formatSignedCurrency(
+                        dashboard
+                          ?.investments
+                          .realizedPnlTotal
+                      )}
+                    </strong>
+                  </span>
+                </div>
+              </div>
+            )}
+
+
+          {loading && (
+            <p
+              className={
+                styles.loading
+              }
+            >
+              투자계좌를 불러오는 중입니다.
+            </p>
+          )}
+
+
+          {!loading &&
+            investmentAccounts
+              .length ===
+              0 && (
+              <p
+                className={
+                  styles.emptyState
+                }
+              >
+                등록된 투자계좌가 없습니다.
+              </p>
+            )}
+
+
+          {!loading &&
+            investmentAccounts
+              .length >
+              0 && (
+              <div
+                className={
+                  styles.accountList
+                }
+              >
+                {investmentAccounts.map(
+                  account => {
+                    const isSelected =
+                      selectedAccountId ===
+                      account.accountId;
+
+
+                    const holdingCount =
+                      investmentHoldings.filter(
+                        holding =>
+                          holding.accountId ===
+                          account.accountId
+                      ).length;
+
+
+                    return (
+                      <Fragment
+                        key={
+                          account.accountId
+                        }
+                      >
+                        <button
+                          type="button"
+                          className={[
+                            styles.accountCard,
+
+                            isSelected
+                              ? styles
+                                  .accountCardActive
+                              : ""
+                          ]
+                            .filter(
+                              Boolean
+                            )
+                            .join(
+                              " "
+                            )}
+                          onClick={
+                            () => {
+                              setCashError(
+                                ""
+                              );
+
+                              setSelectedAccountId(
+                                isSelected
+                                  ? null
+                                  : account.accountId
+                              );
+                            }
+                          }
+                        >
+                          <div
+                            className={
+                              styles.accountCardTop
+                            }
+                          >
+                            <div
+                              className={
+                                styles.accountIdentity
+                              }
+                            >
+                              <strong
+                                className={
+                                  styles.accountName
+                                }
+                              >
+                                {
+                                  account.accountName
+                                }
+                              </strong>
+
+                              <span
+                                className={
+                                  styles.accountSub
+                                }
+                              >
+                                {
+                                  account.subType
+                                }
+                                {" · "}
+                                {
+                                  holdingCount
+                                }
+                                종목
+                              </span>
+                            </div>
+
+
+                            <div
+                              className={
+                                styles.accountTotal
+                              }
+                            >
+                              <strong>
+                                {formatCurrency(
+                                  account.accountValueKrw
+                                )}
+                              </strong>
+
+                              <span>
+                                총 평가
+                              </span>
+                            </div>
+                          </div>
+
+
+                          <div
+                            className={
+                              styles.accountMetrics
+                            }
+                          >
+                            <div
+                              className={
+                                styles.accountMetric
+                              }
+                            >
+                              <span>
+                                예수금
+                              </span>
+
+                              <strong>
+                                {account.cashBaselineConfigured
+                                  ? formatCurrency(
+                                      account.currentCashKrw
+                                    )
+                                  : "미설정"}
+                              </strong>
+                            </div>
+
+
+                            <div
+                              className={
+                                styles.accountMetric
+                              }
+                            >
+                              <span>
+                                실현손익
+                              </span>
+
+                              <strong
+                                style={{
+                                  color:
+                                    account.realizedPnlKrw <
+                                    0
+                                      ? "var(--color-error)"
+                                      : undefined
+                                }}
+                              >
+                                {formatSignedCurrency(
+                                  account.realizedPnlKrw
+                                )}
+                              </strong>
+                            </div>
+                          </div>
+                        </button>
+
+
+                        {isSelected &&
+                          selectedAccount && (
+                            <div
+                              className={
+                                styles.detailCard
+                              }
+                            >
+                              <div
+                                className={
+                                  styles.detailHeader
+                                }
+                              >
+                                <div>
+                                  <span
+                                    className={
+                                      styles.detailEyebrow
+                                    }
+                                  >
+                                    투자계좌
+                                  </span>
+
+                                  <h3
+                                    className={
+                                      styles.detailTitle
+                                    }
+                                  >
+                                    {
+                                      selectedAccount.accountName
+                                    }
+                                  </h3>
+                                </div>
+
+
+                                <strong
+                                  className={
+                                    styles.detailTotal
+                                  }
+                                >
+                                  {formatCurrency(
+                                    selectedAccount.accountValueKrw
+                                  )}
+                                </strong>
+                              </div>
+
+
+                              <div
+                                className={
+                                  styles.detailMetrics
+                                }
+                              >
+                                <div
+                                  className={
+                                    styles.detailMetric
+                                  }
+                                >
+                                  <span>
+                                    현재 예수금
+                                  </span>
+
+                                  <strong>
+                                    {selectedAccount.cashBaselineConfigured
+                                      ? formatCurrency(
+                                          selectedAccount.currentCashKrw
+                                        )
+                                      : "미설정"}
+                                  </strong>
+                                </div>
+
+
+                                <div
+                                  className={
+                                    styles.detailMetric
+                                  }
+                                >
+                                  <span>
+                                    보유종목
+                                  </span>
+
+                                  <strong>
+                                    {formatCurrency(
+                                      selectedAccount.holdingValueKrw
+                                    )}
+                                  </strong>
+                                </div>
+
+
+                                <div
+                                  className={
+                                    styles.detailMetric
+                                  }
+                                >
+                                  <span>
+                                    실현손익
+                                  </span>
+
+                                  <strong
+                                    style={{
+                                      color:
+                                        selectedAccount.realizedPnlKrw <
+                                        0
+                                          ? "var(--color-error)"
+                                          : undefined
+                                    }}
+                                  >
+                                    {formatSignedCurrency(
+                                      selectedAccount.realizedPnlKrw
+                                    )}
+                                  </strong>
+                                </div>
+                              </div>
+
+
+                              {!selectedAccount
+                                .cashBaselineConfigured && (
+                                <div
+                                  className={
+                                    styles.cashSetupCard
+                                  }
+                                >
+                                  <div
+                                    className={
+                                      styles.cashSetupHeading
+                                    }
+                                  >
+                                    <strong>
+                                      예수금 설정
+                                    </strong>
+
+                                    <span>
+                                      증권사 앱의 현재 예수금을 한 번 입력해주세요.
+                                    </span>
+                                  </div>
+
+
+                                  <div
+                                    className={
+                                      styles.cashForm
+                                    }
+                                  >
+                                    <input
+                                      className={
+                                        styles.cashInput
+                                      }
+                                      type="number"
+                                      inputMode="numeric"
+                                      min="0"
+                                      value={
+                                        cashInput
+                                      }
+                                      onChange={
+                                        event =>
+                                          setCashInput(
+                                            event.target.value
+                                          )
+                                      }
+                                      placeholder="예: 327500"
+                                    />
+
+                                    <button
+                                      type="button"
+                                      className={
+                                        styles.cashButton
+                                      }
+                                      onClick={
+                                        handleSaveCashBaseline
+                                      }
+                                      disabled={
+                                        cashSaving
+                                      }
+                                    >
+                                      {cashSaving
+                                        ? "저장 중..."
+                                        : "설정"}
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+
+
+                              {selectedAccount
+                                .cashBaselineConfigured && (
+                                <details
+                                  className={
+                                    styles.baselineDetails
+                                  }
+                                >
+                                  <summary
+                                    className={
+                                      styles.baselineSummary
+                                    }
+                                  >
+                                    예수금 기준값 다시 설정
+                                  </summary>
+
+
+                                  <div
+                                    className={
+                                      styles.baselineBody
+                                    }
+                                  >
+                                    <p
+                                      className={
+                                        styles.helperText
+                                      }
+                                    >
+                                      현재 예수금과 다른 값입니다.
+                                      투자거래 계산의 시작점이 되는 기준값입니다.
+                                    </p>
+
+
+                                    <div
+                                      className={
+                                        styles.cashForm
+                                      }
+                                    >
+                                      <input
+                                        className={
+                                          styles.cashInput
+                                        }
+                                        type="number"
+                                        inputMode="numeric"
+                                        min="0"
+                                        value={
+                                          cashInput
+                                        }
+                                        onChange={
+                                          event =>
+                                            setCashInput(
+                                              event.target.value
+                                            )
+                                        }
+                                      />
+
+                                      <button
+                                        type="button"
+                                        className={
+                                          styles.cashButton
+                                        }
+                                        onClick={
+                                          handleSaveCashBaseline
+                                        }
+                                        disabled={
+                                          cashSaving
+                                        }
+                                      >
+                                        {cashSaving
+                                          ? "저장 중..."
+                                          : "저장"}
+                                      </button>
+                                    </div>
+                                  </div>
+                                </details>
+                              )}
+
+
+                              {cashError && (
+                                <p
+                                  className={
+                                    styles.error
+                                  }
+                                >
+                                  {cashError}
+                                </p>
+                              )}
+
+
+                              <div
+                                className={
+                                  styles.holdingsHeader
+                                }
+                              >
+                                <h4
+                                  className={
+                                    styles.holdingsTitle
+                                  }
+                                >
+                                  보유종목
+                                </h4>
+
+                                <span
+                                  className={
+                                    styles.holdingsCount
+                                  }
+                                >
+                                  {
+                                    holdingsForSelected.length
+                                  }
+                                  종목
+                                </span>
+                              </div>
+
+
+                              {holdingsForSelected
+                                .length ===
+                                0 && (
+                                <p
+                                  className={
+                                    styles.emptyState
+                                  }
+                                >
+                                  보유 중인 종목이 없습니다.
+                                </p>
+                              )}
+
+
+                              {holdingsForSelected
+                                .length >
+                                0 && (
+                                <ul
+                                  className={
+                                    styles.investmentHoldingList
+                                  }
+                                >
+                                  {holdingsForSelected.map(
+                                    holding => {
+                                      const evaluationPnl =
+                                        holding.valueKrw -
+                                        holding.costKrw;
+
+
+                                      return (
+                                        <li
+                                          key={
+                                            holding.holdingId
+                                          }
+                                          className={
+                                            styles.investmentHoldingRow
+                                          }
+                                        >
+                                          <div
+                                            className={
+                                              styles.investmentHoldingTop
+                                            }
+                                          >
+                                            <div
+                                              className={
+                                                styles.investmentHoldingIdentity
+                                              }
+                                            >
+                                              <div
+                                                className={
+                                                  styles.stockNameRow
+                                                }
+                                              >
+                                                <strong
+                                                  className={
+                                                    styles.holdingName
+                                                  }
+                                                >
+                                                  {
+                                                    holding.stockName
+                                                  }
+                                                </strong>
+
+
+                                                {holding.quoteMode ===
+                                                  "수동" && (
+                                                  <span
+                                                    className={
+                                                      styles.manualBadge
+                                                    }
+                                                  >
+                                                    수동시세
+                                                  </span>
+                                                )}
+                                              </div>
+
+
+                                              <span
+                                                className={
+                                                  styles.holdingMeta
+                                                }
+                                              >
+                                                {
+                                                  holding.stockCode
+                                                }
+                                                {" · "}
+                                                {
+                                                  holding.market
+                                                }
+                                                {" · "}
+                                                {formatQuantity(
+                                                  holding.quantity
+                                                )}
+                                                주
+                                              </span>
+                                            </div>
+
+
+                                            <div
+                                              className={
+                                                styles.holdingResult
+                                              }
+                                            >
+                                              <strong
+                                                className={
+                                                  styles.holdingValue
+                                                }
+                                              >
+                                                {formatCurrency(
+                                                  holding.valueKrw
+                                                )}
+                                              </strong>
+
+                                              <span
+                                                className={
+                                                  styles.holdingReturn
+                                                }
+                                                style={{
+                                                  color:
+                                                    holding.returnRate <
+                                                    0
+                                                      ? "var(--color-error)"
+                                                      : undefined
+                                                }}
+                                              >
+                                                {formatPercent(
+                                                  holding.returnRate
+                                                )}
+                                              </span>
+                                            </div>
+                                          </div>
+
+
+                                          <div
+                                            className={
+                                              styles.holdingDetails
+                                            }
+                                          >
+                                            <div
+                                              className={
+                                                styles.holdingDetailItem
+                                              }
+                                            >
+                                              <span>
+                                                평단
+                                              </span>
+
+                                              <strong>
+                                                {formatPrice(
+                                                  holding.avgBuyPrice,
+                                                  holding.market
+                                                )}
+                                              </strong>
+                                            </div>
+
+
+                                            <div
+                                              className={
+                                                styles.holdingDetailItem
+                                              }
+                                            >
+                                              <span>
+                                                현재가
+                                              </span>
+
+                                              <strong>
+                                                {formatPrice(
+                                                  holding.currentPrice,
+                                                  holding.market
+                                                )}
+                                              </strong>
+                                            </div>
+
+
+                                            <div
+                                              className={
+                                                styles.holdingDetailItem
+                                              }
+                                            >
+                                              <span>
+                                                평가손익
+                                              </span>
+
+                                              <strong
+                                                style={{
+                                                  color:
+                                                    evaluationPnl <
+                                                    0
+                                                      ? "var(--color-error)"
+                                                      : undefined
+                                                }}
+                                              >
+                                                {formatSignedCurrency(
+                                                  evaluationPnl
+                                                )}
+                                              </strong>
+                                            </div>
+                                          </div>
+
+
+                                          {holding.quoteMode ===
+                                            "수동" && (
+                                            <details
+                                              className={
+                                                styles.baselineDetails
+                                              }
+                                            >
+                                              <summary
+                                                className={
+                                                  styles.baselineSummary
+                                                }
+                                              >
+                                                수동시세 수정
+                                              </summary>
+
+                                              <div
+                                                className={
+                                                  styles.baselineBody
+                                                }
+                                              >
+                                                <p
+                                                  className={
+                                                    styles.helperText
+                                                  }
+                                                >
+                                                  자동 시세 대신 이 평가단가를 사용합니다.
+                                                </p>
+
+                                                <div
+                                                  className={
+                                                    styles.cashForm
+                                                  }
+                                                >
+                                                  <input
+                                                    className={
+                                                      styles.cashInput
+                                                    }
+                                                    type="number"
+                                                    inputMode="decimal"
+                                                    min="0"
+                                                    step="any"
+                                                    value={
+                                                      getManualPriceInput(
+                                                        holding.holdingId,
+                                                        holding.manualPrice,
+                                                        holding.currentPrice
+                                                      )
+                                                    }
+                                                    onChange={
+                                                      event =>
+                                                        handleManualPriceChange(
+                                                          holding.holdingId,
+                                                          event.target.value
+                                                        )
+                                                    }
+                                                    placeholder={
+                                                      holding.market ===
+                                                        "국내"
+                                                        ? "평가단가(원)"
+                                                        : "평가단가"
+                                                    }
+                                                  />
+
+                                                  <button
+                                                    type="button"
+                                                    className={
+                                                      styles.cashButton
+                                                    }
+                                                    disabled={
+                                                      manualPriceSavingId ===
+                                                        holding.holdingId
+                                                    }
+                                                    onClick={
+                                                      () =>
+                                                        void handleSaveManualPrice(
+                                                          holding.holdingId,
+                                                          holding.manualPrice,
+                                                          holding.currentPrice
+                                                        )
+                                                    }
+                                                  >
+                                                    {manualPriceSavingId ===
+                                                      holding.holdingId
+                                                      ? "저장 중..."
+                                                      : "시세 저장"}
+                                                  </button>
+                                                </div>
+
+                                                {manualPriceErrors[
+                                                  holding.holdingId
+                                                ] && (
+                                                  <p
+                                                    className={
+                                                      styles.error
+                                                    }
+                                                  >
+                                                    {manualPriceErrors[
+                                                      holding.holdingId
+                                                    ]}
+                                                  </p>
+                                                )}
+
+                                                {manualPriceFeedbackId ===
+                                                  holding.holdingId && (
+                                                  <p
+                                                    className={
+                                                      styles.helperText
+                                                    }
+                                                  >
+                                                    수동시세를 저장했습니다.
+                                                  </p>
+                                                )}
+                                              </div>
+                                            </details>
+                                          )}
+
+
+                                          {holding.market ===
+                                            "해외" &&
+                                            holding.fx >
+                                              0 && (
+                                              <p
+                                                className={
+                                                  styles.fxMeta
+                                                }
+                                              >
+                                                적용환율{" "}
+                                                {formatCurrency(
+                                                  holding.fx
+                                                )}
+                                              </p>
+                                            )}
+                                        </li>
+                                      );
+                                    }
+                                  )}
+                                </ul>
+                              )}
+
+
+                              <InvestmentTradeForm
+                                account={
+                                  selectedAccount
+                                }
+                                holdings={
+                                  holdingsForSelected
+                                }
+                                onSaved={
+                                  handleInvestmentSaved
+                                }
+                              />
+
+
+                              <InvestmentTradeHistory
+                                accountId={
+                                  selectedAccount.accountId
+                                }
+                                refreshKey={
+                                  tradeHistoryRefreshKey
+                                }
+                                onChanged={
+                                  handleInvestmentSaved
+                                }
+                              />
+                            </div>
+                          )}
+                      </Fragment>
+                    );
+                  }
+                )}
+              </div>
+            )}
+        </section>
+      )}
+    </main>
+  );
 }
