@@ -1775,3 +1775,9 @@ summary::after {
     border-radius: 20px;
   }
 }
+
+/* v2.2.16 - 카테고리/계좌 목록 텍스트 세로 정렬 */
+.managementRow > .itemTextGroup {
+  min-height: 42px;
+  align-content: center;
+}
