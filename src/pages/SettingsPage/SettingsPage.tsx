@@ -1375,30 +1375,7 @@ function SettingsHome(
                     styles.pageHeader
                 }
             >
-                <p
-                    className={
-                        styles.eyebrow
-                    }
-                >
-                    설정
-                </p>
-
-                <h1
-                    className={
-                        styles.pageTitle
-                    }
-                >
-                    우리 가계부 설정
-                </h1>
-
-                <p
-                    className={
-                        styles.pageDescription
-                    }
-                >
-                    부부가 함께 쓰는 설정과
-                    내 계정 정보를 관리합니다.
-                </p>
+                <h1 className={styles.pageTitle}>설정</h1>
             </header>
 
             <section
@@ -1993,6 +1970,39 @@ function CategorySettings() {
                 inactiveItems
             ]
         );
+
+
+    const activeMenuCategory =
+        managementItems.find(
+            category =>
+                category.categoryId ===
+                menuCategoryId
+        ) || null;
+
+
+    useEffect(
+        () => {
+            if (
+                !activeMenuCategory
+            ) {
+                return;
+            }
+
+            const previousOverflow =
+                document.body.style.overflow;
+
+            document.body.style.overflow =
+                "hidden";
+
+            return () => {
+                document.body.style.overflow =
+                    previousOverflow;
+            };
+        },
+        [
+            activeMenuCategory
+        ]
+    );
 
 
     async function runMutation(
@@ -2864,87 +2874,14 @@ function CategorySettings() {
                                                                                     styles.rowActions
                                                                                 }
                                                                             >
-                                                                                {
-                                                                                    menuOpen && (
-                                                                                        <>
-                                                                                            <button
-                                                                                                type="button"
-                                                                                                className={
-                                                                                                    styles.secondarySmallButton
-                                                                                                }
-                                                                                                onClick={
-                                                                                                    () => {
-                                                                                                        setEditingId(
-                                                                                                            category.categoryId
-                                                                                                        );
-
-                                                                                                        setEditingName(
-                                                                                                            category.name
-                                                                                                        );
-
-                                                                                                        setMenuCategoryId(
-                                                                                                            null
-                                                                                                        );
-                                                                                                    }
-                                                                                                }
-                                                                                            >
-                                                                                                이름 변경
-                                                                                            </button>
-
-                                                                                            <button
-                                                                                                type="button"
-                                                                                                className={
-                                                                                                    styles.secondarySmallButton
-                                                                                                }
-                                                                                                onClick={
-                                                                                                    () =>
-                                                                                                        void runMutation(
-                                                                                                            `active:${category.categoryId}`,
-
-                                                                                                            () =>
-                                                                                                                updateManagedCategory({
-                                                                                                                    categoryId:
-                                                                                                                        category.categoryId,
-
-                                                                                                                    active:
-                                                                                                                        !category.active
-                                                                                                                }),
-
-                                                                                                            category.active
-                                                                                                                ? "카테고리를 사용 중지했습니다."
-                                                                                                                : "카테고리를 다시 사용합니다."
-                                                                                                        )
-                                                                                                }
-                                                                                            >
-                                                                                                {
-                                                                                                    category.active
-                                                                                                        ? "사용 중지"
-                                                                                                        : "다시 사용"
-                                                                                                }
-                                                                                            </button>
-
-                                                                                            <button
-                                                                                                type="button"
-                                                                                                className={
-                                                                                                    styles.dangerSmallButton
-                                                                                                }
-                                                                                                onClick={
-                                                                                                    () =>
-                                                                                                        void handleDelete(
-                                                                                                            category
-                                                                                                        )
-                                                                                                }
-                                                                                            >
-                                                                                                삭제
-                                                                                            </button>
-                                                                                        </>
-                                                                                    )
-                                                                                }
-
                                                                                 <button
                                                                                     type="button"
                                                                                     className={
-                                                                                        styles.secondarySmallButton
+                                                                                        styles.iconMenuButton
+                                                                                    }
+                                                                                    aria-label={`${category.name} 메뉴`}
+                                                                                    aria-expanded={
+                                                                                        menuOpen
                                                                                     }
                                                                                     onClick={
                                                                                         () =>
@@ -2957,11 +2894,7 @@ function CategorySettings() {
                                                                                             )
                                                                                     }
                                                                                 >
-                                                                                    {
-                                                                                        menuOpen
-                                                                                            ? "닫기"
-                                                                                            : "⋮"
-                                                                                    }
+                                                                                    ⋮
                                                                                 </button>
                                                                             </div>
                                                                         </>
@@ -2975,6 +2908,146 @@ function CategorySettings() {
                                     </ul>
                                 )
                 }
+
+                {
+                    activeMenuCategory &&
+                    !reordering && (
+                        <div
+                            className={
+                                styles.actionSheetBackdrop
+                            }
+                            role="presentation"
+                            onClick={
+                                () =>
+                                    setMenuCategoryId(
+                                        null
+                                    )
+                            }
+                        >
+                            <section
+                                className={
+                                    styles.actionSheet
+                                }
+                                role="dialog"
+                                aria-modal="true"
+                                aria-label={`${activeMenuCategory.name} 카테고리 메뉴`}
+                                onClick={
+                                    event =>
+                                        event.stopPropagation()
+                                }
+                            >
+                                <span
+                                    className={
+                                        styles.actionSheetHandle
+                                    }
+                                />
+
+                                <strong
+                                    className={
+                                        styles.actionSheetTitle
+                                    }
+                                >
+                                    {activeMenuCategory.name}
+                                </strong>
+
+                                <button
+                                    type="button"
+                                    className={
+                                        styles.actionSheetButton
+                                    }
+                                    onClick={
+                                        () => {
+                                            setEditingId(
+                                                activeMenuCategory.categoryId
+                                            );
+
+                                            setEditingName(
+                                                activeMenuCategory.name
+                                            );
+
+                                            setMenuCategoryId(
+                                                null
+                                            );
+                                        }
+                                    }
+                                >
+                                    이름 변경
+                                </button>
+
+                                <button
+                                    type="button"
+                                    className={
+                                        styles.actionSheetButton
+                                    }
+                                    onClick={
+                                        () => {
+                                            setMenuCategoryId(
+                                                null
+                                            );
+
+                                            void runMutation(
+                                                `active:${activeMenuCategory.categoryId}`,
+
+                                                () =>
+                                                    updateManagedCategory({
+                                                        categoryId:
+                                                            activeMenuCategory.categoryId,
+
+                                                        active:
+                                                            !activeMenuCategory.active
+                                                    }),
+
+                                                activeMenuCategory.active
+                                                    ? "카테고리를 사용 중지했습니다."
+                                                    : "카테고리를 다시 사용합니다."
+                                            );
+                                        }
+                                    }
+                                >
+                                    {
+                                        activeMenuCategory.active
+                                            ? "사용 중지"
+                                            : "다시 사용"
+                                    }
+                                </button>
+
+                                <button
+                                    type="button"
+                                    className={`${styles.actionSheetButton} ${styles.actionSheetDanger}`}
+                                    onClick={
+                                        () => {
+                                            setMenuCategoryId(
+                                                null
+                                            );
+
+                                            void handleDelete(
+                                                activeMenuCategory
+                                            );
+                                        }
+                                    }
+                                >
+                                    삭제
+                                </button>
+
+                                <button
+                                    type="button"
+                                    className={
+                                        styles.actionSheetCancel
+                                    }
+                                    onClick={
+                                        () =>
+                                            setMenuCategoryId(
+                                                null
+                                            )
+                                    }
+                                >
+                                    취소
+                                </button>
+                            </section>
+                        </div>
+                    )
+                }
+
 
                 {
                     !reordering && (
@@ -3484,6 +3557,39 @@ function AccountSettings() {
                 inactiveAccounts
             ]
         );
+
+
+    const activeMenuAccount =
+        managementItems.find(
+            account =>
+                account.accountId ===
+                menuAccountId
+        ) || null;
+
+
+    useEffect(
+        () => {
+            if (
+                !activeMenuAccount
+            ) {
+                return;
+            }
+
+            const previousOverflow =
+                document.body.style.overflow;
+
+            document.body.style.overflow =
+                "hidden";
+
+            return () => {
+                document.body.style.overflow =
+                    previousOverflow;
+            };
+        },
+        [
+            activeMenuAccount
+        ]
+    );
 
 
     const hiddenAccountSet =
@@ -5033,74 +5139,14 @@ function AccountSettings() {
                                                                                                                                 styles.rowActions
                                                                                                                             }
                                                                                                                         >
-                                                                                                                            {
-                                                                                                                                menuOpen && (
-                                                                                                                                    <>
-                                                                                                                                        <button
-                                                                                                                                            type="button"
-                                                                                                                                            className={
-                                                                                                                                                styles.secondarySmallButton
-                                                                                                                                            }
-                                                                                                                                            onClick={
-                                                                                                                                                () =>
-                                                                                                                                                    beginEdit(
-                                                                                                                                                        account
-                                                                                                                                                    )
-                                                                                                                                            }
-                                                                                                                                        >
-                                                                                                                                            수정
-                                                                                                                                        </button>
-                                                            
-                                                                                                                                        {
-                                                                                                                                            account.active &&
-                                                                                                                                            normalizedPreferences &&
-                                                                                                                                            inputPreference.bootstrap && (
-                                                                                                                                                <button
-                                                                                                                                                    type="button"
-                                                                                                                                                    className={
-                                                                                                                                                        styles.secondarySmallButton
-                                                                                                                                                    }
-                                                                                                                                                    disabled={
-                                                                                                                                                        inputPreference.saving
-                                                                                                                                                    }
-                                                                                                                                                    onClick={
-                                                                                                                                                        () =>
-                                                                                                                                                            void handleToggleInputVisibility(
-                                                                                                                                                                account
-                                                                                                                                                            )
-                                                                                                                                                    }
-                                                                                                                                                >
-                                                                                                                                                    {
-                                                                                                                                                        hidden
-                                                                                                                                                            ? "입력 표시"
-                                                                                                                                                            : "입력 숨김"
-                                                                                                                                                    }
-                                                                                                                                                </button>
-                                                                                                                                            )
-                                                                                                                                        }
-                                                            
-                                                                                                                                        <button
-                                                                                                                                            type="button"
-                                                                                                                                            className={
-                                                                                                                                                styles.dangerSmallButton
-                                                                                                                                            }
-                                                                                                                                            onClick={
-                                                                                                                                                () =>
-                                                                                                                                                    void handleDelete(
-                                                                                                                                                        account
-                                                                                                                                                    )
-                                                                                                                                            }
-                                                                                                                                        >
-                                                                                                                                            삭제
-                                                                                                                                        </button>
-                                                                                                                                    </>
-                                                                                                                                )
-                                                                                                                            }
-                                                            
                                                                                                                             <button
                                                                                                                                 type="button"
                                                                                                                                 className={
-                                                                                                                                    styles.secondarySmallButton
+                                                                                                                                    styles.iconMenuButton
+                                                                                                                                }
+                                                                                                                                aria-label={`${account.displayName} 메뉴`}
+                                                                                                                                aria-expanded={
+                                                                                                                                    menuOpen
                                                                                                                                 }
                                                                                                                                 onClick={
                                                                                                                                     () =>
@@ -5113,11 +5159,7 @@ function AccountSettings() {
                                                                                                                                         )
                                                                                                                                 }
                                                                                                                             >
-                                                                                                                                {
-                                                                                                                                    menuOpen
-                                                                                                                                        ? "닫기"
-                                                                                                                                        : "⋮"
-                                                                                                                                }
+                                                                                                                                ⋮
                                                                                                                             </button>
                                                                                                                         </div>
                                                                                                                     </li>
@@ -5142,6 +5184,130 @@ function AccountSettings() {
                                     </ul>
                                 )
                 }
+
+                {
+                    activeMenuAccount &&
+                    !reordering && (
+                        <div
+                            className={
+                                styles.actionSheetBackdrop
+                            }
+                            role="presentation"
+                            onClick={
+                                () =>
+                                    setMenuAccountId(
+                                        null
+                                    )
+                            }
+                        >
+                            <section
+                                className={
+                                    styles.actionSheet
+                                }
+                                role="dialog"
+                                aria-modal="true"
+                                aria-label={`${activeMenuAccount.displayName} 메뉴`}
+                                onClick={
+                                    event =>
+                                        event.stopPropagation()
+                                }
+                            >
+                                <span
+                                    className={
+                                        styles.actionSheetHandle
+                                    }
+                                />
+
+                                <strong
+                                    className={
+                                        styles.actionSheetTitle
+                                    }
+                                >
+                                    {activeMenuAccount.displayName}
+                                </strong>
+
+                                <button
+                                    type="button"
+                                    className={
+                                        styles.actionSheetButton
+                                    }
+                                    onClick={
+                                        () =>
+                                            beginEdit(
+                                                activeMenuAccount
+                                            )
+                                    }
+                                >
+                                    수정
+                                </button>
+
+                                {
+                                    activeMenuAccount.active &&
+                                    normalizedPreferences &&
+                                    inputPreference.bootstrap && (
+                                        <button
+                                            type="button"
+                                            className={
+                                                styles.actionSheetButton
+                                            }
+                                            disabled={
+                                                inputPreference.saving
+                                            }
+                                            onClick={
+                                                () =>
+                                                    void handleToggleInputVisibility(
+                                                        activeMenuAccount
+                                                    )
+                                            }
+                                        >
+                                            {
+                                                hiddenAccountSet.has(
+                                                    activeMenuAccount.accountId
+                                                )
+                                                    ? "입력 표시"
+                                                    : "입력 숨김"
+                                            }
+                                        </button>
+                                    )
+                                }
+
+                                <button
+                                    type="button"
+                                    className={`${styles.actionSheetButton} ${styles.actionSheetDanger}`}
+                                    onClick={
+                                        () => {
+                                            setMenuAccountId(
+                                                null
+                                            );
+
+                                            void handleDelete(
+                                                activeMenuAccount
+                                            );
+                                        }
+                                    }
+                                >
+                                    삭제
+                                </button>
+
+                                <button
+                                    type="button"
+                                    className={
+                                        styles.actionSheetCancel
+                                    }
+                                    onClick={
+                                        () =>
+                                            setMenuAccountId(
+                                                null
+                                            )
+                                    }
+                                >
+                                    취소
+                                </button>
+                            </section>
+                        </div>
+                    )
+                }
+
 
                 {
                     !reordering && (
