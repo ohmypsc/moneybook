@@ -11,8 +11,8 @@
   position: relative;
   min-height: 138px;
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
+  align-items: center;
+  justify-content: center;
   gap: 16px;
   margin-bottom: 16px;
   padding: 24px 22px 20px;
@@ -23,22 +23,23 @@
     linear-gradient(145deg, #f8fbfa 0%, #e9f2f2 100%);
 }
 
-.headerVisual {
-  position: relative;
-  z-index: 2;
-  width: 78px;
-  height: 78px;
-  flex: 0 0 78px;
+
+.togetherBlock {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  min-width: 0;
 }
 
-.couplePhoto {
-  width: 72px;
-  height: 72px;
-  display: block;
+.homePhoto {
+  width: 58px;
+  height: 58px;
+  flex: 0 0 58px;
+  border: 1px solid rgba(126, 155, 158, 0.42);
+  border-radius: 18px;
   object-fit: cover;
-  object-position: 50% 43%;
-  border: 3px solid rgba(255, 255, 255, 0.9);
-  border-radius: 50%;
   box-shadow: 0 6px 18px rgba(46, 70, 82, 0.12);
 }
 
@@ -58,29 +59,6 @@
   letter-spacing: -0.045em;
   font-variant-numeric: tabular-nums;
 }
-
-.refreshButton {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  z-index: 3;
-  width: 31px;
-  height: 31px;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: 2px solid rgba(255, 255, 255, 0.94);
-  border-radius: 50%;
-  background: rgba(248, 251, 250, 0.96);
-  color: var(--color-primary);
-  box-shadow: 0 3px 10px rgba(46, 70, 82, 0.12);
-  font-size: 15px;
-  font-weight: 800;
-}
-
-.refreshButton:disabled { opacity: 0.55; }
-.refreshing { display: block; animation: homeSpin 0.7s linear infinite; }
-@keyframes homeSpin { to { transform: rotate(360deg); } }
 
 .summaryCard {
   padding: 18px;
@@ -239,9 +217,14 @@
 
 @media (max-width: 390px) {
   .page { padding-right: 14px; padding-left: 14px; }
-  .header { min-height: 126px; padding: 20px 18px 18px; }
-  .headerVisual { width: 70px; height: 70px; flex-basis: 70px; }
-  .couplePhoto { width: 65px; height: 65px; }
+  .header { min-height: 126px; padding: 20px 16px 18px; }
+  .togetherBlock { gap: 13px; }
+  .homePhoto {
+    width: 52px;
+    height: 52px;
+    flex-basis: 52px;
+    border-radius: 16px;
+  }
   .summaryCard { padding: 16px; }
   .summaryRow strong { font-size: 15px; }
   .cardRow,
