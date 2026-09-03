@@ -2,14 +2,14 @@
   "id": "/",
   "name": "우리 가계부",
   "short_name": "가계부",
-  "description": "부부가 함께 쓰는 수입·지출·자산 가계부",
+  "description": "미영♡승철이 함께 쓰는 가계부",
   "lang": "ko-KR",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#ffffff",
-  "theme_color": "#ffffff",
+  "background_color": "#f5f8f7",
+  "theme_color": "#f5f8f7",
   "icons": [
     {
       "src": "/icon-192.png",
