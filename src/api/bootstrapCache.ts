@@ -17,7 +17,7 @@ const SETTINGS_PATH =
   "/api/settings/input-preferences";
 
 const BOOTSTRAP_TTL_MS =
-  5 * 60 * 1000;
+  30 * 60 * 1000;
 
 const FETCH_PATCH_MARKER =
   "__moneybookBootstrapCacheFetchPatched";
@@ -162,6 +162,25 @@ export function getBootstrapCacheGeneration() {
   clearExpiredBootstrapCache();
 
   return bootstrapCacheGeneration;
+}
+
+
+/**
+ * 이미 프리페치된 bootstrap 응답이 있으면 첫 렌더에서 바로 꺼내 씁니다.
+ * InputPage가 캐시 응답을 기다리느라 잠깐 로딩 화면을 보여주는 현상을 줄입니다.
+ */
+export function getCachedBootstrapPayload<T>() {
+  clearExpiredBootstrapCache();
+
+  if (!bootstrapCache) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(bootstrapCache.body) as T;
+  } catch {
+    return null;
+  }
 }
 
 
