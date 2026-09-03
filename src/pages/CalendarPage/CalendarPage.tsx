@@ -679,7 +679,11 @@ function formatDeletedAt(
     );
 }
 
-export default function CalendarPage() {
+type CalendarPageProps = {
+    onAddTransaction?: (date: string) => void;
+};
+
+export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
     const today =
         getToday();
 
@@ -2220,31 +2224,9 @@ export default function CalendarPage() {
                     styles.header
                 }
             >
-                <p
-                    className={
-                        styles.eyebrow
-                    }
-                >
-                    달력
-                </p>
+                <p className={styles.eyebrow}>거래 기록</p>
 
-                <h1
-                    className={
-                        styles.title
-                    }
-                >
-                    거래 내역
-                </h1>
-
-                <p
-                    className={
-                        styles.description
-                    }
-                >
-                    날짜별 수입과 지출,
-                    계좌 이동 내역을
-                    한눈에 확인합니다.
-                </p>
+                <h1 className={styles.title}>내역</h1>
             </header>
 
             <div
@@ -2366,9 +2348,7 @@ export default function CalendarPage() {
                             styles.summaryIncome
                         ].join(" ")}
                     >
-                        {formatCurrency(
-                            summary.monthIncome
-                        )}
+                        {formatCalendarAmount(summary.monthIncome)}원
                     </strong>
                 </div>
 
@@ -2391,9 +2371,7 @@ export default function CalendarPage() {
                             styles.summaryExpense
                         ].join(" ")}
                     >
-                        {formatCurrency(
-                            summary.monthExpense
-                        )}
+                        {formatCalendarAmount(summary.monthExpense)}원
                     </strong>
                 </div>
 
@@ -2425,10 +2403,7 @@ export default function CalendarPage() {
                             )
                             .join(" ")}
                     >
-                        {formatCurrency(
-                            summary
-                                .monthNetCashFlow
-                        )}
+                        {summary.monthNetCashFlow < 0 ? "-" : summary.monthNetCashFlow > 0 ? "+" : ""}{formatCalendarAmount(summary.monthNetCashFlow)}원
                     </strong>
                 </div>
             </section>
@@ -2746,14 +2721,21 @@ export default function CalendarPage() {
                                     </h2>
                                 </div>
 
-                                <span
-                                    className={
-                                        styles.detailCount
-                                    }
-                                >
-                                    {selectedTransactions.length}
-                                    건
-                                </span>
+                                <div className={styles.detailHeaderActions}>
+                                    <span className={styles.detailCount}>
+                                        {selectedTransactions.length}건
+                                    </span>
+
+                                    {onAddTransaction && (
+                                        <button
+                                            type="button"
+                                            className={styles.addTransactionButton}
+                                            onClick={() => onAddTransaction(selectedDate)}
+                                        >
+                                            + 추가
+                                        </button>
+                                    )}
+                                </div>
                             </div>
 
                             <div
