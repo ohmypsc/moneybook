@@ -521,6 +521,91 @@
 
 
 /* =========================================================
+   저장 대기열
+   ========================================================= */
+
+.queueStatus,
+.queueFailure {
+  display: grid;
+  gap: 6px;
+
+  padding: 12px 14px;
+
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.queueStatus {
+  background: var(--color-surface-soft);
+  color: var(--color-text-secondary);
+}
+
+.queueStatus strong {
+  color: var(--color-text-primary);
+}
+
+.queueFailure {
+  background: var(--color-surface);
+  color: var(--color-error);
+}
+
+.queueFailureHeader,
+.queueFailureItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.queueFailureItem {
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border);
+}
+
+.queueFailureItem > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.queueFailureLabel {
+  color: var(--color-text-primary);
+  font-weight: 700;
+}
+
+.queueFailureMessage {
+  color: var(--color-error);
+  font-size: 12px;
+}
+
+.queueRetryButton {
+  flex: 0 0 auto;
+
+  min-height: 36px;
+  padding: 0 12px;
+
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+
+  cursor: pointer;
+}
+
+.queueRetryButton:hover {
+  background: var(--color-surface-soft);
+}
+
+
+/* =========================================================
    저장
    ========================================================= */
 
