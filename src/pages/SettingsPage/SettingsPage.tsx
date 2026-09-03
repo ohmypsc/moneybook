@@ -78,6 +78,39 @@ type SettingsView =
     | "profile";
 
 
+type SettingsHistoryState = {
+    moneybook?: boolean;
+    navigation?: string;
+    moneybookSettingsView?: SettingsView;
+};
+
+
+function isSettingsView(
+    value: unknown
+): value is SettingsView {
+    return (
+        value === "home" ||
+        value === "categories" ||
+        value === "accounts" ||
+        value === "ledger" ||
+        value === "profile"
+    );
+}
+
+
+function historySettingsView() {
+    const state =
+        window.history.state as
+            SettingsHistoryState | null;
+
+    return isSettingsView(
+        state?.moneybookSettingsView
+    )
+        ? state.moneybookSettingsView
+        : "home";
+}
+
+
 interface InputAccount {
     accountId: string;
     accountName?: string;
@@ -6176,8 +6209,112 @@ export default function SettingsPage() {
         useState<
             SettingsView
         >(
+            () =>
+                historySettingsView()
+        );
+
+
+    useEffect(
+        () => {
+            function handlePopState(
+                event: PopStateEvent
+            ) {
+                const state =
+                    event.state as
+                        SettingsHistoryState | null;
+
+                if (
+                    state?.navigation !==
+                    "settings"
+                ) {
+                    return;
+                }
+
+                setView(
+                    isSettingsView(
+                        state.moneybookSettingsView
+                    )
+                        ? state.moneybookSettingsView
+                        : "home"
+                );
+            }
+
+            window.addEventListener(
+                "popstate",
+                handlePopState
+            );
+
+            return () => {
+                window.removeEventListener(
+                    "popstate",
+                    handlePopState
+                );
+            };
+        },
+        []
+    );
+
+
+    useEffect(
+        () => {
+            window.requestAnimationFrame(
+                () =>
+                    window.scrollTo({
+                        top: 0,
+                        left: 0,
+                        behavior: "auto"
+                    })
+            );
+        },
+        [view]
+    );
+
+
+    function openView(
+        nextView: SettingsView
+    ) {
+        const currentState =
+            window.history.state as
+                SettingsHistoryState | null;
+
+        window.history.pushState(
+            {
+                ...(currentState || {}),
+                moneybook: true,
+                navigation: "settings",
+                moneybookSettingsView: nextView
+            },
+            ""
+        );
+
+        setView(
+            nextView
+        );
+    }
+
+
+    function handleDetailBack() {
+        const currentState =
+            window.history.state as
+                SettingsHistoryState | null;
+
+        if (
+            currentState?.navigation ===
+                "settings" &&
+            isSettingsView(
+                currentState.moneybookSettingsView
+            ) &&
+            currentState.moneybookSettingsView !==
+                "home"
+        ) {
+            window.history.back();
+            return;
+        }
+
+        setView(
             "home"
         );
+    }
 
 
     const detail = {
@@ -6227,7 +6364,7 @@ export default function SettingsPage() {
                     ? (
                         <SettingsHome
                             onOpen={
-                                setView
+                                openView
                             }
                         />
                     )
@@ -6245,10 +6382,7 @@ export default function SettingsPage() {
                                     ].description
                                 }
                                 onBack={
-                                    () =>
-                                        setView(
-                                            "home"
-                                        )
+                                    handleDetailBack
                                 }
                             />
 
