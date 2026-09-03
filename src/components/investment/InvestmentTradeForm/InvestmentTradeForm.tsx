@@ -154,8 +154,6 @@ export default function InvestmentTradeForm({
   const [unitPrice, setUnitPrice] = useState("");
   const [fxRate, setFxRate] = useState("");
   const [settlementKrw, setSettlementKrw] = useState("");
-  const [feeKrw, setFeeKrw] = useState("");
-  const [taxKrw, setTaxKrw] = useState("");
   const [memo, setMemo] = useState("");
 
   const [saving, setSaving] = useState(false);
@@ -256,8 +254,6 @@ export default function InvestmentTradeForm({
     setQuantity("");
     setUnitPrice("");
     setSettlementKrw("");
-    setFeeKrw("");
-    setTaxKrw("");
     setMemo("");
   }
 
@@ -351,25 +347,9 @@ export default function InvestmentTradeForm({
     return parsedQuantity * parsedPrice * parsedFx;
   }, [quantity, unitPrice, fxRate, isForeign]);
 
-  const feeNumber = useMemo(() => {
-    if (!feeKrw.trim()) return 0;
-    const value = Number(feeKrw);
-    return Number.isFinite(value) ? value : 0;
-  }, [feeKrw]);
+  const estimatedSettlement =
+    grossKrw;
 
-  const taxNumber = useMemo(() => {
-    if (!taxKrw.trim()) return 0;
-    const value = Number(taxKrw);
-    return Number.isFinite(value) ? value : 0;
-  }, [taxKrw]);
-
-  const estimatedSettlement = useMemo(() => {
-    if (grossKrw <= 0) return 0;
-
-    return tradeType === "매수"
-      ? grossKrw + feeNumber + taxNumber
-      : Math.max(0, grossKrw - feeNumber - taxNumber);
-  }, [grossKrw, feeNumber, taxNumber, tradeType]);
 
   const actualSettlement = useMemo(() => {
     if (!settlementKrw.trim()) return null;
@@ -381,6 +361,15 @@ export default function InvestmentTradeForm({
     actualSettlement !== null && actualSettlement > 0
       ? actualSettlement
       : estimatedSettlement;
+
+  const transactionCostDifference =
+    actualSettlement !== null &&
+    actualSettlement > 0 &&
+    grossKrw > 0
+      ? tradeType === "매수"
+        ? actualSettlement - grossKrw
+        : grossKrw - actualSettlement
+      : null;
 
   const cashAfterTrade =
     account.currentCashKrw !== null &&
@@ -536,19 +525,7 @@ export default function InvestmentTradeForm({
       return;
     }
 
-    const parsedFee = feeKrw.trim() ? Number(feeKrw) : 0;
 
-    if (!Number.isFinite(parsedFee) || parsedFee < 0) {
-      setError("수수료는 0 이상의 금액이어야 합니다.");
-      return;
-    }
-
-    const parsedTax = taxKrw.trim() ? Number(taxKrw) : 0;
-
-    if (!Number.isFinite(parsedTax) || parsedTax < 0) {
-      setError("세금은 0 이상의 금액이어야 합니다.");
-      return;
-    }
 
     let parsedSettlement: number | undefined;
 
@@ -572,8 +549,6 @@ export default function InvestmentTradeForm({
       unitPrice: parsedUnitPrice,
       currency: isForeign ? "USD" : "KRW",
       fxRate: parsedFxRate,
-      feeKrw: parsedFee,
-      taxKrw: parsedTax,
       requestId: makeRequestId()
     };
 
@@ -805,7 +780,7 @@ export default function InvestmentTradeForm({
                 }}
                 placeholder={
                   tradeType === "매수"
-                    ? "종목이름 검색"
+                    ? "종목이름 검색 · 예: 코덱스 나스닥"
                     : "보유종목 이름 검색"
                 }
                 autoComplete="off"
@@ -1048,45 +1023,16 @@ export default function InvestmentTradeForm({
             />
 
             <span className={styles.fieldHint}>
-              정확한 출금·입금액을 알고 있을 때만 입력하세요. 비워두면 자동 계산합니다.
+              증권사 거래내역에 찍힌 실제 금액을 알고 있을 때만 입력하세요. 비워두면 수량 × 체결단가 × 환율로 계산합니다.
             </span>
           </label>
 
-          <div className={styles.grid}>
-            <label className={styles.field}>
-              <span className={styles.label}>
-                수수료
-                <span className={styles.optional}>선택</span>
-              </span>
-              <input
-                className={styles.input}
-                type="number"
-                inputMode="numeric"
-                min="0"
-                step="1"
-                value={feeKrw}
-                onChange={event => setFeeKrw(event.target.value)}
-                placeholder="0"
-              />
-            </label>
-
-            <label className={styles.field}>
-              <span className={styles.label}>
-                세금
-                <span className={styles.optional}>선택</span>
-              </span>
-              <input
-                className={styles.input}
-                type="number"
-                inputMode="numeric"
-                min="0"
-                step="1"
-                value={taxKrw}
-                onChange={event => setTaxKrw(event.target.value)}
-                placeholder="0"
-              />
-            </label>
-          </div>
+          {transactionCostDifference !== null && (
+            <div className={styles.settlementSubRow}>
+              <span>거래비용 차이</span>
+              <span>{formatCurrency(transactionCostDifference)}</span>
+            </div>
+          )}
 
           <label className={styles.field}>
             <span className={styles.label}>
