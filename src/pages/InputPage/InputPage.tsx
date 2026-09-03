@@ -82,6 +82,23 @@ const CARD_PREPAYMENT_CATEGORY = "카드선결제";
 
 interface InputPageProps {
   userName: string;
+  initialDate?: string | null;
+}
+
+type PickerKind =
+  | "category"
+  | "paymentMethod"
+  | "spendingTarget"
+  | "incomeAccount"
+  | "fromAccount"
+  | "toAccount"
+  | "creditCard"
+  | "cardSource";
+
+interface PickerItem {
+  value: string;
+  label: string;
+  meta?: string;
 }
 
 let bootstrapPromise: Promise<BootstrapData> | null = null;
@@ -244,7 +261,8 @@ function isCardSettlementCategory(
 }
 
 export default function InputPage({
-  userName
+  userName,
+  initialDate = null
 }: InputPageProps) {
   const today =
     getToday();
@@ -287,8 +305,18 @@ export default function InputPage({
     setDate
   ] =
     useState(
-      today
+      initialDate || today
     );
+
+  useEffect(
+    () => {
+      if (initialDate) {
+        setDate(initialDate);
+      }
+    },
+    [initialDate]
+  );
+
 
   const [
     amount,
@@ -360,6 +388,32 @@ export default function InputPage({
     setSuccess
   ] =
     useState("");
+
+
+  const [
+    activePicker,
+    setActivePicker
+  ] =
+    useState<PickerKind | null>(
+      null
+    );
+
+  useEffect(
+    () => {
+      if (!activePicker) {
+        return;
+      }
+
+      const previousOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+
+      return () => {
+        document.body.style.overflow = previousOverflow;
+      };
+    },
+    [activePicker]
+  );
+
 
   const [
     queueVersion,
@@ -735,6 +789,8 @@ export default function InputPage({
   function handleModeChange(
     nextMode: InputMode
   ) {
+    setActivePicker(null);
+
     setMode(
       nextMode
     );
@@ -881,6 +937,141 @@ export default function InputPage({
       null;
 
     clearFeedback();
+  }
+
+  function getAccountValueLabel(
+    accountId: string
+  ) {
+    if (!accountId) {
+      return "선택하세요";
+    }
+
+    const account = allAccounts.find(
+      item => item.accountId === accountId
+    );
+
+    return account
+      ? getAccountLabel(account)
+      : "선택하세요";
+  }
+
+  function getPickerItems(
+    kind: PickerKind
+  ): PickerItem[] {
+    if (kind === "category") {
+      return categories.map(
+        category => ({
+          value: category.categoryId,
+          label: getCategoryLabel(category),
+          meta: category.type
+        })
+      );
+    }
+
+    if (kind === "spendingTarget") {
+      return (bootstrap?.spendingTargets ?? []).map(
+        target => ({
+          value: target,
+          label: target
+        })
+      );
+    }
+
+    let source: Account[] = accounts;
+
+    if (kind === "creditCard") {
+      source = creditCards;
+    } else if (kind === "cardSource") {
+      source = cardSourceAccounts;
+    }
+
+    return source.map(
+      account => ({
+        value: account.accountId,
+        label: getAccountLabel(account),
+        meta: [account.subType, account.owner]
+          .filter(Boolean)
+          .join(" · ")
+      })
+    );
+  }
+
+  function getPickerTitle(
+    kind: PickerKind
+  ) {
+    switch (kind) {
+      case "category":
+        return "카테고리 선택";
+      case "paymentMethod":
+        return "결제수단 선택";
+      case "spendingTarget":
+        return "지출대상 선택";
+      case "incomeAccount":
+        return "입금수단 선택";
+      case "fromAccount":
+        return "보내는 수단 선택";
+      case "toAccount":
+        return "받는 수단 선택";
+      case "creditCard":
+        return "결제할 카드 선택";
+      case "cardSource":
+        return "출금계좌 선택";
+    }
+  }
+
+  function getPickerSelectedValue(
+    kind: PickerKind
+  ) {
+    switch (kind) {
+      case "category":
+        return categoryId;
+      case "paymentMethod":
+        return paymentMethodId;
+      case "spendingTarget":
+        return spendingTarget;
+      case "incomeAccount":
+      case "toAccount":
+      case "creditCard":
+        return toAccountId;
+      case "fromAccount":
+      case "cardSource":
+        return fromAccountId;
+    }
+  }
+
+  function applyPickerValue(
+    kind: PickerKind,
+    value: string
+  ) {
+    if (kind === "category") {
+      handleCategoryChange(value);
+    } else if (kind === "paymentMethod") {
+      setPaymentMethodId(value);
+      requestMemory.current = null;
+      clearFeedback();
+    } else if (kind === "spendingTarget") {
+      setSpendingTarget(value);
+      requestMemory.current = null;
+      clearFeedback();
+    } else if (kind === "creditCard") {
+      handleCardChange(value);
+    } else if (kind === "fromAccount" || kind === "cardSource") {
+      setFromAccountId(value);
+      requestMemory.current = null;
+      clearFeedback();
+    } else {
+      setToAccountId(value);
+      requestMemory.current = null;
+      clearFeedback();
+    }
+
+    setActivePicker(null);
+  }
+
+  function getCategoryValueLabel() {
+    return selectedCategory
+      ? getCategoryLabel(selectedCategory)
+      : "선택하세요";
   }
 
   function validate():
@@ -1332,34 +1523,8 @@ export default function InputPage({
         styles.page
       }
     >
-      <header
-        className={
-          styles.header
-        }
-      >
-        <p
-          className={
-            styles.eyebrow
-          }
-        >
-          우리 가계부
-        </p>
-
-        <h1
-          className={
-            styles.title
-          }
-        >
-          거래 입력
-        </h1>
-
-        <p
-          className={
-            styles.description
-          }
-        >
-          수입과 지출, 계좌 이동을 간편하게 기록합니다.
-        </p>
+      <header className={styles.header}>
+        <h1 className={styles.title}>거래 입력</h1>
       </header>
 
       <div
@@ -1437,47 +1602,6 @@ export default function InputPage({
         >
           <label
             className={
-              styles.field
-            }
-          >
-            <span
-              className={
-                styles.fieldLabel
-              }
-            >
-              날짜{" "}
-
-              <span
-                className={
-                  styles.required
-                }
-              >
-                *
-              </span>
-            </span>
-
-            <input
-              type="date"
-              className={
-                styles.input
-              }
-              value={
-                date
-              }
-              disabled={
-                submitting
-              }
-              onChange={
-                event =>
-                  handleDateChange(
-                    event.target.value
-                  )
-              }
-            />
-          </label>
-
-          <label
-            className={
               styles.amountField
             }
           >
@@ -1544,6 +1668,47 @@ export default function InputPage({
                 styles.fieldLabel
               }
             >
+              날짜{" "}
+
+              <span
+                className={
+                  styles.required
+                }
+              >
+                *
+              </span>
+            </span>
+
+            <input
+              type="date"
+              className={
+                styles.input
+              }
+              value={
+                date
+              }
+              disabled={
+                submitting
+              }
+              onChange={
+                event =>
+                  handleDateChange(
+                    event.target.value
+                  )
+              }
+            />
+          </label>
+
+          <label
+            className={
+              styles.field
+            }
+          >
+            <span
+              className={
+                styles.fieldLabel
+              }
+            >
               카테고리{" "}
 
               <span
@@ -1555,50 +1720,17 @@ export default function InputPage({
               </span>
             </span>
 
-            <select
-              className={
-                styles.select
-              }
-              value={
-                categoryId
-              }
-              disabled={
-                submitting
-              }
-              onChange={
-                event =>
-                  handleCategoryChange(
-                    event.target.value
-                  )
-              }
+            <button
+              type="button"
+              className={styles.pickerButton}
+              disabled={submitting}
+              onClick={() => setActivePicker("category")}
             >
-              <option
-                value=""
-              >
-                선택하세요
-              </option>
-
-              {
-                categories.map(
-                  category => (
-                    <option
-                      key={
-                        category.categoryId
-                      }
-                      value={
-                        category.categoryId
-                      }
-                    >
-                      {
-                        getCategoryLabel(
-                          category
-                        )
-                      }
-                    </option>
-                  )
-                )
-              }
-            </select>
+              <span className={categoryId ? styles.pickerValue : styles.pickerPlaceholder}>
+                {getCategoryValueLabel()}
+              </span>
+              <span className={styles.pickerChevron} aria-hidden="true">⌄</span>
+            </button>
           </label>
 
           {
@@ -1638,56 +1770,17 @@ export default function InputPage({
                     </span>
                   </span>
 
-                  <select
-                    className={
-                      styles.select
-                    }
-                    value={
-                      paymentMethodId
-                    }
-                    disabled={
-                      submitting
-                    }
-                    onChange={
-                      event => {
-                        setPaymentMethodId(
-                          event.target.value
-                        );
-
-                        requestMemory.current =
-                          null;
-
-                        clearFeedback();
-                      }
-                    }
+                  <button
+                    type="button"
+                    className={styles.pickerButton}
+                    disabled={submitting}
+                    onClick={() => setActivePicker("paymentMethod")}
                   >
-                    <option
-                      value=""
-                    >
-                      선택하세요
-                    </option>
-
-                    {
-                      accounts.map(
-                        account => (
-                          <option
-                            key={
-                              account.accountId
-                            }
-                            value={
-                              account.accountId
-                            }
-                          >
-                            {
-                              getAccountLabel(
-                                account
-                              )
-                            }
-                          </option>
-                        )
-                      )
-                    }
-                  </select>
+                    <span className={paymentMethodId ? styles.pickerValue : styles.pickerPlaceholder}>
+                      {getAccountValueLabel(paymentMethodId)}
+                    </span>
+                    <span className={styles.pickerChevron} aria-hidden="true">⌄</span>
+                  </button>
 
                   <p
                     className={
@@ -1719,54 +1812,17 @@ export default function InputPage({
                     </span>
                   </span>
 
-                  <select
-                    className={
-                      styles.select
-                    }
-                    value={
-                      spendingTarget
-                    }
-                    disabled={
-                      submitting
-                    }
-                    onChange={
-                      event => {
-                        setSpendingTarget(
-                          event.target.value
-                        );
-
-                        requestMemory.current =
-                          null;
-
-                        clearFeedback();
-                      }
-                    }
+                  <button
+                    type="button"
+                    className={styles.pickerButton}
+                    disabled={submitting}
+                    onClick={() => setActivePicker("spendingTarget")}
                   >
-                    <option
-                      value=""
-                    >
-                      선택하세요
-                    </option>
-
-                    {
-                      bootstrap
-                        .spendingTargets
-                        .map(
-                          target => (
-                            <option
-                              key={
-                                target
-                              }
-                              value={
-                                target
-                              }
-                            >
-                              {target}
-                            </option>
-                          )
-                        )
-                    }
-                  </select>
+                    <span className={spendingTarget ? styles.pickerValue : styles.pickerPlaceholder}>
+                      {spendingTarget || "선택하세요"}
+                    </span>
+                    <span className={styles.pickerChevron} aria-hidden="true">⌄</span>
+                  </button>
                 </label>
               </div>
             )
@@ -1809,56 +1865,17 @@ export default function InputPage({
                     </span>
                   </span>
 
-                  <select
-                    className={
-                      styles.select
-                    }
-                    value={
-                      toAccountId
-                    }
-                    disabled={
-                      submitting
-                    }
-                    onChange={
-                      event => {
-                        setToAccountId(
-                          event.target.value
-                        );
-
-                        requestMemory.current =
-                          null;
-
-                        clearFeedback();
-                      }
-                    }
+                  <button
+                    type="button"
+                    className={styles.pickerButton}
+                    disabled={submitting}
+                    onClick={() => setActivePicker("incomeAccount")}
                   >
-                    <option
-                      value=""
-                    >
-                      선택하세요
-                    </option>
-
-                    {
-                      accounts.map(
-                        account => (
-                          <option
-                            key={
-                              account.accountId
-                            }
-                            value={
-                              account.accountId
-                            }
-                          >
-                            {
-                              getAccountLabel(
-                                account
-                              )
-                            }
-                          </option>
-                        )
-                      )
-                    }
-                  </select>
+                    <span className={toAccountId ? styles.pickerValue : styles.pickerPlaceholder}>
+                      {getAccountValueLabel(toAccountId)}
+                    </span>
+                    <span className={styles.pickerChevron} aria-hidden="true">⌄</span>
+                  </button>
                 </label>
               </div>
             )
@@ -1907,56 +1924,17 @@ export default function InputPage({
                       </span>
                     </span>
 
-                    <select
-                      className={
-                        styles.select
-                      }
-                      value={
-                        fromAccountId
-                      }
-                      disabled={
-                        submitting
-                      }
-                      onChange={
-                        event => {
-                          setFromAccountId(
-                            event.target.value
-                          );
-
-                          requestMemory.current =
-                            null;
-
-                          clearFeedback();
-                        }
-                      }
+                    <button
+                      type="button"
+                      className={styles.pickerButton}
+                      disabled={submitting}
+                      onClick={() => setActivePicker("fromAccount")}
                     >
-                      <option
-                        value=""
-                      >
-                        선택하세요
-                      </option>
-
-                      {
-                        accounts.map(
-                          account => (
-                            <option
-                              key={
-                                account.accountId
-                              }
-                              value={
-                                account.accountId
-                              }
-                            >
-                              {
-                                getAccountLabel(
-                                  account
-                                )
-                              }
-                            </option>
-                          )
-                        )
-                      }
-                    </select>
+                      <span className={fromAccountId ? styles.pickerValue : styles.pickerPlaceholder}>
+                        {getAccountValueLabel(fromAccountId)}
+                      </span>
+                      <span className={styles.pickerChevron} aria-hidden="true">⌄</span>
+                    </button>
                   </label>
 
                   <label
@@ -1980,56 +1958,17 @@ export default function InputPage({
                       </span>
                     </span>
 
-                    <select
-                      className={
-                        styles.select
-                      }
-                      value={
-                        toAccountId
-                      }
-                      disabled={
-                        submitting
-                      }
-                      onChange={
-                        event => {
-                          setToAccountId(
-                            event.target.value
-                          );
-
-                          requestMemory.current =
-                            null;
-
-                          clearFeedback();
-                        }
-                      }
+                    <button
+                      type="button"
+                      className={styles.pickerButton}
+                      disabled={submitting}
+                      onClick={() => setActivePicker("toAccount")}
                     >
-                      <option
-                        value=""
-                      >
-                        선택하세요
-                      </option>
-
-                      {
-                        accounts.map(
-                          account => (
-                            <option
-                              key={
-                                account.accountId
-                              }
-                              value={
-                                account.accountId
-                              }
-                            >
-                              {
-                                getAccountLabel(
-                                  account
-                                )
-                              }
-                            </option>
-                          )
-                        )
-                      }
-                    </select>
+                      <span className={toAccountId ? styles.pickerValue : styles.pickerPlaceholder}>
+                        {getAccountValueLabel(toAccountId)}
+                      </span>
+                      <span className={styles.pickerChevron} aria-hidden="true">⌄</span>
+                    </button>
                   </label>
                 </div>
               </div>
@@ -2100,50 +2039,17 @@ export default function InputPage({
                     </span>
                   </span>
 
-                  <select
-                    className={
-                      styles.select
-                    }
-                    value={
-                      toAccountId
-                    }
-                    disabled={
-                      submitting
-                    }
-                    onChange={
-                      event =>
-                        handleCardChange(
-                          event.target.value
-                        )
-                    }
+                  <button
+                    type="button"
+                    className={styles.pickerButton}
+                    disabled={submitting}
+                    onClick={() => setActivePicker("creditCard")}
                   >
-                    <option
-                      value=""
-                    >
-                      신용카드를 선택하세요
-                    </option>
-
-                    {
-                      creditCards.map(
-                        account => (
-                          <option
-                            key={
-                              account.accountId
-                            }
-                            value={
-                              account.accountId
-                            }
-                          >
-                            {
-                              getAccountLabel(
-                                account
-                              )
-                            }
-                          </option>
-                        )
-                      )
-                    }
-                  </select>
+                    <span className={toAccountId ? styles.pickerValue : styles.pickerPlaceholder}>
+                      {getAccountValueLabel(toAccountId)}
+                    </span>
+                    <span className={styles.pickerChevron} aria-hidden="true">⌄</span>
+                  </button>
                 </label>
 
                 <label
@@ -2167,57 +2073,17 @@ export default function InputPage({
                     </span>
                   </span>
 
-                  <select
-                    className={
-                      styles.select
-                    }
-                    value={
-                      fromAccountId
-                    }
-                    disabled={
-                      submitting ||
-                      !toAccountId
-                    }
-                    onChange={
-                      event => {
-                        setFromAccountId(
-                          event.target.value
-                        );
-
-                        requestMemory.current =
-                          null;
-
-                        clearFeedback();
-                      }
-                    }
+                  <button
+                    type="button"
+                    className={styles.pickerButton}
+                    disabled={submitting || !toAccountId}
+                    onClick={() => setActivePicker("cardSource")}
                   >
-                    <option
-                      value=""
-                    >
-                      선택하세요
-                    </option>
-
-                    {
-                      cardSourceAccounts.map(
-                        account => (
-                          <option
-                            key={
-                              account.accountId
-                            }
-                            value={
-                              account.accountId
-                            }
-                          >
-                            {
-                              getAccountLabel(
-                                account
-                              )
-                            }
-                          </option>
-                        )
-                      )
-                    }
-                  </select>
+                    <span className={fromAccountId ? styles.pickerValue : styles.pickerPlaceholder}>
+                      {getAccountValueLabel(fromAccountId)}
+                    </span>
+                    <span className={styles.pickerChevron} aria-hidden="true">⌄</span>
+                  </button>
 
                   {
                     selectedCard
@@ -2493,6 +2359,56 @@ export default function InputPage({
           </div>
         </section>
       </form>
+
+      {activePicker && (
+        <div
+          className={styles.sheetBackdrop}
+          role="presentation"
+          onClick={() => setActivePicker(null)}
+        >
+          <section
+            className={styles.sheet}
+            role="dialog"
+            aria-modal="true"
+            aria-label={getPickerTitle(activePicker)}
+            onClick={event => event.stopPropagation()}
+          >
+            <div className={styles.sheetHandle} aria-hidden="true" />
+            <div className={styles.sheetHeader}>
+              <h2>{getPickerTitle(activePicker)}</h2>
+              <button
+                type="button"
+                className={styles.sheetClose}
+                aria-label="닫기"
+                onClick={() => setActivePicker(null)}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className={styles.sheetList}>
+              {getPickerItems(activePicker).map(item => {
+                const selected = getPickerSelectedValue(activePicker) === item.value;
+
+                return (
+                  <button
+                    type="button"
+                    key={item.value}
+                    className={`${styles.sheetOption} ${selected ? styles.sheetOptionSelected : ""}`}
+                    onClick={() => applyPickerValue(activePicker, item.value)}
+                  >
+                    <span className={styles.sheetOptionText}>
+                      <strong>{item.label}</strong>
+                      {item.meta && <span>{item.meta}</span>}
+                    </span>
+                    {selected && <span className={styles.sheetCheck} aria-hidden="true">✓</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        </div>
+      )}
     </main>
   );
 }
