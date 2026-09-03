@@ -588,7 +588,15 @@ export default function InvestmentTradeForm({
     if (isNewHolding) {
       payload.stockName = selectedInstrument.stockName;
       payload.market = selectedInstrument.market;
-      payload.quoteMode = "자동";
+
+      // KRX 금현물(04020000)은 GOOGLEFINANCE 자동시세 대상이 아니므로
+      // 최초 등록 시 체결단가를 현재 수동시세의 시작값으로 사용한다.
+      if (selectedInstrument.stockCode === "04020000") {
+        payload.quoteMode = "수동";
+        payload.manualPrice = parsedUnitPrice;
+      } else {
+        payload.quoteMode = "자동";
+      }
     }
 
     setSaving(true);
@@ -797,7 +805,7 @@ export default function InvestmentTradeForm({
                 }}
                 placeholder={
                   tradeType === "매수"
-                    ? "종목이름 검색 · 예: 코덱스 나스닥"
+                    ? "종목이름 검색"
                     : "보유종목 이름 검색"
                 }
                 autoComplete="off"
