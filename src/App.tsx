@@ -344,6 +344,15 @@ export default function App() {
     );
 
 
+  const [
+    inputInitialDate,
+    setInputInitialDate
+  ] =
+    useState<string | null>(
+      null
+    );
+
+
   useEffect(
     () => {
       let cancelled =
@@ -580,6 +589,10 @@ export default function App() {
     nextNavigation:
       NavigationKey
   ) {
+    if (nextNavigation === "input") {
+      setInputInitialDate(null);
+    }
+
     setActiveNavigation(
       nextNavigation
     );
@@ -699,12 +712,7 @@ export default function App() {
   ) {
     pageContent = (
       <HomePage
-        user={
-          user
-        }
-        onLogout={
-          handleLogout
-        }
+        onOpenHistory={() => setActiveNavigation("calendar")}
       />
     );
 
@@ -713,7 +721,14 @@ export default function App() {
     "calendar"
   ) {
     pageContent = (
-      <CalendarPage />
+      <CalendarPage
+        onAddTransaction={
+          date => {
+            setInputInitialDate(date);
+            setActiveNavigation("input");
+          }
+        }
+      />
     );
 
   } else if (
@@ -724,6 +739,9 @@ export default function App() {
       <InputPage
         userName={
           user.name
+        }
+        initialDate={
+          inputInitialDate
         }
       />
     );
