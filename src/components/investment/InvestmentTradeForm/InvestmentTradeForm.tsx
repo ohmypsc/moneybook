@@ -5,125 +5,116 @@ import {
   useState
 } from "react";
 
-
 import {
-  createInvestmentTrade
+  createInvestmentTrade,
+  searchInvestmentSymbols
 } from "../../../api/investments";
-
 
 import type {
   HoldingSummary,
   InvestmentAccountSummary
 } from "../../../types/dashboard";
 
-
 import type {
   CreateInvestmentTradePayload,
+  InvestmentSymbolSearchItem,
   InvestmentTradeType,
-  Market,
-  QuoteMode
+  Market
 } from "../../../types/investment";
 
-
-import styles
-  from "./InvestmentTradeForm.module.css";
-
+import styles from "./InvestmentTradeForm.module.css";
 
 interface InvestmentTradeFormProps {
-  account:
-    InvestmentAccountSummary;
-
-  holdings:
-    HoldingSummary[];
-
-  onSaved:
-    () => void | Promise<void>;
+  account: InvestmentAccountSummary;
+  holdings: HoldingSummary[];
+  onSaved: () => void | Promise<void>;
 }
 
+type SearchStatus =
+  | "idle"
+  | "loading"
+  | "done"
+  | "error";
 
-const NEW_HOLDING =
-  "__new__";
+type SelectedInstrument = {
+  stockCode: string;
+  stockName: string;
+  market: Market;
+  holdingId?: string;
+};
 
+const FUND_BRAND_ALIASES: Array<[RegExp, string]> = [
+  [/코덱스/gi, "KODEX"],
+  [/타이거/gi, "TIGER"],
+  [/에이스/gi, "ACE"],
+  [/라이즈/gi, "RISE"],
+  [/솔/gi, "SOL"],
+  [/플러스/gi, "PLUS"],
+  [/타임폴리오/gi, "TIMEFOLIO"]
+];
 
 function getToday() {
-  const now =
-    new Date();
+  const now = new Date();
+  const local = new Date(
+    now.getTime() - now.getTimezoneOffset() * 60 * 1000
+  );
 
-  const local =
-    new Date(
-      now.getTime() -
-      now.getTimezoneOffset() *
-        60 *
-        1000
-    );
-
-  return local
-    .toISOString()
-    .slice(
-      0,
-      10
-    );
+  return local.toISOString().slice(0, 10);
 }
 
-
-function formatCurrency(
-  value:
-    number |
-    null |
-    undefined
-) {
+function formatCurrency(value: number | null | undefined) {
   if (
     value === null ||
     value === undefined ||
-    !Number.isFinite(
-      value
-    )
+    !Number.isFinite(value)
   ) {
     return "-";
   }
 
-  return (
-    Math.round(value)
-      .toLocaleString(
-        "ko-KR"
-      ) +
-    "원"
+  return `${Math.round(value).toLocaleString("ko-KR")}원`;
+}
+
+function normalizeMarket(value: string | null | undefined): Market {
+  return value === "해외" ? "해외" : "국내";
+}
+
+function normalizeSearchText(value: string) {
+  return value
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "");
+}
+
+function aliasSearchText(value: string) {
+  return FUND_BRAND_ALIASES.reduce(
+    (current, [pattern, replacement]) =>
+      current.replace(pattern, replacement),
+    value
   );
 }
 
+function holdingMatchesQuery(
+  holding: HoldingSummary,
+  query: string
+) {
+  if (!query.trim()) return true;
 
-function normalizeMarket(
-  value:
-    string |
-    null |
-    undefined
-): Market {
-  return value ===
-    "해외"
-    ? "해외"
-    : "국내";
+  const haystack = normalizeSearchText(
+    `${holding.stockName} ${holding.stockCode}`
+  );
+
+  const raw = normalizeSearchText(query);
+  const aliased = normalizeSearchText(aliasSearchText(query));
+
+  return [raw, aliased]
+    .filter(Boolean)
+    .some(term => haystack.includes(term));
 }
-
-
-function normalizeQuoteMode(
-  value:
-    string |
-    null |
-    undefined
-): QuoteMode {
-  return value ===
-    "수동"
-    ? "수동"
-    : "자동";
-}
-
 
 function makeRequestId() {
   if (
-    typeof crypto !==
-      "undefined" &&
-    typeof crypto.randomUUID ===
-      "function"
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
   ) {
     return crypto.randomUUID();
   }
@@ -131,1066 +122,493 @@ function makeRequestId() {
   return [
     "INV",
     Date.now(),
-    Math.random()
-      .toString(36)
-      .slice(2)
+    Math.random().toString(36).slice(2)
   ].join("_");
 }
-
 
 export default function InvestmentTradeForm({
   account,
   holdings,
   onSaved
 }: InvestmentTradeFormProps) {
-  const [
-    tradeType,
-    setTradeType
-  ] =
-    useState<InvestmentTradeType>(
-      "매수"
+  const [tradeType, setTradeType] =
+    useState<InvestmentTradeType>("매수");
+  const [tradeDate, setTradeDate] = useState(getToday());
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchStatus, setSearchStatus] =
+    useState<SearchStatus>("idle");
+  const [remoteResults, setRemoteResults] =
+    useState<InvestmentSymbolSearchItem[]>([]);
+  const [showResults, setShowResults] = useState(false);
+  const [selectedInstrument, setSelectedInstrument] =
+    useState<SelectedInstrument | null>(null);
+
+  const [manualMode, setManualMode] = useState(false);
+  const [manualStockCode, setManualStockCode] = useState("");
+  const [manualStockName, setManualStockName] = useState("");
+  const [manualMarket, setManualMarket] =
+    useState<Market>("국내");
+
+  const [quantity, setQuantity] = useState("");
+  const [unitPrice, setUnitPrice] = useState("");
+  const [fxRate, setFxRate] = useState("");
+  const [settlementKrw, setSettlementKrw] = useState("");
+  const [feeKrw, setFeeKrw] = useState("");
+  const [taxKrw, setTaxKrw] = useState("");
+  const [memo, setMemo] = useState("");
+
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const activeHoldings = useMemo(
+    () => holdings.filter(holding => !holding.isDeleted),
+    [holdings]
+  );
+
+  const sellableHoldings = useMemo(
+    () =>
+      activeHoldings.filter(
+        holding => Number(holding.quantity) > 0
+      ),
+    [activeHoldings]
+  );
+
+  const localMatches = useMemo(() => {
+    const source =
+      tradeType === "매도"
+        ? sellableHoldings
+        : activeHoldings;
+
+    return source.filter(holding =>
+      holdingMatchesQuery(holding, searchQuery)
     );
+  }, [
+    activeHoldings,
+    sellableHoldings,
+    searchQuery,
+    tradeType
+  ]);
 
+  const selectedHolding = useMemo(() => {
+    if (!selectedInstrument) return null;
 
-  const [
-    tradeDate,
-    setTradeDate
-  ] =
-    useState(
-      getToday()
-    );
-
-
-  const [
-    selectedHoldingId,
-    setSelectedHoldingId
-  ] =
-    useState(
-      NEW_HOLDING
-    );
-
-
-  /*
-   * 신규 종목 정보
-   */
-  const [
-    stockCode,
-    setStockCode
-  ] =
-    useState("");
-
-
-  const [
-    stockName,
-    setStockName
-  ] =
-    useState("");
-
-
-  const [
-    market,
-    setMarket
-  ] =
-    useState<Market>(
-      "국내"
-    );
-
-
-  const [
-    quoteMode,
-    setQuoteMode
-  ] =
-    useState<QuoteMode>(
-      "자동"
-    );
-
-
-  const [
-    manualPrice,
-    setManualPrice
-  ] =
-    useState("");
-
-
-  /*
-   * 거래 정보
-   */
-  const [
-    quantity,
-    setQuantity
-  ] =
-    useState("");
-
-
-  const [
-    unitPrice,
-    setUnitPrice
-  ] =
-    useState("");
-
-
-  const [
-    fxRate,
-    setFxRate
-  ] =
-    useState("");
-
-
-  /*
-   * 실제 결제금액
-   */
-  const [
-    settlementKrw,
-    setSettlementKrw
-  ] =
-    useState("");
-
-
-  /*
-   * 상세 입력
-   */
-  const [
-    feeKrw,
-    setFeeKrw
-  ] =
-    useState("");
-
-
-  const [
-    taxKrw,
-    setTaxKrw
-  ] =
-    useState("");
-
-
-  const [
-    memo,
-    setMemo
-  ] =
-    useState("");
-
-
-  const [
-    saving,
-    setSaving
-  ] =
-    useState(false);
-
-
-  const [
-    error,
-    setError
-  ] =
-    useState("");
-
-
-  const [
-    success,
-    setSuccess
-  ] =
-    useState("");
-
-
-  const activeHoldings =
-    useMemo(
-      () =>
-        holdings.filter(
-          holding =>
-            !holding.isDeleted
-        ),
-      [
-        holdings
-      ]
-    );
-
-
-  const sellableHoldings =
-    useMemo(
-      () =>
-        activeHoldings.filter(
-          holding =>
-            Number(
-              holding.quantity
-            ) >
-            0
-        ),
-      [
-        activeHoldings
-      ]
-    );
-
-
-  const selectedHolding =
-    useMemo(
-      () =>
+    if (selectedInstrument.holdingId) {
+      return (
         activeHoldings.find(
           holding =>
             holding.holdingId ===
-            selectedHoldingId
-        ),
-      [
-        activeHoldings,
-        selectedHoldingId
-      ]
-    );
+            selectedInstrument.holdingId
+        ) ?? null
+      );
+    }
 
+    return (
+      activeHoldings.find(
+        holding =>
+          holding.stockCode.trim().toUpperCase() ===
+          selectedInstrument.stockCode.trim().toUpperCase()
+      ) ?? null
+    );
+  }, [activeHoldings, selectedInstrument]);
 
   const isNewHolding =
-    tradeType ===
-      "매수" &&
-    selectedHoldingId ===
-      NEW_HOLDING;
+    tradeType === "매수" &&
+    !!selectedInstrument &&
+    !selectedHolding;
 
+  const effectiveMarket: Market = selectedInstrument
+    ? selectedInstrument.market
+    : "국내";
 
-  const effectiveMarket:
-    Market =
-    selectedHolding
-      ? normalizeMarket(
-          selectedHolding.market
+  const isForeign = effectiveMarket === "해외";
+
+  const filteredRemoteResults = useMemo(() => {
+    const localCodes = new Set(
+      localMatches.map(holding =>
+        holding.stockCode.trim().toUpperCase()
+      )
+    );
+
+    return remoteResults.filter(
+      item =>
+        !localCodes.has(
+          item.stockCode.trim().toUpperCase()
         )
-      : market;
-
-
-  const isForeign =
-    effectiveMarket ===
-    "해외";
-
-
-  /*
-   * 계좌가 바뀌면
-   * 새 입력 상태로 초기화
-   */
-  useEffect(
-    () => {
-      setTradeType(
-        "매수"
-      );
-
-      setTradeDate(
-        getToday()
-      );
-
-      setSelectedHoldingId(
-        NEW_HOLDING
-      );
-
-      setStockCode("");
-      setStockName("");
-
-      setMarket(
-        "국내"
-      );
-
-      setQuoteMode(
-        "자동"
-      );
-
-      setManualPrice("");
-
-      setQuantity("");
-      setUnitPrice("");
-      setFxRate("");
-
-      setSettlementKrw("");
-
-      setFeeKrw("");
-      setTaxKrw("");
-      setMemo("");
-
-      setError("");
-      setSuccess("");
-    },
-    [
-      account.accountId
-    ]
-  );
-
-
-  /*
-   * 매수 / 매도 전환
-   */
-  useEffect(
-    () => {
-      setError("");
-      setSuccess("");
-
-      setQuantity("");
-      setUnitPrice("");
-      setSettlementKrw("");
-      setFeeKrw("");
-      setTaxKrw("");
-
-      if (
-        tradeType ===
-        "매도"
-      ) {
-        const currentExists =
-          sellableHoldings.some(
-            holding =>
-              holding.holdingId ===
-              selectedHoldingId
-          );
-
-        if (
-          !currentExists
-        ) {
-          setSelectedHoldingId(
-            sellableHoldings[0]
-              ?.holdingId ??
-              ""
-          );
-        }
-
-        return;
-      }
-
-      /*
-       * 매수로 돌아오면
-       * 기본값은 신규 종목
-       */
-      setSelectedHoldingId(
-        NEW_HOLDING
-      );
-    },
-    [
-      tradeType
-    ]
-  );
-
-
-  /*
-   * 대시보드 갱신 후
-   * 매도 대상이 사라졌으면
-   * 다음 보유종목으로 이동
-   */
-  useEffect(
-    () => {
-      if (
-        tradeType !==
-        "매도"
-      ) {
-        return;
-      }
-
-      const exists =
-        sellableHoldings.some(
-          holding =>
-            holding.holdingId ===
-            selectedHoldingId
-        );
-
-      if (
-        !exists
-      ) {
-        setSelectedHoldingId(
-          sellableHoldings[0]
-            ?.holdingId ??
-            ""
-        );
-      }
-    },
-    [
-      tradeType,
-      sellableHoldings,
-      selectedHoldingId
-    ]
-  );
-
-
-  /*
-   * 기존 종목을 선택하면
-   * 해당 종목 정보 자동 반영
-   */
-  useEffect(
-    () => {
-      if (
-        selectedHolding
-      ) {
-        setStockCode(
-          selectedHolding.stockCode
-        );
-
-        setStockName(
-          selectedHolding.stockName
-        );
-
-        setMarket(
-          normalizeMarket(
-            selectedHolding.market
-          )
-        );
-
-        setQuoteMode(
-          normalizeQuoteMode(
-            selectedHolding.quoteMode
-          )
-        );
-
-        setManualPrice(
-          selectedHolding.manualPrice !==
-            null &&
-          selectedHolding.manualPrice !==
-            undefined
-            ? String(
-                selectedHolding.manualPrice
-              )
-            : ""
-        );
-
-        setFxRate(
-          normalizeMarket(
-            selectedHolding.market
-          ) ===
-            "해외" &&
-          Number(
-            selectedHolding.fx
-          ) >
-            0
-            ? String(
-                selectedHolding.fx
-              )
-            : ""
-        );
-
-        return;
-      }
-
-      if (
-        selectedHoldingId ===
-        NEW_HOLDING
-      ) {
-        setStockCode("");
-        setStockName("");
-
-        setMarket(
-          "국내"
-        );
-
-        setQuoteMode(
-          "자동"
-        );
-
-        setManualPrice("");
-        setFxRate("");
-      }
-    },
-    [
-      selectedHoldingId,
-      selectedHolding?.holdingId
-    ]
-  );
-
-
-  /*
-   * 국내 종목은 환율 입력 불필요
-   */
-  useEffect(
-    () => {
-      if (
-        !isForeign
-      ) {
-        setFxRate("");
-      }
-    },
-    [
-      isForeign
-    ]
-  );
-
-
-  const grossKrw =
-    useMemo(
-      () => {
-        const parsedQuantity =
-          Number(
-            quantity
-          );
-
-        const parsedPrice =
-          Number(
-            unitPrice
-          );
-
-        const parsedFx =
-          isForeign
-            ? Number(
-                fxRate
-              )
-            : 1;
-
-        if (
-          !Number.isFinite(
-            parsedQuantity
-          ) ||
-          parsedQuantity <=
-            0 ||
-          !Number.isFinite(
-            parsedPrice
-          ) ||
-          parsedPrice <=
-            0 ||
-          !Number.isFinite(
-            parsedFx
-          ) ||
-          parsedFx <=
-            0
-        ) {
-          return 0;
-        }
-
-        return (
-          parsedQuantity *
-          parsedPrice *
-          parsedFx
-        );
-      },
-      [
-        quantity,
-        unitPrice,
-        fxRate,
-        isForeign
-      ]
     );
+  }, [localMatches, remoteResults]);
 
+  function resetSelection() {
+    setSelectedInstrument(null);
+    setSearchQuery("");
+    setRemoteResults([]);
+    setSearchStatus("idle");
+    setShowResults(false);
+    setManualMode(false);
+    setManualStockCode("");
+    setManualStockName("");
+    setManualMarket("국내");
+    setFxRate("");
+  }
 
-  const feeNumber =
-    useMemo(
-      () => {
-        if (
-          !feeKrw.trim()
-        ) {
-          return 0;
-        }
+  function resetTradeInputs() {
+    setQuantity("");
+    setUnitPrice("");
+    setSettlementKrw("");
+    setFeeKrw("");
+    setTaxKrw("");
+    setMemo("");
+  }
 
-        const value =
-          Number(
-            feeKrw
-          );
+  useEffect(() => {
+    setTradeType("매수");
+    setTradeDate(getToday());
+    resetSelection();
+    resetTradeInputs();
+    setError("");
+    setSuccess("");
+  }, [account.accountId]);
 
-        return Number.isFinite(
-          value
-        )
-          ? value
-          : 0;
-      },
-      [
-        feeKrw
-      ]
-    );
+  useEffect(() => {
+    resetSelection();
+    resetTradeInputs();
+    setError("");
+    setSuccess("");
+  }, [tradeType]);
 
-
-  const taxNumber =
-    useMemo(
-      () => {
-        if (
-          !taxKrw.trim()
-        ) {
-          return 0;
-        }
-
-        const value =
-          Number(
-            taxKrw
-          );
-
-        return Number.isFinite(
-          value
-        )
-          ? value
-          : 0;
-      },
-      [
-        taxKrw
-      ]
-    );
-
-
-  const estimatedSettlement =
-    useMemo(
-      () => {
-        if (
-          grossKrw <=
-          0
-        ) {
-          return 0;
-        }
-
-        if (
-          tradeType ===
-          "매수"
-        ) {
-          return (
-            grossKrw +
-            feeNumber +
-            taxNumber
-          );
-        }
-
-        return Math.max(
-          0,
-          grossKrw -
-            feeNumber -
-            taxNumber
-        );
-      },
-      [
-        grossKrw,
-        feeNumber,
-        taxNumber,
-        tradeType
-      ]
-    );
-
-
-  const actualSettlement =
-    useMemo(
-      () => {
-        if (
-          !settlementKrw.trim()
-        ) {
-          return null;
-        }
-
-        const value =
-          Number(
-            settlementKrw
-          );
-
-        return Number.isFinite(
-          value
-        )
-          ? value
-          : null;
-      },
-      [
-        settlementKrw
-      ]
-    );
-
-
-  const settlementForDisplay =
-    actualSettlement !==
-      null &&
-    actualSettlement >
-      0
-      ? actualSettlement
-      : estimatedSettlement;
-
-
-  const cashAfterTrade =
-    account.currentCashKrw !==
-      null &&
-    account.currentCashKrw !==
-      undefined &&
-    settlementForDisplay >
-      0
-      ? tradeType ===
-          "매수"
-        ? account.currentCashKrw -
-          settlementForDisplay
-        : account.currentCashKrw +
-          settlementForDisplay
-      : null;
-
-
-  async function handleSubmit(
-    event:
-      FormEvent<HTMLFormElement>
-  ) {
-    event.preventDefault();
-
+  useEffect(() => {
     if (
-      saving
+      tradeType !== "매수" ||
+      selectedInstrument ||
+      manualMode
     ) {
       return;
     }
+
+    const query = searchQuery.trim();
+
+    if (!query) {
+      setRemoteResults([]);
+      setSearchStatus("idle");
+      return;
+    }
+
+    let cancelled = false;
+
+    setSearchStatus("loading");
+
+    const timer = window.setTimeout(async () => {
+      try {
+        const result = await searchInvestmentSymbols(query);
+
+        if (cancelled) return;
+
+        setRemoteResults(
+          Array.isArray(result.items) ? result.items : []
+        );
+        setSearchStatus("done");
+      } catch {
+        if (cancelled) return;
+        setRemoteResults([]);
+        setSearchStatus("error");
+      }
+    }, 320);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [
+    manualMode,
+    searchQuery,
+    selectedInstrument,
+    tradeType
+  ]);
+
+  useEffect(() => {
+    if (!isForeign) {
+      setFxRate("");
+    }
+  }, [isForeign]);
+
+  const grossKrw = useMemo(() => {
+    const parsedQuantity = Number(quantity);
+    const parsedPrice = Number(unitPrice);
+    const parsedFx = isForeign ? Number(fxRate) : 1;
+
+    if (
+      !Number.isFinite(parsedQuantity) ||
+      parsedQuantity <= 0 ||
+      !Number.isFinite(parsedPrice) ||
+      parsedPrice <= 0 ||
+      !Number.isFinite(parsedFx) ||
+      parsedFx <= 0
+    ) {
+      return 0;
+    }
+
+    return parsedQuantity * parsedPrice * parsedFx;
+  }, [quantity, unitPrice, fxRate, isForeign]);
+
+  const feeNumber = useMemo(() => {
+    if (!feeKrw.trim()) return 0;
+    const value = Number(feeKrw);
+    return Number.isFinite(value) ? value : 0;
+  }, [feeKrw]);
+
+  const taxNumber = useMemo(() => {
+    if (!taxKrw.trim()) return 0;
+    const value = Number(taxKrw);
+    return Number.isFinite(value) ? value : 0;
+  }, [taxKrw]);
+
+  const estimatedSettlement = useMemo(() => {
+    if (grossKrw <= 0) return 0;
+
+    return tradeType === "매수"
+      ? grossKrw + feeNumber + taxNumber
+      : Math.max(0, grossKrw - feeNumber - taxNumber);
+  }, [grossKrw, feeNumber, taxNumber, tradeType]);
+
+  const actualSettlement = useMemo(() => {
+    if (!settlementKrw.trim()) return null;
+    const value = Number(settlementKrw);
+    return Number.isFinite(value) ? value : null;
+  }, [settlementKrw]);
+
+  const settlementForDisplay =
+    actualSettlement !== null && actualSettlement > 0
+      ? actualSettlement
+      : estimatedSettlement;
+
+  const cashAfterTrade =
+    account.currentCashKrw !== null &&
+    account.currentCashKrw !== undefined &&
+    settlementForDisplay > 0
+      ? tradeType === "매수"
+        ? account.currentCashKrw - settlementForDisplay
+        : account.currentCashKrw + settlementForDisplay
+      : null;
+
+  function chooseHolding(holding: HoldingSummary) {
+    setSelectedInstrument({
+      stockCode: holding.stockCode,
+      stockName: holding.stockName || holding.stockCode,
+      market: normalizeMarket(holding.market),
+      holdingId: holding.holdingId
+    });
+    setSearchQuery(holding.stockName || holding.stockCode);
+    setRemoteResults([]);
+    setSearchStatus("idle");
+    setShowResults(false);
+    setManualMode(false);
+    setFxRate("");
+    setError("");
+  }
+
+  function chooseRemote(item: InvestmentSymbolSearchItem) {
+    const existing = activeHoldings.find(
+      holding =>
+        holding.stockCode.trim().toUpperCase() ===
+        item.stockCode.trim().toUpperCase()
+    );
+
+    setSelectedInstrument({
+      stockCode: item.stockCode,
+      stockName: item.stockName || item.stockCode,
+      market: item.market,
+      holdingId: existing?.holdingId
+    });
+    setSearchQuery(item.stockName || item.stockCode);
+    setRemoteResults([]);
+    setSearchStatus("idle");
+    setShowResults(false);
+    setManualMode(false);
+    setFxRate("");
+    setError("");
+  }
+
+  function confirmManualInstrument() {
+    const code = manualStockCode.trim().toUpperCase();
+    const name = manualStockName.trim();
+
+    if (!code) {
+      setError("종목코드를 입력해주세요.");
+      return;
+    }
+
+    if (!name) {
+      setError("종목이름을 입력해주세요.");
+      return;
+    }
+
+    const existing = activeHoldings.find(
+      holding =>
+        holding.stockCode.trim().toUpperCase() === code
+    );
+
+    if (existing) {
+      chooseHolding(existing);
+      return;
+    }
+
+    setSelectedInstrument({
+      stockCode: code,
+      stockName: name,
+      market: manualMarket
+    });
+    setSearchQuery(name);
+    setManualMode(false);
+    setShowResults(false);
+    setError("");
+  }
+
+  async function handleSubmit(
+    event: FormEvent<HTMLFormElement>
+  ) {
+    event.preventDefault();
+
+    if (saving) return;
 
     setError("");
     setSuccess("");
 
-
-    if (
-      !account.cashBaselineConfigured
-    ) {
+    if (!account.cashBaselineConfigured) {
       setError(
         "먼저 이 투자계좌의 현재 예수금을 설정해주세요."
       );
-
       return;
     }
 
-
-    if (
-      !tradeDate
-    ) {
+    if (!selectedInstrument) {
       setError(
-        "거래일을 입력해주세요."
+        tradeType === "매수"
+          ? "매수한 종목을 선택해주세요."
+          : "매도한 종목을 선택해주세요."
       );
-
       return;
     }
 
+    if (!tradeDate) {
+      setError("거래일을 입력해주세요.");
+      return;
+    }
+
+    const parsedQuantity = Number(quantity);
 
     if (
-      tradeType ===
-        "매도" &&
-      !selectedHolding
+      !Number.isFinite(parsedQuantity) ||
+      parsedQuantity <= 0
     ) {
-      setError(
-        "매도할 종목을 선택해주세요."
-      );
-
+      setError("수량은 0보다 커야 합니다.");
       return;
     }
 
-
-    const effectiveStockCode =
-      (
-        selectedHolding
-          ?.stockCode ??
-        stockCode
-      ).trim();
-
-
     if (
-      !effectiveStockCode
-    ) {
-      setError(
-        "종목코드를 입력해주세요."
-      );
-
-      return;
-    }
-
-
-    const parsedQuantity =
-      Number(
-        quantity
-      );
-
-
-    if (
-      !Number.isFinite(
-        parsedQuantity
-      ) ||
-      parsedQuantity <=
-        0
-    ) {
-      setError(
-        "수량은 0보다 커야 합니다."
-      );
-
-      return;
-    }
-
-
-    if (
-      tradeType ===
-        "매도" &&
+      tradeType === "매도" &&
       selectedHolding &&
-      parsedQuantity >
-        Number(
-          selectedHolding.quantity
-        )
+      parsedQuantity > Number(selectedHolding.quantity)
     ) {
       setError(
-        `보유수량 ${selectedHolding.quantity}주보다 많이 매도할 수 없습니다.`
+        `보유수량 ${selectedHolding.quantity}주보다 많이 기록할 수 없습니다.`
       );
-
       return;
     }
 
-
-    const parsedUnitPrice =
-      Number(
-        unitPrice
-      );
-
+    const parsedUnitPrice = Number(unitPrice);
 
     if (
-      !Number.isFinite(
-        parsedUnitPrice
-      ) ||
-      parsedUnitPrice <=
-        0
+      !Number.isFinite(parsedUnitPrice) ||
+      parsedUnitPrice <= 0
     ) {
-      setError(
-        "체결단가는 0보다 커야 합니다."
-      );
-
+      setError("체결단가는 0보다 커야 합니다.");
       return;
     }
 
-
-    const parsedFxRate =
-      isForeign
-        ? Number(
-            fxRate
-          )
-        : 1;
-
+    const parsedFxRate = isForeign ? Number(fxRate) : 1;
 
     if (
       isForeign &&
-      (
-        !Number.isFinite(
-          parsedFxRate
-        ) ||
-        parsedFxRate <=
-          0
-      )
+      (!Number.isFinite(parsedFxRate) || parsedFxRate <= 0)
     ) {
-      setError(
-        "해외주식은 체결환율을 입력해주세요."
-      );
-
+      setError("해외주식은 체결 당시 환율을 입력해주세요.");
       return;
     }
 
+    const parsedFee = feeKrw.trim() ? Number(feeKrw) : 0;
 
-    const parsedFee =
-      feeKrw.trim()
-        ? Number(
-            feeKrw
-          )
-        : 0;
-
-
-    if (
-      !Number.isFinite(
-        parsedFee
-      ) ||
-      parsedFee <
-        0
-    ) {
-      setError(
-        "수수료는 0 이상의 금액이어야 합니다."
-      );
-
+    if (!Number.isFinite(parsedFee) || parsedFee < 0) {
+      setError("수수료는 0 이상의 금액이어야 합니다.");
       return;
     }
 
+    const parsedTax = taxKrw.trim() ? Number(taxKrw) : 0;
 
-    const parsedTax =
-      taxKrw.trim()
-        ? Number(
-            taxKrw
-          )
-        : 0;
-
-
-    if (
-      !Number.isFinite(
-        parsedTax
-      ) ||
-      parsedTax <
-        0
-    ) {
-      setError(
-        "세금은 0 이상의 금액이어야 합니다."
-      );
-
+    if (!Number.isFinite(parsedTax) || parsedTax < 0) {
+      setError("세금은 0 이상의 금액이어야 합니다.");
       return;
     }
 
+    let parsedSettlement: number | undefined;
 
-    let parsedSettlement:
-      number |
-      undefined;
+    if (settlementKrw.trim()) {
+      const value = Number(settlementKrw);
 
-
-    if (
-      settlementKrw.trim()
-    ) {
-      const value =
-        Number(
-          settlementKrw
-        );
-
-      if (
-        !Number.isFinite(
-          value
-        ) ||
-        value <=
-          0
-      ) {
-        setError(
-          "실제 결제금액은 0보다 커야 합니다."
-        );
-
+      if (!Number.isFinite(value) || value <= 0) {
+        setError("실제 결제금액은 0보다 커야 합니다.");
         return;
       }
 
-      parsedSettlement =
-        value;
+      parsedSettlement = value;
     }
 
-
-    const payload:
-      CreateInvestmentTradePayload =
-    {
-      accountId:
-        account.accountId,
-
+    const payload: CreateInvestmentTradePayload = {
+      accountId: account.accountId,
       tradeType,
-
       tradeDate,
-
-      stockCode:
-        effectiveStockCode,
-
-      quantity:
-        parsedQuantity,
-
-      unitPrice:
-        parsedUnitPrice,
-
-      currency:
-        isForeign
-          ? "USD"
-          : "KRW",
-
-      fxRate:
-        parsedFxRate,
-
-      feeKrw:
-        parsedFee,
-
-      taxKrw:
-        parsedTax,
-
-      requestId:
-        makeRequestId()
+      stockCode: selectedInstrument.stockCode,
+      quantity: parsedQuantity,
+      unitPrice: parsedUnitPrice,
+      currency: isForeign ? "USD" : "KRW",
+      fxRate: parsedFxRate,
+      feeKrw: parsedFee,
+      taxKrw: parsedTax,
+      requestId: makeRequestId()
     };
 
-
-    if (
-      parsedSettlement !==
-      undefined
-    ) {
-      payload.settlementKrw =
-        parsedSettlement;
+    if (parsedSettlement !== undefined) {
+      payload.settlementKrw = parsedSettlement;
     }
 
-
-    if (
-      memo.trim()
-    ) {
-      payload.memo =
-        memo.trim();
+    if (memo.trim()) {
+      payload.memo = memo.trim();
     }
 
-
-    /*
-     * 신규 종목일 때만
-     * 종목 생성 정보 추가
-     */
-    if (
-      isNewHolding
-    ) {
-      payload.stockName =
-        stockName.trim();
-
-      payload.market =
-        market;
-
-      payload.quoteMode =
-        quoteMode;
-
-      if (
-        quoteMode ===
-        "수동"
-      ) {
-        const parsedManualPrice =
-          manualPrice.trim()
-            ? Number(
-                manualPrice
-              )
-            : parsedUnitPrice;
-
-        if (
-          !Number.isFinite(
-            parsedManualPrice
-          ) ||
-          parsedManualPrice <=
-            0
-        ) {
-          setError(
-            "수동 시세는 0보다 커야 합니다."
-          );
-
-          return;
-        }
-
-        payload.manualPrice =
-          parsedManualPrice;
-      }
+    if (isNewHolding) {
+      payload.stockName = selectedInstrument.stockName;
+      payload.market = selectedInstrument.market;
+      payload.quoteMode = "자동";
     }
-
 
     setSaving(true);
 
     try {
-      await createInvestmentTrade(
-        payload
-      );
-
-      /*
-       * AssetsPage의
-       * loadDashboard() 실행
-       */
-      await onSaved();
-
+      await createInvestmentTrade(payload);
 
       setSuccess(
-        tradeType ===
-          "매수"
+        tradeType === "매수"
           ? "매수 내역을 저장했습니다."
           : "매도 내역을 저장했습니다."
       );
 
+      resetTradeInputs();
+      resetSelection();
 
-      setQuantity("");
-      setUnitPrice("");
-
-      setSettlementKrw("");
-
-      setFeeKrw("");
-      setTaxKrw("");
-
-      setMemo("");
-
-
-      if (
-        tradeType ===
-          "매수" &&
-        isNewHolding
-      ) {
-        setStockCode("");
-        setStockName("");
-
-        setMarket(
-          "국내"
-        );
-
-        setQuoteMode(
-          "자동"
-        );
-
-        setManualPrice("");
-
-        setFxRate("");
-
-        setSelectedHoldingId(
-          NEW_HOLDING
-        );
-      }
-    } catch (
-      err
-    ) {
+      void Promise.resolve(onSaved()).catch(() => {});
+    } catch (err) {
       setError(
-        err instanceof
-          Error
+        err instanceof Error
           ? err.message
           : "투자거래 저장에 실패했습니다."
       );
@@ -1199,40 +617,14 @@ export default function InvestmentTradeForm({
     }
   }
 
-
-  if (
-    !account.cashBaselineConfigured
-  ) {
+  if (!account.cashBaselineConfigured) {
     return (
-      <section
-        className={
-          styles.form
-        }
-      >
-        <div
-          className={
-            styles.header
-          }
-        >
-          <div
-            className={
-              styles.titleGroup
-            }
-          >
-            <h3
-              className={
-                styles.title
-              }
-            >
-              매수 · 매도
-            </h3>
-
-            <p
-              className={
-                styles.description
-              }
-            >
-              매매를 입력하려면 먼저 현재 예수금을 설정해주세요.
+      <section className={styles.form}>
+        <div className={styles.header}>
+          <div className={styles.titleGroup}>
+            <h3 className={styles.title}>매매 기록</h3>
+            <p className={styles.description}>
+              매매를 기록하려면 먼저 현재 예수금을 설정해주세요.
             </p>
           </div>
         </div>
@@ -1240,1039 +632,487 @@ export default function InvestmentTradeForm({
     );
   }
 
-
   return (
-    <form
-      className={
-        styles.form
-      }
-      onSubmit={
-        handleSubmit
-      }
-    >
-      <div
-        className={
-          styles.header
-        }
-      >
-        <div
-          className={
-            styles.titleGroup
-          }
-        >
-          <h3
-            className={
-              styles.title
-            }
-          >
-            매수 · 매도
-          </h3>
-
-          <p
-            className={
-              styles.description
-            }
-          >
-            실제 매매 내역을 입력하면 예수금과 보유수량이 자동으로 반영됩니다.
+    <form className={styles.form} onSubmit={handleSubmit}>
+      <div className={styles.header}>
+        <div className={styles.titleGroup}>
+          <h3 className={styles.title}>매매 기록</h3>
+          <p className={styles.description}>
+            증권사에서 이미 체결된 내역을 기록하면 자산현황에 자동 반영됩니다.
           </p>
         </div>
 
-        <div
-          className={
-            styles.cash
-          }
-        >
-          <span>
-            현재 예수금
-          </span>
-
-          <strong>
-            {
-              formatCurrency(
-                account.currentCashKrw
-              )
-            }
-          </strong>
+        <div className={styles.cash}>
+          <span>현재 예수금</span>
+          <strong>{formatCurrency(account.currentCashKrw)}</strong>
         </div>
       </div>
 
-
-      <div
-        className={
-          styles.tradeTabs
-        }
-      >
+      <div className={styles.tradeTabs}>
         <button
           type="button"
           className={[
             styles.tradeTab,
-            tradeType ===
-              "매수"
-              ? styles.tradeTabActive
-              : ""
+            tradeType === "매수" ? styles.tradeTabActive : ""
           ]
             .filter(Boolean)
             .join(" ")}
-          onClick={
-            () =>
-              setTradeType(
-                "매수"
-              )
-          }
+          onClick={() => setTradeType("매수")}
         >
-          매수
+          매수 기록
         </button>
 
         <button
           type="button"
           className={[
             styles.tradeTab,
-            tradeType ===
-              "매도"
-              ? styles.tradeTabActive
-              : ""
+            tradeType === "매도" ? styles.tradeTabActive : ""
           ]
             .filter(Boolean)
             .join(" ")}
-          onClick={
-            () =>
-              setTradeType(
-                "매도"
-              )
-          }
+          onClick={() => setTradeType("매도")}
         >
-          매도
+          매도 기록
         </button>
       </div>
 
+      {selectedInstrument ? (
+        <div className={styles.selectedInstrument}>
+          <div className={styles.selectedInstrumentMain}>
+            <strong>{selectedInstrument.stockName}</strong>
+            <span>
+              {selectedInstrument.stockCode}
+              {" · "}
+              {selectedInstrument.market}
+              {selectedHolding
+                ? ` · ${selectedHolding.quantity}주 보유`
+                : " · 신규 종목"}
+            </span>
+          </div>
 
-      <label
-        className={
-          styles.field
-        }
-      >
-        <span
-          className={
-            styles.label
-          }
-        >
-          거래일
-        </span>
+          <button
+            type="button"
+            className={styles.changeInstrumentButton}
+            onClick={() => {
+              resetSelection();
+              setShowResults(true);
+            }}
+          >
+            변경
+          </button>
+        </div>
+      ) : manualMode && tradeType === "매수" ? (
+        <div className={styles.manualBox}>
+          <div className={styles.manualHeader}>
+            <strong>종목 직접 입력</strong>
+            <button
+              type="button"
+              className={styles.textButton}
+              onClick={() => {
+                setManualMode(false);
+                setShowResults(true);
+                setError("");
+              }}
+            >
+              검색으로 돌아가기
+            </button>
+          </div>
 
+          <div className={styles.grid}>
+            <label className={styles.field}>
+              <span className={styles.label}>종목이름</span>
+              <input
+                className={styles.input}
+                type="text"
+                value={manualStockName}
+                onChange={event =>
+                  setManualStockName(event.target.value)
+                }
+                placeholder="예: 삼성전자"
+              />
+            </label>
+
+            <label className={styles.field}>
+              <span className={styles.label}>종목코드</span>
+              <input
+                className={styles.input}
+                type="text"
+                value={manualStockCode}
+                onChange={event =>
+                  setManualStockCode(
+                    event.target.value.toUpperCase()
+                  )
+                }
+                placeholder="예: 005930 / AAPL"
+                autoCapitalize="characters"
+              />
+            </label>
+          </div>
+
+          <label className={styles.field}>
+            <span className={styles.label}>시장</span>
+            <select
+              className={styles.select}
+              value={manualMarket}
+              onChange={event =>
+                setManualMarket(event.target.value as Market)
+              }
+            >
+              <option value="국내">국내</option>
+              <option value="해외">해외</option>
+            </select>
+          </label>
+
+          <button
+            type="button"
+            className={styles.secondaryButton}
+            onClick={confirmManualInstrument}
+          >
+            이 종목 사용
+          </button>
+        </div>
+      ) : (
+        <div className={styles.searchSection}>
+          <label className={styles.field}>
+            <span className={styles.label}>
+              {tradeType === "매수"
+                ? "매수한 종목"
+                : "매도한 종목"}
+            </span>
+
+            <div className={styles.searchInputWrap}>
+              <span className={styles.searchIcon} aria-hidden="true">
+                ⌕
+              </span>
+              <input
+                className={styles.searchInput}
+                type="search"
+                value={searchQuery}
+                onFocus={() => setShowResults(true)}
+                onChange={event => {
+                  setSearchQuery(event.target.value);
+                  setShowResults(true);
+                  setSuccess("");
+                  setError("");
+                }}
+                placeholder={
+                  tradeType === "매수"
+                    ? "종목이름 검색 · 예: 코덱스 나스닥"
+                    : "보유종목 이름 검색"
+                }
+                autoComplete="off"
+              />
+            </div>
+
+            <span className={styles.fieldHint}>
+              {tradeType === "매수"
+                ? "이미 보유한 종목은 바로 선택할 수 있고, 새 종목은 이름으로 검색합니다."
+                : "현재 보유 중인 종목에서만 선택합니다."}
+            </span>
+          </label>
+
+          {showResults && (
+            <div className={styles.searchPanel}>
+              {localMatches.length > 0 && (
+                <div className={styles.resultGroup}>
+                  <div className={styles.resultGroupTitle}>
+                    {tradeType === "매수"
+                      ? "보유 중"
+                      : "보유종목"}
+                  </div>
+
+                  {localMatches.map(holding => (
+                    <button
+                      key={holding.holdingId}
+                      type="button"
+                      className={styles.resultItem}
+                      onClick={() => chooseHolding(holding)}
+                    >
+                      <span className={styles.resultName}>
+                        {holding.stockName || holding.stockCode}
+                      </span>
+                      <span className={styles.resultMeta}>
+                        {holding.stockCode}
+                        {" · "}
+                        {holding.market}
+                        {" · "}
+                        {holding.quantity}주 보유
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {tradeType === "매수" && searchQuery.trim() && (
+                <div className={styles.resultGroup}>
+                  <div className={styles.resultGroupTitle}>
+                    종목 검색
+                  </div>
+
+                  {searchStatus === "loading" && (
+                    <div className={styles.searchState}>
+                      <span className={styles.lookupSpinner} />
+                      <span>국내·해외 종목 찾는 중...</span>
+                    </div>
+                  )}
+
+                  {filteredRemoteResults.map(item => (
+                    <button
+                      key={`${item.market}:${item.stockCode}:${item.symbol ?? ""}`}
+                      type="button"
+                      className={styles.resultItem}
+                      onClick={() => chooseRemote(item)}
+                    >
+                      <span className={styles.resultName}>
+                        {item.stockName || item.stockCode}
+                      </span>
+                      <span className={styles.resultMeta}>
+                        {item.stockCode}
+                        {" · "}
+                        {item.market}
+                        {item.assetType
+                          ? ` · ${item.assetType}`
+                          : ""}
+                      </span>
+                    </button>
+                  ))}
+
+                  {searchStatus === "done" &&
+                    filteredRemoteResults.length === 0 &&
+                    localMatches.length === 0 && (
+                      <div className={styles.searchState}>
+                        검색 결과가 없습니다.
+                      </div>
+                    )}
+
+                  {searchStatus === "error" && (
+                    <div className={styles.searchState}>
+                      종목 검색 서버에 연결하지 못했습니다.
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {!searchQuery.trim() && localMatches.length === 0 && (
+                <div className={styles.searchState}>
+                  {tradeType === "매수"
+                    ? "종목이름을 입력해 검색해주세요."
+                    : "현재 매도할 수 있는 보유종목이 없습니다."}
+                </div>
+              )}
+
+              {tradeType === "매수" && (
+                <button
+                  type="button"
+                  className={styles.manualLink}
+                  onClick={() => {
+                    setManualMode(true);
+                    setShowResults(false);
+                    setError("");
+                  }}
+                >
+                  검색이 안 되는 종목은 직접 입력
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className={styles.grid}>
+        <label className={styles.field}>
+          <span className={styles.label}>
+            {tradeType === "매수"
+              ? "실제 매수수량"
+              : "실제 매도수량"}
+          </span>
+
+          <input
+            className={styles.input}
+            type="number"
+            inputMode="decimal"
+            min="0"
+            step="any"
+            value={quantity}
+            onChange={event => setQuantity(event.target.value)}
+            placeholder="0"
+          />
+        </label>
+
+        <label className={styles.field}>
+          <span className={styles.label}>
+            실제 체결단가
+            {isForeign ? " (USD)" : " (원)"}
+          </span>
+
+          <input
+            className={styles.input}
+            type="number"
+            inputMode="decimal"
+            min="0"
+            step="any"
+            value={unitPrice}
+            onChange={event => setUnitPrice(event.target.value)}
+            placeholder="0"
+          />
+        </label>
+      </div>
+
+      <label className={styles.field}>
+        <span className={styles.label}>거래일</span>
         <input
-          className={
-            styles.input
-          }
+          className={styles.input}
           type="date"
-          value={
-            tradeDate
-          }
-          onChange={
-            event =>
-              setTradeDate(
-                event.target.value
-              )
-          }
+          value={tradeDate}
+          onChange={event => setTradeDate(event.target.value)}
           required
         />
       </label>
 
-
-      {
-        tradeType ===
-        "매수"
-          ? (
-            <label
-              className={
-                styles.field
-              }
-            >
-              <span
-                className={
-                  styles.label
-                }
-              >
-                종목
-              </span>
-
-              <select
-                className={
-                  styles.select
-                }
-                value={
-                  selectedHoldingId
-                }
-                onChange={
-                  event =>
-                    setSelectedHoldingId(
-                      event.target.value
-                    )
-                }
-              >
-                <option
-                  value={
-                    NEW_HOLDING
-                  }
-                >
-                  + 신규 종목
-                </option>
-
-                {
-                  activeHoldings.map(
-                    holding => (
-                      <option
-                        key={
-                          holding.holdingId
-                        }
-                        value={
-                          holding.holdingId
-                        }
-                      >
-                        {
-                          holding.stockName ||
-                          holding.stockCode
-                        }
-                        {" · "}
-                        {
-                          holding.quantity
-                        }
-                        주
-                      </option>
-                    )
-                  )
-                }
-              </select>
-
-              <span
-                className={
-                  styles.fieldHint
-                }
-              >
-                이미 보유 중인 종목을 선택하면 추가매수로 기록됩니다.
-              </span>
-            </label>
-          )
-          : (
-            <>
-              {
-                sellableHoldings.length >
-                0
-                  ? (
-                    <label
-                      className={
-                        styles.field
-                      }
-                    >
-                      <span
-                        className={
-                          styles.label
-                        }
-                      >
-                        매도 종목
-                      </span>
-
-                      <select
-                        className={
-                          styles.select
-                        }
-                        value={
-                          selectedHoldingId
-                        }
-                        onChange={
-                          event =>
-                            setSelectedHoldingId(
-                              event.target.value
-                            )
-                        }
-                      >
-                        {
-                          sellableHoldings.map(
-                            holding => (
-                              <option
-                                key={
-                                  holding.holdingId
-                                }
-                                value={
-                                  holding.holdingId
-                                }
-                              >
-                                {
-                                  holding.stockName ||
-                                  holding.stockCode
-                                }
-                                {" · "}
-                                {
-                                  holding.quantity
-                                }
-                                주
-                              </option>
-                            )
-                          )
-                        }
-                      </select>
-                    </label>
-                  )
-                  : (
-                    <p
-                      className={
-                        styles.empty
-                      }
-                    >
-                      현재 매도할 수 있는 보유종목이 없습니다.
-                    </p>
-                  )
-              }
-            </>
-          )
-      }
-
-
-      {
-        isNewHolding && (
-          <div
-            className={
-              styles.newHoldingBox
-            }
-          >
-            <p
-              className={
-                styles.subTitle
-              }
-            >
-              신규 종목 정보
-            </p>
-
-            <div
-              className={
-                styles.grid
-              }
-            >
-              <label
-                className={
-                  styles.field
-                }
-              >
-                <span
-                  className={
-                    styles.label
-                  }
-                >
-                  종목코드
-                </span>
-
-                <input
-                  className={
-                    styles.input
-                  }
-                  type="text"
-                  value={
-                    stockCode
-                  }
-                  onChange={
-                    event =>
-                      setStockCode(
-                        event.target.value
-                      )
-                  }
-                  placeholder="예: 005930 / AAPL"
-                  autoCapitalize="characters"
-                />
-              </label>
-
-
-              <label
-                className={
-                  styles.field
-                }
-              >
-                <span
-                  className={
-                    styles.label
-                  }
-                >
-                  종목명
-                </span>
-
-                <input
-                  className={
-                    styles.input
-                  }
-                  type="text"
-                  value={
-                    stockName
-                  }
-                  onChange={
-                    event =>
-                      setStockName(
-                        event.target.value
-                      )
-                  }
-                  placeholder="예: 삼성전자"
-                />
-              </label>
-
-
-              <label
-                className={
-                  styles.field
-                }
-              >
-                <span
-                  className={
-                    styles.label
-                  }
-                >
-                  시장
-                </span>
-
-                <select
-                  className={
-                    styles.select
-                  }
-                  value={
-                    market
-                  }
-                  onChange={
-                    event =>
-                      setMarket(
-                        event.target
-                          .value as
-                          Market
-                      )
-                  }
-                >
-                  <option
-                    value="국내"
-                  >
-                    국내
-                  </option>
-
-                  <option
-                    value="해외"
-                  >
-                    해외
-                  </option>
-                </select>
-              </label>
-
-
-              <label
-                className={
-                  styles.field
-                }
-              >
-                <span
-                  className={
-                    styles.label
-                  }
-                >
-                  시세 조회
-                </span>
-
-                <select
-                  className={
-                    styles.select
-                  }
-                  value={
-                    quoteMode
-                  }
-                  onChange={
-                    event =>
-                      setQuoteMode(
-                        event.target
-                          .value as
-                          QuoteMode
-                      )
-                  }
-                >
-                  <option
-                    value="자동"
-                  >
-                    자동
-                  </option>
-
-                  <option
-                    value="수동"
-                  >
-                    수동
-                  </option>
-                </select>
-              </label>
-            </div>
-
-
-            {
-              quoteMode ===
-                "수동" && (
-                <label
-                  className={
-                    styles.field
-                  }
-                >
-                  <span
-                    className={
-                      styles.label
-                    }
-                  >
-                    현재 평가단가
-                  </span>
-
-                  <input
-                    className={
-                      styles.input
-                    }
-                    type="number"
-                    inputMode="decimal"
-                    min="0"
-                    step="any"
-                    value={
-                      manualPrice
-                    }
-                    onChange={
-                      event =>
-                        setManualPrice(
-                          event.target.value
-                        )
-                    }
-                    placeholder="비워두면 체결단가 사용"
-                  />
-
-                  <span
-                    className={
-                      styles.fieldHint
-                    }
-                  >
-                    수동 시세 종목만 필요합니다. 비워두면 이번 체결단가를 최초 평가단가로 사용합니다.
-                  </span>
-                </label>
-              )
-            }
-          </div>
-        )
-      }
-
-
-      {
-        selectedHolding && (
-          <div
-            className={
-              styles.holdingPreview
-            }
-          >
-            <div>
-              <strong>
-                {
-                  selectedHolding.stockName ||
-                  selectedHolding.stockCode
-                }
-              </strong>
-
-              <span>
-                {
-                  selectedHolding.stockCode
-                }
-                {" · "}
-                {
-                  selectedHolding.market
-                }
-              </span>
-            </div>
-
-            <div
-              className={
-                styles.holdingQuantity
-              }
-            >
-              보유{" "}
-              {
-                selectedHolding.quantity
-              }
-              주
-            </div>
-          </div>
-        )
-      }
-
-
-      <div
-        className={
-          styles.grid
-        }
-      >
-        <label
-          className={
-            styles.field
-          }
-        >
-          <span
-            className={
-              styles.label
-            }
-          >
-            {
-              tradeType ===
-                "매수"
-                ? "매수 수량"
-                : "매도 수량"
-            }
-          </span>
-
+      {selectedInstrument && isForeign && (
+        <label className={styles.field}>
+          <span className={styles.label}>체결 당시 환율</span>
           <input
-            className={
-              styles.input
-            }
+            className={styles.input}
             type="number"
             inputMode="decimal"
             min="0"
             step="any"
-            value={
-              quantity
-            }
-            onChange={
-              event =>
-                setQuantity(
-                  event.target.value
-                )
-            }
-            placeholder="0"
+            value={fxRate}
+            onChange={event => setFxRate(event.target.value)}
+            placeholder="예: 1385.50"
           />
         </label>
+      )}
 
+      {selectedInstrument && estimatedSettlement > 0 && (
+        <div className={styles.settlementBox}>
+          <div className={styles.settlementRow}>
+            <span>
+              {actualSettlement !== null && actualSettlement > 0
+                ? tradeType === "매수"
+                  ? "실제 출금액"
+                  : "실제 입금액"
+                : tradeType === "매수"
+                  ? "예상 출금액"
+                  : "예상 입금액"}
+            </span>
+            <strong>{formatCurrency(settlementForDisplay)}</strong>
+          </div>
 
-        <label
-          className={
-            styles.field
-          }
-        >
-          <span
-            className={
-              styles.label
-            }
-          >
-            체결단가
-            {
-              isForeign
-                ? " (USD)"
-                : " (원)"
-            }
-          </span>
+          {cashAfterTrade !== null && (
+            <div className={styles.settlementSubRow}>
+              <span>기록 후 예상 예수금</span>
+              <span>{formatCurrency(cashAfterTrade)}</span>
+            </div>
+          )}
+        </div>
+      )}
 
-          <input
-            className={
-              styles.input
-            }
-            type="number"
-            inputMode="decimal"
-            min="0"
-            step="any"
-            value={
-              unitPrice
-            }
-            onChange={
-              event =>
-                setUnitPrice(
-                  event.target.value
-                )
-            }
-            placeholder="0"
-          />
-        </label>
-      </div>
+      <details className={styles.details}>
+        <summary className={styles.detailsSummary}>
+          추가 정보
+          <span>필요할 때만 입력</span>
+        </summary>
 
-
-      {
-        isForeign && (
-          <label
-            className={
-              styles.field
-            }
-          >
-            <span
-              className={
-                styles.label
-              }
-            >
-              체결환율
+        <div className={styles.detailsContent}>
+          <label className={styles.field}>
+            <span className={styles.label}>
+              증권사 실제 결제금액
+              <span className={styles.optional}>선택</span>
             </span>
 
             <input
-              className={
-                styles.input
-              }
+              className={styles.input}
               type="number"
-              inputMode="decimal"
+              inputMode="numeric"
               min="0"
-              step="any"
-              value={
-                fxRate
+              step="1"
+              value={settlementKrw}
+              onChange={event =>
+                setSettlementKrw(event.target.value)
               }
-              onChange={
-                event =>
-                  setFxRate(
-                    event.target.value
-                  )
+              placeholder={
+                tradeType === "매수"
+                  ? "실제 출금액"
+                  : "실제 입금액"
               }
-              placeholder="예: 1385.50"
             />
 
-            <span
-              className={
-                styles.fieldHint
-              }
-            >
-              해당 매매가 체결된 당시의 USD/KRW 환율을 입력해주세요.
+            <span className={styles.fieldHint}>
+              정확한 출금·입금액을 알고 있을 때만 입력하세요. 비워두면 자동 계산합니다.
             </span>
           </label>
-        )
-      }
 
-
-      <label
-        className={
-          styles.field
-        }
-      >
-        <span
-          className={
-            styles.label
-          }
-        >
-          실제 결제금액
-          <span
-            className={
-              styles.optional
-            }
-          >
-            선택
-          </span>
-        </span>
-
-        <input
-          className={
-            styles.input
-          }
-          type="number"
-          inputMode="numeric"
-          min="0"
-          step="1"
-          value={
-            settlementKrw
-          }
-          onChange={
-            event =>
-              setSettlementKrw(
-                event.target.value
-              )
-          }
-          placeholder={
-            tradeType ===
-              "매수"
-              ? "증권사 실제 출금액"
-              : "증권사 실제 입금액"
-          }
-        />
-
-        <span
-          className={
-            styles.fieldHint
-          }
-        >
-          모르면 비워두세요. 수량 × 체결단가 × 환율을 기준으로 자동 계산합니다.
-        </span>
-      </label>
-
-
-      <details
-        className={
-          styles.details
-        }
-      >
-        <summary
-          className={
-            styles.detailsSummary
-          }
-        >
-          상세 입력
-
-          <span>
-            수수료 · 세금
-          </span>
-        </summary>
-
-        <div
-          className={
-            styles.detailsContent
-          }
-        >
-          <div
-            className={
-              styles.grid
-            }
-          >
-            <label
-              className={
-                styles.field
-              }
-            >
-              <span
-                className={
-                  styles.label
-                }
-              >
+          <div className={styles.grid}>
+            <label className={styles.field}>
+              <span className={styles.label}>
                 수수료
+                <span className={styles.optional}>선택</span>
               </span>
-
               <input
-                className={
-                  styles.input
-                }
+                className={styles.input}
                 type="number"
                 inputMode="numeric"
                 min="0"
                 step="1"
-                value={
-                  feeKrw
-                }
-                onChange={
-                  event =>
-                    setFeeKrw(
-                      event.target.value
-                    )
-                }
+                value={feeKrw}
+                onChange={event => setFeeKrw(event.target.value)}
                 placeholder="0"
               />
             </label>
 
-
-            <label
-              className={
-                styles.field
-              }
-            >
-              <span
-                className={
-                  styles.label
-                }
-              >
+            <label className={styles.field}>
+              <span className={styles.label}>
                 세금
+                <span className={styles.optional}>선택</span>
               </span>
-
               <input
-                className={
-                  styles.input
-                }
+                className={styles.input}
                 type="number"
                 inputMode="numeric"
                 min="0"
                 step="1"
-                value={
-                  taxKrw
-                }
-                onChange={
-                  event =>
-                    setTaxKrw(
-                      event.target.value
-                    )
-                }
+                value={taxKrw}
+                onChange={event => setTaxKrw(event.target.value)}
                 placeholder="0"
               />
             </label>
           </div>
 
-          <p
-            className={
-              styles.detailsHelp
-            }
-          >
-            모르시면 둘 다 비워두면 됩니다. 실제 결제금액을 입력한 경우에는 그 금액이 최종 결제금액으로 우선 사용됩니다.
-          </p>
+          <label className={styles.field}>
+            <span className={styles.label}>
+              메모
+              <span className={styles.optional}>선택</span>
+            </span>
+            <input
+              className={styles.input}
+              type="text"
+              value={memo}
+              onChange={event => setMemo(event.target.value)}
+              placeholder="필요한 경우에만 입력"
+            />
+          </label>
         </div>
       </details>
 
-
-      {
-        estimatedSettlement >
-          0 && (
-          <div
-            className={
-              styles.settlementBox
-            }
-          >
-            <div
-              className={
-                styles.settlementRow
-              }
-            >
-              <span>
-                {
-                  actualSettlement !==
-                    null &&
-                  actualSettlement >
-                    0
-                    ? tradeType ===
-                        "매수"
-                      ? "실제 출금액"
-                      : "실제 입금액"
-                    : tradeType ===
-                        "매수"
-                      ? "예상 출금액"
-                      : "예상 입금액"
-                }
-              </span>
-
-              <strong>
-                {
-                  formatCurrency(
-                    settlementForDisplay
-                  )
-                }
-              </strong>
-            </div>
-
-            {
-              actualSettlement !==
-                null &&
-              actualSettlement >
-                0 && (
-                <div
-                  className={
-                    styles.settlementSubRow
-                  }
-                >
-                  <span>
-                    단순 계산 예상
-                  </span>
-
-                  <span>
-                    {
-                      formatCurrency(
-                        estimatedSettlement
-                      )
-                    }
-                  </span>
-                </div>
-              )
-            }
-
-            {
-              cashAfterTrade !==
-                null && (
-                <div
-                  className={
-                    styles.settlementSubRow
-                  }
-                >
-                  <span>
-                    거래 후 예상 예수금
-                  </span>
-
-                  <span>
-                    {
-                      formatCurrency(
-                        cashAfterTrade
-                      )
-                    }
-                  </span>
-                </div>
-              )
-            }
-          </div>
-        )
-      }
-
-
-      <label
-        className={
-          styles.field
-        }
-      >
-        <span
-          className={
-            styles.label
-          }
-        >
-          메모
-          <span
-            className={
-              styles.optional
-            }
-          >
-            선택
-          </span>
-        </span>
-
-        <input
-          className={
-            styles.input
-          }
-          type="text"
-          value={
-            memo
-          }
-          onChange={
-            event =>
-              setMemo(
-                event.target.value
-              )
-          }
-          placeholder="필요한 경우에만 입력"
-        />
-      </label>
-
-
-      {
-        error && (
-          <p
-            className={
-              styles.error
-            }
-          >
-            {
-              error
-            }
-          </p>
-        )
-      }
-
-
-      {
-        success && (
-          <p
-            className={
-              styles.success
-            }
-          >
-            {
-              success
-            }
-          </p>
-        )
-      }
-
+      {error && <p className={styles.error}>{error}</p>}
+      {success && <p className={styles.success}>{success}</p>}
 
       <button
-        className={
-          styles.submitButton
-        }
+        className={styles.submitButton}
         type="submit"
         disabled={
           saving ||
-          (
-            tradeType ===
-              "매도" &&
-            sellableHoldings.length ===
-              0
-          )
+          !selectedInstrument ||
+          (tradeType === "매도" && sellableHoldings.length === 0)
         }
       >
-        {
-          saving
-            ? "저장 중..."
-            : tradeType ===
-                "매수"
-              ? "매수 저장"
-              : "매도 저장"
-        }
+        {saving
+          ? "저장 중..."
+          : tradeType === "매수"
+            ? "매수 내역 저장"
+            : "매도 내역 저장"}
       </button>
     </form>
   );
