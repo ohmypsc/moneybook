@@ -12,6 +12,7 @@ import {
   getCachedBootstrapPayload
 } from "../../api/bootstrapCache";
 import { createTransaction } from "../../api/transactions";
+import { getDashboardSnapshot } from "../../api/dashboard";
 import {
   applyAccountPreferences,
   applyCategoryPreferences,
@@ -19,6 +20,7 @@ import {
   sortAccountsByPreferences
 } from "../../utils/inputPreferences";
 import {
+  discardPendingTransaction,
   enqueuePendingTransaction,
   getLastPendingTransactionCompletion,
   getPendingTransactions,
@@ -26,6 +28,10 @@ import {
   retryPendingTransaction,
   subscribePendingTransactions
 } from "../../utils/pendingTransactionQueue";
+import type {
+  PendingTransactionRecord
+} from "../../utils/pendingTransactionQueue";
+import { getSeoulDateString } from "../../utils/dateTime";
 import styles from "./InputPage.module.css";
 
 type TransactionType = "지출" | "수입" | "이체";
@@ -210,19 +216,9 @@ async function loadBootstrap(): Promise<BootstrapData> {
 }
 
 function getToday() {
-  const now = new Date();
-
-  const local = new Date(
-    now.getTime() -
-      now.getTimezoneOffset() *
-        60 *
-        1000
-  );
-
-  return local
-    .toISOString()
-    .slice(0, 10);
+  return getSeoulDateString();
 }
+
 
 function createRequestId() {
   if (
@@ -652,8 +648,17 @@ export default function InputPage({
       const previousOverflow = document.body.style.overflow;
       document.body.style.overflow = "hidden";
 
+      function handleKeyDown(event: KeyboardEvent) {
+        if (event.key === "Escape") {
+          setActivePicker(null);
+        }
+      }
+
+      window.addEventListener("keydown", handleKeyDown);
+
       return () => {
         document.body.style.overflow = previousOverflow;
+        window.removeEventListener("keydown", handleKeyDown);
       };
     },
     [activePicker]
@@ -1026,6 +1031,90 @@ export default function InputPage({
   function clearFeedback() {
     setError("");
     setSuccess("");
+  }
+
+  function loadFailedTransactionForEdit(
+    item: PendingTransactionRecord
+  ) {
+    const hasCurrentInput = !!(
+      amount ||
+      categoryId ||
+      paymentMethodId ||
+      spendingTarget ||
+      fromAccountId ||
+      toAccountId ||
+      memo.trim()
+    );
+
+    if (
+      hasCurrentInput &&
+      !window.confirm(
+        "현재 작성 중인 내용을 저장 실패 항목으로 바꿀까요? 작성 중인 내용은 덮어씁니다."
+      )
+    ) {
+      return;
+    }
+
+    const payload = item.payload;
+    const nextMode: InputMode =
+      payload.type === "수입"
+        ? "income"
+        : payload.type === "이체"
+          ? "transfer"
+          : "expense";
+
+    setActivePicker(null);
+    setMode(nextMode);
+    setDate(payload.date || today);
+    setAmount(String(payload.amount || ""));
+    setCategoryId(payload.categoryId || "");
+    setPaymentMethodId(payload.paymentMethodId || "");
+    setSpendingTarget(payload.spendingTarget || "");
+    setFromAccountId(payload.fromAccountId || "");
+    setToAccountId(payload.toAccountId || "");
+    setBillingMonth(
+      payload.billingMonth ||
+      (payload.date || today).slice(0, 7)
+    );
+    setMemo(payload.memo || "");
+
+    const fingerprint = JSON.stringify({
+      date: payload.date,
+      type: payload.type,
+      categoryId: payload.categoryId,
+      amount: Number(payload.amount),
+      paymentMethodId:
+        payload.type === "지출"
+          ? payload.paymentMethodId
+          : undefined,
+      spendingTarget:
+        payload.type === "지출"
+          ? payload.spendingTarget
+          : undefined,
+      fromAccountId:
+        payload.type === "이체"
+          ? payload.fromAccountId
+          : undefined,
+      toAccountId:
+        payload.type === "수입" || payload.type === "이체"
+          ? payload.toAccountId
+          : undefined,
+      billingMonth: payload.billingMonth || undefined,
+      memo: (payload.memo || "").trim()
+    });
+
+    requestMemory.current = {
+      fingerprint,
+      requestId: payload.requestId || item.id
+    };
+
+    discardPendingTransaction(
+      userName,
+      item.id
+    );
+
+    setError("");
+    setSuccess("저장 실패 내용을 불러왔습니다. 확인 후 다시 저장하세요.");
   }
 
   function resetAccountSelections() {
@@ -1534,6 +1623,73 @@ export default function InputPage({
 
     if (
       !bootstrap
+    ) {
+      return;
+    }
+
+    const recentTransactions =
+      getDashboardSnapshot()
+        ?.recentTransactions ||
+      [];
+
+    const numericAmount =
+      Number(
+        amount
+      );
+
+    const possibleDuplicate =
+      recentTransactions.find(
+        transaction => {
+          if (
+            transaction.date !==
+              date ||
+            transaction.type !==
+              backendType ||
+            Math.abs(
+              Number(transaction.amount) -
+              numericAmount
+            ) >
+              0.000001
+          ) {
+            return false;
+          }
+
+          if (
+            mode ===
+            "expense"
+          ) {
+            return (
+              !paymentMethodId ||
+              transaction.paymentMethodId ===
+                paymentMethodId
+            );
+          }
+
+          if (
+            mode ===
+            "income"
+          ) {
+            return (
+              !toAccountId ||
+              transaction.toAccountId ===
+                toAccountId
+            );
+          }
+
+          return (
+            transaction.fromAccountId ===
+              fromAccountId &&
+            transaction.toAccountId ===
+              toAccountId
+          );
+        }
+      );
+
+    if (
+      possibleDuplicate &&
+      !window.confirm(
+        `같은 날짜에 ${numericAmount.toLocaleString("ko-KR")}원 ${backendType} 내역이 이미 있습니다.\n\n중복이 아니라면 그대로 저장하세요.`
+      )
     ) {
       return;
     }
@@ -2543,21 +2699,67 @@ export default function InputPage({
                             </span>
                           </div>
 
-                          <button
-                            type="button"
+                          <div
                             className={
-                              styles.queueRetryButton
-                            }
-                            onClick={
-                              () =>
-                                retryPendingTransaction(
-                                  userName,
-                                  item.id
-                                )
+                              styles.queueFailureActions
                             }
                           >
-                            다시 시도
-                          </button>
+                            {
+                              item.failureKind !== "network" && (
+                                <button
+                                  type="button"
+                                  className={
+                                    styles.queueEditButton
+                                  }
+                                  onClick={
+                                    () =>
+                                      loadFailedTransactionForEdit(
+                                        item
+                                      )
+                                  }
+                                >
+                                  수정
+                                </button>
+                              )
+                            }
+                            <button
+                              type="button"
+                              className={
+                                styles.queueRetryButton
+                              }
+                              onClick={
+                                () =>
+                                  retryPendingTransaction(
+                                    userName,
+                                    item.id
+                                  )
+                              }
+                            >
+                              다시 시도
+                            </button>
+                            <button
+                              type="button"
+                              className={
+                                styles.queueDiscardButton
+                              }
+                              onClick={
+                                () => {
+                                  if (
+                                    window.confirm(
+                                      "이 저장 실패 항목을 대기열에서 삭제할까요?"
+                                    )
+                                  ) {
+                                    discardPendingTransaction(
+                                      userName,
+                                      item.id
+                                    );
+                                  }
+                                }
+                              }
+                            >
+                              삭제
+                            </button>
+                          </div>
                         </div>
                       )
                     )
