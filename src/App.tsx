@@ -56,8 +56,8 @@ import LoginPage
 import HomePage
   from "./pages/HomePage/HomePage";
 
-import CalendarPage
-  from "./pages/CalendarPage/CalendarPage";
+import HistoryPage
+  from "./pages/HistoryPage/HistoryPage";
 
 import InputPage
   from "./pages/InputPage/InputPage";
@@ -94,13 +94,59 @@ type SplashWindow =
 
 
 const SPLASH_MINIMUM_MS =
-  900;
+  250;
 
 const PRIMARY_WARM_TIMEOUT_MS =
-  4500;
+  2500;
 
 const SECONDARY_WARM_DELAY_MS =
   250;
+
+
+const LAST_AUTHENTICATED_USER_KEY =
+  "moneybook:last-authenticated-user:v1";
+
+function readLastAuthenticatedUser(): User | null {
+  try {
+    const raw =
+      window.localStorage.getItem(
+        LAST_AUTHENTICATED_USER_KEY
+      );
+
+    if (!raw) return null;
+
+    const parsed =
+      JSON.parse(raw) as
+        Partial<User>;
+
+    return typeof parsed.name ===
+      "string" &&
+      parsed.name
+        ? { name: parsed.name }
+        : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveLastAuthenticatedUser(
+  user: User | null
+) {
+  try {
+    if (user) {
+      window.localStorage.setItem(
+        LAST_AUTHENTICATED_USER_KEY,
+        JSON.stringify(user)
+      );
+    } else {
+      window.localStorage.removeItem(
+        LAST_AUTHENTICATED_USER_KEY
+      );
+    }
+  } catch {
+    /* 저장소 사용 불가 환경에서는 세션만 사용합니다. */
+  }
+}
 
 
 type AppHistoryState = {
@@ -284,10 +330,13 @@ async function warmPrimaryData() {
     getDashboard();
 
 
-  const calendarRequest =
-    loadCalendarMonth(
-      getCurrentCalendarMonth()
-    );
+  void loadCalendarMonth(
+    getCurrentCalendarMonth()
+  ).catch(
+    () => {
+      /* 내역 화면에서 필요할 때 다시 요청합니다. */
+    }
+  );
 
 
   /*
@@ -326,8 +375,7 @@ async function warmPrimaryData() {
 
   await Promise.race([
     Promise.allSettled([
-      dashboardRequest,
-      calendarRequest
+      dashboardRequest
     ]),
 
     wait(
@@ -564,6 +612,10 @@ export default function App() {
             }
 
 
+            saveLastAuthenticatedUser(
+              session.user
+            );
+
             setUser(
               session.user
             );
@@ -620,6 +672,47 @@ export default function App() {
             return;
           }
 
+          const unauthorizedError =
+            error instanceof ApiError &&
+            error.status === 401;
+
+          const offlineUser =
+            unauthorizedError
+              ? null
+              : readLastAuthenticatedUser();
+
+          if (
+            offlineUser
+          ) {
+            setUser(
+              offlineUser
+            );
+            setStatus(
+              "authenticated"
+            );
+            setActiveNavigation(
+              "home"
+            );
+            setLoginError("");
+
+            await waitForMinimumSplash();
+
+            if (
+              !cancelled
+            ) {
+              hideSplashAfterPaint();
+            }
+
+            return;
+          }
+
+          if (
+            unauthorizedError
+          ) {
+            saveLastAuthenticatedUser(
+              null
+            );
+          }
 
           setUser(
             null
@@ -711,6 +804,10 @@ export default function App() {
 
       await waitForMinimumSplash();
 
+
+      saveLastAuthenticatedUser(
+        result.user
+      );
 
       setUser(
         result.user
@@ -843,6 +940,10 @@ export default function App() {
       clearManagedSettingsCache();
 
 
+      saveLastAuthenticatedUser(
+        null
+      );
+
       setUser(
         null
       );
@@ -928,9 +1029,7 @@ export default function App() {
     "home"
   ) {
     pageContent = (
-      <HomePage
-        onOpenHistory={() => navigateTo("calendar")}
-      />
+      <HomePage />
     );
 
   } else if (
@@ -938,7 +1037,7 @@ export default function App() {
     "calendar"
   ) {
     pageContent = (
-      <CalendarPage
+      <HistoryPage
         onAddTransaction={
           date => {
             navigateTo(
@@ -970,7 +1069,11 @@ export default function App() {
     "assets"
   ) {
     pageContent = (
-      <AssetsPage />
+      <AssetsPage
+        userName={
+          user.name
+        }
+      />
     );
 
   } else {
