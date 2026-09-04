@@ -2,6 +2,7 @@ import {
   type FormEvent,
   useEffect,
   useMemo,
+  useRef,
   useState
 } from "react";
 
@@ -160,6 +161,11 @@ export default function InvestmentTradeForm({
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  const requestMemory = useRef<{
+    fingerprint: string;
+    requestId: string;
+  } | null>(null);
+
   const activeHoldings = useMemo(
     () => holdings.filter(holding => !holding.isDeleted),
     [holdings]
@@ -255,6 +261,7 @@ export default function InvestmentTradeForm({
     setUnitPrice("");
     setSettlementKrw("");
     setMemo("");
+    requestMemory.current = null;
   }
 
   useEffect(() => {
@@ -540,6 +547,45 @@ export default function InvestmentTradeForm({
       parsedSettlement = value;
     }
 
+    const fingerprint = JSON.stringify({
+      accountId: account.accountId,
+      tradeType,
+      tradeDate,
+      stockCode: selectedInstrument.stockCode,
+      stockName: isNewHolding
+        ? selectedInstrument.stockName
+        : undefined,
+      market: isNewHolding
+        ? selectedInstrument.market
+        : undefined,
+      quantity: parsedQuantity,
+      unitPrice: parsedUnitPrice,
+      currency: isForeign ? "USD" : "KRW",
+      fxRate: parsedFxRate,
+      settlementKrw: parsedSettlement,
+      memo: memo.trim() || undefined,
+      quoteMode: isNewHolding
+        ? selectedInstrument.stockCode === "04020000"
+          ? "수동"
+          : "자동"
+        : undefined,
+      manualPrice:
+        isNewHolding &&
+        selectedInstrument.stockCode === "04020000"
+          ? parsedUnitPrice
+          : undefined
+    });
+
+    const requestId =
+      requestMemory.current?.fingerprint === fingerprint
+        ? requestMemory.current.requestId
+        : makeRequestId();
+
+    requestMemory.current = {
+      fingerprint,
+      requestId
+    };
+
     const payload: CreateInvestmentTradePayload = {
       accountId: account.accountId,
       tradeType,
@@ -549,7 +595,7 @@ export default function InvestmentTradeForm({
       unitPrice: parsedUnitPrice,
       currency: isForeign ? "USD" : "KRW",
       fxRate: parsedFxRate,
-      requestId: makeRequestId()
+      requestId
     };
 
     if (parsedSettlement !== undefined) {
