@@ -9,11 +9,15 @@ import {
 import App
   from "./App";
 
-import PwaInstallPrompt
-  from "./components/pwa/PwaInstallPrompt/PwaInstallPrompt";
-
 import "./styles/tokens.css";
 import "./styles/global.css";
+
+import {
+  initializePwaInstall
+} from "./utils/pwaInstall";
+
+
+initializePwaInstall();
 
 
 const root =
@@ -34,8 +38,6 @@ createRoot(
 ).render(
   <StrictMode>
     <App />
-
-    <PwaInstallPrompt />
   </StrictMode>
 );
 
