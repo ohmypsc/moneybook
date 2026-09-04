@@ -78,6 +78,8 @@
 
 .summaryHeader h2 { margin: 0; font-size: 16px; }
 .summaryHeader span { color: var(--color-text-secondary); font-size: 12px; }
+.summaryMeta { display: grid; justify-items: end; gap: 2px; }
+.summaryMeta small { color: var(--color-text-tertiary, var(--color-text-secondary)); font-size: 10px; font-weight: 600; }
 
 .summaryRows { display: grid; }
 .summaryRow {
@@ -119,7 +121,7 @@
 .sectionTotal { flex: 0 0 auto; font-size: 15px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 .cardList,
-.recentList {
+.rankList {
   overflow: hidden;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -128,7 +130,7 @@
 }
 
 .cardRow,
-.recentRow {
+.rankRow {
   min-height: 66px;
   display: flex;
   align-items: center;
@@ -137,7 +139,7 @@
   border-bottom: 1px solid rgba(220, 229, 229, 0.72);
 }
 .cardRow:last-child,
-.recentRow:last-child { border-bottom: 0; }
+.rankRow:last-child { border-bottom: 0; }
 .cardRow { justify-content: space-between; }
 
 .cardName { min-width: 0; display: flex; align-items: center; gap: 11px; }
@@ -158,21 +160,22 @@
 .cardName span { color: var(--color-text-secondary); font-size: 11px; }
 .cardAmount { flex: 0 0 auto; font-size: 14px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
-.recentDate {
-  width: 32px;
-  flex: 0 0 32px;
-  color: var(--color-text-secondary);
-  font-size: 11px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
+
+.rankRow { min-height: 58px; }
+.rankNumber {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 26px;
+  border-radius: 50%;
+  background: var(--color-surface-soft);
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 800;
 }
-.recentText { min-width: 0; flex: 1 1 auto; display: grid; gap: 3px; }
-.recentText strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
-.recentText span { overflow: hidden; color: var(--color-text-secondary); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-.recentAmount { flex: 0 0 auto; font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.recentIncome { color: var(--color-income); }
-.recentExpense { color: var(--color-text); }
-.recentTransfer { color: var(--color-text-secondary); }
+.rankName { min-width: 0; flex: 1 1 auto; overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.rankAmount { flex: 0 0 auto; color: var(--color-text); font-size: 13px; font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 .emptyText {
   margin: 0;
@@ -230,19 +233,7 @@
   .summaryCard { padding: 16px; }
   .summaryRow strong { font-size: 15px; }
   .cardRow,
-  .recentRow { padding-right: 13px; padding-left: 13px; }
+  .rankRow { padding-right: 13px; padding-left: 13px; }
   .cardAmount,
-  .recentAmount { font-size: 12.5px; }
-}
-
-.sectionLink {
-  flex: 0 0 auto;
-  padding: 4px 2px;
-  border: 0;
-  background: transparent;
-  color: var(--color-primary);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 800;
-  white-space: nowrap;
+  .rankAmount { font-size: 12.5px; }
 }
