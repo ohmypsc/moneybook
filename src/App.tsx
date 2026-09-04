@@ -41,6 +41,11 @@ import {
   prefetchManagedSettings
 } from "./api/settingsManagement";
 
+import {
+  startPendingTransactionQueue,
+  stopPendingTransactionQueue
+} from "./utils/pendingTransactionQueue";
+
 import type {
   User
 } from "./types/api";
@@ -485,6 +490,33 @@ export default function App() {
     [
       activeNavigation,
       status
+    ]
+  );
+
+
+  useEffect(
+    () => {
+      if (
+        status !== "authenticated" ||
+        !user
+      ) {
+        stopPendingTransactionQueue();
+        return;
+      }
+
+      startPendingTransactionQueue(
+        user.name
+      );
+
+      return () => {
+        stopPendingTransactionQueue(
+          user.name
+        );
+      };
+    },
+    [
+      status,
+      user
     ]
   );
 
