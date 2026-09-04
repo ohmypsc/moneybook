@@ -175,6 +175,8 @@ export interface GetTransactionsParams {
 
   spendingTarget?: string;
 
+  amount?: number;
+
   q?: string;
 
   limit?: number;
@@ -261,6 +263,14 @@ export async function getTransactions(
     searchParams.set(
       "spendingTarget",
       params.spendingTarget
+    );
+  }
+
+
+  if (params.amount !== undefined) {
+    searchParams.set(
+      "amount",
+      String(params.amount)
     );
   }
 
