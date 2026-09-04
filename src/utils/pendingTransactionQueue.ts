@@ -547,6 +547,27 @@ export function retryPendingTransaction(
   void processQueue(owner);
 }
 
+
+export function discardPendingTransaction(
+  owner: string,
+  id: string
+) {
+  ensureLoaded();
+
+  const record =
+    records.find(
+      item =>
+        item.owner === owner &&
+        item.id === id
+    );
+
+  if (!record || record.status === "saving") {
+    return;
+  }
+
+  removeRecord(id);
+}
+
 export function retryAllFailedPendingTransactions(
   owner: string
 ) {
