@@ -35,6 +35,16 @@ import type {
     LedgerTransactionType
 } from "../../api/calendar";
 
+
+import {
+    markBackgroundRefreshed,
+    shouldBackgroundRefresh
+} from "../../utils/backgroundRefresh";
+
+import {
+    getSeoulDateString
+} from "../../utils/dateTime";
+
 import styles
     from "./CalendarPage.module.css";
 
@@ -145,19 +155,9 @@ function pad(
 }
 
 function getToday() {
-    const now =
-        new Date();
-
-    return [
-        now.getFullYear(),
-        pad(
-            now.getMonth() + 1
-        ),
-        pad(
-            now.getDate()
-        )
-    ].join("-");
+    return getSeoulDateString();
 }
+
 
 function getCurrentMonth() {
     return getToday()
@@ -920,6 +920,10 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
                     setTransactions(
                         items
                     );
+
+                    markBackgroundRefreshed(
+                        `calendar:${month}`
+                    );
                 } catch (
                     loadError
                 ) {
@@ -958,22 +962,51 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
             function refreshWhenVisible() {
                 if (
                     document.visibilityState !==
-                    "visible"
+                    "visible" ||
+                    !shouldBackgroundRefresh(
+                        `calendar:${month}`,
+                        60_000
+                    )
                 ) {
                     return;
                 }
 
-                refreshMonth();
+                void loadCalendarMonth(
+                    month,
+                    {
+                        forceRefresh: true
+                    }
+                )
+                    .then(
+                        items => {
+                            setTransactions(
+                                items
+                            );
+                        }
+                    )
+                    .catch(
+                        () => {
+                            /* 현재 화면은 유지하고 다음 진입 때 다시 확인합니다. */
+                        }
+                    );
             }
 
             document.addEventListener(
                 "visibilitychange",
                 refreshWhenVisible
             );
+            window.addEventListener(
+                "focus",
+                refreshWhenVisible
+            );
 
             return () => {
                 document.removeEventListener(
                     "visibilitychange",
+                    refreshWhenVisible
+                );
+                window.removeEventListener(
+                    "focus",
                     refreshWhenVisible
                 );
             };
