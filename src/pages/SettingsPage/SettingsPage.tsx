@@ -70,6 +70,10 @@ import {
     markLedgerChanged
 } from "../../utils/ledgerEvents";
 
+import {
+    getSeoulFileDate
+} from "../../utils/dateTime";
+
 import styles
     from "./SettingsPage.module.css";
 
@@ -3164,7 +3168,23 @@ function CategorySettings() {
 }
 
 
-export function AccountSettings() {
+interface AccountSettingsProps {
+    initialAccountId?: string;
+    createNew?: boolean;
+    initialOwner?: string;
+    embedded?: boolean;
+    onClose?: () => void;
+    onSaved?: () => void | Promise<void>;
+}
+
+export function AccountSettings({
+    initialAccountId,
+    createNew = false,
+    initialOwner,
+    embedded = false,
+    onClose,
+    onSaved
+}: AccountSettingsProps = {}) {
     const [
         initialSnapshot
     ] =
@@ -3252,6 +3272,9 @@ export function AccountSettings() {
         >(
             null
         );
+
+    const embeddedOpenedRef =
+        useRef(false);
 
     const [
         loading,
@@ -3390,6 +3413,97 @@ export function AccountSettings() {
         );
 
 
+    useEffect(
+        () => {
+            if (
+                !embedded ||
+                embeddedOpenedRef.current
+            ) {
+                return;
+            }
+
+            if (
+                createNew
+            ) {
+                const nextOwner =
+                    ACCOUNT_OWNER_TABS.includes(
+                        initialOwner as AccountOwnerTab
+                    )
+                        ? initialOwner as AccountOwnerTab
+                        : "공동";
+
+                embeddedOpenedRef.current =
+                    true;
+                setOwnerTab(
+                    nextOwner
+                );
+                setEditingId(
+                    null
+                );
+                setForm(
+                    createEmptyAccountForm(
+                        nextOwner
+                    )
+                );
+                setShowForm(
+                    true
+                );
+                setError(
+                    ""
+                );
+                setFeedback(
+                    ""
+                );
+                return;
+            }
+
+            if (
+                !initialAccountId
+            ) {
+                return;
+            }
+
+            const account =
+                accounts.find(
+                    item =>
+                        item.accountId ===
+                        initialAccountId
+                );
+
+            if (
+                !account ||
+                account.isDeleted
+            ) {
+                return;
+            }
+
+            embeddedOpenedRef.current =
+                true;
+
+            if (
+                ACCOUNT_OWNER_TABS.includes(
+                    account.owner as AccountOwnerTab
+                )
+            ) {
+                setOwnerTab(
+                    account.owner as AccountOwnerTab
+                );
+            }
+
+            beginEdit(
+                account
+            );
+        },
+        [
+            accounts,
+            createNew,
+            embedded,
+            initialAccountId,
+            initialOwner
+        ]
+    );
+
+
     const ownerAccounts =
         useMemo(
             () =>
@@ -3506,10 +3620,6 @@ export function AccountSettings() {
                     sortAccountsByPreferences(
                         inputAccounts,
                         normalizedPreferences
-                    ).filter(
-                        account =>
-                            account.owner ===
-                            ownerTab
                     );
 
                 const byId =
@@ -3816,6 +3926,14 @@ export function AccountSettings() {
 
 
     function closeForm() {
+        if (
+            embedded &&
+            onClose
+        ) {
+            onClose();
+            return;
+        }
+
         setEditingId(
             null
         );
@@ -3947,6 +4065,12 @@ export function AccountSettings() {
         if (
             completed
         ) {
+            if (
+                onSaved
+            ) {
+                await onSaved();
+            }
+
             closeForm();
         }
     }
@@ -4688,6 +4812,79 @@ export function AccountSettings() {
                                                     </button>
                                                 </div>
                                             </section>
+        );
+    }
+
+
+    if (
+        embedded
+    ) {
+        const focusedAccount =
+            accounts.find(
+                account =>
+                    account.accountId ===
+                    initialAccountId &&
+                    !account.isDeleted
+            );
+
+        return (
+            <div
+                className={
+                    styles.settingsBody
+                }
+            >
+                {
+                    loading && (
+                        <p
+                            className={
+                                styles.state
+                            }
+                        >
+                            계좌 정보를 불러오는 중입니다.
+                        </p>
+                    )
+                }
+
+                {
+                    !loading &&
+                    !createNew &&
+                    !focusedAccount && (
+                        <p
+                            className={
+                                styles.error
+                            }
+                        >
+                            편집할 계좌를 찾을 수 없습니다.
+                        </p>
+                    )
+                }
+
+                {
+                    feedback && (
+                        <p
+                            className={
+                                styles.feedback
+                            }
+                        >
+                            {feedback}
+                        </p>
+                    )
+                }
+
+                {
+                    !loading &&
+                    showForm &&
+                    (
+                        createNew
+                            ? editingId === null
+                            : Boolean(
+                                focusedAccount &&
+                                editingId === focusedAccount.accountId
+                            )
+                    ) &&
+                    renderAccountForm()
+                }
+            </div>
         );
     }
 
@@ -5748,12 +5945,7 @@ function LedgerDataSettings() {
                 url;
 
             link.download =
-                `우리_가계부_거래_${new Date()
-                    .toISOString()
-                    .slice(
-                        0,
-                        10
-                    )}.csv`;
+                `우리_가계부_거래_${getSeoulFileDate()}.csv`;
 
             document.body.appendChild(
                 link
@@ -6347,6 +6539,13 @@ export default function SettingsPage() {
     } as const;
 
 
+    const detailViewKey =
+        view as Exclude<
+            SettingsView,
+            "home"
+        >;
+
+
     return (
         <main
             className={
@@ -6368,12 +6567,12 @@ export default function SettingsPage() {
                             <DetailHeader
                                 title={
                                     detail[
-                                        view
+                                        detailViewKey
                                     ].title
                                 }
                                 description={
                                     detail[
-                                        view
+                                        detailViewKey
                                     ].description
                                 }
                                 onBack={
