@@ -189,6 +189,8 @@ function LoginPage({
               className={
                 styles.error
               }
+              role="alert"
+              aria-live="polite"
             >
               {
                 errorMessage
