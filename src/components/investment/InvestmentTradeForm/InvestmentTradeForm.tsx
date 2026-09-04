@@ -23,6 +23,10 @@ import type {
   Market
 } from "../../../types/investment";
 
+import {
+  getSeoulDateString
+} from "../../../utils/dateTime";
+
 import styles from "./InvestmentTradeForm.module.css";
 
 interface InvestmentTradeFormProps {
@@ -55,13 +59,9 @@ const FUND_BRAND_ALIASES: Array<[RegExp, string]> = [
 ];
 
 function getToday() {
-  const now = new Date();
-  const local = new Date(
-    now.getTime() - now.getTimezoneOffset() * 60 * 1000
-  );
-
-  return local.toISOString().slice(0, 10);
+  return getSeoulDateString();
 }
+
 
 function formatCurrency(value: number | null | undefined) {
   if (
