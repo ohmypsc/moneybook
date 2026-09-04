@@ -1463,3 +1463,208 @@
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
+
+.headerHint {
+  margin: 4px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.cashAccountRow {
+  width: 100%;
+  color: var(--color-text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cashAccountRowActive {
+  border-color: var(--color-primary);
+}
+
+.cashDetailItem {
+  list-style: none;
+}
+
+.cashDetailCard {
+  display: grid;
+  gap: 14px;
+  margin: -2px 0 8px;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.cashDetailHeader,
+.detailHeaderActions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cashDetailHeader > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.cashDetailHeader span {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
+
+.cashDetailHeader strong {
+  overflow: hidden;
+  font-size: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detailHeaderActions {
+  flex-direction: column;
+  align-items: flex-end;
+  flex: 0 0 auto;
+}
+
+.editAccountButton,
+.reconcileButton {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.cashDetailMetrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.cashDetailMetrics > div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  padding: 11px 10px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+}
+
+.cashDetailMetrics span {
+  color: var(--color-text-secondary);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.cashDetailMetrics strong {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reconcilePanel {
+  display: grid;
+  gap: 9px;
+  padding: 13px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+}
+
+.reconcilePanel label {
+  display: grid;
+  gap: 6px;
+}
+
+.reconcilePanel label > span,
+.reconcilePanel small {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.reconcilePanel input {
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: 16px;
+}
+
+.reconcilePanel p {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.reconcileActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.reconcileActions button {
+  min-height: 40px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.reconcileActions button:last-child {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+}
+
+.editorBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 18px 12px calc(18px + env(safe-area-inset-bottom));
+  background: rgba(20, 30, 34, 0.34);
+}
+
+.editorSheet {
+  width: min(100%, var(--content-width));
+  max-height: min(86dvh, 760px);
+  overflow: auto;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl) var(--radius-xl) var(--radius-lg) var(--radius-lg);
+  background: var(--color-background);
+  box-shadow: 0 20px 60px rgba(20, 30, 34, 0.2);
+}
+
+.addAccountButton {
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
