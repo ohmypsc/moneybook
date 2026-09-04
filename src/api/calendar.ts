@@ -1,240 +1,340 @@
-import {
-  apiRequest
-} from "./client";
+import { getCalendarTransactions } from "./calendar";
+import type { CalendarTransaction } from "./calendar";
+import { subscribeLedgerChanges } from "../utils/ledgerEvents";
+import { getSeoulMonthString } from "../utils/dateTime";
 
-import {
-  unwrapEnvelope
-} from "./envelope";
+interface MonthCacheEntry {
+    items: CalendarTransaction[];
+    storedAt: number;
+}
 
-import type {
-  ApiEnvelope
-} from "./envelope";
+const CURRENT_MONTH_TTL_MS = 30 * 1000;
+const ARCHIVE_MONTH_TTL_MS = 5 * 60 * 1000;
 
+const activeMonthCache = new Map<string, MonthCacheEntry>();
+const deletedMonthCache = new Map<string, MonthCacheEntry>();
 
-export type LedgerTransactionType =
-  | "지출"
-  | "수입"
-  | "이체";
+const activeMonthRequests =
+    new Map<string, Promise<CalendarTransaction[]>>();
 
+const deletedMonthRequests =
+    new Map<string, Promise<CalendarTransaction[]>>();
 
-export interface CalendarTransaction {
-  transactionId: string;
+let cacheGeneration = 0;
 
-  date: string;
+function pad(value: number) {
+    return String(value).padStart(2, "0");
+}
 
-  type:
-    LedgerTransactionType;
-
-  categoryId:
-    string | null;
-
-  category: string;
-
-  amount: number;
-
-  fromAccountId:
-    string | null;
-
-  fromAccount:
-    string | null;
-
-  toAccountId:
-    string | null;
-
-  toAccount:
-    string | null;
-
-  paymentMethodId:
-    string | null;
-
-  paymentMethod:
-    string | null;
-
-  spendingTarget:
-    string | null;
-
-  memo: string;
-
-  billingOverride:
-    string | null;
-
-  billingMonth:
-    string | null;
-
-  groupId:
-    string | null;
-
-  requestId:
-    string | null;
-
-  reversalOf:
-    string | null;
-
-  createdAt:
-    string | null;
-
-  updatedAt:
-    string | null;
-
-  updatedAtMs:
-    number | null;
-
-  createdBy?: string;
-
-  updatedBy?: string;
-
-  deletedAt?:
-    string | null;
-
-  deletedBy?: string;
-
-  isDeleted: boolean;
+export function getCurrentCalendarMonth() {
+    return getSeoulMonthString();
 }
 
 
-export interface CalendarTransactionsResponse {
-  total: number;
+function getMonthBounds(month: string) {
+    const match =
+        /^(\d{4})-(\d{2})$/.exec(month);
 
-  items:
-    CalendarTransaction[];
+    if (!match) {
+        throw new Error(
+            "월 형식이 올바르지 않습니다."
+        );
+    }
+
+    const year = Number(match[1]);
+    const monthNumber = Number(match[2]);
+
+    if (
+        !Number.isInteger(year) ||
+        monthNumber < 1 ||
+        monthNumber > 12
+    ) {
+        throw new Error(
+            "월 형식이 올바르지 않습니다."
+        );
+    }
+
+    const lastDay =
+        new Date(
+            year,
+            monthNumber,
+            0
+        ).getDate();
+
+    return {
+        dateFrom: `${month}-01`,
+        dateTo: `${month}-${pad(lastDay)}`
+    };
 }
 
-
-export interface GetCalendarTransactionsParams {
-  dateFrom?: string;
-
-  dateTo?: string;
-
-  type?:
-    LedgerTransactionType;
-
-  categoryId?: string;
-
-  accountId?: string;
-
-  spendingTarget?: string;
-
-  q?: string;
-
-  includeDeleted?: boolean;
-
-  limit?: number;
-
-  offset?: number;
+function getTtl(month: string) {
+    return month === getCurrentCalendarMonth()
+        ? CURRENT_MONTH_TTL_MS
+        : ARCHIVE_MONTH_TTL_MS;
 }
 
-
-export async function getCalendarTransactions(
-  params:
-    GetCalendarTransactionsParams = {}
+function isFresh(
+    month: string,
+    entry: MonthCacheEntry | undefined
 ) {
-  const searchParams =
-    new URLSearchParams();
-
-
-  if (params.dateFrom) {
-    searchParams.set(
-      "dateFrom",
-      params.dateFrom
+    return Boolean(
+        entry &&
+        Date.now() - entry.storedAt <
+            getTtl(month)
     );
-  }
+}
 
-
-  if (params.dateTo) {
-    searchParams.set(
-      "dateTo",
-      params.dateTo
+export function getCalendarMonthSnapshot(
+    month: string
+) {
+    return (
+        activeMonthCache.get(month)?.items ||
+        null
     );
-  }
+}
 
-
-  if (params.type) {
-    searchParams.set(
-      "type",
-      params.type
+export function getDeletedCalendarMonthSnapshot(
+    month: string
+) {
+    return (
+        deletedMonthCache.get(month)?.items ||
+        null
     );
-  }
+}
 
+export async function loadCalendarMonth(
+    month: string,
+    options: {
+        forceRefresh?: boolean;
+    } = {}
+) {
+    const cached =
+        activeMonthCache.get(month);
 
-  if (params.categoryId) {
-    searchParams.set(
-      "categoryId",
-      params.categoryId
+    if (
+        !options.forceRefresh &&
+        isFresh(month, cached)
+    ) {
+        return cached!.items;
+    }
+
+    const existingRequest =
+        activeMonthRequests.get(month);
+
+    if (
+        !options.forceRefresh &&
+        existingRequest
+    ) {
+        return existingRequest;
+    }
+
+    const {
+        dateFrom,
+        dateTo
+    } = getMonthBounds(month);
+
+    const requestGeneration =
+        cacheGeneration;
+
+    let request:
+        Promise<CalendarTransaction[]>;
+
+    request =
+        getCalendarTransactions({
+            dateFrom,
+            dateTo,
+            limit: 1000
+        })
+            .then(result => {
+                const items =
+                    Array.isArray(result.items)
+                        ? result.items.filter(
+                              item =>
+                                  !item.isDeleted
+                          )
+                        : [];
+
+                if (
+                    requestGeneration ===
+                    cacheGeneration
+                ) {
+                    activeMonthCache.set(
+                        month,
+                        {
+                            items,
+                            storedAt:
+                                Date.now()
+                        }
+                    );
+                }
+
+                return items;
+            })
+            .finally(() => {
+                if (
+                    activeMonthRequests.get(
+                        month
+                    ) === request
+                ) {
+                    activeMonthRequests.delete(
+                        month
+                    );
+                }
+            });
+
+    activeMonthRequests.set(
+        month,
+        request
     );
-  }
 
+    return request;
+}
 
-  if (params.accountId) {
-    searchParams.set(
-      "accountId",
-      params.accountId
+export async function loadDeletedCalendarMonth(
+    month: string,
+    options: {
+        forceRefresh?: boolean;
+    } = {}
+) {
+    const cached =
+        deletedMonthCache.get(month);
+
+    if (
+        !options.forceRefresh &&
+        isFresh(month, cached)
+    ) {
+        return cached!.items;
+    }
+
+    const existingRequest =
+        deletedMonthRequests.get(month);
+
+    if (
+        !options.forceRefresh &&
+        existingRequest
+    ) {
+        return existingRequest;
+    }
+
+    const {
+        dateFrom,
+        dateTo
+    } = getMonthBounds(month);
+
+    const requestGeneration =
+        cacheGeneration;
+
+    let request:
+        Promise<CalendarTransaction[]>;
+
+    request =
+        getCalendarTransactions({
+            dateFrom,
+            dateTo,
+            includeDeleted: true,
+            limit: 1000
+        })
+            .then(result => {
+                const allItems =
+                    Array.isArray(result.items)
+                        ? result.items
+                        : [];
+
+                const deletedItems =
+                    allItems.filter(
+                        item =>
+                            item.isDeleted
+                    );
+
+                const activeItems =
+                    allItems.filter(
+                        item =>
+                            !item.isDeleted
+                    );
+
+                if (
+                    requestGeneration ===
+                    cacheGeneration
+                ) {
+                    const storedAt =
+                        Date.now();
+
+                    deletedMonthCache.set(
+                        month,
+                        {
+                            items:
+                                deletedItems,
+                            storedAt
+                        }
+                    );
+
+                    activeMonthCache.set(
+                        month,
+                        {
+                            items:
+                                activeItems,
+                            storedAt
+                        }
+                    );
+                }
+
+                return deletedItems;
+            })
+            .finally(() => {
+                if (
+                    deletedMonthRequests.get(
+                        month
+                    ) === request
+                ) {
+                    deletedMonthRequests.delete(
+                        month
+                    );
+                }
+            });
+
+    deletedMonthRequests.set(
+        month,
+        request
     );
-  }
 
+    return request;
+}
 
-  if (params.spendingTarget) {
-    searchParams.set(
-      "spendingTarget",
-      params.spendingTarget
-    );
-  }
+export async function prefetchCalendarMonth(
+    month = getCurrentCalendarMonth()
+) {
+    try {
+        await loadCalendarMonth(month);
+    } catch {
+        /*
+         * 달력 프리페치 실패는
+         * 홈 화면과 앱 진입을 막지 않습니다.
+         */
+    }
+}
 
+export function invalidateCalendarCache(
+    month?: string
+) {
+    cacheGeneration += 1;
 
-  if (params.q) {
-    searchParams.set(
-      "q",
-      params.q
-    );
-  }
+    if (month) {
+        activeMonthCache.delete(month);
+        deletedMonthCache.delete(month);
+        activeMonthRequests.delete(month);
+        deletedMonthRequests.delete(month);
 
+        return;
+    }
 
-  if (params.includeDeleted) {
-    searchParams.set(
-      "includeDeleted",
-      "true"
-    );
-  }
+    activeMonthCache.clear();
+    deletedMonthCache.clear();
+    activeMonthRequests.clear();
+    deletedMonthRequests.clear();
+}
 
-
-  searchParams.set(
-    "limit",
-    String(
-      params.limit ?? 1000
-    )
-  );
-
-
-  if (
-    params.offset !==
-      undefined
-  ) {
-    searchParams.set(
-      "offset",
-      String(
-        params.offset
-      )
-    );
-  }
-
-
-  const query =
-    searchParams.toString();
-
-
-  const url =
-    query
-      ? `/api/transactions?${query}`
-      : "/api/transactions";
-
-
-  const raw =
-    await apiRequest<
-      | ApiEnvelope<CalendarTransactionsResponse>
-      | CalendarTransactionsResponse
-    >(url);
-
-
-  return unwrapEnvelope<
-    CalendarTransactionsResponse
-  >(raw);
+if (typeof window !== "undefined") {
+    subscribeLedgerChanges(() => {
+        invalidateCalendarCache();
+    });
 }
