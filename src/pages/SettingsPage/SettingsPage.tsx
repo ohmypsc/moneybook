@@ -74,6 +74,9 @@ import {
     getSeoulFileDate
 } from "../../utils/dateTime";
 
+import PwaInstallPrompt
+    from "../../components/pwa/PwaInstallPrompt/PwaInstallPrompt";
+
 import styles
     from "./SettingsPage.module.css";
 
@@ -6363,6 +6366,8 @@ function ProfileSettings() {
                     </div>
                 </dl>
             </section>
+
+            <PwaInstallPrompt />
 
             <button
                 type="button"
