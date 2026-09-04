@@ -24,7 +24,6 @@ import {
   getPendingTransactions,
   retryAllFailedPendingTransactions,
   retryPendingTransaction,
-  startPendingTransactionQueue,
   subscribePendingTransactions
 } from "../../utils/pendingTransactionQueue";
 import styles from "./InputPage.module.css";
@@ -80,8 +79,23 @@ interface RequestMemory {
   requestId: string;
 }
 
+interface InputDraft {
+  mode: InputMode;
+  date: string;
+  amount: string;
+  categoryId: string;
+  paymentMethodId: string;
+  spendingTarget: string;
+  fromAccountId: string;
+  toAccountId: string;
+  billingMonth: string;
+  memo: string;
+}
+
 const CARD_PAYMENT_CATEGORY = "카드정기결제";
 const CARD_PREPAYMENT_CATEGORY = "카드선결제";
+const INPUT_DRAFT_KEY_PREFIX =
+  "moneybook:input-draft:v1:";
 
 interface InputPageProps {
   userName: string;
@@ -102,6 +116,29 @@ interface PickerItem {
   value: string;
   label: string;
   meta?: string;
+}
+
+function prioritizeAccountsForUser(
+  accounts: Account[],
+  userName: string
+) {
+  return accounts
+    .map((account, index) => ({
+      account,
+      index,
+      rank:
+        account.owner === userName
+          ? 0
+          : account.owner === "공동"
+            ? 1
+            : 2
+    }))
+    .sort(
+      (first, second) =>
+        first.rank - second.rank ||
+        first.index - second.index
+    )
+    .map(item => item.account);
 }
 
 let bootstrapPromise: Promise<BootstrapData> | null = null;
@@ -289,12 +326,133 @@ function isCardSettlementCategory(
   );
 }
 
+function readInputDraft(
+  userName: string
+): InputDraft | null {
+  if (
+    typeof window === "undefined" ||
+    !userName
+  ) {
+    return null;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(
+      `${INPUT_DRAFT_KEY_PREFIX}${userName}`
+    );
+
+    if (!raw) {
+      return null;
+    }
+
+    const value = JSON.parse(raw) as Partial<InputDraft>;
+
+    if (
+      value.mode !== "expense" &&
+      value.mode !== "income" &&
+      value.mode !== "transfer"
+    ) {
+      return null;
+    }
+
+    return {
+      mode: value.mode,
+      date: typeof value.date === "string" ? value.date : "",
+      amount: typeof value.amount === "string" ? value.amount : "",
+      categoryId:
+        typeof value.categoryId === "string" ? value.categoryId : "",
+      paymentMethodId:
+        typeof value.paymentMethodId === "string" ? value.paymentMethodId : "",
+      spendingTarget:
+        typeof value.spendingTarget === "string" ? value.spendingTarget : "",
+      fromAccountId:
+        typeof value.fromAccountId === "string" ? value.fromAccountId : "",
+      toAccountId:
+        typeof value.toAccountId === "string" ? value.toAccountId : "",
+      billingMonth:
+        typeof value.billingMonth === "string" ? value.billingMonth : "",
+      memo: typeof value.memo === "string" ? value.memo : ""
+    };
+  } catch {
+    return null;
+  }
+}
+
+function clearInputDraft(
+  userName: string
+) {
+  if (
+    typeof window === "undefined" ||
+    !userName
+  ) {
+    return;
+  }
+
+  try {
+    window.localStorage.removeItem(
+      `${INPUT_DRAFT_KEY_PREFIX}${userName}`
+    );
+  } catch {
+    // 임시저장 정리 실패가 실제 거래 저장을 막지는 않게 합니다.
+  }
+}
+
+
+function saveInputDraft(
+  userName: string,
+  draft: InputDraft
+) {
+  if (
+    typeof window === "undefined" ||
+    !userName
+  ) {
+    return;
+  }
+
+  try {
+    const hasMeaningfulInput = !!(
+      draft.amount ||
+      draft.categoryId ||
+      draft.paymentMethodId ||
+      draft.spendingTarget ||
+      draft.fromAccountId ||
+      draft.toAccountId ||
+      draft.memo.trim()
+    );
+
+    if (!hasMeaningfulInput) {
+      window.localStorage.removeItem(
+        `${INPUT_DRAFT_KEY_PREFIX}${userName}`
+      );
+      return;
+    }
+
+    window.localStorage.setItem(
+      `${INPUT_DRAFT_KEY_PREFIX}${userName}`,
+      JSON.stringify(draft)
+    );
+  } catch {
+    // 임시저장 실패가 실제 거래 입력을 막지는 않게 합니다.
+  }
+}
+
 export default function InputPage({
   userName,
   initialDate = null
 }: InputPageProps) {
   const today =
     getToday();
+
+  const initialDraft =
+    useMemo(
+      () =>
+        readInputDraft(
+          userName
+        ),
+      [
+        userName
+      ]
+    );
 
   const [
     bootstrap,
@@ -326,6 +484,7 @@ export default function InputPage({
     setMode
   ] =
     useState<InputMode>(
+      initialDraft?.mode ||
       "expense"
     );
 
@@ -334,7 +493,9 @@ export default function InputPage({
     setDate
   ] =
     useState(
-      initialDate || today
+      initialDate ||
+      initialDraft?.date ||
+      today
     );
 
   useEffect(
@@ -351,44 +512,63 @@ export default function InputPage({
     amount,
     setAmount
   ] =
-    useState("");
+    useState(
+      initialDraft?.amount ||
+      ""
+    );
 
   const [
     categoryId,
     setCategoryId
   ] =
-    useState("");
+    useState(
+      initialDraft?.categoryId ||
+      ""
+    );
 
   const [
     paymentMethodId,
     setPaymentMethodId
   ] =
-    useState("");
+    useState(
+      initialDraft?.paymentMethodId ||
+      ""
+    );
 
   const [
     spendingTarget,
     setSpendingTarget
   ] =
-    useState("");
+    useState(
+      initialDraft?.spendingTarget ||
+      ""
+    );
 
   const [
     fromAccountId,
     setFromAccountId
   ] =
-    useState("");
+    useState(
+      initialDraft?.fromAccountId ||
+      ""
+    );
 
   const [
     toAccountId,
     setToAccountId
   ] =
-    useState("");
+    useState(
+      initialDraft?.toAccountId ||
+      ""
+    );
 
   const [
     billingMonth,
     setBillingMonth
   ] =
     useState(
-      today.slice(
+      initialDraft?.billingMonth ||
+      (initialDate || initialDraft?.date || today).slice(
         0,
         7
       )
@@ -398,7 +578,10 @@ export default function InputPage({
     memo,
     setMemo
   ] =
-    useState("");
+    useState(
+      initialDraft?.memo ||
+      ""
+    );
 
   const [
     submitting,
@@ -417,6 +600,39 @@ export default function InputPage({
     setSuccess
   ] =
     useState("");
+
+  useEffect(
+    () => {
+      saveInputDraft(
+        userName,
+        {
+          mode,
+          date,
+          amount,
+          categoryId,
+          paymentMethodId,
+          spendingTarget,
+          fromAccountId,
+          toAccountId,
+          billingMonth,
+          memo
+        }
+      );
+    },
+    [
+      userName,
+      mode,
+      date,
+      amount,
+      categoryId,
+      paymentMethodId,
+      spendingTarget,
+      fromAccountId,
+      toAccountId,
+      billingMonth,
+      memo
+    ]
+  );
 
 
   const [
@@ -531,10 +747,6 @@ export default function InputPage({
             );
           }
         );
-
-      startPendingTransactionQueue(
-        userName
-      );
 
       return unsubscribe;
     },
@@ -679,14 +891,18 @@ export default function InputPage({
           return [];
         }
 
-        return applyAccountPreferences(
-          allAccounts,
-          preferences
+        return prioritizeAccountsForUser(
+          applyAccountPreferences(
+            allAccounts,
+            preferences
+          ),
+          userName
         );
       },
       [
         allAccounts,
-        preferences
+        preferences,
+        userName
       ]
     );
 
@@ -780,9 +996,12 @@ export default function InputPage({
             }
           );
 
-        return sortAccountsByPreferences(
-          candidates,
-          preferences
+        return prioritizeAccountsForUser(
+          sortAccountsByPreferences(
+            candidates,
+            preferences
+          ),
+          userName
         );
       },
       [
@@ -790,7 +1009,8 @@ export default function InputPage({
         preferences,
         selectedCard,
         toAccountId,
-        visibleAccountIds
+        visibleAccountIds,
+        userName
       ]
     );
 
@@ -1438,6 +1658,15 @@ export default function InputPage({
 
         payload
       });
+
+      /*
+       * 이 시점부터는 동일 requestId의 거래가 큐에 안전하게 보관됩니다.
+       * 앱이 바로 종료돼도 이미 큐에 들어간 거래가 초안으로 다시 나타나
+       * 사용자가 같은 내용을 한 번 더 입력하지 않도록 초안은 즉시 지웁니다.
+       */
+      clearInputDraft(
+        userName
+      );
 
       setAmount("");
       setCategoryId("");
@@ -2308,7 +2537,9 @@ export default function InputPage({
                                 styles.queueFailureMessage
                               }
                             >
-                              {item.error}
+                              {item.failureKind === "network"
+                                ? "인터넷 연결이 돌아오면 자동으로 다시 저장합니다."
+                                : item.error}
                             </span>
                           </div>
 
