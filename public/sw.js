@@ -1,5 +1,5 @@
 const CACHE_VERSION =
-  "v3-splash";
+  "v4-shell";
 
 const STATIC_CACHE =
   `moneybook-static-${CACHE_VERSION}`;
@@ -12,9 +12,12 @@ const CACHE_PREFIX =
 
 
 const PRECACHE_URLS = [
-  "/",
   "/splash-photo.jpg",
-  "/manifest.webmanifest"
+  "/manifest.webmanifest",
+  "/apple-touch-icon.png",
+  "/icon-192.png",
+  "/icon-512.png",
+  "/maskable-512.png"
 ];
 
 
@@ -293,66 +296,48 @@ async function networkFirstNavigation(
 
 
 /*
- * 새 Service Worker가 설치될 때
- * 스플래시 사진을 미리 저장합니다.
+ * 새 Service Worker가 설치될 때 현재 index.html이 참조하는
+ * Vite JS/CSS까지 함께 저장합니다. 핵심 앱 셸 중 하나라도
+ * 실패하면 새 Worker를 활성화하지 않아 기존 정상 캐시를 보존합니다.
  */
+async function installAppShell() {
+  const cache = await caches.open(STATIC_CACHE);
+
+  const rootRequest = new Request("/", { cache: "reload" });
+  const rootResponse = await fetch(rootRequest);
+
+  if (!rootResponse.ok) {
+    throw new Error("Precache failed: /");
+  }
+
+  const html = await rootResponse.clone().text();
+  await cache.put(rootRequest, rootResponse.clone());
+
+  const assetMatches = html.match(/\/assets\/[^"'\s>]+\.(?:js|css)/g) || [];
+  const urls = Array.from(new Set([...PRECACHE_URLS, ...assetMatches]));
+
+  await Promise.all(
+    urls.map(async url => {
+      const request = new Request(url, { cache: "reload" });
+      const response = await fetch(request);
+
+      if (!response.ok) {
+        throw new Error(`Precache failed: ${url}`);
+      }
+
+      await cache.put(request, response);
+    })
+  );
+}
+
 self.addEventListener(
   "install",
   event => {
     event.waitUntil(
-      (
-        async () => {
-          const cache =
-            await caches.open(
-              STATIC_CACHE
-            );
-
-
-          /*
-           * 어느 한 파일에 문제가 생겨도
-           * 전체 Service Worker 설치가
-           * 실패하지 않게 개별 처리합니다.
-           */
-          await Promise.allSettled(
-            PRECACHE_URLS.map(
-              async url => {
-                const request =
-                  new Request(
-                    url,
-                    {
-                      cache:
-                        "reload"
-                    }
-                  );
-
-
-                const response =
-                  await fetch(
-                    request
-                  );
-
-
-                if (
-                  !response.ok
-                ) {
-                  throw new Error(
-                    `Precache failed: ${url}`
-                  );
-                }
-
-
-                await cache.put(
-                  request,
-                  response
-                );
-              }
-            )
-          );
-
-
-          await self.skipWaiting();
-        }
-      )()
+      (async () => {
+        await installAppShell();
+        await self.skipWaiting();
+      })()
     );
   }
 );
