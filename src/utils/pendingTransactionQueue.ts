@@ -15,6 +15,7 @@ export interface PendingTransactionRecord {
   payload: CreateTransactionInput;
   status: PendingTransactionStatus;
   error: string;
+  failureKind?: "network" | "other";
   createdAt: number;
   updatedAt: number;
 }
@@ -39,6 +40,7 @@ let records: PendingTransactionRecord[] = [];
 let processing = false;
 let processingOwner = "";
 let lastCompletion: PendingTransactionCompletion | null = null;
+let activeOwner = "";
 
 function now() {
   return Date.now();
@@ -233,6 +235,12 @@ async function processQueue(
 
   try {
     while (true) {
+      if (
+        activeOwner !== owner
+      ) {
+        break;
+      }
+
       const record =
         records.find(
           item =>
@@ -248,7 +256,8 @@ async function processQueue(
         record.id,
         {
           status: "saving",
-          error: ""
+          error: "",
+          failureKind: undefined
         }
       );
 
@@ -268,6 +277,11 @@ async function processQueue(
           record.id
         );
       } catch (error) {
+        const networkFailure =
+          isLikelyNetworkError(
+            error
+          );
+
         updateRecord(
           record.id,
           {
@@ -275,14 +289,16 @@ async function processQueue(
             error:
               getErrorMessage(
                 error
-              )
+              ),
+            failureKind:
+              networkFailure
+                ? "network"
+                : "other"
           }
         );
 
         if (
-          isLikelyNetworkError(
-            error
-          )
+          networkFailure
         ) {
           break;
         }
@@ -302,8 +318,26 @@ async function processQueue(
           item.status === "pending"
       );
 
-    if (hasPending) {
+    if (
+      hasPending &&
+      activeOwner === owner
+    ) {
       void processQueue(owner);
+      return;
+    }
+
+    /*
+     * 처리 중 로그아웃/계정 전환이 일어나면 새 사용자의 start 호출은
+     * processing=true 때문에 즉시 실행되지 못할 수 있습니다.
+     * 이전 요청이 끝난 뒤 현재 활성 사용자 큐로 안전하게 넘깁니다.
+     */
+    if (
+      activeOwner &&
+      activeOwner !== owner
+    ) {
+      void processQueue(
+        activeOwner
+      );
     }
   }
 }
@@ -350,22 +384,42 @@ export function startPendingTransactionQueue(
     return;
   }
 
-  const changed =
-    records.some(
-      record =>
-        record.owner === owner &&
-        record.status === "saving"
-    );
+  activeOwner = owner;
+
+  const canRetryNetwork =
+    typeof navigator === "undefined" ||
+    navigator.onLine !== false;
+
+  const changed = records.some(
+    record =>
+      record.owner === owner &&
+      (
+        record.status === "saving" ||
+        (
+          canRetryNetwork &&
+          record.status === "failed" &&
+          record.failureKind === "network"
+        )
+      )
+  );
 
   if (changed) {
     records =
       records.map(record =>
         record.owner === owner &&
-        record.status === "saving"
+        (
+          record.status === "saving" ||
+          (
+            canRetryNetwork &&
+            record.status === "failed" &&
+            record.failureKind === "network"
+          )
+        )
           ? {
               ...record,
               status: "pending" as const,
               error: "",
+              failureKind: undefined,
               updatedAt: now()
             }
           : record
@@ -376,6 +430,17 @@ export function startPendingTransactionQueue(
   }
 
   void processQueue(owner);
+}
+
+export function stopPendingTransactionQueue(
+  owner?: string
+) {
+  if (
+    !owner ||
+    activeOwner === owner
+  ) {
+    activeOwner = "";
+  }
 }
 
 export function enqueuePendingTransaction(
@@ -474,7 +539,8 @@ export function retryPendingTransaction(
     id,
     {
       status: "pending",
-      error: ""
+      error: "",
+      failureKind: undefined
     }
   );
 
@@ -503,6 +569,7 @@ export function retryAllFailedPendingTransactions(
         ...record,
         status: "pending" as const,
         error: "",
+        failureKind: undefined,
         updatedAt: now()
       };
     });
@@ -521,6 +588,46 @@ if (
   typeof window !== "undefined"
 ) {
   window.addEventListener(
+    "online",
+    () => {
+      ensureLoaded();
+
+      let changed = false;
+
+      records = records.map(
+        record => {
+          if (
+            record.status !== "failed" ||
+            record.failureKind !== "network" ||
+            record.owner !== activeOwner
+          ) {
+            return record;
+          }
+
+          changed = true;
+
+          return {
+            ...record,
+            status: "pending" as const,
+            error: "",
+            failureKind: undefined,
+            updatedAt: now()
+          };
+        }
+      );
+
+      if (changed) {
+        persist();
+        emit();
+      }
+
+      if (activeOwner) {
+        void processQueue(activeOwner);
+      }
+    }
+  );
+
+  window.addEventListener(
     "storage",
     event => {
       if (
@@ -533,9 +640,9 @@ if (
       ensureLoaded();
       emit();
 
-      if (processingOwner) {
+      if (activeOwner) {
         void processQueue(
-          processingOwner
+          activeOwner
         );
       }
     }
