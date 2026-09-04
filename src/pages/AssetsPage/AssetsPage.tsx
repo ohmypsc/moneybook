@@ -366,7 +366,9 @@ export default function AssetsPage() {
     >(null);
 
 
-  async function loadDashboard() {
+  async function loadDashboard(
+    forceRefresh = false
+  ) {
     const cachedDashboard =
       getDashboardSnapshot();
 
@@ -394,7 +396,12 @@ export default function AssetsPage() {
 
     try {
       const data =
-        await getDashboard();
+        await getDashboard(
+          undefined,
+          {
+            forceRefresh
+          }
+        );
 
       setDashboard(
         data
@@ -418,6 +425,37 @@ export default function AssetsPage() {
       );
     }
   }
+
+
+  useEffect(
+    () => {
+      function refreshWhenVisible() {
+        if (
+          document.visibilityState !==
+          "visible"
+        ) {
+          return;
+        }
+
+        void loadDashboard(
+          true
+        );
+      }
+
+      document.addEventListener(
+        "visibilitychange",
+        refreshWhenVisible
+      );
+
+      return () => {
+        document.removeEventListener(
+          "visibilitychange",
+          refreshWhenVisible
+        );
+      };
+    },
+    []
+  );
 
 
   async function handleInvestmentSaved() {
@@ -1146,9 +1184,12 @@ export default function AssetsPage() {
                             styles.cashAccountMeta
                           }
                         >
-                          {
-                            account.subType
-                          }
+                          {[
+                            account.subType,
+                            account.owner
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
                         </span>
                       </div>
 
@@ -1393,14 +1434,13 @@ export default function AssetsPage() {
                                   styles.accountSub
                                 }
                               >
-                                {
-                                  account.subType
-                                }
-                                {" · "}
-                                {
-                                  holdingCount
-                                }
-                                종목
+                                {[
+                                  account.subType,
+                                  account.owner,
+                                  `${holdingCount}종목`
+                                ]
+                                  .filter(Boolean)
+                                  .join(" · ")}
                               </span>
                             </div>
 
@@ -1492,7 +1532,12 @@ export default function AssetsPage() {
                                       styles.detailEyebrow
                                     }
                                   >
-                                    투자계좌
+                                    {[
+                                      "투자계좌",
+                                      selectedAccount.owner
+                                    ]
+                                      .filter(Boolean)
+                                      .join(" · ")}
                                   </span>
 
                                   <h3
