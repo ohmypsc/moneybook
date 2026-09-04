@@ -537,6 +537,11 @@ function getTransactionMethod(
     transaction:
         CalendarTransaction
 ) {
+    const recordedBy =
+        transaction.createdBy
+            ? `기록 ${transaction.createdBy}`
+            : "";
+
     if (
         transaction.type ===
         "지출"
@@ -545,7 +550,9 @@ function getTransactionMethod(
             transaction.paymentMethod ||
                 transaction.fromAccount,
 
-            transaction.spendingTarget
+            transaction.spendingTarget,
+
+            recordedBy
         ].filter(
             Boolean
         );
@@ -567,19 +574,27 @@ function getTransactionMethod(
         transaction.type ===
         "수입"
     ) {
-        return (
+        return [
             transaction.toAccount ||
-            "입금수단 미지정"
-        );
+                "입금수단 미지정",
+            recordedBy
+        ]
+            .filter(Boolean)
+            .join(" · ");
     }
 
     return [
-        transaction.fromAccount ||
-            "-",
-        "→",
-        transaction.toAccount ||
-            "-"
-    ].join(" ");
+        [
+            transaction.fromAccount ||
+                "-",
+            "→",
+            transaction.toAccount ||
+                "-"
+        ].join(" "),
+        recordedBy
+    ]
+        .filter(Boolean)
+        .join(" · ");
 }
 
 function getAmountText(
@@ -935,6 +950,36 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
         [
             month,
             reloadKey
+        ]
+    );
+
+    useEffect(
+        () => {
+            function refreshWhenVisible() {
+                if (
+                    document.visibilityState !==
+                    "visible"
+                ) {
+                    return;
+                }
+
+                refreshMonth();
+            }
+
+            document.addEventListener(
+                "visibilitychange",
+                refreshWhenVisible
+            );
+
+            return () => {
+                document.removeEventListener(
+                    "visibilitychange",
+                    refreshWhenVisible
+                );
+            };
+        },
+        [
+            month
         ]
     );
 
