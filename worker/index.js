@@ -70,10 +70,19 @@ const GET_ROUTES = {
       "categoryId",
       "accountId",
       "spendingTarget",
+      "amount",
       "q",
       "includeDeleted",
       "limit",
       "offset"
+    ]
+  },
+
+  "/api/asset-snapshots": {
+    action: "assetSnapshots",
+    params: [
+      "month",
+      "limit"
     ]
   },
 
@@ -137,6 +146,13 @@ const POST_ROUTES = {
     refresh: "dashboard",
     invalidCode: "INVALID_TRANSACTION",
     invalidMessage: "거래 복원 형식이 올바르지 않습니다."
+  },
+
+  "/api/asset-snapshots": {
+    action: "saveAssetSnapshot",
+    refresh: "none",
+    invalidCode: "INVALID_ASSET_SNAPSHOT",
+    invalidMessage: "순자산 기록 형식이 올바르지 않습니다."
   },
 
   "/api/categories": {
@@ -841,6 +857,14 @@ async function appsScriptGet(
 
   markAppsScriptActivity();
 
+  if (
+    !response.ok
+  ) {
+    throw new Error(
+      `Apps Script GET 요청 실패 (${response.status})`
+    );
+  }
+
   try {
     return JSON.parse(
       text
@@ -901,6 +925,14 @@ async function appsScriptPost(
     await response.text();
 
   markAppsScriptActivity();
+
+  if (
+    !response.ok
+  ) {
+    throw new Error(
+      `Apps Script POST 요청 실패 (${response.status})`
+    );
+  }
 
   try {
     return JSON.parse(
@@ -1509,6 +1541,13 @@ async function refreshAfterMutation(
     !data ||
     data.success ===
       false
+  ) {
+    return;
+  }
+
+  if (
+    kind ===
+    "none"
   ) {
     return;
   }
@@ -2718,13 +2757,19 @@ async function searchInvestmentSymbols(query) {
   ];
 
   const settled = await Promise.allSettled(tasks);
-  const combined = [
-    krxGoldSpotSearchItem(),
-    ...settled.flatMap(result =>
+  const fulfilledExternalItems =
+    settled.flatMap(result =>
       result.status === "fulfilled"
         ? result.value
         : []
-    )
+    );
+  const externalProviderSucceeded =
+    settled.some(result =>
+      result.status === "fulfilled"
+    );
+  const combined = [
+    krxGoldSpotSearchItem(),
+    ...fulfilledExternalItems
   ];
 
   const data = {
@@ -2736,7 +2781,7 @@ async function searchInvestmentSymbols(query) {
   };
 
   // 외부 제공처가 모두 일시 실패한 경우에는 짧게만 캐시한다.
-  if (combined.length === 0) {
+  if (!externalProviderSucceeded) {
     symbolSearchMemory.set(
       cacheKey,
       {
