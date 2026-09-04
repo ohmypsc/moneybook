@@ -26,9 +26,9 @@ export function AppShell({
 }: AppShellProps) {
   return (
     <div className={styles.shell}>
-      <main className={styles.main}>
+      <div className={styles.main}>
         {children}
-      </main>
+      </div>
 
       <BottomNav
         activeNavigation={
