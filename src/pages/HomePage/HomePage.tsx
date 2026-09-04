@@ -28,6 +28,7 @@ interface DashboardAccount {
   accountId: string;
   displayName: string;
   paymentDay: number | null;
+  owner: string;
 }
 
 
@@ -45,6 +46,7 @@ interface DashboardCardView
   extends DashboardCard {
   name: string;
   paymentDay: number | null;
+  owner: string;
 }
 
 
@@ -111,6 +113,24 @@ function formatSignedWon(
   }
 
   return "0원";
+}
+
+function formatBalanceWon(
+  value: number
+) {
+  const safeValue =
+    Number.isFinite(value)
+      ? value
+      : 0;
+
+  return (
+    new Intl.NumberFormat(
+      "ko-KR"
+    ).format(
+      Math.round(safeValue)
+    ) +
+    "원"
+  );
 }
 
 
@@ -244,7 +264,9 @@ export default function HomePage({
     );
 
 
-  async function loadDashboard() {
+  async function loadDashboard(
+    forceRefresh = false
+  ) {
     const cachedDashboard =
       getDashboardSnapshot();
 
@@ -271,7 +293,12 @@ export default function HomePage({
 
     try {
       const data =
-        await getDashboard();
+        await getDashboard(
+          undefined,
+          {
+            forceRefresh
+          }
+        );
 
       setDashboard(
         data
@@ -454,6 +481,37 @@ export default function HomePage({
   );
 
 
+  useEffect(
+    () => {
+      function refreshWhenVisible() {
+        if (
+          document.visibilityState !==
+          "visible"
+        ) {
+          return;
+        }
+
+        void loadDashboard(
+          true
+        );
+      }
+
+      document.addEventListener(
+        "visibilitychange",
+        refreshWhenVisible
+      );
+
+      return () => {
+        document.removeEventListener(
+          "visibilitychange",
+          refreshWhenVisible
+        );
+      };
+    },
+    []
+  );
+
+
   const cardSummary =
     useMemo(
       () => {
@@ -518,7 +576,11 @@ export default function HomePage({
 
                   paymentDay:
                     account?.paymentDay ??
-                    null
+                    null,
+
+                  owner:
+                    account?.owner ||
+                    ""
                 };
               }
             )
@@ -686,6 +748,7 @@ export default function HomePage({
 
 
   const {
+    netWorth,
     monthIncome,
     monthExpense,
     monthNetCashFlow
@@ -720,11 +783,17 @@ export default function HomePage({
 
       <section className={styles.summaryCard}>
         <div className={styles.summaryHeader}>
-          <h2>이번 달 요약</h2>
+          <h2>우리 집 한눈에</h2>
           <span>{formatMonth(dashboard.month)}</span>
         </div>
 
         <div className={styles.summaryRows}>
+          <div className={styles.summaryRow}>
+            <span className={styles.summaryLabel}>우리 순자산</span>
+            <strong className={netWorth < 0 ? styles.negativeAmount : styles.netAmount}>
+              {formatBalanceWon(netWorth)}
+            </strong>
+          </div>
           <div className={styles.summaryRow}>
             <span className={styles.summaryLabel}>수입</span>
             <strong className={styles.incomeAmount}>{formatWon(monthIncome)}</strong>
@@ -760,7 +829,14 @@ export default function HomePage({
                   <div>
                     <strong>{card.name}</strong>
                     <span>
-                      {card.paymentDay ? `${card.paymentDay}일 결제` : "결제일 미설정"}
+                      {[
+                        card.paymentDay
+                          ? `${card.paymentDay}일 결제`
+                          : "결제일 미설정",
+                        card.owner
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </span>
                   </div>
                 </div>
