@@ -29,18 +29,27 @@ export interface PendingTransactionCompletion {
 
 type QueueListener = () => void;
 
-const STORAGE_KEY =
+const LEGACY_STORAGE_KEY =
   "moneybook:pending-transactions:v1";
 
-const listeners =
-  new Set<QueueListener>();
+const DB_NAME =
+  "moneybook-offline-v2";
 
-let loaded = false;
+const DB_VERSION = 1;
+const STORE_NAME = "pendingTransactions";
+const CHANNEL_NAME = "moneybook:pending-transactions:v2";
+
+const listeners = new Set<QueueListener>();
+
 let records: PendingTransactionRecord[] = [];
+let loaded = false;
+let loadPromise: Promise<void> | null = null;
+let dbPromise: Promise<IDBDatabase | null> | null = null;
 let processing = false;
 let processingOwner = "";
 let lastCompletion: PendingTransactionCompletion | null = null;
 let activeOwner = "";
+let channel: BroadcastChannel | null = null;
 
 function now() {
   return Date.now();
@@ -70,7 +79,8 @@ function isLikelyNetworkError(error: unknown) {
     message.includes("failed to fetch") ||
     message.includes("networkerror") ||
     message.includes("network error") ||
-    message.includes("load failed")
+    message.includes("load failed") ||
+    message.includes("offline")
   );
 }
 
@@ -101,78 +111,23 @@ function isValidRecord(
   );
 }
 
-function ensureLoaded() {
-  if (loaded) {
-    return;
+function normalizeRecord(
+  record: PendingTransactionRecord
+): PendingTransactionRecord {
+  if (record.status !== "saving") {
+    return {
+      ...record,
+      error: record.error || ""
+    };
   }
 
-  loaded = true;
-
-  if (
-    typeof window === "undefined"
-  ) {
-    records = [];
-    return;
-  }
-
-  try {
-    const raw =
-      window.localStorage.getItem(
-        STORAGE_KEY
-      );
-
-    if (!raw) {
-      records = [];
-      return;
-    }
-
-    const parsed =
-      JSON.parse(raw) as unknown;
-
-    if (!Array.isArray(parsed)) {
-      records = [];
-      return;
-    }
-
-    records =
-      parsed
-        .filter(isValidRecord)
-        .map(record => ({
-          ...record,
-
-          /*
-           * 앱이 닫히는 순간 요청이 진행 중이었을 수 있습니다.
-           * 같은 requestId로 다시 보내면 백엔드의 멱등성 보호가
-           * 중복 저장을 막으므로 안전하게 pending으로 되돌립니다.
-           */
-          status:
-            record.status === "saving"
-              ? "pending"
-              : record.status,
-
-          error:
-            record.status === "saving"
-              ? ""
-              : record.error || ""
-        }));
-
-    persist();
-  } catch {
-    records = [];
-  }
-}
-
-function persist() {
-  if (
-    typeof window === "undefined"
-  ) {
-    return;
-  }
-
-  window.localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify(records)
-  );
+  return {
+    ...record,
+    status: "pending",
+    error: "",
+    failureKind: undefined,
+    updatedAt: now()
+  };
 }
 
 function emit() {
@@ -181,52 +136,349 @@ function emit() {
       try {
         listener();
       } catch {
-        // 한 구독자의 렌더 오류가 큐 처리를 막지 않게 합니다.
       }
     }
   );
 }
 
-function updateRecord(
+function broadcastQueueChanged() {
+  try {
+    channel?.postMessage({ type: "changed" });
+  } catch {
+  }
+}
+
+function readLegacyRecords() {
+  if (typeof window === "undefined") {
+    return [] as PendingTransactionRecord[];
+  }
+
+  try {
+    const raw =
+      window.localStorage.getItem(
+        LEGACY_STORAGE_KEY
+      );
+
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw) as unknown;
+
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed
+      .filter(isValidRecord)
+      .map(normalizeRecord);
+  } catch {
+    return [];
+  }
+}
+
+function persistLegacySnapshot(
+  nextRecords: PendingTransactionRecord[]
+) {
+  if (typeof window === "undefined") {
+    throw new Error(
+      "브라우저 임시저장 공간을 사용할 수 없습니다."
+    );
+  }
+
+  window.localStorage.setItem(
+    LEGACY_STORAGE_KEY,
+    JSON.stringify(nextRecords)
+  );
+}
+
+
+function openQueueDb() {
+  if (dbPromise) return dbPromise;
+
+  dbPromise = new Promise<IDBDatabase | null>(resolve => {
+    if (
+      typeof window === "undefined" ||
+      !("indexedDB" in window)
+    ) {
+      resolve(null);
+      return;
+    }
+
+    let request: IDBOpenDBRequest;
+
+    try {
+      request = window.indexedDB.open(
+        DB_NAME,
+        DB_VERSION
+      );
+    } catch {
+      resolve(null);
+      return;
+    }
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        const store = db.createObjectStore(
+          STORE_NAME,
+          { keyPath: "id" }
+        );
+
+        store.createIndex(
+          "owner",
+          "owner",
+          { unique: false }
+        );
+      }
+    };
+
+    request.onsuccess = () => {
+      const db = request.result;
+
+      db.onversionchange = () => {
+        db.close();
+        dbPromise = null;
+      };
+
+      resolve(db);
+    };
+
+    request.onerror = () => {
+      resolve(null);
+    };
+
+    request.onblocked = () => {
+      resolve(null);
+    };
+  });
+
+  return dbPromise;
+}
+
+function idbRequest<T>(
+  request: IDBRequest<T>
+) {
+  return new Promise<T>((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(
+      request.error || new Error("IndexedDB 요청에 실패했습니다.")
+    );
+  });
+}
+
+function idbTransactionDone(
+  transaction: IDBTransaction
+) {
+  return new Promise<void>((resolve, reject) => {
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(
+      transaction.error || new Error("IndexedDB 저장에 실패했습니다.")
+    );
+    transaction.onabort = () => reject(
+      transaction.error || new Error("IndexedDB 저장이 취소되었습니다.")
+    );
+  });
+}
+
+async function readDbRecords() {
+  const db = await openQueueDb();
+  if (!db) return null;
+
+  try {
+    const transaction = db.transaction(
+      STORE_NAME,
+      "readonly"
+    );
+    const store = transaction.objectStore(STORE_NAME);
+    const result = await idbRequest(store.getAll());
+
+    return (result as unknown[])
+      .filter(isValidRecord)
+      .map(normalizeRecord);
+  } catch {
+    return null;
+  }
+}
+
+async function putDbRecord(
+  record: PendingTransactionRecord
+) {
+  const db = await openQueueDb();
+  if (!db) return false;
+
+  try {
+    const transaction = db.transaction(
+      STORE_NAME,
+      "readwrite"
+    );
+    const done = idbTransactionDone(transaction);
+    const store = transaction.objectStore(STORE_NAME);
+    await idbRequest(store.put(record));
+    await done;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function deleteDbRecord(
+  id: string
+) {
+  const db = await openQueueDb();
+  if (!db) return false;
+
+  try {
+    const transaction = db.transaction(
+      STORE_NAME,
+      "readwrite"
+    );
+    const done = idbTransactionDone(transaction);
+    const store = transaction.objectStore(STORE_NAME);
+    await idbRequest(store.delete(id));
+    await done;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function persistRecordBestEffort(
+  record: PendingTransactionRecord,
+  nextRecords: PendingTransactionRecord[]
+) {
+  try {
+    persistLegacySnapshot(nextRecords);
+  } catch {
+  }
+
+  await putDbRecord(record);
+}
+
+async function removePersistentRecord(
+  id: string,
+  nextRecords: PendingTransactionRecord[]
+) {
+  try {
+    persistLegacySnapshot(nextRecords);
+  } catch {
+  }
+
+  await deleteDbRecord(id);
+}
+
+function mergeRecords(
+  first: PendingTransactionRecord[],
+  second: PendingTransactionRecord[]
+) {
+  const byId = new Map<string, PendingTransactionRecord>();
+
+  for (const record of [...first, ...second]) {
+    const current = byId.get(record.id);
+
+    if (
+      !current ||
+      record.updatedAt >= current.updatedAt
+    ) {
+      byId.set(record.id, normalizeRecord(record));
+    }
+  }
+
+  return Array.from(byId.values())
+    .sort((a, b) => a.createdAt - b.createdAt);
+}
+
+async function ensureLoadedAsync() {
+  if (loaded) return;
+  if (loadPromise) return loadPromise;
+
+  loadPromise = (async () => {
+    const dbRecords = await readDbRecords();
+    const legacyRecords = readLegacyRecords();
+
+    records = mergeRecords(
+      dbRecords || [],
+      legacyRecords
+    );
+
+    if (dbRecords !== null) {
+      let migrated = true;
+
+      for (const record of records) {
+        if (!(await putDbRecord(record))) {
+          migrated = false;
+          break;
+        }
+      }
+
+      if (migrated) {
+        try {
+          persistLegacySnapshot(records);
+        } catch {
+        }
+      }
+    }
+
+    loaded = true;
+    emit();
+  })().finally(() => {
+    loadPromise = null;
+  });
+
+  return loadPromise;
+}
+
+function kickLoad() {
+  if (!loaded) {
+    void ensureLoadedAsync();
+  }
+}
+
+async function updateRecord(
   id: string,
   patch: Partial<PendingTransactionRecord>
 ) {
-  records =
-    records.map(record =>
-      record.id === id
-        ? {
-            ...record,
-            ...patch,
-            updatedAt: now()
-          }
-        : record
-    );
+  await ensureLoadedAsync();
 
-  persist();
+  const current = records.find(record => record.id === id);
+  if (!current) return;
+
+  const updated: PendingTransactionRecord = {
+    ...current,
+    ...patch,
+    updatedAt: now()
+  };
+
+  const nextRecords = records.map(record =>
+    record.id === id ? updated : record
+  );
+
+  await persistRecordBestEffort(updated, nextRecords);
+  records = nextRecords;
   emit();
+  broadcastQueueChanged();
 }
 
-function removeRecord(
+async function removeRecord(
   id: string
 ) {
-  records =
-    records.filter(
-      record =>
-        record.id !== id
-    );
+  await ensureLoadedAsync();
 
-  persist();
+  const nextRecords = records.filter(
+    record => record.id !== id
+  );
+
+  await removePersistentRecord(id, nextRecords);
+  records = nextRecords;
   emit();
+  broadcastQueueChanged();
 }
 
 async function processQueue(
   owner: string
 ) {
-  ensureLoaded();
+  await ensureLoadedAsync();
 
-  if (
-    processing
-  ) {
+  if (processing) {
     return;
   }
 
@@ -235,24 +487,28 @@ async function processQueue(
 
   try {
     while (true) {
+      if (activeOwner !== owner) {
+        break;
+      }
+
       if (
-        activeOwner !== owner
+        typeof navigator !== "undefined" &&
+        navigator.onLine === false
       ) {
         break;
       }
 
-      const record =
-        records.find(
-          item =>
-            item.owner === owner &&
-            item.status === "pending"
-        );
+      const record = records.find(
+        item =>
+          item.owner === owner &&
+          item.status === "pending"
+      );
 
       if (!record) {
         break;
       }
 
-      updateRecord(
+      await updateRecord(
         record.id,
         {
           status: "saving",
@@ -262,9 +518,7 @@ async function processQueue(
       );
 
       try {
-        await createTransaction(
-          record.payload
-        );
+        await createTransaction(record.payload);
 
         lastCompletion = {
           id: record.id,
@@ -273,33 +527,23 @@ async function processQueue(
           completedAt: now()
         };
 
-        removeRecord(
-          record.id
-        );
+        await removeRecord(record.id);
       } catch (error) {
         const networkFailure =
-          isLikelyNetworkError(
-            error
-          );
+          isLikelyNetworkError(error);
 
-        updateRecord(
+        await updateRecord(
           record.id,
           {
             status: "failed",
-            error:
-              getErrorMessage(
-                error
-              ),
-            failureKind:
-              networkFailure
-                ? "network"
-                : "other"
+            error: getErrorMessage(error),
+            failureKind: networkFailure
+              ? "network"
+              : "other"
           }
         );
 
-        if (
-          networkFailure
-        ) {
+        if (networkFailure) {
           break;
         }
       }
@@ -308,89 +552,43 @@ async function processQueue(
     processing = false;
     processingOwner = "";
 
-    /*
-     * 처리 도중 새 항목이 들어왔을 수 있으므로 한 번 더 확인합니다.
-     */
-    const hasPending =
-      records.some(
-        item =>
-          item.owner === owner &&
-          item.status === "pending"
-      );
+    const hasPending = records.some(
+      item =>
+        item.owner === owner &&
+        item.status === "pending"
+    );
 
     if (
       hasPending &&
-      activeOwner === owner
+      activeOwner === owner &&
+      (
+        typeof navigator === "undefined" ||
+        navigator.onLine !== false
+      )
     ) {
       void processQueue(owner);
       return;
     }
 
-    /*
-     * 처리 중 로그아웃/계정 전환이 일어나면 새 사용자의 start 호출은
-     * processing=true 때문에 즉시 실행되지 못할 수 있습니다.
-     * 이전 요청이 끝난 뒤 현재 활성 사용자 큐로 안전하게 넘깁니다.
-     */
     if (
       activeOwner &&
       activeOwner !== owner
     ) {
-      void processQueue(
-        activeOwner
-      );
+      void processQueue(activeOwner);
     }
   }
 }
 
-export function subscribePendingTransactions(
-  listener: QueueListener
-) {
-  listeners.add(listener);
-
-  return () => {
-    listeners.delete(listener);
-  };
-}
-
-export function getPendingTransactions(
+async function prepareOwnerQueue(
   owner: string
 ) {
-  ensureLoaded();
-
-  return records.filter(
-    record =>
-      record.owner === owner
-  );
-}
-
-export function getLastPendingTransactionCompletion(
-  owner: string
-) {
-  if (
-    lastCompletion?.owner !== owner
-  ) {
-    return null;
-  }
-
-  return lastCompletion;
-}
-
-export function startPendingTransactionQueue(
-  owner: string
-) {
-  ensureLoaded();
-
-  if (!owner) {
-    return;
-  }
-
-  activeOwner = owner;
+  await ensureLoadedAsync();
 
   const canRetryNetwork =
     typeof navigator === "undefined" ||
     navigator.onLine !== false;
 
-  const changed = records.some(
+  const targets = records.filter(
     record =>
       record.owner === owner &&
       (
@@ -403,33 +601,67 @@ export function startPendingTransactionQueue(
       )
   );
 
-  if (changed) {
-    records =
-      records.map(record =>
-        record.owner === owner &&
-        (
-          record.status === "saving" ||
-          (
-            canRetryNetwork &&
-            record.status === "failed" &&
-            record.failureKind === "network"
-          )
-        )
-          ? {
-              ...record,
-              status: "pending" as const,
-              error: "",
-              failureKind: undefined,
-              updatedAt: now()
-            }
-          : record
-      );
+  for (const record of targets) {
+    await updateRecord(
+      record.id,
+      {
+        status: "pending",
+        error: "",
+        failureKind: undefined
+      }
+    );
+  }
+}
 
-    persist();
-    emit();
+async function requestPersistentStorage() {
+  try {
+    await navigator.storage?.persist?.();
+  } catch {
+  }
+}
+
+export function subscribePendingTransactions(
+  listener: QueueListener
+) {
+  listeners.add(listener);
+  kickLoad();
+
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+export function getPendingTransactions(
+  owner: string
+) {
+  kickLoad();
+
+  return records.filter(
+    record => record.owner === owner
+  );
+}
+
+export function getLastPendingTransactionCompletion(
+  owner: string
+) {
+  if (lastCompletion?.owner !== owner) {
+    return null;
   }
 
-  void processQueue(owner);
+  return lastCompletion;
+}
+
+export function startPendingTransactionQueue(
+  owner: string
+) {
+  if (!owner) return;
+
+  activeOwner = owner;
+
+  void requestPersistentStorage();
+
+  void prepareOwnerQueue(owner)
+    .then(() => processQueue(owner));
 }
 
 export function stopPendingTransactionQueue(
@@ -450,221 +682,183 @@ export function enqueuePendingTransaction(
     payload: CreateTransactionInput;
   }
 ) {
-  ensureLoaded();
-
-  const requestId =
-    input.payload.requestId;
+  const requestId = input.payload.requestId;
 
   if (!requestId) {
-    throw new Error(
-      "저장 요청 ID가 없습니다."
-    );
+    throw new Error("저장 요청 ID가 없습니다.");
   }
 
   if (!input.owner) {
-    throw new Error(
-      "로그인 사용자를 확인할 수 없습니다."
-    );
+    throw new Error("로그인 사용자를 확인할 수 없습니다.");
   }
 
-  const existing =
-    records.find(
-      record =>
-        record.id === requestId
-    );
+  const baseRecords = loaded
+    ? records
+    : mergeRecords(records, readLegacyRecords());
+
+  const existing = baseRecords.find(
+    record => record.id === requestId
+  );
 
   if (!existing) {
-    const timestamp =
-      now();
+    const timestamp = now();
+
+    const record: PendingTransactionRecord = {
+      id: requestId,
+      owner: input.owner,
+      label: input.label,
+      payload: input.payload,
+      status: "pending",
+      error: "",
+      createdAt: timestamp,
+      updatedAt: timestamp
+    };
 
     const nextRecords = [
-      ...records,
-      {
-        id: requestId,
-        owner: input.owner,
-        label: input.label,
-        payload: input.payload,
-        status: "pending" as const,
-        error: "",
-        createdAt: timestamp,
-        updatedAt: timestamp
-      }
+      ...baseRecords,
+      record
     ];
 
-    /*
-     * 폼을 비우기 전에 로컬 저장이 반드시 먼저 성공해야 합니다.
-     * 여기서 실패하면 메모리 큐에도 넣지 않으므로 사용자의 입력값이
-     * 그대로 남아 안전하게 다시 시도할 수 있습니다.
-     */
-    if (
-      typeof window === "undefined"
-    ) {
-      throw new Error(
-        "브라우저 임시저장 공간을 사용할 수 없습니다."
-      );
-    }
-
-    window.localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify(nextRecords)
-    );
+    persistLegacySnapshot(nextRecords);
 
     records = nextRecords;
     emit();
+    broadcastQueueChanged();
+
+    void putDbRecord(record);
+  } else {
+    records = baseRecords;
   }
 
-  void processQueue(
-    input.owner
-  );
+  void ensureLoadedAsync()
+    .then(() => processQueue(input.owner));
 }
 
 export function retryPendingTransaction(
   owner: string,
   id: string
 ) {
-  ensureLoaded();
+  void (async () => {
+    await ensureLoadedAsync();
 
-  const record =
-    records.find(
+    const record = records.find(
       item =>
         item.owner === owner &&
         item.id === id
     );
 
-  if (!record) {
-    return;
-  }
+    if (!record) return;
 
-  updateRecord(
-    id,
-    {
-      status: "pending",
-      error: "",
-      failureKind: undefined
-    }
-  );
+    await updateRecord(
+      id,
+      {
+        status: "pending",
+        error: "",
+        failureKind: undefined
+      }
+    );
 
-  void processQueue(owner);
+    void processQueue(owner);
+  })();
 }
-
 
 export function discardPendingTransaction(
   owner: string,
   id: string
 ) {
-  ensureLoaded();
+  void (async () => {
+    await ensureLoadedAsync();
 
-  const record =
-    records.find(
+    const record = records.find(
       item =>
         item.owner === owner &&
         item.id === id
     );
 
-  if (!record || record.status === "saving") {
-    return;
-  }
+    if (
+      !record ||
+      record.status === "saving"
+    ) {
+      return;
+    }
 
-  removeRecord(id);
+    await removeRecord(id);
+  })();
 }
 
 export function retryAllFailedPendingTransactions(
   owner: string
 ) {
-  ensureLoaded();
+  void (async () => {
+    await ensureLoadedAsync();
 
-  let changed = false;
+    const failed = records.filter(
+      record =>
+        record.owner === owner &&
+        record.status === "failed"
+    );
 
-  records =
-    records.map(record => {
-      if (
-        record.owner !== owner ||
-        record.status !== "failed"
-      ) {
-        return record;
-      }
+    for (const record of failed) {
+      await updateRecord(
+        record.id,
+        {
+          status: "pending",
+          error: "",
+          failureKind: undefined
+        }
+      );
+    }
 
-      changed = true;
+    if (failed.length) {
+      void processQueue(owner);
+    }
+  })();
+}
 
-      return {
-        ...record,
-        status: "pending" as const,
-        error: "",
-        failureKind: undefined,
-        updatedAt: now()
-      };
-    });
+async function retryNetworkFailures() {
+  if (!activeOwner) return;
 
-  if (changed) {
-    persist();
-    emit();
-    void processQueue(owner);
+  await prepareOwnerQueue(activeOwner);
+  await processQueue(activeOwner);
+}
+
+async function reloadFromPersistentStorage() {
+  if (processing) return;
+
+  loaded = false;
+  await ensureLoadedAsync();
+
+  if (activeOwner) {
+    void processQueue(activeOwner);
   }
 }
 
-/*
- * 여러 탭에서 같은 브라우저 저장소를 쓸 때 표시 상태를 맞춥니다.
- */
-if (
-  typeof window !== "undefined"
-) {
+if (typeof window !== "undefined") {
+  if ("BroadcastChannel" in window) {
+    try {
+      channel = new BroadcastChannel(CHANNEL_NAME);
+      channel.addEventListener("message", event => {
+        if (event.data?.type === "changed") {
+          void reloadFromPersistentStorage();
+        }
+      });
+    } catch {
+      channel = null;
+    }
+  }
+
   window.addEventListener(
     "online",
     () => {
-      ensureLoaded();
-
-      let changed = false;
-
-      records = records.map(
-        record => {
-          if (
-            record.status !== "failed" ||
-            record.failureKind !== "network" ||
-            record.owner !== activeOwner
-          ) {
-            return record;
-          }
-
-          changed = true;
-
-          return {
-            ...record,
-            status: "pending" as const,
-            error: "",
-            failureKind: undefined,
-            updatedAt: now()
-          };
-        }
-      );
-
-      if (changed) {
-        persist();
-        emit();
-      }
-
-      if (activeOwner) {
-        void processQueue(activeOwner);
-      }
+      void retryNetworkFailures();
     }
   );
 
   window.addEventListener(
-    "storage",
-    event => {
-      if (
-        event.key !== STORAGE_KEY
-      ) {
-        return;
-      }
-
-      loaded = false;
-      ensureLoaded();
-      emit();
-
-      if (activeOwner) {
-        void processQueue(
-          activeOwner
-        );
+    "focus",
+    () => {
+      if (navigator.onLine !== false) {
+        void retryNetworkFailures();
       }
     }
   );
