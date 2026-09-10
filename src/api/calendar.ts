@@ -53,6 +53,8 @@ export interface CalendarTransaction {
   spendingTarget:
     string | null;
 
+  description: string;
+
   memo: string;
 
   billingOverride:

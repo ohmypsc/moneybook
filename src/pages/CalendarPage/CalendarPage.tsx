@@ -4,9 +4,6 @@ import {
     useState
 } from "react";
 
-import type {
-    SyntheticEvent
-} from "react";
 
 import {
     apiRequest
@@ -102,6 +99,7 @@ interface EditForm {
     fromAccountId: string;
     toAccountId: string;
     billingMonth: string;
+    description: string;
     memo: string;
 }
 
@@ -309,56 +307,8 @@ function formatCurrency(
 function formatCalendarAmount(
     value: number
 ) {
-    const absolute =
-        Math.abs(value);
-
-    if (
-        absolute >=
-        100000000
-    ) {
-        const divided =
-            absolute /
-            100000000;
-
-        return (
-            divided
-                .toFixed(
-                    divided >= 10
-                        ? 0
-                        : 1
-                )
-                .replace(
-                    /\.0$/,
-                    ""
-                ) +
-            "억"
-        );
-    }
-
-    if (
-        absolute >= 10000
-    ) {
-        const divided =
-            absolute /
-            10000;
-
-        return (
-            divided
-                .toFixed(
-                    divided >= 10
-                        ? 0
-                        : 1
-                )
-                .replace(
-                    /\.0$/,
-                    ""
-                ) +
-            "만"
-        );
-    }
-
     return Math.round(
-        absolute
+        Math.abs(value)
     ).toLocaleString(
         "ko-KR"
     );
@@ -597,6 +547,27 @@ function getTransactionMethod(
         .join(" · ");
 }
 
+function getTransactionTitle(
+    transaction: CalendarTransaction
+) {
+    return (
+        transaction.description ||
+        transaction.category ||
+        transaction.type
+    );
+}
+
+function getTransactionMetaLabel(
+    transaction: CalendarTransaction
+) {
+    return [
+        transaction.description ? transaction.category : "",
+        getTransactionMethod(transaction)
+    ]
+        .filter(Boolean)
+        .join(" · ");
+}
+
 function getAmountText(
     transaction:
         CalendarTransaction
@@ -761,6 +732,11 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
         useState("");
 
     const [
+        trashOpen,
+        setTrashOpen
+    ] = useState(false);
+
+    const [
         loading,
         setLoading
     ] =
@@ -865,6 +841,26 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
         setUndoBusy
     ] =
         useState(false);
+
+    useEffect(() => {
+        if (!trashOpen) return;
+
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === "Escape") {
+                setTrashOpen(false);
+            }
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+
+        return () => {
+            document.body.style.overflow = previousOverflow;
+            window.removeEventListener("keydown", handleKeyDown);
+        };
+    }, [trashOpen]);
 
     useEffect(
         () => {
@@ -1332,14 +1328,10 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
             "이체"
         );
 
-    async function handleDeletedToggle(
-        event:
-            SyntheticEvent<
-                HTMLDetailsElement
-            >
-    ) {
+    async function openTrash() {
+        setTrashOpen(true);
+
         if (
-            !event.currentTarget.open ||
             deletedLoaded ||
             deletedLoading
         ) {
@@ -1614,6 +1606,10 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
                         .billingMonth ||
                     "",
 
+                description:
+                    transaction.description ||
+                    "",
+
                 memo:
                     transaction.memo ||
                     ""
@@ -1834,6 +1830,21 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
                         .updatedAtMs ??
                     null
             };
+
+        const currentDescription =
+            editingTransaction.description ||
+            "";
+
+        const nextDescription =
+            editForm.description.trim();
+
+        if (
+            nextDescription !==
+            currentDescription
+        ) {
+            input.description =
+                nextDescription;
+        }
 
         const currentMemo =
             editingTransaction
@@ -3015,10 +3026,9 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
                                                                                 styles.transactionTitle
                                                                             }
                                                                         >
-                                                                            {
-                                                                                transaction.category ||
-                                                                                transaction.type
-                                                                            }
+                                                                            {getTransactionTitle(
+                                                                                transaction
+                                                                            )}
                                                                         </span>
 
                                                                         {
@@ -3039,7 +3049,7 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
                                                                             styles.transactionMeta
                                                                         }
                                                                     >
-                                                                        {getTransactionMethod(
+                                                                        {getTransactionMetaLabel(
                                                                             transaction
                                                                         )}
                                                                     </p>
@@ -3161,10 +3171,9 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
                                                                                         styles.editTitle
                                                                                     }
                                                                                 >
-                                                                                    {
-                                                                                        transaction.category ||
-                                                                                        transaction.type
-                                                                                    }
+                                                                                    {getTransactionTitle(
+                                                                                        transaction
+                                                                                    )}
                                                                                 </h3>
                                                                             </div>
 
@@ -3649,6 +3658,36 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
                                                                                 )}
                                                                             >
                                                                                 <span>
+                                                                                    내용
+                                                                                </span>
+
+                                                                                <input
+                                                                                    type="text"
+                                                                                    value={
+                                                                                        editForm.description
+                                                                                    }
+                                                                                    disabled={
+                                                                                        isSaving
+                                                                                    }
+                                                                                    onChange={
+                                                                                        event =>
+                                                                                            updateEditField(
+                                                                                                "description",
+                                                                                                event.target.value
+                                                                                            )
+                                                                                    }
+                                                                                />
+                                                                            </label>
+
+                                                                            <label
+                                                                                className={[
+                                                                                    styles.editField,
+                                                                                    styles.editMemoField
+                                                                                ].join(
+                                                                                    " "
+                                                                                )}
+                                                                            >
+                                                                                <span>
                                                                                     메모
                                                                                 </span>
 
@@ -3723,322 +3762,123 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
                             }
                         </section>
 
-                        <details
-                            className={
-                                styles.deletedSection
-                            }
-                            onToggle={
-                                event =>
-                                    void handleDeletedToggle(
-                                        event
-                                    )
-                            }
-                        >
-                            <summary
-                                className={
-                                    styles.deletedSummary
-                                }
+                        <div className={styles.trashLauncher}>
+                            <button
+                                type="button"
+                                className={styles.trashButton}
+                                onClick={() => void openTrash()}
                             >
-                                <span
-                                    className={
-                                        styles.deletedSummaryText
-                                    }
-                                >
-                                    <strong>
-                                        삭제 거래 보기
-                                    </strong>
+                                <span>최근 삭제한 내역</span>
+                                <small>실수로 삭제한 거래만 여기에서 복원합니다.</small>
+                            </button>
+                        </div>
 
-                                    <span>
-                                        이 달의 삭제된 거래를
-                                        확인하고 복원할 수 있습니다.
-                                    </span>
-                                </span>
-
-                                <span
-                                    className={
-                                        styles.deletedCount
-                                    }
-                                >
-                                    {
-                                        deletedLoading
-                                            ? "불러오는 중"
-                                            : deletedLoaded
-                                            ? `${deletedTransactions.length}건`
-                                            : "눌러서 조회"
-                                    }
-                                </span>
-                            </summary>
-
+                        {trashOpen && (
                             <div
-                                className={
-                                    styles.deletedBody
-                                }
+                                className={styles.trashBackdrop}
+                                role="presentation"
+                                onClick={() => setTrashOpen(false)}
                             >
-                                {
-                                    deletedLoading && (
-                                        <p
-                                            className={
-                                                styles.deletedEmpty
-                                            }
+                                <section
+                                    className={styles.trashModal}
+                                    role="dialog"
+                                    aria-modal="true"
+                                    aria-label="최근 삭제한 내역"
+                                    onClick={event => event.stopPropagation()}
+                                >
+                                    <div className={styles.trashHeader}>
+                                        <div>
+                                            <strong>최근 삭제한 내역</strong>
+                                            <span>{formatMonthLabel(month)} · 현재 유형 필터 기준</span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            aria-label="닫기"
+                                            onClick={() => setTrashOpen(false)}
                                         >
-                                            삭제 거래를 불러오는 중입니다.
-                                        </p>
-                                    )
-                                }
+                                            ×
+                                        </button>
+                                    </div>
 
-                                {
-                                    !deletedLoading &&
-                                    deletedError && (
-                                        <p
-                                            className={
-                                                styles.error
-                                            }
-                                            role="alert"
-                                        >
-                                            {deletedError}
-                                        </p>
-                                    )
-                                }
+                                    {deletedLoading && (
+                                        <p className={styles.deletedEmpty}>삭제 거래를 불러오는 중입니다.</p>
+                                    )}
 
-                                {
-                                    !deletedLoading &&
-                                    !deletedError &&
-                                    deletedLoaded &&
-                                    deletedTransactions.length ===
-                                        0 && (
-                                        <p
-                                            className={
-                                                styles.deletedEmpty
-                                            }
-                                        >
-                                            이 달에는 현재 유형 필터에
-                                            해당하는 삭제 거래가 없습니다.
-                                        </p>
-                                    )
-                                }
+                                    {!deletedLoading && deletedError && (
+                                        <p className={styles.error} role="alert">{deletedError}</p>
+                                    )}
 
-                                {
-                                    !deletedLoading &&
-                                    !deletedError &&
-                                    deletedLoaded &&
-                                    deletedTransactions.length >
-                                        0 && (
-                                        <ul
-                                            className={
-                                                styles.deletedList
-                                            }
-                                        >
-                                            {
-                                                deletedTransactions.map(
-                                                    transaction => {
-                                                        const isRestoring =
-                                                            restoringId ===
-                                                            transaction.transactionId;
+                                    {!deletedLoading && !deletedError && deletedLoaded && deletedTransactions.length === 0 && (
+                                        <p className={styles.deletedEmpty}>복원할 삭제 거래가 없습니다.</p>
+                                    )}
 
-                                                        const deletedCategory =
-                                                            transaction.category ||
-                                                            (
-                                                                transaction.categoryId
-                                                                    ? categoryNameById.get(
-                                                                          transaction.categoryId
-                                                                      )
-                                                                    : ""
-                                                            ) ||
-                                                            transaction.type;
-
-                                                        const displayTransaction = {
-                                                            ...transaction,
-
-                                                            fromAccount:
-                                                                transaction.fromAccount ||
-                                                                (
-                                                                    transaction.fromAccountId
-                                                                        ? accountNameById.get(
-                                                                              transaction.fromAccountId
-                                                                          ) ||
-                                                                          null
-                                                                        : null
-                                                                ),
-
-                                                            toAccount:
-                                                                transaction.toAccount ||
-                                                                (
-                                                                    transaction.toAccountId
-                                                                        ? accountNameById.get(
-                                                                              transaction.toAccountId
-                                                                          ) ||
-                                                                          null
-                                                                        : null
-                                                                ),
-
-                                                            paymentMethod:
-                                                                transaction.paymentMethod ||
-                                                                (
-                                                                    transaction.paymentMethodId
-                                                                        ? accountNameById.get(
-                                                                              transaction.paymentMethodId
-                                                                          ) ||
-                                                                          null
-                                                                        : null
-                                                                )
-                                                        };
-
-                                                        return (
-                                                            <li
-                                                                key={
-                                                                    transaction.transactionId
-                                                                }
-                                                                className={
-                                                                    styles.deletedItem
-                                                                }
-                                                            >
-                                                                <div
-                                                                    className={
-                                                                        styles.transactionTop
-                                                                    }
-                                                                >
-                                                                    <div
-                                                                        className={
-                                                                            styles.transactionMain
-                                                                        }
-                                                                    >
-                                                                        <div
-                                                                            className={
-                                                                                styles.transactionTitleRow
-                                                                            }
-                                                                        >
-                                                                            <span
-                                                                                className={[
-                                                                                    styles.transactionType,
-
-                                                                                    transaction.type ===
-                                                                                    "지출"
-                                                                                        ? styles.transactionTypeExpense
-                                                                                        : transaction.type ===
-                                                                                          "수입"
-                                                                                        ? styles.transactionTypeIncome
-                                                                                        : styles.transactionTypeTransfer
-                                                                                ].join(
-                                                                                    " "
-                                                                                )}
-                                                                            >
-                                                                                {transaction.type}
-                                                                            </span>
-
-                                                                            <strong
-                                                                                className={
-                                                                                    styles.transactionTitle
-                                                                                }
-                                                                            >
-                                                                                {deletedCategory}
-                                                                            </strong>
-                                                                        </div>
-
-                                                                        <p
-                                                                            className={
-                                                                                styles.transactionMeta
-                                                                            }
-                                                                        >
-                                                                            {formatDateLabel(
-                                                                                transaction.date
-                                                                            )}
-                                                                            {" · "}
-                                                                            {getTransactionMethod(
-                                                                                displayTransaction
-                                                                            )}
-                                                                        </p>
-                                                                    </div>
-
-                                                                    <strong
-                                                                        className={[
-                                                                            styles.transactionAmount,
-
-                                                                            transaction.type ===
-                                                                            "지출"
-                                                                                ? styles.amountExpense
-                                                                                : transaction.type ===
-                                                                                  "수입"
-                                                                                ? styles.amountIncome
-                                                                                : styles.amountTransfer
-                                                                        ].join(
-                                                                            " "
-                                                                        )}
-                                                                    >
-                                                                        {getAmountText(
-                                                                            transaction
-                                                                        )}
+                                    {!deletedLoading && !deletedError && deletedLoaded && deletedTransactions.length > 0 && (
+                                        <ul className={styles.deletedList}>
+                                            {deletedTransactions.map(transaction => {
+                                                const isRestoring = restoringId === transaction.transactionId;
+                                                return (
+                                                    <li key={transaction.transactionId} className={styles.deletedItem}>
+                                                        <div className={styles.transactionTop}>
+                                                            <div className={styles.transactionMain}>
+                                                                <div className={styles.transactionTitleRow}>
+                                                                    <span className={[
+                                                                        styles.transactionType,
+                                                                        transaction.type === "지출"
+                                                                            ? styles.transactionTypeExpense
+                                                                            : transaction.type === "수입"
+                                                                            ? styles.transactionTypeIncome
+                                                                            : styles.transactionTypeTransfer
+                                                                    ].join(" ")}>
+                                                                        {transaction.type}
+                                                                    </span>
+                                                                    <strong className={styles.transactionTitle}>
+                                                                        {getTransactionTitle(transaction)}
                                                                     </strong>
                                                                 </div>
+                                                                <p className={styles.transactionMeta}>
+                                                                    {formatDateLabel(transaction.date)}
+                                                                    {" · "}
+                                                                    {getTransactionMetaLabel(transaction)}
+                                                                </p>
+                                                            </div>
+                                                            <strong className={[
+                                                                styles.transactionAmount,
+                                                                transaction.type === "지출"
+                                                                    ? styles.amountExpense
+                                                                    : transaction.type === "수입"
+                                                                    ? styles.amountIncome
+                                                                    : styles.amountTransfer
+                                                            ].join(" ")}>
+                                                                {getAmountText(transaction)}
+                                                            </strong>
+                                                        </div>
 
-                                                                {
-                                                                    transaction.memo && (
-                                                                        <p
-                                                                            className={
-                                                                                styles.transactionMemo
-                                                                            }
-                                                                        >
-                                                                            {transaction.memo}
-                                                                        </p>
-                                                                    )
-                                                                }
+                                                        {transaction.memo && (
+                                                            <p className={styles.transactionMemo}>{transaction.memo}</p>
+                                                        )}
 
-                                                                <div
-                                                                    className={
-                                                                        styles.deletedFooter
-                                                                    }
-                                                                >
-                                                                    <span
-                                                                        className={
-                                                                            styles.deletedAudit
-                                                                        }
-                                                                    >
-                                                                        삭제{" · "}
-
-                                                                        {
-                                                                            transaction.deletedBy
-                                                                                ? `${transaction.deletedBy} · `
-                                                                                : ""
-                                                                        }
-
-                                                                        {formatDeletedAt(
-                                                                            transaction.deletedAt
-                                                                        )}
-                                                                    </span>
-
-                                                                    <button
-                                                                        type="button"
-                                                                        className={
-                                                                            styles.restoreButton
-                                                                        }
-                                                                        disabled={
-                                                                            Boolean(
-                                                                                restoringId
-                                                                            )
-                                                                        }
-                                                                        onClick={
-                                                                            () =>
-                                                                                void handleRestoreDeleted(
-                                                                                    transaction
-                                                                                )
-                                                                        }
-                                                                    >
-                                                                        {
-                                                                            isRestoring
-                                                                                ? "복원 중..."
-                                                                                : "복원"
-                                                                        }
-                                                                    </button>
-                                                                </div>
-                                                            </li>
-                                                        );
-                                                    }
-                                                )
-                                            }
+                                                        <div className={styles.deletedFooter}>
+                                                            <span className={styles.deletedAudit}>
+                                                                삭제 · {transaction.deletedBy ? `${transaction.deletedBy} · ` : ""}
+                                                                {formatDeletedAt(transaction.deletedAt)}
+                                                            </span>
+                                                            <button
+                                                                type="button"
+                                                                className={styles.restoreButton}
+                                                                disabled={Boolean(restoringId)}
+                                                                onClick={() => void handleRestoreDeleted(transaction)}
+                                                            >
+                                                                {isRestoring ? "복원 중..." : "복원"}
+                                                            </button>
+                                                        </div>
+                                                    </li>
+                                                );
+                                            })}
                                         </ul>
-                                    )
-                                }
+                                    )}
+                                </section>
                             </div>
-                        </details>
+                        )}
                     </>
                 )
             }

@@ -758,7 +758,7 @@ function createEmptyAccountForm(
         owner,
 
         openingBalance:
-            "0",
+            "",
 
         billingCutoffDay:
             "",
@@ -4569,6 +4569,7 @@ export function AccountSettings({
                                                                     busyKey
                                                                 )
                                                             }
+                                                            placeholder="0"
                                                             onChange={
                                                                 event =>
                                                                     updateForm(

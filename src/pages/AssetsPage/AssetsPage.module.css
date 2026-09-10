@@ -1668,3 +1668,96 @@
   font-weight: 800;
   cursor: pointer;
 }
+
+.ownerFilter {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  margin: 0 0 16px;
+  padding: 2px 0 4px;
+  scrollbar-width: none;
+}
+
+.ownerFilter::-webkit-scrollbar {
+  display: none;
+}
+
+.ownerFilter button {
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 0 13px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.ownerFilter button.ownerFilterActive {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+}
+
+.cashDetailItem,
+.investmentDetailBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 85;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 16px;
+  background: rgb(0 0 0 / 0.38);
+}
+
+.cashDetailCard,
+.detailCard {
+  width: min(760px, 100%);
+  max-height: min(84vh, 820px);
+  overflow: auto;
+  box-sizing: border-box;
+  margin: 0;
+  border-radius: 20px 20px 16px 16px;
+  box-shadow: 0 20px 60px rgb(0 0 0 / 0.22);
+}
+
+.modalHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.modalCloseButton {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--color-surface-soft);
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: 23px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+@media (min-width: 720px) {
+  .cashDetailItem,
+  .investmentDetailBackdrop {
+    align-items: center;
+  }
+
+  .cashDetailCard,
+  .detailCard {
+    border-radius: 20px;
+  }
+}
+
+.editorBackdrop {
+  z-index: 100;
+}

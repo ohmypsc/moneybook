@@ -12,7 +12,7 @@ import {
   getCachedBootstrapPayload
 } from "../../api/bootstrapCache";
 import { createTransaction } from "../../api/transactions";
-import { getDashboardSnapshot } from "../../api/dashboard";
+import { getDashboard, getDashboardSnapshot } from "../../api/dashboard";
 import {
   applyAccountPreferences,
   applyCategoryPreferences,
@@ -89,6 +89,7 @@ interface InputDraft {
   mode: InputMode;
   date: string;
   amount: string;
+  description: string;
   categoryId: string;
   paymentMethodId: string;
   spendingTarget: string;
@@ -96,6 +97,12 @@ interface InputDraft {
   toAccountId: string;
   billingMonth: string;
   memo: string;
+}
+
+interface CardBillingInfo {
+  usage: number;
+  payments: number;
+  estimatedRemaining: number;
 }
 
 const CARD_PAYMENT_CATEGORY = "카드정기결제";
@@ -355,6 +362,7 @@ function readInputDraft(
       mode: value.mode,
       date: typeof value.date === "string" ? value.date : "",
       amount: typeof value.amount === "string" ? value.amount : "",
+      description: typeof value.description === "string" ? value.description : "",
       categoryId:
         typeof value.categoryId === "string" ? value.categoryId : "",
       paymentMethodId:
@@ -413,6 +421,7 @@ function saveInputDraft(
       draft.spendingTarget ||
       draft.fromAccountId ||
       draft.toAccountId ||
+      draft.description.trim() ||
       draft.memo.trim()
     );
 
@@ -571,6 +580,15 @@ export default function InputPage({
     );
 
   const [
+    description,
+    setDescription
+  ] =
+    useState(
+      initialDraft?.description ||
+      ""
+    );
+
+  const [
     memo,
     setMemo
   ] =
@@ -578,6 +596,24 @@ export default function InputPage({
       initialDraft?.memo ||
       ""
     );
+
+  const [
+    cardBillingInfo,
+    setCardBillingInfo
+  ] = useState<CardBillingInfo | null>(null);
+
+  const [
+    cardBillingLoading,
+    setCardBillingLoading
+  ] = useState(false);
+
+  const [
+    cardBillingError,
+    setCardBillingError
+  ] = useState("");
+
+  const cardAmountEditedRef = useRef(false);
+  const cardBillingRequestKeyRef = useRef("");
 
   const [
     submitting,
@@ -611,6 +647,7 @@ export default function InputPage({
           fromAccountId,
           toAccountId,
           billingMonth,
+          description,
           memo
         }
       );
@@ -626,6 +663,7 @@ export default function InputPage({
       fromAccountId,
       toAccountId,
       billingMonth,
+      description,
       memo
     ]
   );
@@ -1028,6 +1066,79 @@ export default function InputPage({
         )
       : "";
 
+  useEffect(() => {
+    if (!isCardTransfer || !toAccountId || !billingMonth) {
+      setCardBillingInfo(null);
+      setCardBillingLoading(false);
+      setCardBillingError("");
+      cardBillingRequestKeyRef.current = "";
+      return;
+    }
+
+    let cancelled = false;
+    const requestKey = `${toAccountId}:${billingMonth}`;
+    cardBillingRequestKeyRef.current = requestKey;
+    cardAmountEditedRef.current = false;
+    setCardBillingLoading(true);
+    setCardBillingError("");
+
+    void getDashboard(billingMonth, { forceRefresh: true })
+      .then(data => {
+        if (cancelled || cardBillingRequestKeyRef.current !== requestKey) {
+          return;
+        }
+
+        const card = (data.cards || []).find(
+          item => item.accountId === toAccountId
+        );
+
+        if (!card) {
+          setCardBillingInfo({ usage: 0, payments: 0, estimatedRemaining: 0 });
+          if (!cardAmountEditedRef.current) {
+            setAmount("");
+          }
+          return;
+        }
+
+        const info = {
+          usage: Number(card.usage) || 0,
+          payments: Number(card.payments) || 0,
+          estimatedRemaining: Math.max(0, Number(card.estimatedRemaining) || 0)
+        };
+
+        setCardBillingInfo(info);
+
+        if (!cardAmountEditedRef.current) {
+          setAmount(
+            info.estimatedRemaining > 0
+              ? String(Math.round(info.estimatedRemaining))
+              : ""
+          );
+          requestMemory.current = null;
+        }
+      })
+      .catch(loadError => {
+        if (cancelled || cardBillingRequestKeyRef.current !== requestKey) {
+          return;
+        }
+        setCardBillingInfo(null);
+        setCardBillingError(
+          loadError instanceof Error
+            ? loadError.message
+            : "카드 결제 예정액을 불러오지 못했습니다."
+        );
+      })
+      .finally(() => {
+        if (!cancelled && cardBillingRequestKeyRef.current === requestKey) {
+          setCardBillingLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isCardTransfer, toAccountId, billingMonth]);
+
   function clearFeedback() {
     setError("");
     setSuccess("");
@@ -1100,6 +1211,7 @@ export default function InputPage({
           ? payload.toAccountId
           : undefined,
       billingMonth: payload.billingMonth || undefined,
+      description: (payload.description || "").trim(),
       memo: (payload.memo || "").trim()
     });
 
@@ -1144,6 +1256,10 @@ export default function InputPage({
       )
     );
 
+    cardAmountEditedRef.current = false;
+    setCardBillingInfo(null);
+    setCardBillingError("");
+
     requestMemory.current =
       null;
 
@@ -1177,6 +1293,9 @@ export default function InputPage({
           7
         )
       );
+      cardAmountEditedRef.current = false;
+      setCardBillingInfo(null);
+      setCardBillingError("");
     }
 
     requestMemory.current =
@@ -1203,6 +1322,10 @@ export default function InputPage({
     setAmount(
       normalized
     );
+
+    if (isCardTransfer) {
+      cardAmountEditedRef.current = true;
+    }
 
     requestMemory.current =
       null;
@@ -1243,6 +1366,9 @@ export default function InputPage({
             7
           )
         );
+        cardAmountEditedRef.current = false;
+        setCardBillingInfo(null);
+        setCardBillingError("");
       }
     }
 
@@ -1270,6 +1396,10 @@ export default function InputPage({
       card?.paymentAccountId ||
       ""
     );
+
+    cardAmountEditedRef.current = false;
+    setCardBillingInfo(null);
+    setCardBillingError("");
 
     requestMemory.current =
       null;
@@ -1547,6 +1677,9 @@ export default function InputPage({
           amount
         ),
 
+      description:
+        description.trim(),
+
       memo:
         memo.trim(),
 
@@ -1739,6 +1872,9 @@ export default function InputPage({
             ? billingMonth
             : undefined,
 
+        description:
+          description.trim(),
+
         memo:
           memo.trim()
       });
@@ -1836,7 +1972,11 @@ export default function InputPage({
         )
       );
 
+      setDescription("");
       setMemo("");
+      cardAmountEditedRef.current = false;
+      setCardBillingInfo(null);
+      setCardBillingError("");
 
       requestMemory.current =
         null;
@@ -2550,6 +2690,9 @@ export default function InputPage({
                         setBillingMonth(
                           event.target.value
                         );
+                        cardAmountEditedRef.current = false;
+                        setCardBillingInfo(null);
+                        setCardBillingError("");
 
                         requestMemory.current =
                           null;
@@ -2566,10 +2709,60 @@ export default function InputPage({
                   >
                     이 결제가 어느 달 카드대금에 해당하는지 선택합니다.
                   </p>
+
+                  {cardBillingLoading && (
+                    <div className={styles.cardBillingBox}>
+                      카드 결제 예정액을 계산하는 중입니다.
+                    </div>
+                  )}
+
+                  {!cardBillingLoading && cardBillingInfo && (
+                    <div className={styles.cardBillingBox}>
+                      <span>사용 {Math.round(cardBillingInfo.usage).toLocaleString("ko-KR")}원</span>
+                      <span>기결제 {Math.round(cardBillingInfo.payments).toLocaleString("ko-KR")}원</span>
+                      <strong>남은 결제액 {Math.round(cardBillingInfo.estimatedRemaining).toLocaleString("ko-KR")}원</strong>
+                      <small>위 남은 결제액을 금액 칸에 자동 입력했습니다. 금액은 직접 수정할 수 있습니다.</small>
+                    </div>
+                  )}
+
+                  {!cardBillingLoading && cardBillingError && (
+                    <p className={styles.cardBillingError}>{cardBillingError}</p>
+                  )}
                 </label>
               </div>
             )
           }
+
+          <label
+            className={
+              styles.field
+            }
+          >
+            <span
+              className={
+                styles.fieldLabel
+              }
+            >
+              내용
+            </span>
+
+            <input
+              className={styles.input}
+              type="text"
+              placeholder="예: 스타벅스, 주유, 급여"
+              value={description}
+              disabled={submitting}
+              onChange={event => {
+                setDescription(event.target.value);
+                requestMemory.current = null;
+                clearFeedback();
+              }}
+            />
+
+            <p className={styles.helper}>
+              내역에서 한눈에 알아볼 짧은 내용을 적어주세요. 비워도 됩니다.
+            </p>
+          </label>
 
           <label
             className={
@@ -2588,7 +2781,7 @@ export default function InputPage({
               className={
                 styles.textarea
               }
-              placeholder="필요한 내용을 적어주세요."
+              placeholder="추가로 남길 메모가 있다면 적어주세요."
               value={
                 memo
               }

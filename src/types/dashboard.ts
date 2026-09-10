@@ -74,6 +74,7 @@ export interface RecentTransaction {
   paymentMethodId: string | null;
   paymentMethod: string | null;
   spendingTarget: string | null;
+  description: string;
   memo: string;
   reversalOf: string | null;
 }

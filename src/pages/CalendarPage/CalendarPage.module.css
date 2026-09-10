@@ -651,15 +651,18 @@
   }
 
   .dayIncome,
-  .dayTransfer {
-    display: none;
-  }
-
   .dayExpense {
     display: block;
-    margin-top: auto;
     font-size: 9px;
     line-height: 1.25;
+  }
+
+  .dayIncome {
+    margin-top: auto;
+  }
+
+  .dayTransfer {
+    display: none;
   }
 
   .detailHeader {
@@ -1260,5 +1263,116 @@
 
   .detailCount {
     display: none;
+  }
+}
+
+.trashLauncher {
+  margin-top: 18px;
+}
+
+.trashButton {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.trashButton span {
+  font-weight: 800;
+}
+
+.trashButton small {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  text-align: right;
+}
+
+.trashBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 16px;
+  background: rgb(0 0 0 / 0.38);
+}
+
+.trashModal {
+  width: min(680px, 100%);
+  max-height: min(78vh, 760px);
+  overflow: auto;
+  border-radius: 20px 20px 16px 16px;
+  background: var(--color-surface);
+  box-shadow: 0 20px 60px rgb(0 0 0 / 0.2);
+  padding: 18px;
+}
+
+.trashHeader {
+  position: sticky;
+  top: -18px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: -18px -18px 14px;
+  padding: 18px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.trashHeader > div {
+  display: grid;
+  gap: 3px;
+}
+
+.trashHeader strong {
+  font-size: 17px;
+}
+
+.trashHeader span {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.trashHeader button {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--color-surface-soft);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+@media (min-width: 720px) {
+  .trashBackdrop {
+    align-items: center;
+  }
+
+  .trashModal {
+    border-radius: 20px;
+  }
+}
+
+@media (max-width: 640px) {
+  .dayIncome,
+  .dayExpense {
+    overflow: visible;
+    font-size: 8px;
+    letter-spacing: -0.35px;
+    text-overflow: clip;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
   }
 }

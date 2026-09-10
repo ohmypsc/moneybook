@@ -237,3 +237,143 @@
   .cardAmount,
   .rankAmount { font-size: 12.5px; }
 }
+
+.summaryRowButton {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.summaryRowButton:hover,
+.summaryRowButton:focus-visible {
+  background: var(--color-surface-soft);
+}
+
+.summaryRowButton .summaryLabel small {
+  margin-left: 5px;
+  color: var(--color-text-secondary);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.detailBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 16px;
+  background: rgb(0 0 0 / 0.38);
+}
+
+.detailModal {
+  width: min(680px, 100%);
+  max-height: min(80vh, 760px);
+  overflow: auto;
+  border-radius: 20px 20px 16px 16px;
+  background: var(--color-surface);
+  box-shadow: 0 20px 60px rgb(0 0 0 / 0.2);
+  padding: 18px;
+}
+
+.detailHeader {
+  position: sticky;
+  top: -18px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: -18px -18px 12px;
+  padding: 18px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.detailHeader > div {
+  display: grid;
+  gap: 3px;
+}
+
+.detailHeader strong {
+  font-size: 17px;
+}
+
+.detailHeader span {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.detailHeader button {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--color-surface-soft);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.detailState,
+.detailError {
+  margin: 0;
+  padding: 20px 4px;
+  color: var(--color-text-secondary);
+}
+
+.detailError {
+  color: var(--color-error);
+}
+
+.detailList {
+  display: grid;
+  gap: 8px;
+}
+
+.detailRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 2px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.detailRow > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.detailRow span,
+.detailRow small,
+.detailRow em {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.detailRow strong {
+  font-size: 14px;
+}
+
+.detailRow b {
+  flex: 0 0 auto;
+  font-size: 14px;
+}
+
+@media (min-width: 720px) {
+  .detailBackdrop {
+    align-items: center;
+  }
+
+  .detailModal {
+    border-radius: 20px;
+  }
+}

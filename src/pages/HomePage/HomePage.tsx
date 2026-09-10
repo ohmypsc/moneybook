@@ -9,6 +9,11 @@ import {
   getDashboardSnapshot
 } from "../../api/dashboard";
 
+import {
+  getTransactions,
+  type Transaction
+} from "../../api/transactions";
+
 import type {
   DashboardAccount,
   DashboardData
@@ -79,6 +84,39 @@ function formatMonth(month: string) {
   return `${match[1]}년 ${Number(match[2])}월`;
 }
 
+function getMonthRange(month: string) {
+  const match = /^(\d{4})-(\d{2})$/.exec(month);
+  if (!match) {
+    return { dateFrom: `${month}-01`, dateTo: `${month}-31` };
+  }
+  const year = Number(match[1]);
+  const monthNumber = Number(match[2]);
+  const lastDay = new Date(year, monthNumber, 0).getDate();
+  return {
+    dateFrom: `${month}-01`,
+    dateTo: `${month}-${String(lastDay).padStart(2, "0")}`
+  };
+}
+
+function getTransactionTitle(transaction: Transaction) {
+  return transaction.description || transaction.category || transaction.type;
+}
+
+function getTransactionMeta(transaction: Transaction) {
+  const method = transaction.type === "수입"
+    ? transaction.toAccount
+    : transaction.type === "이체"
+      ? `${transaction.fromAccount || "출금"} → ${transaction.toAccount || "입금"}`
+      : transaction.paymentMethod || transaction.fromAccount;
+
+  return [
+    transaction.description ? transaction.category : "",
+    method,
+    transaction.type === "지출" ? transaction.spendingTarget : "",
+    transaction.createdBy
+  ].filter(Boolean).join(" · ");
+}
+
 const TOGETHER_START = "2026-07-11";
 
 function getTogetherDays() {
@@ -104,6 +142,28 @@ export default function HomePage() {
   const [loading, setLoading] = useState(initialDashboard === null);
   const [errorMessage, setErrorMessage] = useState("");
   const [lastUpdatedLabel, setLastUpdatedLabel] = useState("");
+  const [detailType, setDetailType] = useState<"수입" | "지출" | null>(null);
+  const [detailItems, setDetailItems] = useState<Transaction[]>([]);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState("");
+
+  useEffect(() => {
+    if (!detailType) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setDetailType(null);
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [detailType]);
 
   async function loadDashboard(options: {
     forceRefresh?: boolean;
@@ -211,6 +271,34 @@ export default function HomePage() {
       window.removeEventListener("focus", refreshWhenVisible);
     };
   }, []);
+
+  async function openMonthlyDetail(type: "수입" | "지출") {
+    if (!dashboard) return;
+
+    setDetailType(type);
+    setDetailItems([]);
+    setDetailError("");
+    setDetailLoading(true);
+
+    const range = getMonthRange(dashboard.month);
+
+    try {
+      const response = await getTransactions({
+        ...range,
+        type,
+        limit: 500
+      });
+      setDetailItems(response.data.items || []);
+    } catch (error) {
+      setDetailError(
+        error instanceof Error
+          ? error.message
+          : "거래 내역을 불러오지 못했습니다."
+      );
+    } finally {
+      setDetailLoading(false);
+    }
+  }
 
   const cardSummary = useMemo(() => {
     if (!dashboard) {
@@ -337,14 +425,22 @@ export default function HomePage() {
               {formatBalanceWon(netWorth)}
             </strong>
           </div>
-          <div className={styles.summaryRow}>
-            <span className={styles.summaryLabel}>수입</span>
+          <button
+            type="button"
+            className={[styles.summaryRow, styles.summaryRowButton].join(" ")}
+            onClick={() => void openMonthlyDetail("수입")}
+          >
+            <span className={styles.summaryLabel}>수입 <small>내역 보기</small></span>
             <strong className={styles.incomeAmount}>{formatWon(monthIncome)}</strong>
-          </div>
-          <div className={styles.summaryRow}>
-            <span className={styles.summaryLabel}>지출</span>
+          </button>
+          <button
+            type="button"
+            className={[styles.summaryRow, styles.summaryRowButton].join(" ")}
+            onClick={() => void openMonthlyDetail("지출")}
+          >
+            <span className={styles.summaryLabel}>지출 <small>내역 보기</small></span>
             <strong className={styles.expenseAmount}>{formatWon(monthExpense)}</strong>
-          </div>
+          </button>
           <div className={styles.summaryRow}>
             <span className={styles.summaryLabel}>순현금흐름</span>
             <strong className={monthNetCashFlow < 0 ? styles.negativeAmount : styles.netAmount}>
@@ -412,6 +508,54 @@ export default function HomePage() {
           )}
         </div>
       </section>
+
+      {detailType && (
+        <div
+          className={styles.detailBackdrop}
+          role="presentation"
+          onClick={() => setDetailType(null)}
+        >
+          <section
+            className={styles.detailModal}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`${formatMonth(dashboard.month)} ${detailType} 내역`}
+            onClick={event => event.stopPropagation()}
+          >
+            <div className={styles.detailHeader}>
+              <div>
+                <strong>{formatMonth(dashboard.month)} {detailType} 내역</strong>
+                <span>{detailItems.length.toLocaleString("ko-KR")}건</span>
+              </div>
+              <button type="button" aria-label="닫기" onClick={() => setDetailType(null)}>×</button>
+            </div>
+
+            {detailLoading && <p className={styles.detailState}>내역을 불러오는 중입니다.</p>}
+            {!detailLoading && detailError && <p className={styles.detailError}>{detailError}</p>}
+            {!detailLoading && !detailError && detailItems.length === 0 && (
+              <p className={styles.detailState}>해당 거래가 없습니다.</p>
+            )}
+
+            {!detailLoading && !detailError && detailItems.length > 0 && (
+              <div className={styles.detailList}>
+                {detailItems.map(transaction => (
+                  <article key={transaction.transactionId} className={styles.detailRow}>
+                    <div>
+                      <span>{transaction.date}</span>
+                      <strong>{getTransactionTitle(transaction)}</strong>
+                      <small>{getTransactionMeta(transaction)}</small>
+                      {transaction.memo && <em>{transaction.memo}</em>}
+                    </div>
+                    <b className={detailType === "수입" ? styles.incomeAmount : styles.expenseAmount}>
+                      {detailType === "수입" ? "+" : "-"}{formatWon(transaction.amount)}
+                    </b>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+      )}
     </main>
   );
 }

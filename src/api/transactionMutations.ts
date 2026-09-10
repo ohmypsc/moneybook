@@ -53,6 +53,8 @@ export interface TransactionItem {
   spendingTarget:
     string | null;
 
+  description: string;
+
   memo: string;
 
   billingOverride:
@@ -121,6 +123,8 @@ export interface UpdateTransactionInput {
   paymentMethodId?: string;
 
   spendingTarget?: string;
+
+  description?: string;
 
   memo?: string;
 

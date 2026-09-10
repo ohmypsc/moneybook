@@ -1,6 +1,7 @@
 import {
   Fragment,
   useEffect,
+  useMemo,
   useState
 } from "react";
 
@@ -211,6 +212,11 @@ export default function AssetsPage({
     );
 
   const [
+    ownerFilter,
+    setOwnerFilter
+  ] = useState("전체");
+
+  const [
     initialDashboard
   ] =
     useState<
@@ -306,6 +312,30 @@ export default function AssetsPage({
     setReconcileError
   ] =
     useState("");
+
+  useEffect(() => {
+    if (!selectedCashAccountId && !selectedAccountId) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setSelectedCashAccountId(null);
+        setSelectedAccountId(null);
+        setReconcileAccountId(null);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [selectedCashAccountId, selectedAccountId]);
 
   useEffect(
     () => {
@@ -709,6 +739,60 @@ export default function AssetsPage({
       ?.investments
       .holdings ||
     [];
+
+  const ownerOptions = useMemo(() => {
+    const owners = new Set<string>();
+
+    (dashboard?.accounts || []).forEach(account => {
+      if (account.owner) owners.add(account.owner);
+    });
+
+    (dashboard?.investments.accounts || []).forEach(account => {
+      if (account.owner) owners.add(account.owner);
+    });
+
+    return Array.from(owners).sort((first, second) => {
+      if (first === userName) return -1;
+      if (second === userName) return 1;
+      if (first === "공동") return -1;
+      if (second === "공동") return 1;
+      return first.localeCompare(second, "ko-KR");
+    });
+  }, [dashboard, userName]);
+
+  const visibleCashLikeAccounts = useMemo(() => {
+    return cashLikeAccounts
+      .filter(account => ownerFilter === "전체" || account.owner === ownerFilter)
+      .slice()
+      .sort((first, second) => {
+        if (first.owner === userName && second.owner !== userName) return -1;
+        if (second.owner === userName && first.owner !== userName) return 1;
+        const ownerCompare = (first.owner || "").localeCompare(second.owner || "", "ko-KR");
+        return ownerCompare || first.displayName.localeCompare(second.displayName, "ko-KR");
+      });
+  }, [cashLikeAccounts, ownerFilter, userName]);
+
+  const visibleInvestmentAccounts = useMemo(() => {
+    return investmentAccounts
+      .filter(account => ownerFilter === "전체" || account.owner === ownerFilter)
+      .slice()
+      .sort((first, second) => {
+        if (first.owner === userName && second.owner !== userName) return -1;
+        if (second.owner === userName && first.owner !== userName) return 1;
+        const ownerCompare = (first.owner || "").localeCompare(second.owner || "", "ko-KR");
+        return ownerCompare || first.accountName.localeCompare(second.accountName, "ko-KR");
+      });
+  }, [investmentAccounts, ownerFilter, userName]);
+
+  const visibleCashTotal = visibleCashLikeAccounts.reduce(
+    (sum, account) => sum + Number(account.currentBalance || 0),
+    0
+  );
+
+  const visibleInvestmentTotal = visibleInvestmentAccounts.reduce(
+    (sum, account) => sum + Number(account.accountValueKrw || 0),
+    0
+  );
 
 
   const selectedAccount =
@@ -1125,6 +1209,26 @@ export default function AssetsPage({
         </button>
       </div>
 
+      {ownerOptions.length > 1 && (
+        <div className={styles.ownerFilter} aria-label="명의자 필터">
+          {["전체", ...ownerOptions].map(owner => (
+            <button
+              key={owner}
+              type="button"
+              className={ownerFilter === owner ? styles.ownerFilterActive : ""}
+              onClick={() => {
+                setOwnerFilter(owner);
+                setSelectedCashAccountId(null);
+                setSelectedAccountId(null);
+                setReconcileAccountId(null);
+              }}
+            >
+              {owner}
+            </button>
+          ))}
+        </div>
+      )}
+
 
       {activeTab ===
         "cash" && (
@@ -1157,8 +1261,7 @@ export default function AssetsPage({
                   }
                 >
                   {formatCurrency(
-                    summary
-                      .cashLikeValue
+                    visibleCashTotal
                   )}
                 </strong>
               </div>
@@ -1177,7 +1280,7 @@ export default function AssetsPage({
 
 
           {!loading &&
-            cashLikeAccounts
+            visibleCashLikeAccounts
               .length ===
               0 && (
               <p
@@ -1191,7 +1294,7 @@ export default function AssetsPage({
 
 
           {!loading &&
-            cashLikeAccounts
+            visibleCashLikeAccounts
               .length >
               0 && (
               <ul
@@ -1199,7 +1302,7 @@ export default function AssetsPage({
                   styles.cashAccountList
                 }
               >
-                {cashLikeAccounts.map(
+                {visibleCashLikeAccounts.map(
                   account => {
                     const isSelected =
                       selectedCashAccountId ===
@@ -1300,11 +1403,20 @@ export default function AssetsPage({
                               className={
                                 styles.cashDetailItem
                               }
+                              role="presentation"
+                              onClick={() => {
+                                setSelectedCashAccountId(null);
+                                setReconcileAccountId(null);
+                              }}
                             >
                               <section
                                 className={
                                   styles.cashDetailCard
                                 }
+                                role="dialog"
+                                aria-modal="true"
+                                aria-label={`${selectedCashAccount.displayName} 상세`}
+                                onClick={event => event.stopPropagation()}
                               >
                                 <div
                                   className={
@@ -1327,20 +1439,26 @@ export default function AssetsPage({
                                     </strong>
                                   </div>
 
-                                  <button
-                                    type="button"
-                                    className={
-                                      styles.editAccountButton
-                                    }
-                                    onClick={
-                                      () =>
-                                        setEditingAccountId(
-                                          selectedCashAccount.accountId
-                                        )
-                                    }
-                                  >
-                                    편집
-                                  </button>
+                                  <div className={styles.modalHeaderActions}>
+                                    <button
+                                      type="button"
+                                      className={styles.editAccountButton}
+                                      onClick={() => setEditingAccountId(selectedCashAccount.accountId)}
+                                    >
+                                      편집
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={styles.modalCloseButton}
+                                      aria-label="상세 닫기"
+                                      onClick={() => {
+                                        setSelectedCashAccountId(null);
+                                        setReconcileAccountId(null);
+                                      }}
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
                                 </div>
 
                                 <div
@@ -1521,7 +1639,7 @@ export default function AssetsPage({
             </h2>
 
             {!loading &&
-              investmentAccounts
+              visibleInvestmentAccounts
                 .length >
                 0 && (
                 <span
@@ -1530,7 +1648,7 @@ export default function AssetsPage({
                   }
                 >
                   {
-                    investmentAccounts
+                    visibleInvestmentAccounts
                       .length
                   }
                   개 계좌
@@ -1561,8 +1679,7 @@ export default function AssetsPage({
                     }
                   >
                     {formatCurrency(
-                      summary
-                        .investmentValue
+                      visibleInvestmentTotal
                     )}
                   </strong>
                 </div>
@@ -1624,7 +1741,7 @@ export default function AssetsPage({
 
 
           {!loading &&
-            investmentAccounts
+            visibleInvestmentAccounts
               .length ===
               0 && (
               <p
@@ -1638,7 +1755,7 @@ export default function AssetsPage({
 
 
           {!loading &&
-            investmentAccounts
+            visibleInvestmentAccounts
               .length >
               0 && (
               <div
@@ -1646,7 +1763,7 @@ export default function AssetsPage({
                   styles.accountList
                 }
               >
-                {investmentAccounts.map(
+                {visibleInvestmentAccounts.map(
                   account => {
                     const isSelected =
                       selectedAccountId ===
@@ -1805,9 +1922,18 @@ export default function AssetsPage({
                         {isSelected &&
                           selectedAccount && (
                             <div
+                              className={styles.investmentDetailBackdrop}
+                              role="presentation"
+                              onClick={() => setSelectedAccountId(null)}
+                            >
+                            <div
                               className={
                                 styles.detailCard
                               }
+                              role="dialog"
+                              aria-modal="true"
+                              aria-label={`${selectedAccount.accountName} 상세`}
+                              onClick={event => event.stopPropagation()}
                             >
                               <div
                                 className={
@@ -1857,17 +1983,19 @@ export default function AssetsPage({
 
                                   <button
                                     type="button"
-                                    className={
-                                      styles.editAccountButton
-                                    }
-                                    onClick={
-                                      () =>
-                                        setEditingAccountId(
-                                          selectedAccount.accountId
-                                        )
-                                    }
+                                    className={styles.editAccountButton}
+                                    onClick={() => setEditingAccountId(selectedAccount.accountId)}
                                   >
                                     편집
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    className={styles.modalCloseButton}
+                                    aria-label="상세 닫기"
+                                    onClick={() => setSelectedAccountId(null)}
+                                  >
+                                    ×
                                   </button>
                                 </div>
                               </div>
@@ -2483,6 +2611,7 @@ export default function AssetsPage({
                                   handleInvestmentSaved
                                 }
                               />
+                            </div>
                             </div>
                           )}
                       </Fragment>

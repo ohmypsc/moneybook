@@ -70,24 +70,26 @@ function moveMonth(month: string, offset: number) {
 }
 
 function getTransactionTitle(transaction: Transaction) {
-  return transaction.memo || transaction.category || transaction.type;
+  return transaction.description || transaction.category || transaction.type;
 }
 
 function getTransactionMeta(transaction: Transaction) {
   if (transaction.type === "수입") {
-    return [transaction.toAccount, transaction.createdBy]
+    return [transaction.description ? transaction.category : "", transaction.toAccount, transaction.createdBy]
       .filter(Boolean)
       .join(" · ");
   }
 
   if (transaction.type === "이체") {
     return [
+      transaction.description ? transaction.category : "",
       `${transaction.fromAccount || "출금"} → ${transaction.toAccount || "입금"}`,
       transaction.createdBy
     ].filter(Boolean).join(" · ");
   }
 
   return [
+    transaction.description ? transaction.category : "",
     transaction.paymentMethod || transaction.fromAccount,
     transaction.spendingTarget,
     transaction.createdBy
@@ -288,7 +290,7 @@ export default function HistoryPage({
         <main className={styles.page}>
           <header className={styles.header}>
             <h1>전체 내역 검색</h1>
-            <p>메모·카테고리·계좌·지출대상 또는 정확한 금액으로 찾을 수 있습니다.</p>
+            <p>내용·메모·카테고리·계좌·지출대상 또는 정확한 금액으로 찾을 수 있습니다.</p>
           </header>
 
           <form className={styles.searchCard} onSubmit={runSearch}>
