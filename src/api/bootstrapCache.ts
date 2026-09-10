@@ -17,7 +17,7 @@ const SETTINGS_PATH =
   "/api/settings/input-preferences";
 
 const BOOTSTRAP_TTL_MS =
-  3 * 60 * 1000;
+  Number.POSITIVE_INFINITY;
 
 const FETCH_PATCH_MARKER =
   "__moneybookBootstrapCacheFetchPatched";
