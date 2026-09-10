@@ -1,5 +1,5 @@
 const CACHE_VERSION =
-  "v4-shell";
+  "v5-shell";
 
 const STATIC_CACHE =
   `moneybook-static-${CACHE_VERSION}`;
