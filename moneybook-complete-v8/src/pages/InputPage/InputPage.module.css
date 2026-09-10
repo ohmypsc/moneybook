@@ -1,0 +1,1131 @@
+.page {
+  width: 100%;
+  max-width: var(--content-width);
+
+  min-height: 100vh;
+
+  margin: 0 auto;
+  padding: 24px 18px 110px;
+}
+
+
+/* =========================================================
+   상단
+   ========================================================= */
+
+.header {
+  margin-bottom: var(--space-6);
+}
+
+.eyebrow {
+  margin: 0 0 var(--space-1);
+
+  color: var(--color-text-secondary);
+
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.title {
+  margin: 0;
+
+  font-size: 28px;
+  line-height: 1.3;
+}
+
+.description {
+  margin: var(--space-2) 0 0;
+
+  color: var(--color-text-secondary);
+
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+
+/* =========================================================
+   일반 거래 유형
+   ========================================================= */
+
+.typeTabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+
+  gap: 4px;
+
+  padding: 4px;
+
+  background: var(--color-surface-soft);
+
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.typeButton {
+  min-height: 46px;
+
+  padding: 0 12px;
+
+  border: 0;
+  border-radius: var(--radius-sm);
+
+  background: transparent;
+
+  color: inherit;
+
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+
+  cursor: pointer;
+
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.typeButton:hover {
+  background: var(--color-surface);
+}
+
+.typeButtonActive {
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+
+  box-shadow: var(--shadow-card);
+}
+
+.typeButtonActive:hover {
+  background: var(--color-primary-hover);
+}
+
+.typeButton:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+
+/* =========================================================
+   카드 빠른 입력
+   ========================================================= */
+
+.quickSection {
+  margin-top: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.quickHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: var(--space-3);
+
+  margin-bottom: var(--space-2);
+}
+
+.quickTitle {
+  margin: 0;
+
+  color: var(--color-text-secondary);
+
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.quickActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+
+  gap: var(--space-2);
+}
+
+.quickActionButton {
+  width: 100%;
+  min-height: 70px;
+
+  display: flex;
+  align-items: center;
+
+  gap: 12px;
+
+  padding: 12px 14px;
+
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+
+  background: var(--color-surface);
+
+  color: inherit;
+
+  font: inherit;
+  text-align: left;
+
+  cursor: pointer;
+
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.1s ease;
+}
+
+.quickActionButton:hover {
+  border-color: var(--color-primary);
+
+  background: var(--color-surface-soft);
+}
+
+.quickActionButton:active {
+  transform: translateY(1px);
+}
+
+.quickActionButton:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.quickActionSelected {
+  border-color: var(--color-primary);
+
+  background: var(--color-surface-soft);
+
+  box-shadow: var(--shadow-card);
+}
+
+.quickActionIcon {
+  flex: 0 0 auto;
+
+  width: 38px;
+  height: 38px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: var(--radius-sm);
+
+  background: var(--color-surface-soft);
+
+  font-size: 20px;
+}
+
+.quickActionSelected .quickActionIcon {
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+}
+
+.quickActionText {
+  min-width: 0;
+
+  display: grid;
+
+  gap: 2px;
+}
+
+.quickActionLabel {
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.quickActionHint {
+  color: var(--color-text-secondary);
+
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+
+/* =========================================================
+   입력 폼
+   ========================================================= */
+
+.form {
+  display: grid;
+
+  gap: var(--space-4);
+}
+
+.card {
+  display: grid;
+
+  gap: var(--space-4);
+
+  padding: 20px;
+
+  background: var(--color-surface);
+
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+
+  box-shadow: var(--shadow-card);
+}
+
+.field {
+  display: grid;
+
+  gap: var(--space-2);
+}
+
+.fieldLabel {
+  display: flex;
+  align-items: center;
+
+  gap: 4px;
+
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.required {
+  color: var(--color-error);
+}
+
+
+/* =========================================================
+   공통 입력 요소
+   ========================================================= */
+
+.input,
+.select,
+.textarea {
+  width: 100%;
+
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+
+  background: var(--color-surface);
+
+  color: inherit;
+
+  font: inherit;
+
+  outline: none;
+
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.input,
+.select {
+  min-height: 50px;
+
+  padding: 0 14px;
+}
+
+.textarea {
+  min-height: 96px;
+
+  padding: 13px 14px;
+
+  line-height: 1.6;
+
+  resize: vertical;
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  border-color: var(--color-primary);
+
+  box-shadow: 0 0 0 2px var(--color-surface-soft);
+}
+
+.input:disabled,
+.select:disabled,
+.textarea:disabled {
+  opacity: 0.6;
+
+  cursor: not-allowed;
+}
+
+
+/* =========================================================
+   금액
+   ========================================================= */
+
+.amountField {
+  display: grid;
+
+  gap: var(--space-2);
+}
+
+.amountWrap {
+  position: relative;
+}
+
+.amountInput {
+  width: 100%;
+  min-height: 62px;
+
+  padding: 0 52px 0 16px;
+
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+
+  background: var(--color-surface);
+
+  color: inherit;
+
+  font: inherit;
+  font-size: 26px;
+  font-weight: 800;
+  text-align: right;
+
+  outline: none;
+
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.amountInput:focus {
+  border-color: var(--color-primary);
+
+  box-shadow: 0 0 0 2px var(--color-surface-soft);
+}
+
+.currency {
+  position: absolute;
+
+  top: 50%;
+  right: 16px;
+
+  transform: translateY(-50%);
+
+  color: var(--color-text-secondary);
+
+  font-size: 15px;
+  font-weight: 700;
+
+  pointer-events: none;
+}
+
+
+/* =========================================================
+   유형별 입력 영역
+   ========================================================= */
+
+.conditionalSection {
+  display: grid;
+
+  gap: var(--space-4);
+}
+
+.sectionTitle {
+  margin: 0;
+
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.helper {
+  margin: 0;
+
+  color: var(--color-text-secondary);
+
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.fieldPair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+
+  gap: var(--space-3);
+}
+
+
+/* =========================================================
+   카드 결제 전용 안내
+   ========================================================= */
+
+.cardPaymentNotice {
+  display: flex;
+  align-items: flex-start;
+
+  gap: 10px;
+
+  padding: 12px 14px;
+
+  background: var(--color-surface-soft);
+
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.cardPaymentNoticeIcon {
+  flex: 0 0 auto;
+
+  font-size: 17px;
+  line-height: 1.4;
+}
+
+.cardPaymentNoticeText {
+  margin: 0;
+
+  color: var(--color-text-secondary);
+
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.cardPaymentNoticeText strong {
+  color: inherit;
+
+  font-weight: 800;
+}
+
+
+/* =========================================================
+   로딩 / 오류 / 성공
+   ========================================================= */
+
+.loading {
+  padding: 24px 18px;
+
+  background: var(--color-surface);
+
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+
+  color: var(--color-text-secondary);
+
+  font-size: 14px;
+  line-height: 1.6;
+
+  text-align: center;
+}
+
+.error {
+  margin: 0;
+
+  color: var(--color-error);
+
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.success {
+  margin: 0;
+
+  color: var(--color-primary);
+
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+
+/* =========================================================
+   저장 대기열
+   ========================================================= */
+
+.queueStatus,
+.queueFailure {
+  display: grid;
+  gap: 6px;
+
+  padding: 12px 14px;
+
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.queueStatus {
+  background: var(--color-surface-soft);
+  color: var(--color-text-secondary);
+}
+
+.queueStatus strong {
+  color: var(--color-text-primary);
+}
+
+.queueFailure {
+  background: var(--color-surface);
+  color: var(--color-error);
+}
+
+.queueFailureHeader,
+.queueFailureItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.queueFailureItem {
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border);
+}
+
+.queueFailureItem > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.queueFailureLabel {
+  color: var(--color-text-primary);
+  font-weight: 700;
+}
+
+.queueFailureMessage {
+  color: var(--color-error);
+  font-size: 12px;
+}
+
+.queueRetryButton {
+  flex: 0 0 auto;
+
+  min-height: 36px;
+  padding: 0 12px;
+
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+
+  cursor: pointer;
+}
+
+.queueRetryButton:hover {
+  background: var(--color-surface-soft);
+}
+
+
+/* =========================================================
+   저장
+   ========================================================= */
+
+.submitArea {
+  margin-top: var(--space-2);
+}
+
+.submitButton {
+  width: 100%;
+  min-height: 54px;
+
+  padding: 0 18px;
+
+  border: 0;
+  border-radius: var(--radius-md);
+
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+
+  font: inherit;
+  font-size: 16px;
+  font-weight: 800;
+
+  cursor: pointer;
+
+  transition:
+    background 0.15s ease,
+    transform 0.1s ease,
+    opacity 0.15s ease;
+}
+
+.submitButton:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.submitButton:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.submitButton:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
+.submitButton:disabled {
+  opacity: 0.55;
+
+  cursor: not-allowed;
+}
+
+
+/* =========================================================
+   모바일
+   ========================================================= */
+
+@media (max-width: 480px) {
+  .page {
+    padding-right: 16px;
+    padding-bottom:
+      calc(
+        182px +
+        env(safe-area-inset-bottom)
+      );
+    padding-left: 16px;
+  }
+
+  .title {
+    font-size: 26px;
+  }
+
+  .card {
+    padding: 18px 16px;
+  }
+
+  .fieldPair {
+    grid-template-columns: 1fr;
+  }
+
+  .input,
+  .select {
+    min-height: 48px;
+    font-size: 16px;
+  }
+
+  .textarea {
+    font-size: 16px;
+  }
+
+  .amountInput {
+    font-size: 24px;
+  }
+
+  .submitArea {
+    position: fixed;
+    left: 50%;
+    bottom:
+      calc(
+        76px +
+        env(safe-area-inset-bottom)
+      );
+    z-index: 20;
+
+    width:
+      min(
+        calc(100% - 24px),
+        calc(var(--content-width) - 24px)
+      );
+
+    margin: 0;
+    padding: 10px;
+
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+
+    background: var(--color-surface);
+
+    box-shadow: var(--shadow-card);
+
+    transform: translateX(-50%);
+  }
+
+  .submitButton {
+    min-height: 56px;
+  }
+}
+
+
+/* 아주 좁은 화면 */
+@media (max-width: 360px) {
+  .quickActions {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* =========================================================
+   v2.2.15 A 콘셉트 / 빠른 기록 UI
+   ========================================================= */
+.page {
+  padding-top: 20px;
+}
+
+.header {
+  margin-bottom: 14px;
+}
+
+.eyebrow,
+.description {
+  display: none;
+}
+
+.title {
+  font-size: 24px;
+  letter-spacing: -0.035em;
+}
+
+.typeTabs {
+  margin-bottom: 12px;
+  border-color: var(--color-border);
+  background: rgba(237, 243, 241, 0.82);
+}
+
+.typeButton {
+  min-height: 42px;
+}
+
+.typeButtonActive {
+  background: var(--color-primary);
+  box-shadow: 0 5px 12px rgba(71, 106, 132, 0.13);
+}
+
+.form {
+  gap: 12px;
+}
+
+.card {
+  gap: 16px;
+  padding: 18px;
+  border-color: var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.amountField {
+  gap: 5px;
+  padding: 5px 0 10px;
+  border-bottom: 1px solid rgba(220, 229, 229, 0.82);
+}
+
+.amountField .fieldLabel {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.amountWrap {
+  display: flex;
+  align-items: baseline;
+}
+
+.amountInput {
+  min-width: 0;
+  padding: 0 6px 0 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-primary);
+  font-size: clamp(32px, 9vw, 42px);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  box-shadow: none !important;
+}
+
+.currency {
+  color: var(--color-primary);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.input,
+.textarea,
+.pickerButton {
+  border-color: var(--color-border);
+  background: #fbfcfc;
+}
+
+.input:focus,
+.textarea:focus,
+.pickerButton:focus-visible {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(71, 106, 132, 0.1);
+}
+
+.pickerButton {
+  width: 100%;
+  min-height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.pickerButton:disabled {
+  opacity: 0.55;
+}
+
+.pickerValue,
+.pickerPlaceholder {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+.pickerValue {
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+.pickerPlaceholder {
+  color: var(--color-text-secondary);
+}
+
+.pickerChevron {
+  flex: 0 0 auto;
+  color: var(--color-text-secondary);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.conditionalSection {
+  gap: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(220, 229, 229, 0.82);
+}
+
+.sectionTitle {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  letter-spacing: 0;
+}
+
+.helper {
+  margin-top: 0;
+  font-size: 11px;
+}
+
+.submitButton {
+  min-height: 52px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--color-primary), #5b7f94);
+  box-shadow: 0 8px 18px rgba(71, 106, 132, 0.16);
+}
+
+.sheetBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+  background: rgba(34, 51, 60, 0.28);
+  backdrop-filter: blur(2px);
+}
+
+.sheet {
+  width: min(100%, var(--content-width));
+  max-height: min(72dvh, 620px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 8px 14px calc(14px + env(safe-area-inset-bottom));
+  border: 1px solid var(--color-border);
+  border-bottom: 0;
+  border-radius: 24px 24px 0 0;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sheet);
+  animation: inputSheetIn 170ms ease-out;
+}
+
+@keyframes inputSheetIn {
+  from { transform: translateY(14px); opacity: 0.82; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.sheetHandle {
+  width: 38px;
+  height: 4px;
+  margin: 0 auto 5px;
+  border-radius: 999px;
+  background: #cdd7d8;
+}
+
+.sheetHeader {
+  min-height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 2px 6px;
+}
+
+.sheetHeader h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.sheetClose {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--color-surface-soft);
+  color: var(--color-text-secondary);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.sheetList {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-top: 1px solid rgba(220, 229, 229, 0.76);
+}
+
+.sheetOption {
+  width: 100%;
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 4px;
+  border: 0;
+  border-bottom: 1px solid rgba(220, 229, 229, 0.68);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.sheetOption:last-child {
+  border-bottom: 0;
+}
+
+.sheetOptionSelected {
+  color: var(--color-primary);
+}
+
+.sheetOptionText {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.sheetOptionText strong {
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sheetOptionText span {
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sheetCheck {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 26px;
+  border-radius: 50%;
+  background: var(--color-surface-sage);
+  color: var(--color-positive);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+@media (max-width: 390px) {
+  .page {
+    padding-right: 14px;
+    padding-left: 14px;
+  }
+
+  .card {
+    padding: 16px 14px;
+  }
+
+  .amountInput {
+    font-size: clamp(30px, 9.2vw, 34px);
+  }
+
+  .fieldPair {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* amount legacy absolute-unit reset */
+.amountInput {
+  flex: 1 1 auto;
+  padding: 0 6px 0 0;
+  text-align: right;
+}
+
+.currency {
+  position: static;
+  top: auto;
+  right: auto;
+  transform: none;
+  flex: 0 0 auto;
+  margin-left: 4px;
+}
+
+.queueFailureActions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.queueDiscardButton {
+  min-height: 32px;
+  padding: 0 9px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-error);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.queueEditButton {
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cardBillingBox {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-subtle, #f7f8fa);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.cardBillingBox strong {
+  margin-top: 2px;
+  font-size: 14px;
+}
+
+.cardBillingBox small {
+  color: var(--color-text-secondary, #68707c);
+}
+
+.cardBillingError {
+  margin: 8px 0 0;
+  color: var(--color-error, #b3261e);
+  font-size: 12px;
+}

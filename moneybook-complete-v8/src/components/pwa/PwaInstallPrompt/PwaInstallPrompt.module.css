@@ -1,0 +1,132 @@
+.panel {
+  display: grid;
+  gap: 14px;
+
+  padding: 18px;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius:
+    var(--radius-lg);
+
+  background:
+    var(--color-surface);
+
+  box-shadow:
+    var(--shadow-card);
+}
+
+.headingRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.icon {
+  display: grid;
+  place-items: center;
+
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+
+  border-radius: 14px;
+
+  background:
+    var(--color-primary);
+
+  color:
+    var(--color-primary-text);
+
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.content {
+  min-width: 0;
+}
+
+.title {
+  display: block;
+
+  margin: 0;
+
+  color:
+    var(--color-text-primary);
+
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.message {
+  margin: 4px 0 0;
+
+  color:
+    var(--color-text-secondary);
+
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.primaryButton {
+  width: 100%;
+  min-height: 44px;
+
+  border:
+    1px solid
+    var(--color-primary);
+
+  border-radius:
+    var(--radius-md);
+
+  background:
+    var(--color-primary);
+
+  color:
+    var(--color-primary-text);
+
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+
+  cursor: pointer;
+}
+
+.primaryButton:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.instructions {
+  display: grid;
+  gap: 4px;
+
+  padding: 12px 13px;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius:
+    var(--radius-md);
+
+  background:
+    var(--color-surface-soft);
+
+  color:
+    var(--color-text-secondary);
+
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.instructions strong {
+  color:
+    var(--color-text-primary);
+
+  font-size: 12px;
+}

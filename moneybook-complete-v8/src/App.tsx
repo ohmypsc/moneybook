@@ -1,0 +1,1146 @@
+import {
+  useEffect,
+  useState
+} from "react";
+
+import type {
+  ReactNode
+} from "react";
+
+import {
+  getSession,
+  login,
+  logout
+} from "./api/auth";
+
+import {
+  ApiError
+} from "./api/client";
+
+import {
+  clearBootstrapMemoryCache,
+  prefetchBootstrap
+} from "./api/bootstrapCache";
+
+import {
+  getCurrentCalendarMonth,
+  loadCalendarMonth
+} from "./api/calendarCache";
+
+import {
+  getDashboard,
+  invalidateDashboardCache
+} from "./api/dashboard";
+
+import {
+  clearInvestmentPrefetchCache,
+  prefetchInvestmentTrades
+} from "./api/investments";
+
+import {
+  clearManagedSettingsCache,
+  prefetchManagedSettings
+} from "./api/settingsManagement";
+
+import {
+  startPendingTransactionQueue,
+  stopPendingTransactionQueue
+} from "./utils/pendingTransactionQueue";
+
+import {
+  startRealtimeSync
+} from "./utils/realtimeSync";
+
+import type {
+  User
+} from "./types/api";
+
+import LoginPage
+  from "./pages/LoginPage/LoginPage";
+
+import HomePage
+  from "./pages/HomePage/HomePage";
+
+import HistoryPage
+  from "./pages/HistoryPage/HistoryPage";
+
+import InputPage
+  from "./pages/InputPage/InputPage";
+
+import AssetsPage
+  from "./pages/AssetsPage/AssetsPage";
+
+import SettingsPage
+  from "./pages/SettingsPage/SettingsPage";
+
+import {
+  AppShell
+} from "./components/layout/AppShell/AppShell";
+
+import type {
+  NavigationKey
+} from "./components/layout/BottomNav/BottomNav";
+
+import styles
+  from "./App.module.css";
+
+
+type AppStatus =
+  | "checking"
+  | "authenticated"
+  | "guest";
+
+
+type SplashWindow =
+  Window & {
+    __moneybookSplashStartedAt?:
+      number;
+  };
+
+
+const SPLASH_MINIMUM_MS =
+  250;
+
+const PRIMARY_WARM_TIMEOUT_MS =
+  2500;
+
+const SECONDARY_WARM_DELAY_MS =
+  250;
+
+
+const LAST_AUTHENTICATED_USER_KEY =
+  "moneybook:last-authenticated-user:v1";
+
+function readLastAuthenticatedUser(): User | null {
+  try {
+    const raw =
+      window.localStorage.getItem(
+        LAST_AUTHENTICATED_USER_KEY
+      );
+
+    if (!raw) return null;
+
+    const parsed =
+      JSON.parse(raw) as
+        Partial<User>;
+
+    return typeof parsed.name ===
+      "string" &&
+      parsed.name
+        ? { name: parsed.name }
+        : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveLastAuthenticatedUser(
+  user: User | null
+) {
+  try {
+    if (user) {
+      window.localStorage.setItem(
+        LAST_AUTHENTICATED_USER_KEY,
+        JSON.stringify(user)
+      );
+    } else {
+      window.localStorage.removeItem(
+        LAST_AUTHENTICATED_USER_KEY
+      );
+    }
+  } catch {
+    /* 저장소 사용 불가 환경에서는 세션만 사용합니다. */
+  }
+}
+
+
+type AppHistoryState = {
+  moneybook?: boolean;
+  navigation?: NavigationKey;
+  inputInitialDate?: string | null;
+  moneybookSettingsView?: string;
+};
+
+
+const PRIMARY_NAVIGATION_KEYS =
+  new Set<NavigationKey>([
+    "home",
+    "calendar",
+    "input",
+    "assets",
+    "settings"
+  ]);
+
+
+function isPrimaryNavigation(
+  value: unknown
+): value is NavigationKey {
+  return (
+    typeof value === "string" &&
+    PRIMARY_NAVIGATION_KEYS.has(
+      value as NavigationKey
+    )
+  );
+}
+
+
+function createHistoryState(
+  navigation: NavigationKey,
+  inputInitialDate: string | null = null
+): AppHistoryState {
+  return {
+    moneybook: true,
+    navigation,
+    inputInitialDate:
+      navigation === "input"
+        ? inputInitialDate
+        : null
+  };
+}
+
+
+function scrollToPageTop() {
+  window.requestAnimationFrame(
+    () => {
+      window.scrollTo({
+        top: 0,
+        left: 0,
+        behavior: "auto"
+      });
+
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    }
+  );
+}
+
+
+function wait(
+  milliseconds:
+    number
+) {
+  return new Promise<void>(
+    resolve => {
+      window.setTimeout(
+        resolve,
+        milliseconds
+      );
+    }
+  );
+}
+
+
+function getSplashElement() {
+  return document
+    .getElementById(
+      "launch-splash"
+    );
+}
+
+
+function showLaunchSplash() {
+  const splash =
+    getSplashElement();
+
+
+  if (!splash) {
+    return;
+  }
+
+
+  (
+    window as
+      SplashWindow
+  ).__moneybookSplashStartedAt =
+    Date.now();
+
+
+  splash.classList.remove(
+    "is-hidden"
+  );
+}
+
+
+function hideLaunchSplashNow() {
+  const splash =
+    getSplashElement();
+
+
+  if (!splash) {
+    return;
+  }
+
+
+  splash.classList.add(
+    "is-hidden"
+  );
+}
+
+
+async function waitForMinimumSplash() {
+  const startedAt =
+    (
+      window as
+        SplashWindow
+    ).__moneybookSplashStartedAt ??
+    Date.now();
+
+
+  const elapsed =
+    Date.now() -
+    startedAt;
+
+
+  const remaining =
+    SPLASH_MINIMUM_MS -
+    elapsed;
+
+
+  if (
+    remaining >
+    0
+  ) {
+    await wait(
+      remaining
+    );
+  }
+}
+
+
+function hideSplashAfterPaint() {
+  window.requestAnimationFrame(
+    () => {
+      window.requestAnimationFrame(
+        () => {
+          hideLaunchSplashNow();
+        }
+      );
+    }
+  );
+}
+
+
+/*
+ * 스플래시가 보이는 동안
+ * 첫 진입에 필요한 데이터를 준비합니다.
+ *
+ * dashboard와 이번 달 달력은 홈 표시 전에 기다립니다.
+ *
+ * bootstrap과 관리용 카테고리·자산 데이터는
+ * 같은 시점에 요청을 시작하되,
+ * 늦어져도 홈 화면은 기다리지 않습니다.
+ */
+async function warmPrimaryData() {
+  const dashboardRequest =
+    getDashboard();
+
+
+  void loadCalendarMonth(
+    getCurrentCalendarMonth()
+  ).catch(
+    () => {
+      /* 내역 화면에서 필요할 때 다시 요청합니다. */
+    }
+  );
+
+
+  /*
+   * 거래 입력 화면용 데이터.
+   */
+  void prefetchBootstrap()
+    .catch(
+      () => {
+        /*
+         * 입력 화면에서 필요할 때
+         * 다시 요청할 수 있습니다.
+         */
+      }
+    );
+
+
+  /*
+   * 설정의 카테고리 관리 / 자산 관리용 데이터.
+   *
+   * 이전처럼 홈 표시 후 1초 이상 기다렸다가
+   * 시작하지 않고 스플래시 단계에서 바로 요청합니다.
+   *
+   * 다만 이 요청의 완료를 기다리지는 않으므로
+   * 홈 진입 속도에는 영향을 주지 않습니다.
+   */
+  void prefetchManagedSettings()
+    .catch(
+      () => {
+        /*
+         * 설정 화면에서 필요할 때
+         * 다시 요청할 수 있습니다.
+         */
+      }
+    );
+
+
+  await Promise.race([
+    Promise.allSettled([
+      dashboardRequest
+    ]),
+
+    wait(
+      PRIMARY_WARM_TIMEOUT_MS
+    )
+  ]);
+}
+
+
+/*
+ * 홈이 실제로 뜬 뒤에만 필요한
+ * 투자 매매내역을 준비합니다.
+ */
+function scheduleSecondaryWarm() {
+  window.setTimeout(
+    () => {
+      void prefetchInvestmentTrades()
+        .catch(
+          () => {
+            /*
+             * 실패해도 자산 화면에서
+             * 필요할 때 다시 요청합니다.
+             */
+          }
+        );
+    },
+    SECONDARY_WARM_DELAY_MS
+  );
+}
+
+
+export default function App() {
+  const [
+    status,
+    setStatus
+  ] =
+    useState<AppStatus>(
+      "checking"
+    );
+
+
+  const [
+    user,
+    setUser
+  ] =
+    useState<
+      User |
+      null
+    >(
+      null
+    );
+
+
+  const [
+    loginLoading,
+    setLoginLoading
+  ] =
+    useState(
+      false
+    );
+
+
+  const [
+    loginError,
+    setLoginError
+  ] =
+    useState(
+      ""
+    );
+
+
+  const [
+    activeNavigation,
+    setActiveNavigation
+  ] =
+    useState<
+      NavigationKey
+    >(
+      "home"
+    );
+
+
+  const [
+    inputInitialDate,
+    setInputInitialDate
+  ] =
+    useState<string | null>(
+      null
+    );
+
+
+  const [
+    remoteRevision,
+    setRemoteRevision
+  ] =
+    useState(0);
+
+
+  useEffect(
+    () => {
+      if (
+        status !== "authenticated" ||
+        !user
+      ) {
+        return;
+      }
+
+      /*
+       * 앱을 새로 연 시점에는 화면도 home으로 시작하므로
+       * 현재 history entry도 home과 맞춰 둡니다.
+       */
+      window.history.replaceState(
+        createHistoryState("home"),
+        ""
+      );
+
+      function handlePopState(
+        event: PopStateEvent
+      ) {
+        const state =
+          event.state as
+            AppHistoryState | null;
+
+        const nextNavigation =
+          isPrimaryNavigation(
+            state?.navigation
+          )
+            ? state.navigation
+            : "home";
+
+        setInputInitialDate(
+          nextNavigation === "input"
+            ? state?.inputInitialDate ?? null
+            : null
+        );
+
+        setActiveNavigation(
+          nextNavigation
+        );
+      }
+
+      window.addEventListener(
+        "popstate",
+        handlePopState
+      );
+
+      return () => {
+        window.removeEventListener(
+          "popstate",
+          handlePopState
+        );
+      };
+    },
+    [
+      status,
+      user
+    ]
+  );
+
+
+  useEffect(
+    () => {
+      if (status === "authenticated") {
+        scrollToPageTop();
+      }
+    },
+    [
+      activeNavigation,
+      status
+    ]
+  );
+
+
+  useEffect(
+    () => {
+      if (
+        status !== "authenticated" ||
+        !user
+      ) {
+        stopPendingTransactionQueue();
+        return;
+      }
+
+      startPendingTransactionQueue(
+        user.name
+      );
+
+      return () => {
+        stopPendingTransactionQueue(
+          user.name
+        );
+      };
+    },
+    [
+      status,
+      user
+    ]
+  );
+
+
+  useEffect(
+    () => {
+      if (
+        status !== "authenticated" ||
+        !user
+      ) {
+        return;
+      }
+
+      return startRealtimeSync({
+        userName: user.name,
+        onRemoteChange: () => {
+          setRemoteRevision(
+            value => value + 1
+          );
+        }
+      });
+    },
+    [
+      status,
+      user
+    ]
+  );
+
+
+  useEffect(
+    () => {
+      let cancelled =
+        false;
+
+
+      async function restoreSession() {
+        try {
+          const session =
+            await getSession();
+
+
+          if (
+            cancelled
+          ) {
+            return;
+          }
+
+
+          if (
+            session.loggedIn &&
+            session.user
+          ) {
+            await warmPrimaryData();
+
+
+            if (
+              cancelled
+            ) {
+              return;
+            }
+
+
+            await waitForMinimumSplash();
+
+
+            if (
+              cancelled
+            ) {
+              return;
+            }
+
+
+            saveLastAuthenticatedUser(
+              session.user
+            );
+
+            setUser(
+              session.user
+            );
+
+
+            setStatus(
+              "authenticated"
+            );
+
+
+            setActiveNavigation(
+              "home"
+            );
+
+
+            hideSplashAfterPaint();
+
+
+            scheduleSecondaryWarm();
+
+
+            return;
+          }
+
+
+          setUser(
+            null
+          );
+
+
+          setStatus(
+            "guest"
+          );
+
+
+          await waitForMinimumSplash();
+
+
+          if (
+            cancelled
+          ) {
+            return;
+          }
+
+
+          hideSplashAfterPaint();
+
+        } catch (
+          error
+        ) {
+          if (
+            cancelled
+          ) {
+            return;
+          }
+
+          const unauthorizedError =
+            error instanceof ApiError &&
+            error.status === 401;
+
+          const offlineUser =
+            unauthorizedError
+              ? null
+              : readLastAuthenticatedUser();
+
+          if (
+            offlineUser
+          ) {
+            setUser(
+              offlineUser
+            );
+            setStatus(
+              "authenticated"
+            );
+            setActiveNavigation(
+              "home"
+            );
+            setLoginError("");
+
+            await waitForMinimumSplash();
+
+            if (
+              !cancelled
+            ) {
+              hideSplashAfterPaint();
+            }
+
+            return;
+          }
+
+          if (
+            unauthorizedError
+          ) {
+            saveLastAuthenticatedUser(
+              null
+            );
+          }
+
+          setUser(
+            null
+          );
+
+
+          setStatus(
+            "guest"
+          );
+
+
+          if (
+            error instanceof
+              ApiError &&
+            error.status ===
+              401
+          ) {
+            setLoginError(
+              ""
+            );
+
+          } else {
+            setLoginError(
+              error instanceof
+                Error
+                ? error.message
+                : "로그인 상태를 확인하지 못했습니다."
+            );
+          }
+
+
+          await waitForMinimumSplash();
+
+
+          if (
+            cancelled
+          ) {
+            return;
+          }
+
+
+          hideSplashAfterPaint();
+        }
+      }
+
+
+      void restoreSession();
+
+
+      return () => {
+        cancelled =
+          true;
+      };
+    },
+    []
+  );
+
+
+  async function handleLogin(
+    name:
+      string,
+
+    password:
+      string
+  ) {
+    setLoginLoading(
+      true
+    );
+
+
+    setLoginError(
+      ""
+    );
+
+
+    try {
+      const result =
+        await login(
+          name,
+          password
+        );
+
+
+      showLaunchSplash();
+
+
+      clearBootstrapMemoryCache();
+
+
+      await warmPrimaryData();
+
+
+      await waitForMinimumSplash();
+
+
+      saveLastAuthenticatedUser(
+        result.user
+      );
+
+      setUser(
+        result.user
+      );
+
+
+      setStatus(
+        "authenticated"
+      );
+
+
+      setActiveNavigation(
+        "home"
+      );
+
+
+      hideSplashAfterPaint();
+
+
+      scheduleSecondaryWarm();
+
+    } catch (
+      error
+    ) {
+      hideLaunchSplashNow();
+
+
+      setLoginError(
+        error instanceof
+          Error
+          ? error.message
+          : "로그인에 실패했습니다."
+      );
+
+    } finally {
+      setLoginLoading(
+        false
+      );
+    }
+  }
+
+
+  function navigateTo(
+    nextNavigation: NavigationKey,
+    nextInputDate: string | null = null
+  ) {
+    const normalizedInputDate =
+      nextNavigation === "input"
+        ? nextInputDate
+        : null;
+
+    setInputInitialDate(
+      normalizedInputDate
+    );
+
+    const currentState =
+      window.history.state as
+        AppHistoryState | null;
+
+    const sameDestination =
+      currentState?.moneybook === true &&
+      currentState.navigation === nextNavigation &&
+      (
+        nextNavigation !== "input" ||
+        (currentState.inputInitialDate ?? null) ===
+          normalizedInputDate
+      );
+
+    if (!sameDestination) {
+      window.history.pushState(
+        createHistoryState(
+          nextNavigation,
+          normalizedInputDate
+        ),
+        ""
+      );
+    }
+
+    setActiveNavigation(
+      nextNavigation
+    );
+
+    scrollToPageTop();
+
+    /*
+     * 앱 시작 프리페치가 아직 진행 중인 경우에도
+     * 같은 요청을 재사용하므로 중복 네트워크 요청은 생기지 않습니다.
+     */
+    if (nextNavigation === "settings") {
+      void prefetchManagedSettings()
+        .catch(
+          () => {
+            /*
+             * 설정 화면에서 필요할 때
+             * 다시 요청할 수 있습니다.
+             */
+          }
+        );
+    }
+
+    if (nextNavigation === "input") {
+      void prefetchBootstrap()
+        .catch(() => {
+          /* InputPage에서 정상 재시도 */
+        });
+    }
+  }
+
+
+  function handleNavigate(
+    nextNavigation: NavigationKey
+  ) {
+    navigateTo(
+      nextNavigation,
+      null
+    );
+  }
+
+
+
+  async function handleLogout() {
+    try {
+      await logout();
+
+    } finally {
+      invalidateDashboardCache();
+
+      clearBootstrapMemoryCache();
+
+      clearInvestmentPrefetchCache();
+
+      clearManagedSettingsCache();
+
+
+      saveLastAuthenticatedUser(
+        null
+      );
+
+      setUser(
+        null
+      );
+
+
+      setStatus(
+        "guest"
+      );
+
+
+      setActiveNavigation(
+        "home"
+      );
+
+
+      setLoginError(
+        ""
+      );
+
+      window.history.replaceState(
+        {},
+        ""
+      );
+    }
+  }
+
+
+  if (
+    status ===
+    "checking"
+  ) {
+    return (
+      <main
+        className={
+          styles.center
+        }
+      >
+        <section
+          className={
+            styles.panel
+          }
+        >
+          <h1>
+            우리 가계부
+          </h1>
+
+          <p>
+            로그인 상태를 확인하고 있습니다.
+          </p>
+        </section>
+      </main>
+    );
+  }
+
+
+  if (
+    status ===
+      "guest" ||
+    !user
+  ) {
+    return (
+      <LoginPage
+        loading={
+          loginLoading
+        }
+        errorMessage={
+          loginError
+        }
+        onLogin={
+          handleLogin
+        }
+      />
+    );
+  }
+
+
+  let pageContent:
+    ReactNode;
+
+
+  if (
+    activeNavigation ===
+    "home"
+  ) {
+    pageContent = (
+      <HomePage
+        key={`home:${remoteRevision}`}
+      />
+    );
+
+  } else if (
+    activeNavigation ===
+    "calendar"
+  ) {
+    pageContent = (
+      <HistoryPage
+        key={`history:${remoteRevision}`}
+        onAddTransaction={
+          date => {
+            navigateTo(
+              "input",
+              date
+            );
+          }
+        }
+      />
+    );
+
+  } else if (
+    activeNavigation ===
+    "input"
+  ) {
+    pageContent = (
+      <InputPage
+        userName={
+          user.name
+        }
+        initialDate={
+          inputInitialDate
+        }
+      />
+    );
+
+  } else if (
+    activeNavigation ===
+    "assets"
+  ) {
+    pageContent = (
+      <AssetsPage
+        key={`assets:${remoteRevision}`}
+        userName={
+          user.name
+        }
+      />
+    );
+
+  } else {
+    pageContent = (
+      <SettingsPage
+        key={`settings:${remoteRevision}`}
+      />
+    );
+  }
+
+
+  return (
+    <AppShell
+      activeNavigation={
+        activeNavigation
+      }
+      onNavigate={
+        handleNavigate
+      }
+    >
+      {pageContent}
+    </AppShell>
+  );
+}

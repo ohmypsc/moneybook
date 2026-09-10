@@ -1,0 +1,1378 @@
+.page {
+  width: 100%;
+  max-width: var(--content-width);
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 24px 18px 110px;
+}
+
+.header {
+  margin-bottom: var(--space-5);
+}
+
+.eyebrow {
+  margin: 0 0 var(--space-1);
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.title {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.3;
+}
+
+.description {
+  margin: var(--space-2) 0 0;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* =========================================================
+   월 이동
+   ========================================================= */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.monthNavigator {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.monthLabel {
+  min-width: 112px;
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.iconButton,
+.todayButton,
+.refreshButton {
+  min-height: 40px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.iconButton {
+  width: 40px;
+  padding: 0;
+}
+
+.todayButton,
+.refreshButton {
+  padding: 0 12px;
+}
+
+.toolbarActions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.iconButton:disabled,
+.todayButton:disabled,
+.refreshButton:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* =========================================================
+   월 요약
+   ========================================================= */
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns:
+    repeat(
+      3,
+      minmax(0, 1fr)
+    );
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.summaryCard {
+  min-width: 0;
+  padding: 15px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.summaryLabel {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.summaryValue {
+  display: block;
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.summaryIncome {
+  color: var(--color-primary);
+}
+
+.summaryExpense {
+  color: var(--color-error);
+}
+
+.summaryNegative {
+  color: var(--color-error);
+}
+
+/* =========================================================
+   유형 필터
+   ========================================================= */
+
+.filters {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  margin-bottom: var(--space-4);
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.filters::-webkit-scrollbar {
+  display: none;
+}
+
+.filterButton {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.filterButtonActive {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+}
+
+/* =========================================================
+   달력
+   ========================================================= */
+
+.calendarCard {
+  overflow: hidden;
+  margin-bottom: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.weekdays {
+  display: grid;
+  grid-template-columns:
+    repeat(
+      7,
+      minmax(0, 1fr)
+    );
+  border-bottom:
+    1px solid
+    var(--color-border);
+  background:
+    var(--color-surface-soft);
+}
+
+.weekday {
+  padding: 10px 2px;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.weekday:first-child {
+  color: var(--color-error);
+}
+
+.weekday:last-child {
+  color: var(--color-primary);
+}
+
+.calendarGrid {
+  display: grid;
+  grid-template-columns:
+    repeat(
+      7,
+      minmax(0, 1fr)
+    );
+}
+
+.blankCell {
+  min-height: 88px;
+  border-right:
+    1px solid
+    var(--color-border);
+  border-bottom:
+    1px solid
+    var(--color-border);
+  background:
+    var(--color-surface-soft);
+}
+
+.dayCell {
+  position: relative;
+  min-width: 0;
+  min-height: 88px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 7px 5px;
+  border: 0;
+  border-right:
+    1px solid
+    var(--color-border);
+  border-bottom:
+    1px solid
+    var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dayCell:nth-child(7n) {
+  border-right: 0;
+}
+
+.dayCell:hover {
+  background:
+    var(--color-surface-soft);
+}
+
+.dayCellSelected {
+  box-shadow:
+    inset 0 0 0 2px
+    var(--color-primary);
+}
+
+.dayCellToday .dayNumber {
+  width: 25px;
+  height: 25px;
+  display: grid;
+  place-items: center;
+  margin: -2px 0 0 -2px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+}
+
+.dayNumberRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.dayNumber {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.transactionCount {
+  min-width: 17px;
+  height: 17px;
+  display: grid;
+  place-items: center;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--color-surface-soft);
+  color: var(--color-text-secondary);
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.dayStats {
+  display: grid;
+  gap: 2px;
+  margin-top: auto;
+  min-width: 0;
+}
+
+.dayIncome,
+.dayExpense,
+.dayTransfer {
+  display: block;
+  overflow: hidden;
+  font-size: 9px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dayIncome {
+  color: var(--color-primary);
+}
+
+.dayExpense {
+  color: var(--color-error);
+}
+
+.dayTransfer {
+  color: var(--color-text-secondary);
+}
+
+/* =========================================================
+   상태 메시지
+   ========================================================= */
+
+.loading,
+.error,
+.emptyState {
+  margin: 0;
+  padding: 22px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  font-size: 14px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.loading,
+.emptyState {
+  color: var(--color-text-secondary);
+}
+
+.error {
+  color: var(--color-error);
+}
+
+/* =========================================================
+   선택 날짜 상세
+   ========================================================= */
+
+.detailSection {
+  margin-top: var(--space-4);
+}
+
+.detailHeader {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.detailTitleGroup {
+  min-width: 0;
+}
+
+.detailEyebrow {
+  margin: 0 0 3px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.detailTitle {
+  margin: 0;
+  font-size: 19px;
+  line-height: 1.35;
+}
+
+.detailCount {
+  flex-shrink: 0;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.daySummary {
+  display: grid;
+  grid-template-columns:
+    repeat(
+      3,
+      minmax(0, 1fr)
+    );
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.daySummaryItem {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background:
+    var(--color-surface-soft);
+}
+
+.daySummaryLabel {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--color-text-secondary);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.daySummaryValue {
+  display: block;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* =========================================================
+   거래 목록
+   ========================================================= */
+
+.transactionList {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.transactionItem {
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.transactionTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.transactionMain {
+  min-width: 0;
+}
+
+.transactionTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.transactionType {
+  flex-shrink: 0;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background:
+    var(--color-surface-soft);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.transactionTypeExpense {
+  color: var(--color-error);
+}
+
+.transactionTypeIncome {
+  color: var(--color-primary);
+}
+
+.transactionTypeTransfer {
+  color: var(--color-text-secondary);
+}
+
+.transactionTitle {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.transactionAmount {
+  flex-shrink: 0;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.amountExpense {
+  color: var(--color-error);
+}
+
+.amountIncome {
+  color: var(--color-primary);
+}
+
+.amountTransfer {
+  color: var(--color-text-primary);
+}
+
+.transactionMeta {
+  margin: 7px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.transactionMemo {
+  margin: 7px 0 0;
+  padding-top: 7px;
+  border-top:
+    1px solid
+    var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.reversalLabel {
+  display: inline-block;
+  margin-left: 6px;
+  color: var(--color-text-secondary);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* =========================================================
+   모바일
+   ========================================================= */
+
+@media (max-width: 520px) {
+  .page {
+    padding:
+      20px
+      12px
+      106px;
+  }
+
+  .toolbar {
+    align-items: stretch;
+  }
+
+  .monthNavigator {
+    flex: 1;
+  }
+
+  .monthLabel {
+    flex: 1;
+    min-width: 0;
+    font-size: 17px;
+  }
+
+  .toolbarActions {
+    gap: 4px;
+  }
+
+  .iconButton,
+  .todayButton,
+  .refreshButton {
+    min-height: 44px;
+  }
+
+  .iconButton,
+  .refreshButton {
+    width: 44px;
+  }
+
+  .todayButton {
+    padding: 0 10px;
+  }
+
+  .refreshButton {
+    padding: 0;
+  }
+
+  .filterButton {
+    min-height: 44px;
+    padding: 0 16px;
+  }
+
+  .summaryGrid {
+    gap: 6px;
+  }
+
+  .summaryCard {
+    padding: 11px 8px;
+  }
+
+  .summaryLabel {
+    font-size: 10px;
+  }
+
+  .summaryValue {
+    font-size: 13px;
+  }
+
+  .blankCell,
+  .dayCell {
+    min-height: 78px;
+  }
+
+  .dayCell {
+    padding: 6px 4px;
+  }
+
+  .dayNumber {
+    font-size: 12px;
+  }
+
+  .transactionCount {
+    display: none;
+  }
+
+  .dayIncome,
+  .dayExpense {
+    display: block;
+    font-size: 9px;
+    line-height: 1.25;
+  }
+
+  .dayIncome {
+    margin-top: auto;
+  }
+
+  .dayTransfer {
+    display: none;
+  }
+
+  .detailHeader {
+    align-items: center;
+  }
+
+  .daySummary {
+    gap: 6px;
+  }
+
+  .daySummaryItem {
+    padding: 8px 6px;
+  }
+
+  .daySummaryValue {
+    font-size: 11px;
+  }
+}
+
+/* =========================================================
+   거래 수정 / 삭제
+   ========================================================= */
+
+.actionError,
+.actionFeedback {
+  margin:
+    0
+    0
+    var(--space-3);
+  padding: 11px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.actionError {
+  color: var(--color-error);
+}
+
+.actionFeedback {
+  color: var(--color-text-primary);
+}
+
+.transactionActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.editButton,
+.deleteButton,
+.editCloseButton,
+.editCancelButton,
+.editSaveButton,
+.undoButton {
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.editButton,
+.deleteButton,
+.editCancelButton {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.editButton,
+.editCancelButton {
+  color: var(--color-text-primary);
+}
+
+.deleteButton {
+  color: var(--color-error);
+}
+
+.editButton:disabled,
+.deleteButton:disabled,
+.editCloseButton:disabled,
+.editCancelButton:disabled,
+.editSaveButton:disabled,
+.undoButton:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.editPanel {
+  margin-top: 12px;
+  padding: 13px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+}
+
+.editHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: 12px;
+}
+
+.editEyebrow {
+  margin: 0 0 2px;
+  color: var(--color-text-secondary);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.editTitle {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.editCloseButton {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.editNotice {
+  margin:
+    0
+    0
+    12px;
+  padding: 10px 11px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.editGrid {
+  display: grid;
+  grid-template-columns:
+    repeat(
+      2,
+      minmax(0, 1fr)
+    );
+  gap: 10px;
+}
+
+.editField {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.editField input,
+.editField select,
+.editField textarea {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+
+.editField input:disabled,
+.editField select:disabled,
+.editField textarea:disabled {
+  opacity: 0.65;
+}
+
+.editField textarea {
+  min-height: 76px;
+  resize: vertical;
+}
+
+.editMemoField {
+  grid-column: 1 / -1;
+}
+
+.editActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.editSaveButton {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+}
+
+/* =========================================================
+   삭제 거래 목록 / 복원
+   ========================================================= */
+
+.deletedSection {
+  margin-top: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.deletedSummary {
+  min-height: 66px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 13px 15px;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  list-style: none;
+}
+
+.deletedSummary::-webkit-details-marker {
+  display: none;
+}
+
+.deletedSummary::after {
+  content: "⌄";
+  flex: 0 0 auto;
+  color: var(--color-text-secondary);
+  font-size: 16px;
+  line-height: 1;
+  transition: transform 0.15s ease;
+}
+
+.deletedSection[open]
+.deletedSummary::after {
+  transform: rotate(180deg);
+}
+
+.deletedSummaryText {
+  min-width: 0;
+  display: grid;
+  flex: 1;
+  gap: 3px;
+}
+
+.deletedSummaryText strong {
+  font-size: 14px;
+}
+
+.deletedSummaryText span {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.deletedCount {
+  flex: 0 0 auto;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.deletedBody {
+  padding: 0 14px 14px;
+}
+
+.deletedEmpty {
+  margin: 0;
+  padding: 17px 12px;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.55;
+  text-align: center;
+}
+
+.deletedList {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--color-border);
+  list-style: none;
+}
+
+.deletedItem {
+  padding: 13px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+}
+
+.deletedFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border);
+}
+
+.deletedAudit {
+  min-width: 0;
+  color: var(--color-text-secondary);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.restoreButton {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 0 13px;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.restoreButton:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* =========================================================
+   삭제 직후 실행 취소
+   ========================================================= */
+
+.undoBar {
+  position: fixed;
+  left: 50%;
+  bottom:
+    calc(
+      88px +
+      env(safe-area-inset-bottom)
+    );
+  z-index: 50;
+  width:
+    min(
+      calc(100% - 28px),
+      460px
+    );
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 13px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-card);
+  transform: translateX(-50%);
+}
+
+.undoText {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  font-size: 12px;
+}
+
+.undoText span {
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.undoButton {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+}
+
+@media (max-width: 520px) {
+  .transactionTop {
+    gap: 8px;
+  }
+
+  .editButton,
+  .deleteButton,
+  .editCancelButton,
+  .editSaveButton,
+  .restoreButton,
+  .undoButton {
+    min-height: 44px;
+    padding-right: 14px;
+    padding-left: 14px;
+  }
+
+  .editCloseButton {
+    width: 44px;
+    height: 44px;
+  }
+
+  .editGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .editMemoField {
+    grid-column: auto;
+  }
+
+  .editField input,
+  .editField select {
+    min-height: 48px;
+    font-size: 16px;
+  }
+
+  .editField textarea {
+    min-height: 88px;
+    font-size: 16px;
+  }
+
+  .deletedSummary {
+    padding: 12px;
+  }
+
+  .deletedBody {
+    padding: 0 10px 10px;
+  }
+
+  .deletedFooter {
+    align-items: flex-end;
+  }
+
+  .undoBar {
+    bottom:
+      calc(
+        82px +
+        env(safe-area-inset-bottom)
+      );
+  }
+}
+
+/* =========================================================
+   v2.2.15 A 콘셉트 / 좁은 화면 정리
+   ========================================================= */
+.header {
+  margin-bottom: 14px;
+}
+
+.eyebrow {
+  margin-bottom: 3px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.title {
+  font-size: 26px;
+  letter-spacing: -0.035em;
+}
+
+.description {
+  display: none;
+}
+
+.toolbar {
+  margin-bottom: 10px;
+}
+
+.monthNavigator {
+  border-color: var(--color-border);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.summaryGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  margin-bottom: 12px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.summaryCard {
+  min-width: 0;
+  padding: 13px 8px;
+  border: 0;
+  border-right: 1px solid rgba(220, 229, 229, 0.78);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  text-align: center;
+}
+
+.summaryCard:last-child {
+  border-right: 0;
+}
+
+.summaryLabel {
+  font-size: 11px;
+}
+
+.summaryValue {
+  display: block;
+  max-width: 100%;
+  margin-top: 3px;
+  overflow: hidden;
+  font-size: clamp(12px, 3.5vw, 15px);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.summaryIncome {
+  color: var(--color-income);
+}
+
+.summaryExpense,
+.summaryNegative {
+  color: var(--color-expense);
+}
+
+.filterButtonActive {
+  border-color: var(--color-primary);
+  background: var(--color-surface-blue);
+  color: var(--color-primary);
+}
+
+.calendarCard,
+.detailSection {
+  border-color: var(--color-border);
+  box-shadow: var(--shadow-card);
+}
+
+.detailHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.addTransactionButton {
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid rgba(71, 106, 132, 0.2);
+  border-radius: 999px;
+  background: var(--color-surface-blue);
+  color: var(--color-primary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+@media (max-width: 390px) {
+  .page {
+    padding-right: 14px;
+    padding-left: 14px;
+  }
+
+  .toolbar {
+    gap: 8px;
+  }
+
+  .todayButton {
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+
+  .summaryCard {
+    padding-right: 5px;
+    padding-left: 5px;
+  }
+
+  .summaryValue {
+    font-size: 12px;
+  }
+
+  .detailHeader {
+    gap: 8px;
+  }
+
+  .detailCount {
+    display: none;
+  }
+}
+
+.trashLauncher {
+  margin-top: 18px;
+}
+
+.trashButton {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.trashButton span {
+  font-weight: 800;
+}
+
+.trashButton small {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  text-align: right;
+}
+
+.trashBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 16px;
+  background: rgb(0 0 0 / 0.38);
+}
+
+.trashModal {
+  width: min(680px, 100%);
+  max-height: min(78vh, 760px);
+  overflow: auto;
+  border-radius: 20px 20px 16px 16px;
+  background: var(--color-surface);
+  box-shadow: 0 20px 60px rgb(0 0 0 / 0.2);
+  padding: 18px;
+}
+
+.trashHeader {
+  position: sticky;
+  top: -18px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: -18px -18px 14px;
+  padding: 18px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.trashHeader > div {
+  display: grid;
+  gap: 3px;
+}
+
+.trashHeader strong {
+  font-size: 17px;
+}
+
+.trashHeader span {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.trashHeader button {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--color-surface-soft);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+@media (min-width: 720px) {
+  .trashBackdrop {
+    align-items: center;
+  }
+
+  .trashModal {
+    border-radius: 20px;
+  }
+}
+
+@media (max-width: 640px) {
+  .dayIncome,
+  .dayExpense {
+    overflow: visible;
+    font-size: 8px;
+    letter-spacing: -0.35px;
+    text-overflow: clip;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+}
