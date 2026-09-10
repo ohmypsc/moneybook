@@ -18,6 +18,7 @@ import {
 } from "./api/client";
 
 import {
+  clearBootstrapMemoryCache,
   prefetchBootstrap
 } from "./api/bootstrapCache";
 
@@ -45,6 +46,10 @@ import {
   startPendingTransactionQueue,
   stopPendingTransactionQueue
 } from "./utils/pendingTransactionQueue";
+
+import {
+  startRealtimeSync
+} from "./utils/realtimeSync";
 
 import type {
   User
@@ -467,6 +472,13 @@ export default function App() {
     );
 
 
+  const [
+    remoteRevision,
+    setRemoteRevision
+  ] =
+    useState(0);
+
+
   useEffect(
     () => {
       if (
@@ -561,6 +573,31 @@ export default function App() {
           user.name
         );
       };
+    },
+    [
+      status,
+      user
+    ]
+  );
+
+
+  useEffect(
+    () => {
+      if (
+        status !== "authenticated" ||
+        !user
+      ) {
+        return;
+      }
+
+      return startRealtimeSync({
+        userName: user.name,
+        onRemoteChange: () => {
+          setRemoteRevision(
+            value => value + 1
+          );
+        }
+      });
     },
     [
       status,
@@ -799,6 +836,9 @@ export default function App() {
       showLaunchSplash();
 
 
+      clearBootstrapMemoryCache();
+
+
       await warmPrimaryData();
 
 
@@ -935,6 +975,8 @@ export default function App() {
     } finally {
       invalidateDashboardCache();
 
+      clearBootstrapMemoryCache();
+
       clearInvestmentPrefetchCache();
 
       clearManagedSettingsCache();
@@ -1029,7 +1071,9 @@ export default function App() {
     "home"
   ) {
     pageContent = (
-      <HomePage />
+      <HomePage
+        key={`home:${remoteRevision}`}
+      />
     );
 
   } else if (
@@ -1038,6 +1082,7 @@ export default function App() {
   ) {
     pageContent = (
       <HistoryPage
+        key={`history:${remoteRevision}`}
         onAddTransaction={
           date => {
             navigateTo(
@@ -1070,6 +1115,7 @@ export default function App() {
   ) {
     pageContent = (
       <AssetsPage
+        key={`assets:${remoteRevision}`}
         userName={
           user.name
         }
@@ -1078,7 +1124,9 @@ export default function App() {
 
   } else {
     pageContent = (
-      <SettingsPage />
+      <SettingsPage
+        key={`settings:${remoteRevision}`}
+      />
     );
   }
 
