@@ -3792,7 +3792,7 @@ function mbD1ValidateAutomationSettings(settings) {
     if (benefitAccounts.has(rule.accountId)) mbD1Fail("BENEFIT_ACCOUNT_DUPLICATE", "한 계좌에는 하나의 현재 혜택 규칙만 설정할 수 있습니다.");
     benefitAccounts.add(rule.accountId);
     if (rule.kind !== "none" && (!Number.isFinite(rule.ratePercent) || rule.ratePercent <= 0)) mbD1Fail("BENEFIT_RATE_REQUIRED", "혜택률은 0보다 커야 합니다.");
-    if (!Number.isFinite(rule.rewardOpeningBalance) || rule.rewardOpeningBalance < 0) mbD1Fail("BENEFIT_OPENING_BALANCE_INVALID", "현재 보유 캐시백은 0원 이상이어야 합니다.");
+    if (!Number.isFinite(rule.rewardOpeningBalance) || rule.rewardOpeningBalance < 0) mbD1Fail("BENEFIT_OPENING_BALANCE_INVALID", "시작 잔액 중 캐시백은 0원 이상이어야 합니다.");
     if (rule.validFrom && rule.validTo && rule.validFrom > rule.validTo) mbD1Fail("BENEFIT_DATE_RANGE_INVALID", "혜택 적용 시작일이 종료일보다 늦습니다.");
   }
 }
@@ -3946,7 +3946,7 @@ async function mbD1BenefitRewardBalance(env, rule, excludeTransactionId = "", ex
 
 async function mbD1BenefitRewardBalancesData(env) {
   const settings = await mbD1AutomationSettingsData(env);
-  const rules = settings.benefitRules.filter((rule) => rule.kind === "post_reward" && rule.accountId);
+  const rules = settings.benefitRules.filter((rule) => rule.accountId && (rule.kind === "post_reward" || rule.rewardOpeningBalance > 0));
   return Promise.all(
     rules.map(async (rule) => ({
       ruleId: rule.id,

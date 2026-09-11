@@ -32,6 +32,21 @@ import {
 } from "../../api/transactionMutations";
 
 import {
+    getAutomationSettings,
+    saveAutomationSettings
+} from "../../api/automation";
+
+import type {
+    AutomationSettings,
+    BenefitKind,
+    BenefitRule
+} from "../../api/automation";
+
+import {
+    clearBootstrapMemoryCache
+} from "../../api/bootstrapCache";
+
+import {
     clearLedgerStartDate,
     createManagedAccount,
     createManagedCategory,
@@ -224,6 +239,24 @@ interface AccountFormState {
         string;
 
     openingBalance:
+        string;
+
+    rewardOpeningBalance:
+        string;
+
+    benefitKind:
+        BenefitKind;
+
+    benefitRatePercent:
+        string;
+
+    benefitMonthlyCap:
+        string;
+
+    benefitValidFrom:
+        string;
+
+    benefitValidTo:
         string;
 
     billingCutoffDay:
@@ -689,6 +722,42 @@ function applyAccountKind(
         balanceMethod:
             kind.balanceMethod,
 
+        rewardOpeningBalance:
+            kind.subType ===
+                "선불/지역화폐"
+                ? current.rewardOpeningBalance
+                : "",
+
+        benefitKind:
+            kind.subType ===
+                "선불/지역화폐"
+                ? current.benefitKind
+                : "none",
+
+        benefitRatePercent:
+            kind.subType ===
+                "선불/지역화폐"
+                ? current.benefitRatePercent
+                : "",
+
+        benefitMonthlyCap:
+            kind.subType ===
+                "선불/지역화폐"
+                ? current.benefitMonthlyCap
+                : "",
+
+        benefitValidFrom:
+            kind.subType ===
+                "선불/지역화폐"
+                ? current.benefitValidFrom
+                : "",
+
+        benefitValidTo:
+            kind.subType ===
+                "선불/지역화폐"
+                ? current.benefitValidTo
+                : "",
+
         paymentAccountId:
             isCard
                 ? current.paymentAccountId
@@ -769,6 +838,24 @@ function createEmptyAccountForm(
         openingBalance:
             "",
 
+        rewardOpeningBalance:
+            "",
+
+        benefitKind:
+            "none",
+
+        benefitRatePercent:
+            "",
+
+        benefitMonthlyCap:
+            "",
+
+        benefitValidFrom:
+            "",
+
+        benefitValidTo:
+            "",
+
         billingCutoffDay:
             "",
 
@@ -792,7 +879,11 @@ function createEmptyAccountForm(
 
 function accountToForm(
     account:
-        ManagedAccount
+        ManagedAccount,
+
+    benefitRule:
+        BenefitRule |
+        null = null
 ): AccountFormState {
     const kind =
         getAccountKind(
@@ -820,6 +911,48 @@ function accountToForm(
                 account.openingBalance ??
                     0
             ),
+
+        rewardOpeningBalance:
+            Number(
+                benefitRule?.rewardOpeningBalance ||
+                0
+            ) > 0
+                ? String(
+                    benefitRule?.rewardOpeningBalance
+                )
+                : "",
+
+        benefitKind:
+            benefitRule?.kind ||
+            "none",
+
+        benefitRatePercent:
+            Number(
+                benefitRule?.ratePercent ||
+                0
+            ) > 0
+                ? String(
+                    benefitRule?.ratePercent
+                )
+                : "",
+
+        benefitMonthlyCap:
+            benefitRule?.monthlyCap ===
+                null ||
+            benefitRule?.monthlyCap ===
+                undefined
+                ? ""
+                : String(
+                    benefitRule.monthlyCap
+                ),
+
+        benefitValidFrom:
+            benefitRule?.validFrom ||
+            "",
+
+        benefitValidTo:
+            benefitRule?.validTo ||
+            "",
 
         billingCutoffDay:
             account.billingCutoffDay ===
@@ -861,6 +994,185 @@ function accountToForm(
         paymentAccountId:
             account.paymentAccountId ||
             ""
+    };
+}
+
+
+function getBenefitRuleForAccount(
+    settings:
+        AutomationSettings | null,
+
+    accountId:
+        string
+) {
+    if (
+        !settings
+    ) {
+        return null;
+    }
+
+    return (
+        settings.benefitRules.find(
+            rule =>
+                rule.accountId ===
+                    accountId
+        ) ||
+        null
+    );
+}
+
+
+function parseRewardOpeningBalance(
+    form:
+        AccountFormState,
+
+    openingBalance:
+        number
+) {
+    if (
+        form.subType !==
+            "선불/지역화폐"
+    ) {
+        return 0;
+    }
+
+    const rewardOpeningBalance =
+        Number(
+            form.rewardOpeningBalance ||
+                0
+        );
+
+    if (
+        !Number.isFinite(
+            rewardOpeningBalance
+        ) ||
+        rewardOpeningBalance < 0
+    ) {
+        throw new Error(
+            "시작 잔액 중 캐시백은 0원 이상으로 입력해주세요."
+        );
+    }
+
+    if (
+        rewardOpeningBalance >
+            Math.max(
+                0,
+                openingBalance
+            )
+    ) {
+        throw new Error(
+            "시작 잔액 중 캐시백은 시작 잔액보다 클 수 없습니다."
+        );
+    }
+
+    return rewardOpeningBalance;
+}
+
+
+function parseBenefitSettings(
+    form:
+        AccountFormState,
+
+    rewardOpeningBalance:
+        number
+) {
+    if (
+        form.subType !==
+            "선불/지역화폐"
+    ) {
+        return null;
+    }
+
+    if (
+        form.benefitKind ===
+            "none"
+    ) {
+        return {
+            enabled:
+                false,
+            kind:
+                "none" as BenefitKind,
+            ratePercent:
+                0,
+            monthlyCap:
+                null,
+            validFrom:
+                null,
+            validTo:
+                null,
+            rewardOpeningBalance
+        };
+    }
+
+    const ratePercent =
+        Number(
+            form.benefitRatePercent
+        );
+
+    if (
+        !Number.isFinite(
+            ratePercent
+        ) ||
+        ratePercent <= 0 ||
+        ratePercent > 100
+    ) {
+        throw new Error(
+            "혜택률은 0보다 크고 100 이하로 입력해주세요."
+        );
+    }
+
+    const monthlyCap =
+        form.benefitMonthlyCap.trim() ===
+            ""
+            ? null
+            : Number(
+                form.benefitMonthlyCap
+            );
+
+    if (
+        monthlyCap !==
+            null &&
+        (
+            !Number.isFinite(
+                monthlyCap
+            ) ||
+            monthlyCap < 0
+        )
+    ) {
+        throw new Error(
+            "월 최대 혜택은 0원 이상으로 입력해주세요."
+        );
+    }
+
+    const validFrom =
+        form.benefitValidFrom ||
+        null;
+
+    const validTo =
+        form.benefitValidTo ||
+        null;
+
+    if (
+        validFrom &&
+        validTo &&
+        validFrom >
+            validTo
+    ) {
+        throw new Error(
+            "혜택 적용 시작일은 종료일보다 늦을 수 없습니다."
+        );
+    }
+
+    return {
+        enabled:
+            true,
+        kind:
+            form.benefitKind,
+        ratePercent,
+        monthlyCap,
+        validFrom,
+        validTo,
+        rewardOpeningBalance
     };
 }
 
@@ -1403,10 +1715,10 @@ function SettingsHome(
                     "automation",
 
                 title:
-                    "자동화·혜택",
+                    "자동화",
 
                 description:
-                    "고정 거래와 지역화폐 적립·선할인"
+                    "고정 거래 자동 등록과 확인"
             },
 
             {
@@ -3230,6 +3542,17 @@ export function AccountSettings({
         );
 
     const [
+        automationSettings,
+        setAutomationSettings
+    ] =
+        useState<
+            AutomationSettings |
+            null
+        >(
+            null
+        );
+
+    const [
         form,
         setForm
     ] =
@@ -3372,17 +3695,27 @@ export function AccountSettings({
                 );
 
                 try {
-                    const result =
-                        await getManagedAccounts({
-                            includeDeleted:
-                                true
-                        });
+                    const [
+                        result,
+                        nextAutomationSettings
+                    ] =
+                        await Promise.all([
+                            getManagedAccounts({
+                                includeDeleted:
+                                    true
+                            }),
+                            getAutomationSettings()
+                        ]);
 
                     if (
                         active
                     ) {
                         setAccounts(
                             result.items
+                        );
+
+                        setAutomationSettings(
+                            nextAutomationSettings
                         );
                     }
                 } catch (
@@ -3481,7 +3814,8 @@ export function AccountSettings({
             }
 
             if (
-                !initialAccountId
+                !initialAccountId ||
+                !automationSettings
             ) {
                 return;
             }
@@ -3519,6 +3853,7 @@ export function AccountSettings({
         },
         [
             accounts,
+            automationSettings,
             createNew,
             embedded,
             initialAccountId,
@@ -3930,7 +4265,11 @@ export function AccountSettings({
 
         setForm(
             accountToForm(
-                account
+                account,
+                getBenefitRuleForAccount(
+                    automationSettings,
+                    account.accountId
+                )
             )
         );
 
@@ -3947,6 +4286,174 @@ export function AccountSettings({
         );
     }
 
+
+    useEffect(
+        () => {
+            if (
+                !automationSettings ||
+                !editingId ||
+                !showForm
+            ) {
+                return;
+            }
+
+            const account =
+                accounts.find(
+                    item =>
+                        item.accountId ===
+                            editingId
+                );
+
+            if (
+                !account ||
+                account.subType !==
+                    "선불/지역화폐"
+            ) {
+                return;
+            }
+
+            const rule =
+                getBenefitRuleForAccount(
+                    automationSettings,
+                    editingId
+                );
+
+            setForm(
+                current => ({
+                    ...current,
+                    rewardOpeningBalance:
+                        Number(
+                            rule?.rewardOpeningBalance ||
+                            0
+                        ) > 0
+                            ? String(
+                                rule?.rewardOpeningBalance
+                            )
+                            : "",
+                    benefitKind:
+                        rule?.kind ||
+                        "none",
+                    benefitRatePercent:
+                        Number(
+                            rule?.ratePercent ||
+                            0
+                        ) > 0
+                            ? String(
+                                rule?.ratePercent
+                            )
+                            : "",
+                    benefitMonthlyCap:
+                        rule?.monthlyCap ===
+                            null ||
+                        rule?.monthlyCap ===
+                            undefined
+                            ? ""
+                            : String(
+                                rule.monthlyCap
+                            ),
+                    benefitValidFrom:
+                        rule?.validFrom ||
+                        "",
+                    benefitValidTo:
+                        rule?.validTo ||
+                        ""
+                })
+            );
+        },
+        [
+            accounts,
+            automationSettings,
+            editingId,
+            showForm
+        ]
+    );
+
+
+    async function persistAccountBenefitSettings(
+        accountId:
+            string,
+
+        benefitSettings:
+            Omit<
+                BenefitRule,
+                "id" |
+                "accountId"
+            > |
+            null,
+
+        isPrepaid:
+            boolean
+    ) {
+        const latest =
+            await getAutomationSettings();
+
+        const existing =
+            latest.benefitRules.find(
+                rule =>
+                    rule.accountId ===
+                        accountId
+            ) ||
+            null;
+
+        const remainingRules =
+            latest.benefitRules.filter(
+                rule =>
+                    rule.accountId !==
+                        accountId
+            );
+
+        if (
+            !isPrepaid ||
+            !benefitSettings
+        ) {
+            if (
+                !existing
+            ) {
+                setAutomationSettings(
+                    latest
+                );
+                return;
+            }
+
+            const saved =
+                await saveAutomationSettings({
+                    ...latest,
+                    benefitRules:
+                        remainingRules
+                });
+
+            setAutomationSettings(
+                saved.settings
+            );
+
+            clearBootstrapMemoryCache();
+            return;
+        }
+
+        const nextRule:
+            BenefitRule = {
+                id:
+                    existing?.id ||
+                    `BEN_${accountId}`,
+                accountId,
+                ...benefitSettings
+            };
+
+        const saved =
+            await saveAutomationSettings({
+                ...latest,
+                benefitRules: [
+                    ...remainingRules,
+                    nextRule
+                ]
+            });
+
+        setAutomationSettings(
+            saved.settings
+        );
+
+        clearBootstrapMemoryCache();
+    }
 
     function closeForm() {
         if (
@@ -4041,10 +4548,37 @@ export function AccountSettings({
         let payload:
             SaveAccountInput;
 
+        let rewardOpeningBalance =
+            0;
+
+        let benefitSettings:
+            Omit<
+                BenefitRule,
+                "id" |
+                "accountId"
+            > |
+            null =
+                null;
+
         try {
             payload =
                 buildAccountPayload(
                     form
+                );
+
+            rewardOpeningBalance =
+                parseRewardOpeningBalance(
+                    form,
+                    Number(
+                        payload.openingBalance ||
+                            0
+                    )
+                );
+
+            benefitSettings =
+                parseBenefitSettings(
+                    form,
+                    rewardOpeningBalance
                 );
         } catch (
             validationError
@@ -4064,23 +4598,53 @@ export function AccountSettings({
                 ? await runMutation(
                     `save:${editingId}`,
 
-                    () =>
-                        updateManagedAccount({
+                    async () => {
+                        await updateManagedAccount({
                             accountId:
                                 editingId,
 
                             ...payload
-                        }),
+                        });
+
+                        await persistAccountBenefitSettings(
+                            editingId,
+                            benefitSettings,
+                            payload.subType ===
+                                "선불/지역화폐"
+                        );
+                    },
 
                     "자산 정보를 수정했습니다."
                 )
                 : await runMutation(
                     "create",
 
-                    () =>
-                        createManagedAccount(
-                            payload
-                        ),
+                    async () => {
+                        const created =
+                            await createManagedAccount(
+                                payload
+                            );
+
+                        const accountId =
+                            created.account?.accountId ||
+                            created.accountId ||
+                            "";
+
+                        if (
+                            !accountId
+                        ) {
+                            throw new Error(
+                                "새 자산의 식별값을 확인하지 못했습니다."
+                            );
+                        }
+
+                        await persistAccountBenefitSettings(
+                            accountId,
+                            benefitSettings,
+                            payload.subType ===
+                                "선불/지역화폐"
+                        );
+                    },
 
                     "새 항목을 추가했습니다."
                 );
@@ -4599,6 +5163,323 @@ export function AccountSettings({
                                                             }
                                                         />
                                                     </label>
+
+                                                    {
+                                                        form.subType ===
+                                                            "선불/지역화폐" && (
+                                                            <label
+                                                                className={`${styles.field} ${styles.fullField}`}
+                                                            >
+                                                                <span>
+                                                                    시작 잔액 중 캐시백
+                                                                </span>
+
+                                                                <input
+                                                                    type="number"
+                                                                    min={
+                                                                        0
+                                                                    }
+                                                                    inputMode="numeric"
+                                                                    value={
+                                                                        form.rewardOpeningBalance
+                                                                    }
+                                                                    disabled={
+                                                                        Boolean(
+                                                                            busyKey
+                                                                        ) ||
+                                                                        Boolean(
+                                                                            editingId &&
+                                                                            !automationSettings
+                                                                        )
+                                                                    }
+                                                                    placeholder={
+                                                                        editingId &&
+                                                                        !automationSettings
+                                                                            ? "캐시백 정보 불러오는 중"
+                                                                            : "0"
+                                                                    }
+                                                                    onChange={
+                                                                        event =>
+                                                                            updateForm(
+                                                                                "rewardOpeningBalance",
+                                                                                event.target.value
+                                                                            )
+                                                                    }
+                                                                />
+
+                                                                <small
+                                                                    className={
+                                                                        styles.fieldHelp
+                                                                    }
+                                                                >
+                                                                    가계부 추적을 시작한 시점의 잔액 중 캐시백 금액만 입력합니다. 시작 잔액에 추가로 더해지지 않습니다. 온누리처럼 캐시백이 없는 경우 0원으로 두세요.
+                                                                </small>
+                                                            </label>
+                                                        )
+                                                    }
+
+                                                    {
+                                                        form.subType ===
+                                                            "선불/지역화폐" && (
+                                                            <div
+                                                                className={`${styles.fullField} ${styles.automationBenefitCard}`}
+                                                            >
+                                                                <div
+                                                                    className={
+                                                                        styles.automationBenefitTitle
+                                                                    }
+                                                                >
+                                                                    <strong>
+                                                                        혜택 설정
+                                                                    </strong>
+
+                                                                    <span>
+                                                                        이 자산에서 함께 관리
+                                                                    </span>
+                                                                </div>
+
+                                                                <div
+                                                                    className={
+                                                                        styles.automationGrid
+                                                                    }
+                                                                >
+                                                                    <label
+                                                                        className={
+                                                                            styles.field
+                                                                        }
+                                                                    >
+                                                                        <span>
+                                                                            혜택 방식
+                                                                        </span>
+
+                                                                        <select
+                                                                            value={
+                                                                                form.benefitKind
+                                                                            }
+                                                                            disabled={
+                                                                                Boolean(
+                                                                                    busyKey
+                                                                                )
+                                                                            }
+                                                                            onChange={
+                                                                                event => {
+                                                                                    const kind =
+                                                                                        event.target.value as BenefitKind;
+
+                                                                                    setForm(
+                                                                                        current => ({
+                                                                                            ...current,
+                                                                                            benefitKind:
+                                                                                                kind,
+                                                                                            benefitRatePercent:
+                                                                                                kind ===
+                                                                                                    "none"
+                                                                                                    ? ""
+                                                                                                    : current.benefitRatePercent,
+                                                                                            benefitMonthlyCap:
+                                                                                                kind ===
+                                                                                                    "none"
+                                                                                                    ? ""
+                                                                                                    : current.benefitMonthlyCap,
+                                                                                            benefitValidFrom:
+                                                                                                kind ===
+                                                                                                    "none"
+                                                                                                    ? ""
+                                                                                                    : current.benefitValidFrom,
+                                                                                            benefitValidTo:
+                                                                                                kind ===
+                                                                                                    "none"
+                                                                                                    ? ""
+                                                                                                    : current.benefitValidTo
+                                                                                        })
+                                                                                    );
+                                                                                }
+                                                                            }
+                                                                        >
+                                                                            <option
+                                                                                value="none"
+                                                                            >
+                                                                                혜택 없음
+                                                                            </option>
+                                                                            <option
+                                                                                value="post_reward"
+                                                                            >
+                                                                                결제 후 즉시 캐시백
+                                                                            </option>
+                                                                            <option
+                                                                                value="pre_discount"
+                                                                            >
+                                                                                충전 시 선할인
+                                                                            </option>
+                                                                        </select>
+                                                                    </label>
+
+                                                                    <label
+                                                                        className={
+                                                                            styles.field
+                                                                        }
+                                                                    >
+                                                                        <span>
+                                                                            혜택률 (%)
+                                                                        </span>
+
+                                                                        <input
+                                                                            type="number"
+                                                                            min={
+                                                                                0
+                                                                            }
+                                                                            max={
+                                                                                100
+                                                                            }
+                                                                            step="0.1"
+                                                                            value={
+                                                                                form.benefitRatePercent
+                                                                            }
+                                                                            disabled={
+                                                                                Boolean(
+                                                                                    busyKey
+                                                                                ) ||
+                                                                                form.benefitKind ===
+                                                                                    "none"
+                                                                            }
+                                                                            placeholder="예: 10"
+                                                                            onChange={
+                                                                                event =>
+                                                                                    updateForm(
+                                                                                        "benefitRatePercent",
+                                                                                        event.target.value
+                                                                                    )
+                                                                            }
+                                                                        />
+                                                                    </label>
+
+                                                                    <label
+                                                                        className={
+                                                                            styles.field
+                                                                        }
+                                                                    >
+                                                                        <span>
+                                                                            월 최대 혜택
+                                                                        </span>
+
+                                                                        <input
+                                                                            type="number"
+                                                                            min={
+                                                                                0
+                                                                            }
+                                                                            inputMode="numeric"
+                                                                            value={
+                                                                                form.benefitMonthlyCap
+                                                                            }
+                                                                            disabled={
+                                                                                Boolean(
+                                                                                    busyKey
+                                                                                ) ||
+                                                                                form.benefitKind ===
+                                                                                    "none"
+                                                                            }
+                                                                            placeholder="제한 없으면 비움"
+                                                                            onChange={
+                                                                                event =>
+                                                                                    updateForm(
+                                                                                        "benefitMonthlyCap",
+                                                                                        event.target.value
+                                                                                    )
+                                                                            }
+                                                                        />
+                                                                    </label>
+
+                                                                    <label
+                                                                        className={
+                                                                            styles.field
+                                                                        }
+                                                                    >
+                                                                        <span>
+                                                                            적용 시작일
+                                                                        </span>
+
+                                                                        <input
+                                                                            type="date"
+                                                                            value={
+                                                                                form.benefitValidFrom
+                                                                            }
+                                                                            disabled={
+                                                                                Boolean(
+                                                                                    busyKey
+                                                                                ) ||
+                                                                                form.benefitKind ===
+                                                                                    "none"
+                                                                            }
+                                                                            onChange={
+                                                                                event =>
+                                                                                    updateForm(
+                                                                                        "benefitValidFrom",
+                                                                                        event.target.value
+                                                                                    )
+                                                                            }
+                                                                        />
+                                                                    </label>
+
+                                                                    <label
+                                                                        className={
+                                                                            styles.field
+                                                                        }
+                                                                    >
+                                                                        <span>
+                                                                            적용 종료일
+                                                                        </span>
+
+                                                                        <input
+                                                                            type="date"
+                                                                            value={
+                                                                                form.benefitValidTo
+                                                                            }
+                                                                            disabled={
+                                                                                Boolean(
+                                                                                    busyKey
+                                                                                ) ||
+                                                                                form.benefitKind ===
+                                                                                    "none"
+                                                                            }
+                                                                            onChange={
+                                                                                event =>
+                                                                                    updateForm(
+                                                                                        "benefitValidTo",
+                                                                                        event.target.value
+                                                                                    )
+                                                                            }
+                                                                        />
+                                                                    </label>
+                                                                </div>
+
+                                                                {
+                                                                    form.benefitKind ===
+                                                                        "post_reward" && (
+                                                                        <p
+                                                                            className={
+                                                                                styles.automationNote
+                                                                            }
+                                                                        >
+                                                                            결제 후 캐시백을 즉시 적립합니다. 결제에 사용한 기존 캐시백 금액에는 새 캐시백을 적립하지 않습니다.
+                                                                        </p>
+                                                                    )
+                                                                }
+
+                                                                {
+                                                                    form.benefitKind ===
+                                                                        "pre_discount" && (
+                                                                        <p
+                                                                            className={
+                                                                                styles.automationNote
+                                                                            }
+                                                                        >
+                                                                            지역화폐 충전 시 충전액은 전액 반영하고, 출금 계좌에서는 할인된 실제 결제액만 빠지도록 계산합니다.
+                                                                        </p>
+                                                                    )
+                                                                }
+                                                            </div>
+                                                        )
+                                                    }
 
                                                     {
                                                         isCard && (
@@ -6885,10 +7766,10 @@ export default function SettingsPage() {
 
         automation: {
             title:
-                "자동화·혜택",
+                "자동화",
 
             description:
-                "고정 거래 자동 등록과 지역화폐 혜택을 관리합니다."
+                "고정 거래의 자동 등록과 확인 방식을 관리합니다."
         },
 
         ledger: {

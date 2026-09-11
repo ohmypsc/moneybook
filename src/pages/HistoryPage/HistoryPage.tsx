@@ -31,6 +31,10 @@ import {
   getSeoulMonthString
 } from "../../utils/dateTime";
 
+import {
+  subscribeLedgerChanges
+} from "../../utils/ledgerEvents";
+
 import styles from "./HistoryPage.module.css";
 
 type HistoryView = "calendar" | "search" | "report";
@@ -117,6 +121,7 @@ export default function HistoryPage({
   const [snapshotSaving, setSnapshotSaving] = useState(false);
   const [snapshotError, setSnapshotError] = useState("");
   const [snapshotFeedback, setSnapshotFeedback] = useState("");
+  const [ledgerVersion, setLedgerVersion] = useState(0);
 
   async function runSearch(
     event?: FormEvent,
@@ -140,8 +145,13 @@ export default function HistoryPage({
         limit: 100
       });
 
-      setSearchItems(response.data.items || []);
-      setSearchTotal(response.data.total || 0);
+      const activeItems = (response.data.items || []).filter(
+        transaction => !transaction.isDeleted
+      );
+      const hiddenDeletedCount = (response.data.items || []).length - activeItems.length;
+
+      setSearchItems(activeItems);
+      setSearchTotal(Math.max(0, (response.data.total || 0) - hiddenDeletedCount));
     } catch (error) {
       setSearchError(
         error instanceof Error ? error.message : "내역을 검색하지 못했습니다."
@@ -217,10 +227,16 @@ export default function HistoryPage({
   }
 
   useEffect(() => {
-    if (view === "search" && searchItems.length === 0 && !searchLoading) {
+    return subscribeLedgerChanges(() => {
+      setLedgerVersion(value => value + 1);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (view === "search") {
       void runSearch();
     }
-  }, [view]);
+  }, [view, ledgerVersion]);
 
   useEffect(() => {
     if (view === "report") {

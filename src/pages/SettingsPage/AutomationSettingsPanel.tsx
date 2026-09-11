@@ -12,8 +12,6 @@ import {
 } from "../../api/automation";
 import type {
   AutomationSettings,
-  BenefitKind,
-  BenefitRule,
   RecurringDueItem,
   RecurringMode,
   RecurringTransactionRule
@@ -107,12 +105,6 @@ function accountLabel(account: ManagedAccount) {
   return account.displayName || account.accountName || account.accountId;
 }
 
-function benefitKindLabel(kind: BenefitKind) {
-  if (kind === "post_reward") return "결제 후 즉시 적립";
-  if (kind === "pre_discount") return "충전 시 선할인";
-  return "혜택 없음";
-}
-
 function recurringTypeSummary(rule: RecurringTransactionRule) {
   if (rule.mode === "auto") return "자동 등록(앱 열 때)";
   return "확인 후 등록";
@@ -128,7 +120,6 @@ export default function AutomationSettingsPanel() {
   const [categories, setCategories] = useState<ManagedCategory[]>([]);
   const [dueItems, setDueItems] = useState<RecurringDueItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [savingBenefits, setSavingBenefits] = useState(false);
   const [savingRecurring, setSavingRecurring] = useState(false);
   const [busyRuleId, setBusyRuleId] = useState("");
   const [error, setError] = useState("");
@@ -139,11 +130,6 @@ export default function AutomationSettingsPanel() {
   const activeAccounts = useMemo(
     () => accounts.filter(account => !account.isDeleted && account.active),
     [accounts]
-  );
-
-  const prepaidAccounts = useMemo(
-    () => activeAccounts.filter(account => account.subType === "선불/지역화폐"),
-    [activeAccounts]
   );
 
   const spendingTargets = useMemo(() => {
@@ -211,55 +197,6 @@ export default function AutomationSettingsPanel() {
       active = false;
     };
   }, []);
-
-  function getBenefitRule(accountId: string): BenefitRule {
-    return settings.benefitRules.find(rule => rule.accountId === accountId) || {
-      id: `BEN_${accountId}`,
-      accountId,
-      enabled: false,
-      kind: "none",
-      ratePercent: 0,
-      monthlyCap: null,
-      validFrom: null,
-      validTo: null,
-      rewardOpeningBalance: 0
-    };
-  }
-
-  function updateBenefitRule(accountId: string, patch: Partial<BenefitRule>) {
-    const current = getBenefitRule(accountId);
-    const next = {
-      ...current,
-      ...patch,
-      accountId
-    };
-    next.enabled = next.kind !== "none";
-    setSettings(previous => ({
-      ...previous,
-      benefitRules: [
-        ...previous.benefitRules.filter(rule => rule.accountId !== accountId),
-        next
-      ]
-    }));
-    setFeedback("");
-    setError("");
-  }
-
-  async function handleSaveBenefits() {
-    setSavingBenefits(true);
-    setError("");
-    setFeedback("");
-    try {
-      const result = await saveAutomationSettings(settings);
-      clearBootstrapMemoryCache();
-      setSettings(result.settings);
-      setFeedback("지역화폐 혜택 설정을 저장했습니다.");
-    } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "혜택 설정을 저장하지 못했습니다.");
-    } finally {
-      setSavingBenefits(false);
-    }
-  }
 
   function beginNewRecurring() {
     setRecurringForm(emptyRecurringForm());
@@ -682,131 +619,6 @@ export default function AutomationSettingsPanel() {
         )}
       </section>
 
-      <section className={styles.cardSection}>
-        <div className={styles.sectionHeading}>
-          <h2>지역화폐 혜택</h2>
-          <p>여민전처럼 결제 직후 적립되거나 온누리처럼 충전할 때 선할인되는 혜택을 자동 계산합니다.</p>
-        </div>
-
-        {prepaidAccounts.length === 0 ? (
-          <p className={styles.emptyState}>선불·지역화폐 계좌가 없습니다.</p>
-        ) : (
-          <div className={styles.automationBenefitList}>
-            {prepaidAccounts.map(account => {
-              const rule = getBenefitRule(account.accountId);
-              return (
-                <div key={account.accountId} className={styles.automationBenefitCard}>
-                  <div className={styles.automationBenefitTitle}>
-                    <strong>{accountLabel(account)}</strong>
-                    <span>{benefitKindLabel(rule.kind)}</span>
-                  </div>
-
-                  <div className={styles.automationGrid}>
-                    <label className={styles.field}>
-                      <span>혜택 방식</span>
-                      <select
-                        value={rule.kind}
-                        onChange={event => updateBenefitRule(account.accountId, { kind: event.target.value as BenefitKind })}
-                      >
-                        <option value="none">혜택 없음</option>
-                        <option value="post_reward">결제 후 즉시 적립</option>
-                        <option value="pre_discount">충전 시 선할인</option>
-                      </select>
-                    </label>
-
-                    <label className={styles.field}>
-                      <span>혜택률 (%)</span>
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.1"
-                        disabled={rule.kind === "none"}
-                        value={rule.ratePercent || ""}
-                        onChange={event => updateBenefitRule(account.accountId, { ratePercent: Number(event.target.value) || 0 })}
-                      />
-                    </label>
-
-                    <label className={styles.field}>
-                      <span>월 최대 혜택</span>
-                      <input
-                        type="number"
-                        min="0"
-                        inputMode="numeric"
-                        disabled={rule.kind === "none"}
-                        placeholder="제한 없으면 비움"
-                        value={rule.monthlyCap ?? ""}
-                        onChange={event => updateBenefitRule(account.accountId, {
-                          monthlyCap: event.target.value === "" ? null : Math.max(0, Number(event.target.value) || 0)
-                        })}
-                      />
-                    </label>
-
-                    {rule.kind === "post_reward" && (
-                      <label className={styles.field}>
-                        <span>현재 잔액 중 캐시백</span>
-                        <input
-                          type="number"
-                          min="0"
-                          inputMode="numeric"
-                          value={rule.rewardOpeningBalance || ""}
-                          placeholder="예: 12500"
-                          onChange={event => updateBenefitRule(account.accountId, {
-                            rewardOpeningBalance: Math.max(0, Number(event.target.value) || 0)
-                          })}
-                        />
-                      </label>
-                    )}
-
-                    <label className={styles.field}>
-                      <span>적용 시작일</span>
-                      <input
-                        type="date"
-                        disabled={rule.kind === "none"}
-                        value={rule.validFrom || ""}
-                        onChange={event => updateBenefitRule(account.accountId, { validFrom: event.target.value || null })}
-                      />
-                    </label>
-
-                    <label className={styles.field}>
-                      <span>적용 종료일</span>
-                      <input
-                        type="date"
-                        disabled={rule.kind === "none"}
-                        value={rule.validTo || ""}
-                        onChange={event => updateBenefitRule(account.accountId, { validTo: event.target.value || null })}
-                      />
-                    </label>
-                  </div>
-
-                  {rule.kind === "post_reward" && (
-                    <p className={styles.automationNote}>
-                      여민전 앱에 표시된 전체 사용 가능 잔액 중 캐시백 금액만 입력하세요. 이 금액은 자산에 추가로 더해지지 않고 총잔액의 구성만 추적합니다. 이후 적립·사용액은 자동 반영되며, 결제에서 사용한 캐시백에는 새 캐시백이 붙지 않습니다.
-                    </p>
-                  )}
-
-                  {rule.kind === "pre_discount" && (
-                    <p className={styles.automationNote}>
-                      ‘지역화폐충전’ 이체에서 충전액 전체를 받는 계좌에 넣고, 보내는 계좌에서는 선할인을 뺀 실제 금액만 출금되도록 자동 기록합니다.
-                    </p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        <div className={styles.rowActions}>
-          <button
-            type="button"
-            className={styles.primaryButton}
-            disabled={savingBenefits}
-            onClick={() => void handleSaveBenefits()}
-          >
-            {savingBenefits ? "저장 중..." : "혜택 설정 저장"}
-          </button>
-        </div>
-      </section>
     </div>
   );
 }
