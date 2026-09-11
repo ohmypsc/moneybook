@@ -117,6 +117,21 @@ export interface CreateTransactionInput {
   billingMonth?:
     string;
 
+  groupId?:
+    string;
+
+  benefitRuleId?:
+    string;
+
+  benefitFaceAmount?:
+    number;
+
+  benefitRewardUsedAmount?:
+    number;
+
+  benefitAccrualEnabled?:
+    boolean;
+
   requestId?:
     string;
 }

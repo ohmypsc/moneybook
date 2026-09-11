@@ -7,6 +7,12 @@ import {
 } from "react";
 
 import { apiRequest } from "../../api/client";
+import { previewBenefit } from "../../api/automation";
+import type {
+  AutomationSettings,
+  BenefitPreview,
+  BenefitRule
+} from "../../api/automation";
 import {
   getBootstrapCacheGeneration,
   getCachedBootstrapPayload
@@ -60,6 +66,7 @@ interface BootstrapData {
   spendingTargets: string[];
   accounts: Account[];
   categories: Category[];
+  automationSettings?: AutomationSettings;
 }
 
 interface BootstrapResponse {
@@ -97,6 +104,7 @@ interface InputDraft {
   toAccountId: string;
   billingMonth: string;
   memo: string;
+  benefitRewardUsedAmount: string;
 }
 
 interface CardBillingInfo {
@@ -104,6 +112,7 @@ interface CardBillingInfo {
   payments: number;
   estimatedRemaining: number;
 }
+
 
 const CARD_PAYMENT_CATEGORY = "카드정기결제";
 const CARD_PREPAYMENT_CATEGORY = "카드선결제";
@@ -329,6 +338,25 @@ function isCardSettlementCategory(
   );
 }
 
+function isBenefitRuleActive(
+  rule: BenefitRule,
+  date: string
+) {
+  if (!rule.enabled || rule.kind === "none" || rule.ratePercent <= 0) {
+    return false;
+  }
+
+  if (rule.validFrom && date < rule.validFrom) {
+    return false;
+  }
+
+  if (rule.validTo && date > rule.validTo) {
+    return false;
+  }
+
+  return true;
+}
+
 function readInputDraft(
   userName: string
 ): InputDraft | null {
@@ -375,7 +403,11 @@ function readInputDraft(
         typeof value.toAccountId === "string" ? value.toAccountId : "",
       billingMonth:
         typeof value.billingMonth === "string" ? value.billingMonth : "",
-      memo: typeof value.memo === "string" ? value.memo : ""
+      memo: typeof value.memo === "string" ? value.memo : "",
+      benefitRewardUsedAmount:
+        typeof value.benefitRewardUsedAmount === "string"
+          ? value.benefitRewardUsedAmount
+          : ""
     };
   } catch {
     return null;
@@ -422,7 +454,8 @@ function saveInputDraft(
       draft.fromAccountId ||
       draft.toAccountId ||
       draft.description.trim() ||
-      draft.memo.trim()
+      draft.memo.trim() ||
+      draft.benefitRewardUsedAmount
     );
 
     if (!hasMeaningfulInput) {
@@ -612,6 +645,33 @@ export default function InputPage({
     setCardBillingError
   ] = useState("");
 
+  const [
+    benefitEnabled,
+    setBenefitEnabled
+  ] = useState(true);
+
+  const [
+    benefitRewardUsedAmount,
+    setBenefitRewardUsedAmount
+  ] = useState(
+    initialDraft?.benefitRewardUsedAmount || ""
+  );
+
+  const [
+    benefitPreview,
+    setBenefitPreview
+  ] = useState<BenefitPreview | null>(null);
+
+  const [
+    benefitPreviewLoading,
+    setBenefitPreviewLoading
+  ] = useState(false);
+
+  const [
+    benefitPreviewError,
+    setBenefitPreviewError
+  ] = useState("");
+
   const cardAmountEditedRef = useRef(false);
   const cardBillingRequestKeyRef = useRef("");
 
@@ -648,7 +708,8 @@ export default function InputPage({
           toAccountId,
           billingMonth,
           description,
-          memo
+          memo,
+          benefitRewardUsedAmount
         }
       );
     },
@@ -664,7 +725,8 @@ export default function InputPage({
       toAccountId,
       billingMonth,
       description,
-      memo
+      memo,
+      benefitRewardUsedAmount
     ]
   );
 
@@ -1057,6 +1119,47 @@ export default function InputPage({
       ]
     );
 
+  const automationSettings =
+    bootstrap?.automationSettings;
+
+  const isRegionalTopup =
+    mode === "transfer" &&
+    selectedCategory?.name === "지역화폐충전";
+
+  const benefitAccountId =
+    mode === "expense"
+      ? paymentMethodId
+      : isRegionalTopup
+        ? toAccountId
+        : "";
+
+  const selectedBenefitRule =
+    useMemo(
+      () => {
+        if (!benefitAccountId || !automationSettings) {
+          return null;
+        }
+
+        const expectedKind =
+          mode === "expense"
+            ? "post_reward"
+            : "pre_discount";
+
+        return automationSettings.benefitRules.find(
+          rule =>
+            rule.accountId === benefitAccountId &&
+            rule.kind === expectedKind &&
+            isBenefitRuleActive(rule, date)
+        ) ?? null;
+      },
+      [
+        automationSettings,
+        benefitAccountId,
+        mode,
+        date
+      ]
+    );
+
   const formattedAmount =
     amount
       ? Number(
@@ -1065,6 +1168,116 @@ export default function InputPage({
           "ko-KR"
         )
       : "";
+
+  useEffect(
+    () => {
+      setBenefitEnabled(true);
+      setBenefitPreview(null);
+      setBenefitPreviewError("");
+      if (!selectedBenefitRule || selectedBenefitRule.kind !== "post_reward") {
+        setBenefitRewardUsedAmount("");
+      }
+    },
+    [selectedBenefitRule?.id, selectedBenefitRule?.kind]
+  );
+
+  useEffect(
+    () => {
+      if (!selectedBenefitRule || !date) {
+        setBenefitPreview(null);
+        setBenefitPreviewLoading(false);
+        setBenefitPreviewError("");
+        return;
+      }
+
+      const numericAmount = Math.max(0, Number(amount) || 0);
+      const numericRewardUse = Math.max(0, Number(benefitRewardUsedAmount) || 0);
+      const isPostReward = selectedBenefitRule.kind === "post_reward";
+
+      if (
+        (!isPostReward && (!benefitEnabled || numericAmount <= 0 || !categoryId || !toAccountId)) ||
+        (isPostReward && !paymentMethodId)
+      ) {
+        setBenefitPreview(null);
+        setBenefitPreviewLoading(false);
+        setBenefitPreviewError("");
+        return;
+      }
+
+      let cancelled = false;
+      setBenefitPreviewLoading(true);
+      setBenefitPreviewError("");
+
+      const timer = window.setTimeout(
+        () => {
+          void previewBenefit({
+            date,
+            type: backendType,
+            amount: numericAmount,
+            categoryId,
+            benefitRuleId: selectedBenefitRule.id,
+            ...(isPostReward
+              ? {
+                  paymentMethodId,
+                  benefitRewardUsedAmount: numericRewardUse,
+                  benefitAccrualEnabled: benefitEnabled
+                }
+              : {
+                  toAccountId,
+                  benefitFaceAmount: numericAmount
+                })
+          })
+            .then(result => {
+              if (cancelled) return;
+              setBenefitPreview(result);
+              if (
+                isPostReward &&
+                result &&
+                result.rewardUsedAmount !== numericRewardUse
+              ) {
+                setBenefitRewardUsedAmount(
+                  result.rewardUsedAmount > 0
+                    ? String(Math.round(result.rewardUsedAmount))
+                    : ""
+                );
+              }
+            })
+            .catch(previewError => {
+              if (!cancelled) {
+                setBenefitPreview(null);
+                setBenefitPreviewError(
+                  previewError instanceof Error
+                    ? previewError.message
+                    : "혜택 금액을 계산하지 못했습니다."
+                );
+              }
+            })
+            .finally(() => {
+              if (!cancelled) {
+                setBenefitPreviewLoading(false);
+              }
+            });
+        },
+        180
+      );
+
+      return () => {
+        cancelled = true;
+        window.clearTimeout(timer);
+      };
+    },
+    [
+      selectedBenefitRule,
+      benefitEnabled,
+      benefitRewardUsedAmount,
+      amount,
+      date,
+      categoryId,
+      backendType,
+      paymentMethodId,
+      toAccountId
+    ]
+  );
 
   useEffect(() => {
     if (!isCardTransfer || !toAccountId || !billingMonth) {
@@ -1187,7 +1400,13 @@ export default function InputPage({
       payload.billingMonth ||
       (payload.date || today).slice(0, 7)
     );
+    setDescription(payload.description || "");
     setMemo(payload.memo || "");
+    setBenefitRewardUsedAmount(
+      payload.benefitRewardUsedAmount
+        ? String(payload.benefitRewardUsedAmount)
+        : ""
+    );
 
     const fingerprint = JSON.stringify({
       date: payload.date,
@@ -1212,7 +1431,10 @@ export default function InputPage({
           : undefined,
       billingMonth: payload.billingMonth || undefined,
       description: (payload.description || "").trim(),
-      memo: (payload.memo || "").trim()
+      memo: (payload.memo || "").trim(),
+      benefitRuleId: payload.benefitRuleId || undefined,
+      benefitRewardUsedAmount: payload.benefitRewardUsedAmount || undefined,
+      benefitAccrualEnabled: payload.benefitAccrualEnabled
     });
 
     requestMemory.current = {
@@ -1234,6 +1456,7 @@ export default function InputPage({
     setSpendingTarget("");
     setFromAccountId("");
     setToAccountId("");
+    setBenefitRewardUsedAmount("");
   }
 
   function handleModeChange(
@@ -1296,6 +1519,7 @@ export default function InputPage({
       cardAmountEditedRef.current = false;
       setCardBillingInfo(null);
       setCardBillingError("");
+      setBenefitRewardUsedAmount("");
     }
 
     requestMemory.current =
@@ -1330,6 +1554,22 @@ export default function InputPage({
     requestMemory.current =
       null;
 
+    clearFeedback();
+  }
+
+  function handleBenefitRewardUseChange(value: string) {
+    const digits = value.replace(/[^\d]/g, "");
+    const normalized = digits.replace(/^0+(?=\d)/, "");
+    const requested = Math.max(0, Number(normalized) || 0);
+    const amountLimit = Math.max(0, Number(amount) || 0);
+    const balanceLimit = benefitPreview?.rewardBalanceBefore ?? Number.POSITIVE_INFINITY;
+    const maxAllowed = Math.max(0, Math.floor(Math.min(amountLimit, balanceLimit)));
+    const nextValue = requested > maxAllowed
+      ? maxAllowed > 0 ? String(maxAllowed) : ""
+      : normalized;
+
+    setBenefitRewardUsedAmount(nextValue);
+    requestMemory.current = null;
     clearFeedback();
   }
 
@@ -1380,6 +1620,7 @@ export default function InputPage({
       cardAmountEditedRef.current = false;
       setCardBillingInfo(null);
       setCardBillingError("");
+      setBenefitRewardUsedAmount("");
     }
 
     requestMemory.current =
@@ -1548,6 +1789,7 @@ export default function InputPage({
       handleCategoryChange(value);
     } else if (kind === "paymentMethod") {
       setPaymentMethodId(value);
+      setBenefitRewardUsedAmount("");
       requestMemory.current = null;
       clearFeedback();
     } else if (kind === "spendingTarget") {
@@ -1639,6 +1881,23 @@ export default function InputPage({
       ) {
         return "지출대상을 선택해주세요.";
       }
+
+      if (selectedBenefitRule?.kind === "post_reward") {
+        const rewardUsed = Math.max(0, Number(benefitRewardUsedAmount) || 0);
+        if (rewardUsed > numericAmount) {
+          return "캐시백 사용액은 결제 금액보다 클 수 없습니다.";
+        }
+        if (rewardUsed > 0 && benefitPreviewLoading) {
+          return "사용 가능한 캐시백을 확인하는 중입니다. 잠시 후 다시 저장해주세요.";
+        }
+        if (
+          rewardUsed > 0 &&
+          benefitPreview &&
+          rewardUsed > benefitPreview.rewardBalanceBefore
+        ) {
+          return `사용 가능한 캐시백은 ${Math.round(benefitPreview.rewardBalanceBefore).toLocaleString("ko-KR")}원입니다.`;
+        }
+      }
     }
 
     if (
@@ -1707,70 +1966,85 @@ export default function InputPage({
     return null;
   }
 
+  function getEffectiveDescription() {
+    if (!isCardTransfer) {
+      return description.trim();
+    }
+
+    return [
+      selectedCard ? getAccountLabel(selectedCard) : "",
+      billingMonth,
+      cardTransferLabel
+    ]
+      .filter(Boolean)
+      .join(" " );
+  }
+
+  function getEffectiveMemo() {
+    return isCardTransfer ? "" : memo.trim();
+  }
+
+  function getBenefitPayloadFields() {
+    if (!selectedBenefitRule) {
+      return {};
+    }
+
+    if (selectedBenefitRule.kind === "pre_discount") {
+      return benefitEnabled
+        ? {
+            benefitRuleId: selectedBenefitRule.id,
+            benefitFaceAmount: Number(amount)
+          }
+        : {};
+    }
+
+    const rewardUsedAmount = Math.max(0, Number(benefitRewardUsedAmount) || 0);
+    if (!benefitEnabled && rewardUsedAmount <= 0) {
+      return {};
+    }
+
+    return {
+      benefitRuleId: selectedBenefitRule.id,
+      benefitRewardUsedAmount: rewardUsedAmount,
+      benefitAccrualEnabled: benefitEnabled
+    };
+  }
+
   function buildPayload(
     requestId: string
   ):
     CreateTransactionPayload {
     const base = {
       date,
-
-      type:
-        backendType,
-
+      type: backendType,
       categoryId,
-
-      amount:
-        Number(
-          amount
-        ),
-
-      description:
-        description.trim(),
-
-      memo:
-        memo.trim(),
-
+      amount: Number(amount),
+      description: getEffectiveDescription(),
+      memo: getEffectiveMemo(),
+      ...getBenefitPayloadFields(),
       requestId
     };
 
-    if (
-      mode ===
-      "expense"
-    ) {
+    if (mode === "expense") {
       return {
         ...base,
-
         paymentMethodId,
-
         spendingTarget
       };
     }
 
-    if (
-      mode ===
-      "income"
-    ) {
+    if (mode === "income") {
       return {
         ...base,
-
         toAccountId
       };
     }
 
     return {
       ...base,
-
       fromAccountId,
-
       toAccountId,
-
-      ...(
-        isCardTransfer
-          ? {
-              billingMonth
-            }
-          : {}
-      )
+      ...(isCardTransfer ? { billingMonth } : {})
     };
   }
 
@@ -1920,10 +2194,12 @@ export default function InputPage({
             : undefined,
 
         description:
-          description.trim(),
+          getEffectiveDescription(),
 
         memo:
-          memo.trim()
+          getEffectiveMemo(),
+
+        ...getBenefitPayloadFields()
       });
 
     let requestId:
@@ -2021,6 +2297,7 @@ export default function InputPage({
 
       setDescription("");
       setMemo("");
+      setBenefitRewardUsedAmount("");
       cardAmountEditedRef.current = false;
       setCardBillingInfo(null);
       setCardBillingError("");
@@ -2380,7 +2657,7 @@ export default function InputPage({
                   styles.fieldLabel
                 }
               >
-                금액{" "}
+                {isRegionalTopup ? "충전 금액" : "금액"}{" "}
 
                 <span
                   className={
@@ -2520,6 +2797,98 @@ export default function InputPage({
                     <span className={styles.pickerChevron} aria-hidden="true">⌄</span>
                   </button>
                 </label>
+
+                {selectedBenefitRule && selectedBenefitRule.kind === "post_reward" && (
+                  <div className={styles.benefitBox}>
+                    <div className={styles.benefitHeader}>
+                      <div>
+                        <strong>{getAccountValueLabel(selectedBenefitRule.accountId)} 캐시백</strong>
+                        <span>{selectedBenefitRule.ratePercent}% 적립</span>
+                      </div>
+                      <label className={styles.benefitToggle}>
+                        <input
+                          type="checkbox"
+                          checked={benefitEnabled}
+                          disabled={submitting}
+                          onChange={event => {
+                            setBenefitEnabled(event.target.checked);
+                            requestMemory.current = null;
+                            clearFeedback();
+                          }}
+                        />
+                        새 적립
+                      </label>
+                    </div>
+
+                    {benefitPreviewLoading && !benefitPreview && (
+                      <p className={styles.benefitMuted}>보유 캐시백을 확인하는 중입니다.</p>
+                    )}
+
+                    {benefitPreview && (
+                      <>
+                        <div className={styles.benefitRewardBalance}>
+                          <span>보유 캐시백</span>
+                          <strong>{Math.round(benefitPreview.rewardBalanceBefore).toLocaleString("ko-KR")}원</strong>
+                        </div>
+
+                        <label className={styles.benefitRewardField}>
+                          <span>이번 결제에 사용할 캐시백</span>
+                          <div className={styles.benefitRewardInputRow}>
+                            <div className={styles.benefitRewardInputWrap}>
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                autoComplete="off"
+                                value={
+                                  benefitRewardUsedAmount
+                                    ? Number(benefitRewardUsedAmount).toLocaleString("ko-KR")
+                                    : ""
+                                }
+                                placeholder="0"
+                                disabled={submitting || benefitPreview.maxRewardUsable <= 0}
+                                onChange={event => handleBenefitRewardUseChange(event.target.value)}
+                              />
+                              <span>원</span>
+                            </div>
+                            <button
+                              type="button"
+                              className={styles.benefitRewardAllButton}
+                              disabled={submitting || benefitPreview.maxRewardUsable <= 0}
+                              onClick={() =>
+                                handleBenefitRewardUseChange(
+                                  String(Math.floor(benefitPreview.maxRewardUsable))
+                                )
+                              }
+                            >
+                              전액 사용
+                            </button>
+                          </div>
+                        </label>
+
+                        {Number(amount) > 0 && (
+                          <div className={styles.benefitSummary}>
+                            <span>결제 금액 {Math.round(benefitPreview.faceAmount).toLocaleString("ko-KR")}원</span>
+                            <span>캐시백 사용 -{Math.round(benefitPreview.rewardUsedAmount).toLocaleString("ko-KR")}원</span>
+                            <span>새 적립 대상 {Math.round(benefitPreview.eligibleAmount).toLocaleString("ko-KR")}원</span>
+                            <strong>새 캐시백 +{Math.round(benefitPreview.benefitAmount).toLocaleString("ko-KR")}원</strong>
+                            <span>거래 후 예상 캐시백 {Math.round(benefitPreview.rewardBalanceAfter).toLocaleString("ko-KR")}원</span>
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {benefitPreviewError && (
+                      <p className={styles.cardBillingError}>{benefitPreviewError}</p>
+                    )}
+
+                    <p className={styles.benefitMuted}>
+                      사용한 캐시백 금액에는 새 캐시백이 붙지 않고, 나머지 결제금액에만 설정한 비율을 적용합니다. 새로 적립된 캐시백은 즉시 보유액에 더해지며 나중에 사용해도 됩니다.
+                      {selectedBenefitRule.monthlyCap !== null
+                        ? ` 월 혜택 한도 ${Math.round(selectedBenefitRule.monthlyCap).toLocaleString("ko-KR")}원도 자동 반영합니다.`
+                        : ""}
+                    </p>
+                  </div>
+                )}
               </div>
             )
           }
@@ -2668,6 +3037,53 @@ export default function InputPage({
                     </button>
                   </label>
                 </div>
+
+                {selectedBenefitRule && selectedBenefitRule.kind === "pre_discount" && (
+                  <div className={styles.benefitBox}>
+                    <div className={styles.benefitHeader}>
+                      <div>
+                        <strong>{getAccountValueLabel(selectedBenefitRule.accountId)} 선할인</strong>
+                        <span>{selectedBenefitRule.ratePercent}% 혜택</span>
+                      </div>
+                      <label className={styles.benefitToggle}>
+                        <input
+                          type="checkbox"
+                          checked={benefitEnabled}
+                          disabled={submitting}
+                          onChange={event => setBenefitEnabled(event.target.checked)}
+                        />
+                        적용
+                      </label>
+                    </div>
+
+                    {benefitEnabled && benefitPreviewLoading && (
+                      <p className={styles.benefitMuted}>선할인 금액을 계산하는 중입니다.</p>
+                    )}
+
+                    {benefitEnabled && benefitPreview && (
+                      <div className={styles.benefitSummary}>
+                        <span>충전 금액 {Math.round(benefitPreview.faceAmount).toLocaleString("ko-KR")}원</span>
+                        <strong>선할인 -{Math.round(benefitPreview.benefitAmount).toLocaleString("ko-KR")}원</strong>
+                        <span>실제 출금 {Math.round(benefitPreview.actualAmount).toLocaleString("ko-KR")}원</span>
+                      </div>
+                    )}
+
+                    {benefitEnabled && !benefitPreviewLoading && !benefitPreview && !benefitPreviewError && Number(amount) > 0 && (
+                      <p className={styles.benefitMuted}>현재 월 한도까지 반영하면 이번 충전에 적용할 추가 선할인이 없습니다.</p>
+                    )}
+
+                    {benefitPreviewError && (
+                      <p className={styles.cardBillingError}>{benefitPreviewError}</p>
+                    )}
+
+                    <p className={styles.benefitMuted}>
+                      받는 계좌에는 입력한 충전 금액 전체가 들어가고, 보내는 계좌에서는 선할인을 뺀 실제 금액만 출금되도록 자동 기록합니다.
+                      {selectedBenefitRule.monthlyCap !== null
+                        ? ` 월 혜택 한도 ${Math.round(selectedBenefitRule.monthlyCap).toLocaleString("ko-KR")}원도 자동 반영합니다.`
+                        : ""}
+                    </p>
+                  </div>
+                )}
               </div>
             )
           }
@@ -2899,75 +3315,79 @@ export default function InputPage({
             )
           }
 
+          {!isCardTransfer && (
+            <>
           <label
-            className={
-              styles.field
-            }
-          >
-            <span
               className={
-                styles.fieldLabel
+                styles.field
               }
             >
-              내용
-            </span>
-
-            <input
-              className={styles.input}
-              type="text"
-              placeholder="예: 스타벅스, 주유, 급여"
-              value={description}
-              disabled={submitting}
-              onChange={event => {
-                setDescription(event.target.value);
-                requestMemory.current = null;
-                clearFeedback();
-              }}
-            />
-
-            <p className={styles.helper}>
-              내역에서 한눈에 알아볼 짧은 내용을 적어주세요. 비워도 됩니다.
-            </p>
-          </label>
-
-          <label
-            className={
-              styles.field
-            }
-          >
-            <span
-              className={
-                styles.fieldLabel
-              }
-            >
-              메모
-            </span>
-
-            <textarea
-              className={
-                styles.textarea
-              }
-              placeholder="추가로 남길 메모가 있다면 적어주세요."
-              value={
-                memo
-              }
-              disabled={
-                submitting
-              }
-              onChange={
-                event => {
-                  setMemo(
-                    event.target.value
-                  );
-
-                  requestMemory.current =
-                    null;
-
-                  clearFeedback();
+              <span
+                className={
+                  styles.fieldLabel
                 }
+              >
+                내용
+              </span>
+  
+              <input
+                className={styles.input}
+                type="text"
+                placeholder="예: 스타벅스, 주유, 급여"
+                value={description}
+                disabled={submitting}
+                onChange={event => {
+                  setDescription(event.target.value);
+                  requestMemory.current = null;
+                  clearFeedback();
+                }}
+              />
+  
+              <p className={styles.helper}>
+                내역에서 한눈에 알아볼 짧은 내용을 적어주세요. 비워도 됩니다.
+              </p>
+            </label>
+  
+            <label
+              className={
+                styles.field
               }
-            />
-          </label>
+            >
+              <span
+                className={
+                  styles.fieldLabel
+                }
+              >
+                메모
+              </span>
+  
+              <textarea
+                className={
+                  styles.textarea
+                }
+                placeholder="추가로 남길 메모가 있다면 적어주세요."
+                value={
+                  memo
+                }
+                disabled={
+                  submitting
+                }
+                onChange={
+                  event => {
+                    setMemo(
+                      event.target.value
+                    );
+  
+                    requestMemory.current =
+                      null;
+  
+                    clearFeedback();
+                  }
+                }
+              />
+            </label>
+            </>
+          )}
 
           {
             savingCount > 0 && (

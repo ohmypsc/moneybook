@@ -43,6 +43,10 @@ import {
 } from "./api/settingsManagement";
 
 import {
+  processRecurringTransactions
+} from "./api/automation";
+
+import {
   startPendingTransactionQueue,
   stopPendingTransactionQueue
 } from "./utils/pendingTransactionQueue";
@@ -50,6 +54,10 @@ import {
 import {
   startRealtimeSync
 } from "./utils/realtimeSync";
+
+import {
+  markLedgerChanged
+} from "./utils/ledgerEvents";
 
 import type {
   User
@@ -572,6 +580,41 @@ export default function App() {
         stopPendingTransactionQueue(
           user.name
         );
+      };
+    },
+    [
+      status,
+      user
+    ]
+  );
+
+
+  useEffect(
+    () => {
+      if (
+        status !== "authenticated" ||
+        !user
+      ) {
+        return;
+      }
+
+      let cancelled = false;
+
+      void processRecurringTransactions()
+        .then(result => {
+          if (cancelled || result.created.length === 0) {
+            return;
+          }
+
+          invalidateDashboardCache();
+          markLedgerChanged();
+          setRemoteRevision(value => value + 1);
+        })
+        .catch(() => {
+        });
+
+      return () => {
+        cancelled = true;
       };
     },
     [

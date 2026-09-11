@@ -81,6 +81,9 @@ import {
 import PwaInstallPrompt
     from "../../components/pwa/PwaInstallPrompt/PwaInstallPrompt";
 
+import AutomationSettingsPanel
+    from "./AutomationSettingsPanel";
+
 import styles
     from "./SettingsPage.module.css";
 
@@ -89,6 +92,7 @@ type SettingsView =
     | "home"
     | "categories"
     | "accounts"
+    | "automation"
     | "ledger"
     | "profile";
 
@@ -107,6 +111,7 @@ function isSettingsView(
         value === "home" ||
         value === "categories" ||
         value === "accounts" ||
+        value === "automation" ||
         value === "ledger" ||
         value === "profile"
     );
@@ -1391,6 +1396,17 @@ function SettingsHome(
 
                 description:
                     "카테고리 추가·수정과 입력 화면 순서"
+            },
+
+            {
+                key:
+                    "automation",
+
+                title:
+                    "자동화·혜택",
+
+                description:
+                    "고정 거래와 지역화폐 적립·선할인"
             },
 
             {
@@ -6867,6 +6883,14 @@ export default function SettingsPage() {
                 "자산을 관리하고 입력 화면 노출과 순서를 정합니다."
         },
 
+        automation: {
+            title:
+                "자동화·혜택",
+
+            description:
+                "고정 거래 자동 등록과 지역화폐 혜택을 관리합니다."
+        },
+
         ledger: {
             title:
                 "가계부 운영·데이터",
@@ -6937,6 +6961,13 @@ export default function SettingsPage() {
                                 view ===
                                     "accounts" && (
                                     <AccountSettings />
+                                )
+                            }
+
+                            {
+                                view ===
+                                    "automation" && (
+                                    <AutomationSettingsPanel />
                                 )
                             }
 

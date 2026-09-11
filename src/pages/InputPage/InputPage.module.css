@@ -1203,3 +1203,161 @@
   font-weight: 800;
   pointer-events: none;
 }
+
+.benefitBox {
+  display: grid;
+  gap: 10px;
+  margin-top: 2px;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+}
+
+.benefitHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.benefitHeader > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.benefitHeader strong {
+  color: var(--color-text-primary);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.benefitHeader span {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
+
+.benefitToggle {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-primary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.benefitToggle input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
+
+.benefitSummary {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.benefitSummary strong {
+  color: var(--color-primary);
+  font-size: 14px;
+}
+
+.benefitMuted {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.benefitRewardBalance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.benefitRewardBalance strong {
+  color: var(--color-text-primary);
+  font-size: 15px;
+}
+
+.benefitRewardField {
+  display: grid;
+  gap: 6px;
+  color: var(--color-text-primary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.benefitRewardInputRow {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.benefitRewardInputWrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.benefitRewardInputWrap input {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 38px 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: 14px;
+  text-align: right;
+}
+
+.benefitRewardInputWrap input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-surface-soft);
+}
+
+.benefitRewardInputWrap > span {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.benefitRewardAllButton {
+  flex: 0 0 auto;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.benefitRewardAllButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
