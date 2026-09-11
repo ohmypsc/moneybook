@@ -7,6 +7,14 @@
 
   "compatibility_date": "2026-08-10",
 
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "moneybook-prod",
+      "database_id": "4045ea6b-fc08-4f76-add7-b57bd245cfbc"
+    }
+  ],
+
   "assets": {
     "not_found_handling": "single-page-application",
 
