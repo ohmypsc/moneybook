@@ -1,5 +1,5 @@
 const CACHE_VERSION =
-  "v8.4-cashback-balance";
+  "v8.4.1-cashback-asset-breakdown";
 
 const STATIC_CACHE =
   `moneybook-static-${CACHE_VERSION}`;

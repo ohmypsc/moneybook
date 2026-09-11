@@ -3943,6 +3943,19 @@ async function mbD1BenefitRewardBalance(env, rule, excludeTransactionId = "", ex
   return Math.max(0, Math.floor(opening + earned - used + 1e-9));
 }
 
+
+async function mbD1BenefitRewardBalancesData(env) {
+  const settings = await mbD1AutomationSettingsData(env);
+  const rules = settings.benefitRules.filter((rule) => rule.kind === "post_reward" && rule.accountId);
+  return Promise.all(
+    rules.map(async (rule) => ({
+      ruleId: rule.id,
+      accountId: rule.accountId,
+      rewardBalance: await mbD1BenefitRewardBalance(env, rule)
+    }))
+  );
+}
+
 async function mbD1BenefitUsedThisMonth(env, rule, date, excludeRequestId = "") {
   if (rule.monthlyCap === null) return 0;
   const month = date.slice(0, 7);
@@ -5951,6 +5964,7 @@ async function mbD1ProductionRoute(request, url, session, env, ctx) {
     "/api/accounts",
     "/api/settings/ledger-config",
     "/api/settings/automation",
+    "/api/benefits/reward-balances",
     "/api/transactions",
     "/api/asset-snapshots",
     "/api/investments/accounts",
@@ -6007,6 +6021,7 @@ async function mbD1ProductionRoute(request, url, session, env, ctx) {
       if (path === "/api/accounts") return mbD1Envelope(await mbD1GetAccountsData(env, url));
       if (path === "/api/settings/ledger-config") return mbD1Envelope(await mbD1GetLedgerConfigData(env));
       if (path === "/api/settings/automation") return mbD1Envelope(await mbD1AutomationSettingsData(env));
+      if (path === "/api/benefits/reward-balances") return mbD1Envelope(await mbD1BenefitRewardBalancesData(env));
       if (path === "/api/transactions") return mbD1Envelope(await mbD1GetTransactionsData(env, url));
       if (path === "/api/asset-snapshots") return mbD1Envelope(await mbD1GetAssetSnapshotsData(env, url));
       if (path === "/api/investments/accounts") return mbD1Envelope(await mbD1GetInvestmentAccountsData(env));

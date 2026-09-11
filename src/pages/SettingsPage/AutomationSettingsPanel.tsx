@@ -744,7 +744,7 @@ export default function AutomationSettingsPanel() {
 
                     {rule.kind === "post_reward" && (
                       <label className={styles.field}>
-                        <span>추적 시작 캐시백</span>
+                        <span>현재 잔액 중 캐시백</span>
                         <input
                           type="number"
                           min="0"
@@ -781,7 +781,7 @@ export default function AutomationSettingsPanel() {
 
                   {rule.kind === "post_reward" && (
                     <p className={styles.automationNote}>
-                      처음 설정할 때 여민전 앱에 표시된 현재 캐시백을 ‘추적 시작 캐시백’에 한 번 입력하면 이후 적립·사용액을 자동 추적합니다. 결제에서 사용한 캐시백에는 새 캐시백이 붙지 않고 나머지 금액에만 혜택률을 적용합니다.
+                      여민전 앱에 표시된 전체 사용 가능 잔액 중 캐시백 금액만 입력하세요. 이 금액은 자산에 추가로 더해지지 않고 총잔액의 구성만 추적합니다. 이후 적립·사용액은 자동 반영되며, 결제에서 사용한 캐시백에는 새 캐시백이 붙지 않습니다.
                     </p>
                   )}
 

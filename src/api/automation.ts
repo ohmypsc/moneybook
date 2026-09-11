@@ -70,6 +70,13 @@ export interface SaveAutomationSettingsResult {
   updatedBy: string;
 }
 
+
+export interface BenefitRewardBalance {
+  ruleId: string;
+  accountId: string;
+  rewardBalance: number;
+}
+
 export interface BenefitPreview {
   kind: "post_reward" | "pre_discount";
   ratePercent: number;
@@ -116,6 +123,14 @@ export async function createRecurringTransaction(ruleId: string, month?: string)
     "/api/automations/recurring/create",
     { ruleId, month }
   );
+}
+
+
+export async function getBenefitRewardBalances() {
+  const raw = await apiRequest<ApiEnvelope<BenefitRewardBalance[]> | BenefitRewardBalance[]>(
+    "/api/benefits/reward-balances"
+  );
+  return unwrapEnvelope<BenefitRewardBalance[]>(raw);
 }
 
 export async function previewBenefit(input: {

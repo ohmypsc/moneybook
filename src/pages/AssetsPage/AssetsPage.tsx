@@ -11,6 +11,10 @@ import {
 } from "../../api/dashboard";
 
 import {
+  getBenefitRewardBalances
+} from "../../api/automation";
+
+import {
   setInvestmentCashBaseline,
   updateHoldingManualPrice
 } from "../../api/investments";
@@ -30,7 +34,8 @@ import {
 } from "../../api/settingsManagement";
 
 import {
-  markLedgerChanged
+  markLedgerChanged,
+  subscribeLedgerChanges
 } from "../../utils/ledgerEvents";
 
 import {
@@ -252,6 +257,13 @@ export default function AssetsPage({
     setError
   ] =
     useState("");
+
+
+  const [
+    rewardBalances,
+    setRewardBalances
+  ] =
+    useState<Record<string, number>>({});
 
   const [
     selectedAccountId,
@@ -487,16 +499,35 @@ export default function AssetsPage({
     );
 
     try {
-      const data =
-        await getDashboard(
-          undefined,
-          {
-            forceRefresh
-          }
-        );
+      const [data, benefitBalances] =
+        await Promise.all([
+          getDashboard(
+            undefined,
+            {
+              forceRefresh
+            }
+          ),
+          getBenefitRewardBalances().catch(
+            () => []
+          )
+        ]);
 
       setDashboard(
         data
+      );
+
+      setRewardBalances(
+        Object.fromEntries(
+          benefitBalances.map(
+            item => [
+              item.accountId,
+              Math.max(
+                0,
+                Number(item.rewardBalance || 0)
+              )
+            ]
+          )
+        )
       );
 
       markBackgroundRefreshed(
@@ -581,6 +612,19 @@ export default function AssetsPage({
     () => {
       void loadDashboard();
     },
+    []
+  );
+
+
+  useEffect(
+    () =>
+      subscribeLedgerChanges(
+        () => {
+          void loadDashboard(
+            true
+          );
+        }
+      ),
     []
   );
 
@@ -725,6 +769,18 @@ export default function AssetsPage({
         selectedCashAccountId
     ) ||
     null;
+
+
+  const selectedRewardBalance =
+    selectedCashAccount &&
+    Object.prototype.hasOwnProperty.call(
+      rewardBalances,
+      selectedCashAccount.accountId
+    )
+      ? rewardBalances[
+          selectedCashAccount.accountId
+        ]
+      : null;
 
 
   const investmentAccounts =
@@ -1377,7 +1433,15 @@ export default function AssetsPage({
                               >
                                 {[
                                   account.subType,
-                                  account.owner
+                                  account.owner,
+                                  Object.prototype.hasOwnProperty.call(
+                                    rewardBalances,
+                                    account.accountId
+                                  )
+                                    ? `캐시백 ${formatCurrency(
+                                        rewardBalances[account.accountId]
+                                      )} 포함`
+                                    : ""
                                 ]
                                   .filter(Boolean)
                                   .join(" · ")}
@@ -1467,13 +1531,40 @@ export default function AssetsPage({
                                   }
                                 >
                                   <div>
-                                    <span>계산 잔액</span>
+                                    <span>
+                                      {selectedRewardBalance !== null
+                                        ? "총 사용 가능 잔액"
+                                        : "계산 잔액"}
+                                    </span>
                                     <strong>
                                       {formatCurrency(
                                         selectedCashAccount.currentBalance
                                       )}
                                     </strong>
                                   </div>
+
+                                  {selectedRewardBalance !== null && (
+                                    <>
+                                      <div>
+                                        <span>그중 캐시백</span>
+                                        <strong>
+                                          {formatCurrency(
+                                            selectedRewardBalance
+                                          )}
+                                        </strong>
+                                      </div>
+                                      <div>
+                                        <span>일반 잔액</span>
+                                        <strong>
+                                          {formatCurrency(
+                                            selectedCashAccount.currentBalance -
+                                              selectedRewardBalance
+                                          )}
+                                        </strong>
+                                      </div>
+                                    </>
+                                  )}
+
                                   <div>
                                     <span>시작 잔액</span>
                                     <strong>
