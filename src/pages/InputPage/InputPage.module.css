@@ -443,6 +443,36 @@
    카드 결제 전용 안내
    ========================================================= */
 
+.cardKindTabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.cardKindButton {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.cardKindButtonActive {
+  border-color: var(--color-primary);
+  background: var(--color-surface-soft);
+  color: var(--color-primary);
+}
+
+.cardKindButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .cardPaymentNotice {
   display: flex;
   align-items: flex-start;
@@ -1128,4 +1158,48 @@
   margin: 8px 0 0;
   color: var(--color-error, #b3261e);
   font-size: 12px;
+}
+
+.cardAmountField {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+}
+
+.cardAmountWrap {
+  position: relative;
+}
+
+.cardAmountInput {
+  width: 100%;
+  min-height: 54px;
+  padding: 0 46px 0 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  font: inherit;
+  font-size: 26px;
+  font-weight: 800;
+  text-align: right;
+  outline: none;
+}
+
+.cardAmountInput:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-surface-soft);
+}
+
+.cardAmountCurrency {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  transform: translateY(-50%);
+  color: var(--color-primary);
+  font-size: 14px;
+  font-weight: 800;
+  pointer-events: none;
 }

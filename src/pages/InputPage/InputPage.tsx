@@ -1336,6 +1336,14 @@ export default function InputPage({
   function handleCategoryChange(
     nextCategoryId: string
   ) {
+    if (
+      nextCategoryId ===
+      categoryId
+    ) {
+      clearFeedback();
+      return;
+    }
+
     setCategoryId(
       nextCategoryId
     );
@@ -1346,6 +1354,7 @@ export default function InputPage({
     ) {
       setFromAccountId("");
       setToAccountId("");
+      setAmount("");
 
       const nextCategory =
         categories.find(
@@ -1366,10 +1375,11 @@ export default function InputPage({
             7
           )
         );
-        cardAmountEditedRef.current = false;
-        setCardBillingInfo(null);
-        setCardBillingError("");
       }
+
+      cardAmountEditedRef.current = false;
+      setCardBillingInfo(null);
+      setCardBillingError("");
     }
 
     requestMemory.current =
@@ -1427,7 +1437,21 @@ export default function InputPage({
     kind: PickerKind
   ): PickerItem[] {
     if (kind === "category") {
-      return categories.map(
+      const visibleCategories = mode === "transfer"
+        ? [
+            ...categories.filter(
+              category => category.name === CARD_PAYMENT_CATEGORY
+            ),
+            ...categories.filter(
+              category => category.name === CARD_PREPAYMENT_CATEGORY
+            ),
+            ...categories.filter(
+              category => !isCardSettlementCategory(category)
+            )
+          ]
+        : categories;
+
+      return visibleCategories.map(
         category => ({
           value: category.categoryId,
           label: getCategoryLabel(category),
@@ -1437,12 +1461,19 @@ export default function InputPage({
     }
 
     if (kind === "spendingTarget") {
-      return (bootstrap?.spendingTargets ?? []).map(
-        target => ({
-          value: target,
-          label: target
+      return (bootstrap?.spendingTargets ?? [])
+        .slice()
+        .sort((first, second) => {
+          if (first === "공동") return -1;
+          if (second === "공동") return 1;
+          return first.localeCompare(second, "ko");
         })
-      );
+        .map(
+          target => ({
+            value: target,
+            label: target
+          })
+        );
     }
 
     let source: Account[] = accounts;
@@ -1469,7 +1500,9 @@ export default function InputPage({
   ) {
     switch (kind) {
       case "category":
-        return "카테고리 선택";
+        return mode === "transfer"
+          ? "이체 분류 선택"
+          : "카테고리 선택";
       case "paymentMethod":
         return "결제수단 선택";
       case "spendingTarget":
@@ -1554,6 +1587,20 @@ export default function InputPage({
       !date
     ) {
       return "날짜를 선택해주세요.";
+    }
+
+    if (isCardTransfer) {
+      if (!toAccountId) {
+        return "결제할 카드를 선택해주세요.";
+      }
+
+      if (!fromAccountId) {
+        return "돈이 나갈 계좌를 선택해주세요.";
+      }
+
+      if (!billingMonth) {
+        return "대상 청구월을 선택해주세요.";
+      }
     }
 
     const numericAmount =
@@ -2107,36 +2154,27 @@ export default function InputPage({
             ([
               value,
               label
-            ]) => (
-              <button
-                type="button"
-                key={
-                  value
-                }
-                className={[
-                  styles.typeButton,
+            ]) => {
+              const active =
+                mode === value;
 
-                  mode ===
-                    value
-                    ? styles.typeButtonActive
-                    : ""
-                ].join(
-                  " "
-                )}
-                aria-pressed={
-                  mode ===
-                  value
-                }
-                onClick={
-                  () =>
-                    handleModeChange(
-                      value
-                    )
-                }
-              >
-                {label}
-              </button>
-            )
+              return (
+                <button
+                  type="button"
+                  key={value}
+                  className={[
+                    styles.typeButton,
+                    active
+                      ? styles.typeButtonActive
+                      : ""
+                  ].join(" ")}
+                  aria-pressed={active}
+                  onClick={() => handleModeChange(value)}
+                >
+                  {label}
+                </button>
+              );
+            }
           )
         }
       </div>
@@ -2154,63 +2192,105 @@ export default function InputPage({
             styles.card
           }
         >
-          <label
-            className={
-              styles.amountField
-            }
-          >
-            <span
+          {mode === "transfer" && (
+            <label
               className={
-                styles.fieldLabel
+                styles.field
               }
             >
-              금액{" "}
-
               <span
                 className={
-                  styles.required
+                  styles.fieldLabel
                 }
               >
-                *
-              </span>
-            </span>
+                이체 분류{" "}
 
-            <div
+                <span
+                  className={
+                    styles.required
+                  }
+                >
+                  *
+                </span>
+              </span>
+
+              <button
+                type="button"
+                className={styles.pickerButton}
+                disabled={submitting}
+                onClick={() => setActivePicker("category")}
+              >
+                <span className={categoryId ? styles.pickerValue : styles.pickerPlaceholder}>
+                  {getCategoryValueLabel()}
+                </span>
+                <span className={styles.pickerChevron} aria-hidden="true">⌄</span>
+              </button>
+
+              <p className={styles.helper}>
+                카드값 결제나 선결제를 선택하면 카드 결제용 입력 화면으로 바뀝니다.
+              </p>
+            </label>
+          )}
+
+          {mode !== "transfer" && (
+            <label
               className={
-                styles.amountWrap
+                styles.amountField
               }
             >
-              <input
-                type="text"
-                inputMode="numeric"
-                autoComplete="off"
-                className={
-                  styles.amountInput
-                }
-                placeholder="0"
-                value={
-                  formattedAmount
-                }
-                disabled={
-                  submitting
-                }
-                onChange={
-                  event =>
-                    handleAmountChange(
-                      event.target.value
-                    )
-                }
-              />
-
               <span
                 className={
-                  styles.currency
+                  styles.fieldLabel
                 }
               >
-                원
+                금액{" "}
+
+                <span
+                  className={
+                    styles.required
+                  }
+                >
+                  *
+                </span>
               </span>
-            </div>
-          </label>
+
+              <div
+                className={
+                  styles.amountWrap
+                }
+              >
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  className={
+                    styles.amountInput
+                  }
+                  placeholder="0"
+                  value={
+                    formattedAmount
+                  }
+                  disabled={
+                    submitting
+                  }
+                  onChange={
+                    event =>
+                      handleAmountChange(
+                        event.target.value
+                      )
+                  }
+                />
+
+                <span
+                  className={
+                    styles.currency
+                  }
+                >
+                  원
+                </span>
+              </div>
+            </label>
+          )}
 
           <label
             className={
@@ -2253,39 +2333,101 @@ export default function InputPage({
             />
           </label>
 
-          <label
-            className={
-              styles.field
-            }
-          >
-            <span
+          {mode !== "transfer" && (
+            <label
               className={
-                styles.fieldLabel
+                styles.field
               }
             >
-              카테고리{" "}
-
               <span
                 className={
-                  styles.required
+                  styles.fieldLabel
                 }
               >
-                *
-              </span>
-            </span>
+                카테고리{" "}
 
-            <button
-              type="button"
-              className={styles.pickerButton}
-              disabled={submitting}
-              onClick={() => setActivePicker("category")}
-            >
-              <span className={categoryId ? styles.pickerValue : styles.pickerPlaceholder}>
-                {getCategoryValueLabel()}
+                <span
+                  className={
+                    styles.required
+                  }
+                >
+                  *
+                </span>
               </span>
-              <span className={styles.pickerChevron} aria-hidden="true">⌄</span>
-            </button>
-          </label>
+
+              <button
+                type="button"
+                className={styles.pickerButton}
+                disabled={submitting}
+                onClick={() => setActivePicker("category")}
+              >
+                <span className={categoryId ? styles.pickerValue : styles.pickerPlaceholder}>
+                  {getCategoryValueLabel()}
+                </span>
+                <span className={styles.pickerChevron} aria-hidden="true">⌄</span>
+              </button>
+            </label>
+          )}
+
+          {mode === "transfer" && categoryId && !isCardTransfer && (
+            <label
+              className={
+                styles.amountField
+              }
+            >
+              <span
+                className={
+                  styles.fieldLabel
+                }
+              >
+                금액{" "}
+
+                <span
+                  className={
+                    styles.required
+                  }
+                >
+                  *
+                </span>
+              </span>
+
+              <div
+                className={
+                  styles.amountWrap
+                }
+              >
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  className={
+                    styles.amountInput
+                  }
+                  placeholder="0"
+                  value={
+                    formattedAmount
+                  }
+                  disabled={
+                    submitting
+                  }
+                  onChange={
+                    event =>
+                      handleAmountChange(
+                        event.target.value
+                      )
+                  }
+                />
+
+                <span
+                  className={
+                    styles.currency
+                  }
+                >
+                  원
+                </span>
+              </div>
+            </label>
+          )}
 
           {
             mode ===
@@ -2438,6 +2580,7 @@ export default function InputPage({
           {
             mode ===
               "transfer" &&
+            categoryId &&
             !isCardTransfer && (
               <div
                 className={
@@ -2616,53 +2759,6 @@ export default function InputPage({
                       styles.fieldLabel
                     }
                   >
-                    돈이 나갈 계좌{" "}
-
-                    <span
-                      className={
-                        styles.required
-                      }
-                    >
-                      *
-                    </span>
-                  </span>
-
-                  <button
-                    type="button"
-                    className={styles.pickerButton}
-                    disabled={submitting || !toAccountId}
-                    onClick={() => setActivePicker("cardSource")}
-                  >
-                    <span className={fromAccountId ? styles.pickerValue : styles.pickerPlaceholder}>
-                      {getAccountValueLabel(fromAccountId)}
-                    </span>
-                    <span className={styles.pickerChevron} aria-hidden="true">⌄</span>
-                  </button>
-
-                  {
-                    selectedCard
-                      ?.paymentAccountId && (
-                      <p
-                        className={
-                          styles.helper
-                        }
-                      >
-                        카드에 등록된 결제계좌를 자동으로 선택했습니다. 실제 출금계좌가 다르면 변경할 수 있습니다.
-                      </p>
-                    )
-                  }
-                </label>
-
-                <label
-                  className={
-                    styles.field
-                  }
-                >
-                  <span
-                    className={
-                      styles.fieldLabel
-                    }
-                  >
                     대상 청구월{" "}
 
                     <span
@@ -2721,7 +2817,7 @@ export default function InputPage({
                       <span>사용 {Math.round(cardBillingInfo.usage).toLocaleString("ko-KR")}원</span>
                       <span>기결제 {Math.round(cardBillingInfo.payments).toLocaleString("ko-KR")}원</span>
                       <strong>남은 결제액 {Math.round(cardBillingInfo.estimatedRemaining).toLocaleString("ko-KR")}원</strong>
-                      <small>위 남은 결제액을 금액 칸에 자동 입력했습니다. 금액은 직접 수정할 수 있습니다.</small>
+                      <small>남은 결제액을 아래 결제 금액에 자동 입력했습니다. 필요하면 직접 수정할 수 있습니다.</small>
                     </div>
                   )}
 
@@ -2729,6 +2825,76 @@ export default function InputPage({
                     <p className={styles.cardBillingError}>{cardBillingError}</p>
                   )}
                 </label>
+
+                <label className={styles.cardAmountField}>
+                  <span className={styles.fieldLabel}>
+                    결제 금액 <span className={styles.required}>*</span>
+                  </span>
+                  <div className={styles.cardAmountWrap}>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="off"
+                      className={styles.cardAmountInput}
+                      placeholder={cardBillingLoading ? "계산 중" : "0"}
+                      value={formattedAmount}
+                      disabled={submitting}
+                      onChange={event => handleAmountChange(event.target.value)}
+                    />
+                    <span className={styles.cardAmountCurrency}>원</span>
+                  </div>
+                  <p className={styles.helper}>
+                    자동 계산된 남은 카드값을 그대로 결제하거나 금액을 수정할 수 있습니다.
+                  </p>
+                </label>
+
+                <label
+                  className={
+                    styles.field
+                  }
+                >
+                  <span
+                    className={
+                      styles.fieldLabel
+                    }
+                  >
+                    돈이 나갈 계좌{" "}
+
+                    <span
+                      className={
+                        styles.required
+                      }
+                    >
+                      *
+                    </span>
+                  </span>
+
+                  <button
+                    type="button"
+                    className={styles.pickerButton}
+                    disabled={submitting || !toAccountId}
+                    onClick={() => setActivePicker("cardSource")}
+                  >
+                    <span className={fromAccountId ? styles.pickerValue : styles.pickerPlaceholder}>
+                      {getAccountValueLabel(fromAccountId)}
+                    </span>
+                    <span className={styles.pickerChevron} aria-hidden="true">⌄</span>
+                  </button>
+
+                  {
+                    selectedCard
+                      ?.paymentAccountId && (
+                      <p
+                        className={
+                          styles.helper
+                        }
+                      >
+                        카드에 등록된 결제계좌를 자동으로 선택했습니다. 실제 출금계좌가 다르면 변경할 수 있습니다.
+                      </p>
+                    )
+                  }
+                </label>
+
               </div>
             )
           }

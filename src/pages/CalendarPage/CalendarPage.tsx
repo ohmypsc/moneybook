@@ -42,6 +42,10 @@ import {
     getSeoulDateString
 } from "../../utils/dateTime";
 
+import {
+    subscribeLedgerChanges
+} from "../../utils/ledgerEvents";
+
 import styles
     from "./CalendarPage.module.css";
 
@@ -950,6 +954,25 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
         [
             month,
             reloadKey
+        ]
+    );
+
+    useEffect(
+        () => {
+            return subscribeLedgerChanges(
+                () => {
+                    setDeletedMonthTransactions([]);
+                    setDeletedLoaded(false);
+                    setDeletedError("");
+                    setReloadKey(
+                        value =>
+                            value + 1
+                    );
+                }
+            );
+        },
+        [
+            month
         ]
     );
 
@@ -3762,123 +3785,6 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
                             }
                         </section>
 
-                        <div className={styles.trashLauncher}>
-                            <button
-                                type="button"
-                                className={styles.trashButton}
-                                onClick={() => void openTrash()}
-                            >
-                                <span>최근 삭제한 내역</span>
-                                <small>실수로 삭제한 거래만 여기에서 복원합니다.</small>
-                            </button>
-                        </div>
-
-                        {trashOpen && (
-                            <div
-                                className={styles.trashBackdrop}
-                                role="presentation"
-                                onClick={() => setTrashOpen(false)}
-                            >
-                                <section
-                                    className={styles.trashModal}
-                                    role="dialog"
-                                    aria-modal="true"
-                                    aria-label="최근 삭제한 내역"
-                                    onClick={event => event.stopPropagation()}
-                                >
-                                    <div className={styles.trashHeader}>
-                                        <div>
-                                            <strong>최근 삭제한 내역</strong>
-                                            <span>{formatMonthLabel(month)} · 현재 유형 필터 기준</span>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            aria-label="닫기"
-                                            onClick={() => setTrashOpen(false)}
-                                        >
-                                            ×
-                                        </button>
-                                    </div>
-
-                                    {deletedLoading && (
-                                        <p className={styles.deletedEmpty}>삭제 거래를 불러오는 중입니다.</p>
-                                    )}
-
-                                    {!deletedLoading && deletedError && (
-                                        <p className={styles.error} role="alert">{deletedError}</p>
-                                    )}
-
-                                    {!deletedLoading && !deletedError && deletedLoaded && deletedTransactions.length === 0 && (
-                                        <p className={styles.deletedEmpty}>복원할 삭제 거래가 없습니다.</p>
-                                    )}
-
-                                    {!deletedLoading && !deletedError && deletedLoaded && deletedTransactions.length > 0 && (
-                                        <ul className={styles.deletedList}>
-                                            {deletedTransactions.map(transaction => {
-                                                const isRestoring = restoringId === transaction.transactionId;
-                                                return (
-                                                    <li key={transaction.transactionId} className={styles.deletedItem}>
-                                                        <div className={styles.transactionTop}>
-                                                            <div className={styles.transactionMain}>
-                                                                <div className={styles.transactionTitleRow}>
-                                                                    <span className={[
-                                                                        styles.transactionType,
-                                                                        transaction.type === "지출"
-                                                                            ? styles.transactionTypeExpense
-                                                                            : transaction.type === "수입"
-                                                                            ? styles.transactionTypeIncome
-                                                                            : styles.transactionTypeTransfer
-                                                                    ].join(" ")}>
-                                                                        {transaction.type}
-                                                                    </span>
-                                                                    <strong className={styles.transactionTitle}>
-                                                                        {getTransactionTitle(transaction)}
-                                                                    </strong>
-                                                                </div>
-                                                                <p className={styles.transactionMeta}>
-                                                                    {formatDateLabel(transaction.date)}
-                                                                    {" · "}
-                                                                    {getTransactionMetaLabel(transaction)}
-                                                                </p>
-                                                            </div>
-                                                            <strong className={[
-                                                                styles.transactionAmount,
-                                                                transaction.type === "지출"
-                                                                    ? styles.amountExpense
-                                                                    : transaction.type === "수입"
-                                                                    ? styles.amountIncome
-                                                                    : styles.amountTransfer
-                                                            ].join(" ")}>
-                                                                {getAmountText(transaction)}
-                                                            </strong>
-                                                        </div>
-
-                                                        {transaction.memo && (
-                                                            <p className={styles.transactionMemo}>{transaction.memo}</p>
-                                                        )}
-
-                                                        <div className={styles.deletedFooter}>
-                                                            <span className={styles.deletedAudit}>
-                                                                삭제 · {transaction.deletedBy ? `${transaction.deletedBy} · ` : ""}
-                                                                {formatDeletedAt(transaction.deletedAt)}
-                                                            </span>
-                                                            <button
-                                                                type="button"
-                                                                className={styles.restoreButton}
-                                                                disabled={Boolean(restoringId)}
-                                                                onClick={() => void handleRestoreDeleted(transaction)}
-                                                            >
-                                                                {isRestoring ? "복원 중..." : "복원"}
-                                                            </button>
-                                                        </div>
-                                                    </li>
-                                                );
-                                            })}
-                                        </ul>
-                                    )}
-                                </section>
-                            </div>
-                        )}
                     </>
                 )
             }

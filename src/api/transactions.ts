@@ -184,6 +184,8 @@ export interface GetTransactionsParams {
 
   q?: string;
 
+  includeDeleted?: boolean;
+
   limit?: number;
 
   offset?: number;
@@ -284,6 +286,14 @@ export async function getTransactions(
     searchParams.set(
       "q",
       params.q
+    );
+  }
+
+
+  if (params.includeDeleted) {
+    searchParams.set(
+      "includeDeleted",
+      "true"
     );
   }
 

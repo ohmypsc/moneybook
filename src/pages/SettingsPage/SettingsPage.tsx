@@ -28,6 +28,10 @@ import type {
 } from "../../api/transactions";
 
 import {
+    restoreTransaction
+} from "../../api/transactionMutations";
+
+import {
     clearLedgerStartDate,
     createManagedAccount,
     createManagedCategory,
@@ -1397,7 +1401,7 @@ function SettingsHome(
                     "가계부 운영·데이터",
 
                 description:
-                    "가계부 시작일, 전체 거래 내보내기, 새로고침"
+                    "가계부 시작일, 삭제 내역 복원, 내보내기"
             }
         ];
 
@@ -5660,6 +5664,30 @@ function LedgerDataSettings() {
     ] =
         useState("");
 
+    const [
+        deletedTransactions,
+        setDeletedTransactions
+    ] =
+        useState<Transaction[]>([]);
+
+    const [
+        trashLoaded,
+        setTrashLoaded
+    ] =
+        useState(false);
+
+    const [
+        trashLoading,
+        setTrashLoading
+    ] =
+        useState(false);
+
+    const [
+        restoringTransactionId,
+        setRestoringTransactionId
+    ] =
+        useState("");
+
 
     useEffect(
         () => {
@@ -5800,6 +5828,152 @@ function LedgerDataSettings() {
             setBusyKey(
                 ""
             );
+        }
+    }
+
+
+    async function loadDeletedTransactions(
+        force = false
+    ) {
+        if (
+            trashLoading ||
+            (trashLoaded && !force)
+        ) {
+            return;
+        }
+
+        setTrashLoading(true);
+        setError("");
+
+        try {
+            const items: Transaction[] = [];
+            let offset = 0;
+            const limit = 1000;
+            let total = 0;
+
+            do {
+                const response =
+                    await getTransactions({
+                        includeDeleted: true,
+                        limit,
+                        offset
+                    });
+
+                total =
+                    response.data.total;
+
+                items.push(
+                    ...response.data.items
+                );
+
+                offset +=
+                    response.data.items.length;
+
+                if (
+                    response.data.items.length === 0
+                ) {
+                    break;
+                }
+            } while (
+                offset < total
+            );
+
+            setDeletedTransactions(
+                items
+                    .filter(
+                        transaction =>
+                            transaction.isDeleted
+                    )
+                    .sort(
+                        (first, second) =>
+                            String(
+                                second.deletedAt ||
+                                second.updatedAt ||
+                                second.date
+                            ).localeCompare(
+                                String(
+                                    first.deletedAt ||
+                                    first.updatedAt ||
+                                    first.date
+                                )
+                            )
+                    )
+            );
+
+            setTrashLoaded(true);
+        } catch (
+            loadError
+        ) {
+            setError(
+                getErrorMessage(
+                    loadError,
+                    "삭제한 거래를 불러오지 못했습니다."
+                )
+            );
+        } finally {
+            setTrashLoading(false);
+        }
+    }
+
+
+    async function handleRestoreDeletedTransaction(
+        transaction: Transaction
+    ) {
+        if (
+            restoringTransactionId
+        ) {
+            return;
+        }
+
+        const title =
+            transaction.description ||
+            transaction.category ||
+            transaction.type;
+
+        if (
+            !window.confirm(
+                `${transaction.date} ${title} ${Math.round(transaction.amount).toLocaleString("ko-KR")}원 거래를 복원할까요?`
+            )
+        ) {
+            return;
+        }
+
+        setRestoringTransactionId(
+            transaction.transactionId
+        );
+        setError("");
+        setFeedback("");
+
+        try {
+            await restoreTransaction(
+                transaction.transactionId
+            );
+
+            setDeletedTransactions(
+                current =>
+                    current.filter(
+                        item =>
+                            item.transactionId !==
+                            transaction.transactionId
+                    )
+            );
+
+            setFeedback(
+                "삭제한 거래를 복원했습니다."
+            );
+
+            markLedgerChanged();
+        } catch (
+            restoreError
+        ) {
+            setError(
+                getErrorMessage(
+                    restoreError,
+                    "거래를 복원하지 못했습니다."
+                )
+            );
+        } finally {
+            setRestoringTransactionId("");
         }
     }
 
@@ -6126,6 +6300,172 @@ function LedgerDataSettings() {
                     styles.cardSection
                 }
             >
+                <div
+                    className={
+                        styles.sectionHeading
+                    }
+                >
+                    <h2>
+                        데이터 관리
+                    </h2>
+
+                    <p>
+                        삭제한 거래는 일반 내역에서 숨기고,
+                        필요할 때만 여기에서 확인하고 복원합니다.
+                    </p>
+                </div>
+
+                <details
+                    className={
+                        styles.deletedSection
+                    }
+                    onToggle={
+                        event => {
+                            if (
+                                event.currentTarget.open
+                            ) {
+                                void loadDeletedTransactions();
+                            }
+                        }
+                    }
+                >
+                    <summary>
+                        최근 삭제한 내역
+
+                        <span>
+                            {
+                                trashLoaded
+                                    ? deletedTransactions.length
+                                    : "…"
+                            }
+                        </span>
+                    </summary>
+
+                    {
+                        trashLoading && (
+                            <p
+                                className={
+                                    styles.state
+                                }
+                            >
+                                삭제한 거래를 불러오는 중입니다.
+                            </p>
+                        )
+                    }
+
+                    {
+                        !trashLoading &&
+                        trashLoaded &&
+                        deletedTransactions.length === 0 && (
+                            <p
+                                className={
+                                    styles.emptyState
+                                }
+                            >
+                                복원할 삭제 거래가 없습니다.
+                            </p>
+                        )
+                    }
+
+                    {
+                        !trashLoading &&
+                        deletedTransactions.length > 0 && (
+                            <ul
+                                className={
+                                    styles.itemList
+                                }
+                            >
+                                {
+                                    deletedTransactions.map(
+                                        transaction => {
+                                            const title =
+                                                transaction.description ||
+                                                transaction.category ||
+                                                transaction.type;
+
+                                            const prefix =
+                                                transaction.type === "수입"
+                                                    ? "+"
+                                                    : transaction.type === "지출"
+                                                        ? "-"
+                                                        : "";
+
+                                            const restoring =
+                                                restoringTransactionId ===
+                                                transaction.transactionId;
+
+                                            return (
+                                                <li
+                                                    key={
+                                                        transaction.transactionId
+                                                    }
+                                                    className={
+                                                        styles.deletedRow
+                                                    }
+                                                >
+                                                    <span
+                                                        className={
+                                                            styles.itemTextGroup
+                                                        }
+                                                    >
+                                                        <strong>
+                                                            {title}
+                                                        </strong>
+
+                                                        <span>
+                                                            {transaction.date}
+                                                            {" · "}
+                                                            {transaction.type}
+                                                            {" · "}
+                                                            {prefix}
+                                                            {Math.round(transaction.amount).toLocaleString("ko-KR")}원
+                                                            {
+                                                                transaction.deletedBy
+                                                                    ? ` · 삭제 ${transaction.deletedBy}`
+                                                                    : ""
+                                                            }
+                                                        </span>
+                                                    </span>
+
+                                                    <button
+                                                        type="button"
+                                                        className={
+                                                            styles.restoreButton
+                                                        }
+                                                        disabled={
+                                                            Boolean(
+                                                                restoringTransactionId
+                                                            )
+                                                        }
+                                                        onClick={
+                                                            () =>
+                                                                void handleRestoreDeletedTransaction(
+                                                                    transaction
+                                                                )
+                                                        }
+                                                    >
+                                                        {
+                                                            restoring
+                                                                ? "복원 중..."
+                                                                : "복원"
+                                                        }
+                                                    </button>
+                                                </li>
+                                            );
+                                        }
+                                    )
+                                }
+                            </ul>
+                        )
+                    }
+                </details>
+            </section>
+
+            <section
+                className={
+                    styles.cardSection
+                }
+            >
                 <button
                     type="button"
                     className={
@@ -6348,11 +6688,11 @@ function ProfileSettings() {
 
                     <div>
                         <dt>
-                            원본 데이터
+                            기본 저장소
                         </dt>
 
                         <dd>
-                            Google Sheets
+                            Cloudflare D1
                         </dd>
                     </div>
 
@@ -6532,7 +6872,7 @@ export default function SettingsPage() {
                 "가계부 운영·데이터",
 
             description:
-                "운영 기준과 데이터 내보내기를 관리합니다."
+                "운영 기준, 삭제 내역 복원, 데이터 내보내기를 관리합니다."
         },
 
         profile: {
