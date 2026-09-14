@@ -43,6 +43,10 @@ import {
 } from "./api/settingsManagement";
 
 import {
+  processRecurringTransactions
+} from "./api/automation";
+
+import {
   startPendingTransactionQueue,
   stopPendingTransactionQueue
 } from "./utils/pendingTransactionQueue";
@@ -50,6 +54,10 @@ import {
 import {
   startRealtimeSync
 } from "./utils/realtimeSync";
+
+import {
+  markLedgerChanged
+} from "./utils/ledgerEvents";
 
 import type {
   User
@@ -154,10 +162,19 @@ function saveLastAuthenticatedUser(
 }
 
 
+type InputLaunchPreset = {
+  mode: "expense" | "income" | "transfer";
+  fromAccountId?: string | null;
+  toAccountId?: string | null;
+  categoryId?: string | null;
+};
+
+
 type AppHistoryState = {
   moneybook?: boolean;
   navigation?: NavigationKey;
   inputInitialDate?: string | null;
+  inputPreset?: InputLaunchPreset | null;
   moneybookSettingsView?: string;
 };
 
@@ -186,7 +203,8 @@ function isPrimaryNavigation(
 
 function createHistoryState(
   navigation: NavigationKey,
-  inputInitialDate: string | null = null
+  inputInitialDate: string | null = null,
+  inputPreset: InputLaunchPreset | null = null
 ): AppHistoryState {
   return {
     moneybook: true,
@@ -194,6 +212,10 @@ function createHistoryState(
     inputInitialDate:
       navigation === "input"
         ? inputInitialDate
+        : null,
+    inputPreset:
+      navigation === "input"
+        ? inputPreset
         : null
   };
 }
@@ -473,6 +495,15 @@ export default function App() {
 
 
   const [
+    inputPreset,
+    setInputPreset
+  ] =
+    useState<InputLaunchPreset | null>(
+      null
+    );
+
+
+  const [
     remoteRevision,
     setRemoteRevision
   ] =
@@ -514,6 +545,12 @@ export default function App() {
         setInputInitialDate(
           nextNavigation === "input"
             ? state?.inputInitialDate ?? null
+            : null
+        );
+
+        setInputPreset(
+          nextNavigation === "input"
+            ? state?.inputPreset ?? null
             : null
         );
 
@@ -572,6 +609,41 @@ export default function App() {
         stopPendingTransactionQueue(
           user.name
         );
+      };
+    },
+    [
+      status,
+      user
+    ]
+  );
+
+
+  useEffect(
+    () => {
+      if (
+        status !== "authenticated" ||
+        !user
+      ) {
+        return;
+      }
+
+      let cancelled = false;
+
+      void processRecurringTransactions()
+        .then(result => {
+          if (cancelled || result.created.length === 0) {
+            return;
+          }
+
+          invalidateDashboardCache();
+          markLedgerChanged();
+          setRemoteRevision(value => value + 1);
+        })
+        .catch(() => {
+        });
+
+      return () => {
+        cancelled = true;
       };
     },
     [
@@ -892,15 +964,25 @@ export default function App() {
 
   function navigateTo(
     nextNavigation: NavigationKey,
-    nextInputDate: string | null = null
+    nextInputDate: string | null = null,
+    nextInputPreset: InputLaunchPreset | null = null
   ) {
     const normalizedInputDate =
       nextNavigation === "input"
         ? nextInputDate
         : null;
 
+    const normalizedInputPreset =
+      nextNavigation === "input"
+        ? nextInputPreset
+        : null;
+
     setInputInitialDate(
       normalizedInputDate
+    );
+
+    setInputPreset(
+      normalizedInputPreset
     );
 
     const currentState =
@@ -912,15 +994,20 @@ export default function App() {
       currentState.navigation === nextNavigation &&
       (
         nextNavigation !== "input" ||
-        (currentState.inputInitialDate ?? null) ===
-          normalizedInputDate
+        (
+          (currentState.inputInitialDate ?? null) ===
+            normalizedInputDate &&
+          JSON.stringify(currentState.inputPreset ?? null) ===
+            JSON.stringify(normalizedInputPreset)
+        )
       );
 
     if (!sameDestination) {
       window.history.pushState(
         createHistoryState(
           nextNavigation,
-          normalizedInputDate
+          normalizedInputDate,
+          normalizedInputPreset
         ),
         ""
       );
@@ -1106,6 +1193,18 @@ export default function App() {
         initialDate={
           inputInitialDate
         }
+        initialMode={
+          inputPreset?.mode ?? null
+        }
+        initialFromAccountId={
+          inputPreset?.fromAccountId ?? null
+        }
+        initialToAccountId={
+          inputPreset?.toAccountId ?? null
+        }
+        initialCategoryId={
+          inputPreset?.categoryId ?? null
+        }
       />
     );
 
@@ -1118,6 +1217,15 @@ export default function App() {
         key={`assets:${remoteRevision}`}
         userName={
           user.name
+        }
+        onOpenInput={
+          preset => {
+            navigateTo(
+              "input",
+              null,
+              preset
+            );
+          }
         }
       />
     );
