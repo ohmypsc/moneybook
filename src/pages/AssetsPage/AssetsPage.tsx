@@ -762,6 +762,14 @@ export default function AssetsPage({
     ) || [];
 
 
+  const liabilityAccounts =
+    dashboard?.accounts.filter(
+      account =>
+        account.accountType ===
+          "부채"
+    ) || [];
+
+
   const selectedCashAccount =
     cashLikeAccounts.find(
       account =>
@@ -840,6 +848,18 @@ export default function AssetsPage({
       });
   }, [investmentAccounts, ownerFilter, userName]);
 
+  const visibleLiabilityAccounts = useMemo(() => {
+    return liabilityAccounts
+      .filter(account => ownerFilter === "전체" || account.owner === ownerFilter)
+      .slice()
+      .sort((first, second) => {
+        if (first.owner === userName && second.owner !== userName) return -1;
+        if (second.owner === userName && first.owner !== userName) return 1;
+        const ownerCompare = (first.owner || "").localeCompare(second.owner || "", "ko-KR");
+        return ownerCompare || first.displayName.localeCompare(second.displayName, "ko-KR");
+      });
+  }, [liabilityAccounts, ownerFilter, userName]);
+
   const visibleCashTotal = visibleCashLikeAccounts.reduce(
     (sum, account) => sum + Number(account.currentBalance || 0),
     0
@@ -857,6 +877,12 @@ export default function AssetsPage({
 
   const visibleInvestmentRealizedPnlTotal = visibleInvestmentAccounts.reduce(
     (sum, account) => sum + Number(account.realizedPnlKrw || 0),
+    0
+  );
+
+  const visibleLiabilityTotal = visibleLiabilityAccounts.reduce(
+    (sum, account) =>
+      sum + Math.max(0, -Number(account.currentBalance || 0)),
     0
   );
 
@@ -1714,6 +1740,65 @@ export default function AssetsPage({
                   }
                 )}
               </ul>
+            )}
+
+          {!loading &&
+            visibleLiabilityAccounts.length > 0 && (
+              <>
+                <div
+                  className={styles.sectionHeading}
+                  style={{ marginTop: "var(--space-6)" }}
+                >
+                  <h2 className={styles.sectionTitle}>부채</h2>
+                  <span className={styles.sectionCount}>
+                    {visibleLiabilityAccounts.length}개
+                  </span>
+                </div>
+
+                <div className={styles.cashSummary}>
+                  <span className={styles.summaryLabel}>총 부채</span>
+                  <strong className={styles.summaryValue}>
+                    {formatCurrency(visibleLiabilityTotal)}
+                  </strong>
+                </div>
+
+                <ul className={styles.cashAccountList}>
+                  {visibleLiabilityAccounts.map(account => {
+                    const outstanding =
+                      Math.max(
+                        0,
+                        -Number(account.currentBalance || 0)
+                      );
+
+                    return (
+                      <li key={account.accountId}>
+                        <button
+                          type="button"
+                          className={styles.cashAccountRow}
+                          onClick={() =>
+                            setEditingAccountId(account.accountId)
+                          }
+                        >
+                          <div className={styles.cashAccountInfo}>
+                            <strong className={styles.cashAccountName}>
+                              {account.displayName}
+                            </strong>
+                            <span className={styles.cashAccountMeta}>
+                              {[account.subType, account.owner, "눌러서 편집"]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </span>
+                          </div>
+
+                          <strong className={styles.cashAccountValue}>
+                            {formatCurrency(outstanding)}
+                          </strong>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
             )}
         </section>
       )}
