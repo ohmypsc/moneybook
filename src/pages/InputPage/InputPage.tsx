@@ -216,6 +216,10 @@ function isLoanSourceAccount(account: Account) {
   );
 }
 
+function isTransferAssetAccount(account: Account) {
+  return account.accountType === "자산";
+}
+
 function prioritizeAccountsForUser(
   accounts: Account[],
   userName: string
@@ -857,6 +861,26 @@ export default function InputPage({
     setSuccess
   ] =
     useState("");
+
+  useEffect(
+    () => {
+      if (!success) {
+        return;
+      }
+
+      const timer = window.setTimeout(
+        () => {
+          setSuccess("");
+        },
+        3500
+      );
+
+      return () => {
+        window.clearTimeout(timer);
+      };
+    },
+    [success]
+  );
 
   useEffect(
     () => {
@@ -2042,6 +2066,16 @@ export default function InputPage({
     if (kind === "loanAccount") {
       return uniqueAccounts(
         orderedAllAccounts.filter(isLoanAccount)
+      );
+    }
+
+    if (
+      kind === "incomeAccount" ||
+      kind === "fromAccount" ||
+      kind === "toAccount"
+    ) {
+      return uniqueAccounts(
+        orderedAllAccounts.filter(isTransferAssetAccount)
       );
     }
 
