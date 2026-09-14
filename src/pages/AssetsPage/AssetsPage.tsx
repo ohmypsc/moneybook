@@ -221,18 +221,25 @@ export default function AssetsPage({
   function openInput(preset: AssetInputPreset) {
     if (onOpenInput) {
       onOpenInput(preset);
-      return;
     }
 
+    const currentState =
+      window.history.state || {};
+
     const nextState = {
-      ...(window.history.state || {}),
+      ...currentState,
       moneybook: true,
       navigation: "input",
       inputInitialDate: null,
       inputPreset: preset
     };
 
-    window.history.pushState(nextState, "");
+    if (currentState.navigation === "input") {
+      window.history.replaceState(nextState, "");
+    } else {
+      window.history.pushState(nextState, "");
+    }
+
     window.dispatchEvent(
       new PopStateEvent("popstate", { state: nextState })
     );
