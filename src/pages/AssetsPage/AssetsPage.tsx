@@ -212,11 +212,13 @@ interface AssetInputPreset {
 interface AssetsPageProps {
   userName: string;
   onOpenInput?: (preset: AssetInputPreset) => void;
+  refreshRevision?: number;
 }
 
 export default function AssetsPage({
   userName,
-  onOpenInput
+  onOpenInput,
+  refreshRevision = 0
 }: AssetsPageProps) {
   function openInput(preset: AssetInputPreset) {
     if (onOpenInput) {
@@ -649,6 +651,18 @@ export default function AssetsPage({
       void loadDashboard();
     },
     []
+  );
+
+
+  useEffect(
+    () => {
+      if (refreshRevision <= 0) {
+        return;
+      }
+
+      void loadDashboard(true);
+    },
+    [refreshRevision]
   );
 
 
