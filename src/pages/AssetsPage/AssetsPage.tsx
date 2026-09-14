@@ -57,7 +57,8 @@ import styles
 
 type AssetsTab =
   | "cash"
-  | "investment";
+  | "investment"
+  | "liability";
 
 
 function formatCurrency(
@@ -752,13 +753,22 @@ export default function AssetsPage({
     dashboard?.summary;
 
 
+  const investmentAccountIds =
+    new Set(
+      (dashboard?.investments.accounts || []).map(
+        account => account.accountId
+      )
+    );
+
+
   const cashLikeAccounts =
     dashboard?.accounts.filter(
       account =>
         account.accountType ===
           "자산" &&
-        account.balanceMethod !==
-          "평가입력"
+        !investmentAccountIds.has(
+          account.accountId
+        )
     ) || [];
 
 
@@ -882,7 +892,7 @@ export default function AssetsPage({
 
   const visibleLiabilityTotal = visibleLiabilityAccounts.reduce(
     (sum, account) =>
-      sum + Math.max(0, -Number(account.currentBalance || 0)),
+      sum + Math.abs(Number(account.currentBalance || 0)),
     0
   );
 
@@ -1244,6 +1254,9 @@ export default function AssetsPage({
         className={
           styles.tabs
         }
+        style={{
+          gridTemplateColumns: "repeat(3, minmax(0, 1fr))"
+        }}
       >
         <button
           type="button"
@@ -1298,6 +1311,34 @@ export default function AssetsPage({
           }
         >
           투자
+        </button>
+
+
+        <button
+          type="button"
+          className={[
+            styles.tabButton,
+
+            activeTab ===
+            "liability"
+              ? styles
+                  .tabButtonActive
+              : ""
+          ]
+            .filter(
+              Boolean
+            )
+            .join(
+              " "
+            )}
+          onClick={
+            () =>
+              setActiveTab(
+                "liability"
+              )
+          }
+        >
+          부채
         </button>
       </div>
 
@@ -1742,63 +1783,166 @@ export default function AssetsPage({
               </ul>
             )}
 
+        </section>
+      )}
+
+
+      {activeTab ===
+        "liability" && (
+        <section
+          className={
+            styles.section
+          }
+        >
+          <div
+            className={
+              styles.sectionHeading
+            }
+          >
+            <h2
+              className={
+                styles.sectionTitle
+              }
+            >
+              부채
+            </h2>
+
+            {!loading &&
+              visibleLiabilityAccounts.length > 0 && (
+                <span
+                  className={
+                    styles.sectionCount
+                  }
+                >
+                  {visibleLiabilityAccounts.length}개 계좌
+                </span>
+              )}
+          </div>
+
+          {!loading &&
+            summary && (
+              <div
+                className={
+                  styles.cashSummary
+                }
+              >
+                <span
+                  className={
+                    styles.summaryLabel
+                  }
+                >
+                  총 부채
+                </span>
+
+                <strong
+                  className={
+                    styles.summaryValue
+                  }
+                >
+                  {formatCurrency(
+                    visibleLiabilityTotal
+                  )}
+                </strong>
+              </div>
+            )}
+
+          {loading && (
+            <p
+              className={
+                styles.loading
+              }
+            >
+              부채계좌를 불러오는 중입니다.
+            </p>
+          )}
+
+          {!loading &&
+            visibleLiabilityAccounts.length === 0 && (
+              <p
+                className={
+                  styles.emptyState
+                }
+              >
+                등록된 부채계좌가 없습니다.
+              </p>
+            )}
+
           {!loading &&
             visibleLiabilityAccounts.length > 0 && (
-              <>
-                <div
-                  className={styles.sectionHeading}
-                  style={{ marginTop: "var(--space-6)" }}
-                >
-                  <h2 className={styles.sectionTitle}>부채</h2>
-                  <span className={styles.sectionCount}>
-                    {visibleLiabilityAccounts.length}개
-                  </span>
-                </div>
-
-                <div className={styles.cashSummary}>
-                  <span className={styles.summaryLabel}>총 부채</span>
-                  <strong className={styles.summaryValue}>
-                    {formatCurrency(visibleLiabilityTotal)}
-                  </strong>
-                </div>
-
-                <ul className={styles.cashAccountList}>
-                  {visibleLiabilityAccounts.map(account => {
+              <ul
+                className={
+                  styles.cashAccountList
+                }
+              >
+                {visibleLiabilityAccounts.map(
+                  account => {
                     const outstanding =
-                      Math.max(
-                        0,
-                        -Number(account.currentBalance || 0)
+                      Math.abs(
+                        Number(
+                          account.currentBalance || 0
+                        )
                       );
 
                     return (
-                      <li key={account.accountId}>
+                      <li
+                        key={
+                          account.accountId
+                        }
+                      >
                         <button
                           type="button"
-                          className={styles.cashAccountRow}
+                          className={
+                            styles.cashAccountRow
+                          }
                           onClick={() =>
-                            setEditingAccountId(account.accountId)
+                            setEditingAccountId(
+                              account.accountId
+                            )
                           }
                         >
-                          <div className={styles.cashAccountInfo}>
-                            <strong className={styles.cashAccountName}>
+                          <div
+                            className={
+                              styles.cashAccountInfo
+                            }
+                          >
+                            <strong
+                              className={
+                                styles.cashAccountName
+                              }
+                            >
                               {account.displayName}
                             </strong>
-                            <span className={styles.cashAccountMeta}>
-                              {[account.subType, account.owner, "눌러서 편집"]
+
+                            <span
+                              className={
+                                styles.cashAccountMeta
+                              }
+                            >
+                              {[
+                                account.subType,
+                                account.owner,
+                                "눌러서 편집"
+                              ]
                                 .filter(Boolean)
                                 .join(" · ")}
                             </span>
                           </div>
 
-                          <strong className={styles.cashAccountValue}>
-                            {formatCurrency(outstanding)}
+                          <strong
+                            className={
+                              styles.cashAccountValue
+                            }
+                          >
+                            {formatCurrency(
+                              outstanding
+                            )}
                           </strong>
                         </button>
                       </li>
                     );
-                  })}
-                </ul>
-              </>
+                  }
+                )}
+              </ul>
             )}
         </section>
       )}
