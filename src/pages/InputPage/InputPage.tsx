@@ -21,6 +21,8 @@ import { createTransaction } from "../../api/transactions";
 import { getDashboard, getDashboardSnapshot } from "../../api/dashboard";
 import InvestmentTradeForm
   from "../../components/investment/InvestmentTradeForm/InvestmentTradeForm";
+import InvestmentTradeHistory
+  from "../../components/investment/InvestmentTradeHistory/InvestmentTradeHistory";
 import type {
   DashboardData,
   InvestmentAccountSummary
@@ -1000,6 +1002,11 @@ export default function InputPage({
     setSelectedInvestmentAccountId
   ] = useState("");
 
+  const [
+    investmentTradeHistoryRefreshKey,
+    setInvestmentTradeHistoryRefreshKey
+  ] = useState(0);
+
   useEffect(
     () => {
       if (!success) {
@@ -1527,6 +1534,9 @@ export default function InputPage({
   async function refreshInvestmentDashboard() {
     const data = await getDashboard(undefined, { forceRefresh: true });
     setInvestmentDashboard(data);
+    setInvestmentTradeHistoryRefreshKey(
+      current => current + 1
+    );
   }
 
 
@@ -3735,12 +3745,21 @@ export default function InputPage({
               )}
 
             {selectedInvestmentAccount && (
-              <InvestmentTradeForm
-                key={selectedInvestmentAccount.accountId}
-                account={selectedInvestmentAccount}
-                holdings={selectedInvestmentHoldings}
-                onSaved={refreshInvestmentDashboard}
-              />
+              <>
+                <InvestmentTradeForm
+                  key={`form:${selectedInvestmentAccount.accountId}`}
+                  account={selectedInvestmentAccount}
+                  holdings={selectedInvestmentHoldings}
+                  onSaved={refreshInvestmentDashboard}
+                />
+
+                <InvestmentTradeHistory
+                  key={`history:${selectedInvestmentAccount.accountId}`}
+                  accountId={selectedInvestmentAccount.accountId}
+                  refreshKey={investmentTradeHistoryRefreshKey}
+                  onChanged={refreshInvestmentDashboard}
+                />
+              </>
             )}
           </section>
         </div>
