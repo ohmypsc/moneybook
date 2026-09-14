@@ -218,6 +218,25 @@ export default function AssetsPage({
   userName,
   onOpenInput
 }: AssetsPageProps) {
+  function openInput(preset: AssetInputPreset) {
+    if (onOpenInput) {
+      onOpenInput(preset);
+      return;
+    }
+
+    const nextState = {
+      ...(window.history.state || {}),
+      moneybook: true,
+      navigation: "input",
+      inputInitialDate: null,
+      inputPreset: preset
+    };
+
+    window.history.pushState(nextState, "");
+    window.dispatchEvent(
+      new PopStateEvent("popstate", { state: nextState })
+    );
+  }
   const [
     activeTab,
     setActiveTab
@@ -1193,19 +1212,17 @@ export default function AssetsPage({
             gap: 8
           }}
         >
-          {onOpenInput && (
-            <button
-              type="button"
-              className={styles.addAccountButton}
-              onClick={() =>
-                onOpenInput({
-                  mode: "transfer"
-                })
-              }
-            >
-              이체 입력
-            </button>
-          )}
+          <button
+            type="button"
+            className={styles.addAccountButton}
+            onClick={() =>
+              openInput({
+                mode: "transfer"
+              })
+            }
+          >
+            이체 입력
+          </button>
 
           <button
             type="button"
@@ -1682,45 +1699,43 @@ export default function AssetsPage({
                                   </div>
                                 </div>
 
-                                {onOpenInput && (
-                                  <div
-                                    className={
-                                      styles.reconcileActions
-                                    }
+                                <div
+                                  className={
+                                    styles.reconcileActions
+                                  }
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const accountId =
+                                        selectedCashAccount.accountId;
+                                      setSelectedCashAccountId(null);
+                                      setReconcileAccountId(null);
+                                      openInput({
+                                        mode: "transfer",
+                                        fromAccountId: accountId
+                                      });
+                                    }}
                                   >
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const accountId =
-                                          selectedCashAccount.accountId;
-                                        setSelectedCashAccountId(null);
-                                        setReconcileAccountId(null);
-                                        onOpenInput({
-                                          mode: "transfer",
-                                          fromAccountId: accountId
-                                        });
-                                      }}
-                                    >
-                                      여기서 보내기
-                                    </button>
+                                    여기서 보내기
+                                  </button>
 
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const accountId =
-                                          selectedCashAccount.accountId;
-                                        setSelectedCashAccountId(null);
-                                        setReconcileAccountId(null);
-                                        onOpenInput({
-                                          mode: "transfer",
-                                          toAccountId: accountId
-                                        });
-                                      }}
-                                    >
-                                      여기로 받기
-                                    </button>
-                                  </div>
-                                )}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const accountId =
+                                        selectedCashAccount.accountId;
+                                      setSelectedCashAccountId(null);
+                                      setReconcileAccountId(null);
+                                      openInput({
+                                        mode: "transfer",
+                                        toAccountId: accountId
+                                      });
+                                    }}
+                                  >
+                                    여기로 받기
+                                  </button>
+                                </div>
 
                                 {
                                   reconcileAccountId !==
@@ -2010,7 +2025,6 @@ export default function AssetsPage({
                         </button>
 
                         {
-                          onOpenInput &&
                           account.subType === "대출" && (
                             <button
                               type="button"
@@ -2020,7 +2034,7 @@ export default function AssetsPage({
                                 marginTop: 8
                               }}
                               onClick={() =>
-                                onOpenInput({
+                                openInput({
                                   mode: "transfer",
                                   toAccountId: account.accountId,
                                   categoryId: "__moneybook_loan_repayment__"
@@ -2484,43 +2498,41 @@ export default function AssetsPage({
                               </div>
 
 
-                              {onOpenInput && (
-                                <div
-                                  className={
-                                    styles.reconcileActions
-                                  }
+                              <div
+                                className={
+                                  styles.reconcileActions
+                                }
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const accountId =
+                                      selectedAccount.accountId;
+                                    setSelectedAccountId(null);
+                                    openInput({
+                                      mode: "transfer",
+                                      fromAccountId: accountId
+                                    });
+                                  }}
                                 >
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const accountId =
-                                        selectedAccount.accountId;
-                                      setSelectedAccountId(null);
-                                      onOpenInput({
-                                        mode: "transfer",
-                                        fromAccountId: accountId
-                                      });
-                                    }}
-                                  >
-                                    여기서 보내기
-                                  </button>
+                                  여기서 보내기
+                                </button>
 
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const accountId =
-                                        selectedAccount.accountId;
-                                      setSelectedAccountId(null);
-                                      onOpenInput({
-                                        mode: "transfer",
-                                        toAccountId: accountId
-                                      });
-                                    }}
-                                  >
-                                    여기로 받기
-                                  </button>
-                                </div>
-                              )}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const accountId =
+                                      selectedAccount.accountId;
+                                    setSelectedAccountId(null);
+                                    openInput({
+                                      mode: "transfer",
+                                      toAccountId: accountId
+                                    });
+                                  }}
+                                >
+                                  여기로 받기
+                                </button>
+                              </div>
 
 
                               {!selectedAccount
