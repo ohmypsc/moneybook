@@ -170,6 +170,16 @@ interface InputPageProps {
   initialCategoryId?: string | null;
 }
 
+interface InputHistoryState {
+  inputInitialDate?: string | null;
+  inputPreset?: {
+    mode?: InputMode | null;
+    fromAccountId?: string | null;
+    toAccountId?: string | null;
+    categoryId?: string | null;
+  } | null;
+}
+
 type PickerKind =
   | "category"
   | "paymentMethod"
@@ -639,11 +649,42 @@ export default function InputPage({
   const today =
     getToday();
 
+  const historyLaunchState =
+    (typeof window !== "undefined"
+      ? window.history.state
+      : null) as InputHistoryState | null;
+
+  const historyPreset =
+    historyLaunchState?.inputPreset ?? null;
+
+  const launchDate =
+    initialDate ??
+    historyLaunchState?.inputInitialDate ??
+    null;
+
+  const launchMode =
+    initialMode ?? historyPreset?.mode ?? null;
+
+  const launchFromAccountId =
+    initialFromAccountId ??
+    historyPreset?.fromAccountId ??
+    null;
+
+  const launchToAccountId =
+    initialToAccountId ??
+    historyPreset?.toAccountId ??
+    null;
+
+  const launchCategoryId =
+    initialCategoryId ??
+    historyPreset?.categoryId ??
+    null;
+
   const hasLaunchPreset = Boolean(
-    initialMode ||
-    initialFromAccountId ||
-    initialToAccountId ||
-    initialCategoryId
+    launchMode ||
+    launchFromAccountId ||
+    launchToAccountId ||
+    launchCategoryId
   );
 
   const initialDraft =
@@ -692,7 +733,7 @@ export default function InputPage({
     setMode
   ] =
     useState<InputMode>(
-      initialMode ||
+      launchMode ||
       initialDraft?.mode ||
       "expense"
     );
@@ -702,18 +743,18 @@ export default function InputPage({
     setDate
   ] =
     useState(
-      initialDate ||
+      launchDate ||
       (hasLaunchPreset ? null : initialDraft?.date) ||
       today
     );
 
   useEffect(
     () => {
-      if (initialDate) {
-        setDate(initialDate);
+      if (launchDate) {
+        setDate(launchDate);
       }
     },
-    [initialDate]
+    [launchDate]
   );
 
 
@@ -732,7 +773,7 @@ export default function InputPage({
     setCategoryId
   ] =
     useState(
-      initialCategoryId ||
+      launchCategoryId ||
       (hasLaunchPreset ? "" : initialDraft?.categoryId || "")
     );
 
@@ -761,7 +802,7 @@ export default function InputPage({
     setFromAccountId
   ] =
     useState(
-      initialFromAccountId ||
+      launchFromAccountId ||
       (hasLaunchPreset ? "" : initialDraft?.fromAccountId || "")
     );
 
@@ -770,7 +811,7 @@ export default function InputPage({
     setToAccountId
   ] =
     useState(
-      initialToAccountId ||
+      launchToAccountId ||
       (hasLaunchPreset ? "" : initialDraft?.toAccountId || "")
     );
 
@@ -780,9 +821,9 @@ export default function InputPage({
   ] =
     useState(
       hasLaunchPreset
-        ? (initialDate || today).slice(0, 7)
+        ? (launchDate || today).slice(0, 7)
         : initialDraft?.billingMonth ||
-          (initialDate || initialDraft?.date || today).slice(
+          (launchDate || initialDraft?.date || today).slice(
             0,
             7
           )
