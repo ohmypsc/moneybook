@@ -144,6 +144,33 @@ function formatUnitPrice(
 }
 
 
+function getAutomaticSettlement(
+  trade: InvestmentTrade
+) {
+  const gross =
+    Number(trade.quantity || 0) *
+    Number(trade.unitPrice || 0) *
+    Number(trade.fxRate || 1);
+
+  const fee = Number(trade.feeKrw || 0);
+  const tax = Number(trade.taxKrw || 0);
+
+  return trade.tradeType === "매수"
+    ? gross + fee + tax
+    : gross - fee - tax;
+}
+
+
+function hasCustomSettlement(
+  trade: InvestmentTrade
+) {
+  return Math.abs(
+    Number(trade.settlementKrw || 0) -
+    getAutomaticSettlement(trade)
+  ) >= 0.5;
+}
+
+
 export default function InvestmentTradeHistory({
   accountId,
   refreshKey = 0,
@@ -211,6 +238,24 @@ export default function InvestmentTradeHistory({
   const [
     editUnitPrice,
     setEditUnitPrice
+  ] =
+    useState("");
+
+  const [
+    editFxRate,
+    setEditFxRate
+  ] =
+    useState("");
+
+  const [
+    editFeeKrw,
+    setEditFeeKrw
+  ] =
+    useState("");
+
+  const [
+    editTaxKrw,
+    setEditTaxKrw
   ] =
     useState("");
 
@@ -426,10 +471,28 @@ export default function InvestmentTradeHistory({
       )
     );
 
+    setEditFxRate(
+      trade.currency === "KRW"
+        ? ""
+        : String(trade.fxRate || "")
+    );
+
+    setEditFeeKrw(
+      trade.feeKrw > 0
+        ? String(trade.feeKrw)
+        : ""
+    );
+
+    setEditTaxKrw(
+      trade.taxKrw > 0
+        ? String(trade.taxKrw)
+        : ""
+    );
+
     setEditSettlementKrw(
-      String(
-        trade.settlementKrw
-      )
+      hasCustomSettlement(trade)
+        ? String(trade.settlementKrw)
+        : ""
     );
 
     setEditMemo(
@@ -526,6 +589,60 @@ export default function InvestmentTradeHistory({
     }
 
 
+    const fxRate =
+      trade.currency === "KRW"
+        ? 1
+        : Number(editFxRate);
+
+    if (
+      trade.currency !== "KRW" &&
+      (
+        !Number.isFinite(fxRate) ||
+        fxRate <= 0
+      )
+    ) {
+      setActionError(
+        "해외주식 체결환율은 0보다 큰 숫자로 입력해주세요."
+      );
+
+      return;
+    }
+
+
+    const feeKrw =
+      editFeeKrw.trim() === ""
+        ? 0
+        : Number(editFeeKrw);
+
+    if (
+      !Number.isFinite(feeKrw) ||
+      feeKrw < 0
+    ) {
+      setActionError(
+        "수수료는 0 이상의 숫자로 입력해주세요."
+      );
+
+      return;
+    }
+
+
+    const taxKrw =
+      editTaxKrw.trim() === ""
+        ? 0
+        : Number(editTaxKrw);
+
+    if (
+      !Number.isFinite(taxKrw) ||
+      taxKrw < 0
+    ) {
+      setActionError(
+        "세금은 0 이상의 숫자로 입력해주세요."
+      );
+
+      return;
+    }
+
+
     const settlementText =
       editSettlementKrw.trim();
 
@@ -573,6 +690,18 @@ export default function InvestmentTradeHistory({
       unitPrice !==
       trade.unitPrice;
 
+    const fxRateChanged =
+      fxRate !==
+      trade.fxRate;
+
+    const feeChanged =
+      feeKrw !==
+      trade.feeKrw;
+
+    const taxChanged =
+      taxKrw !==
+      trade.taxKrw;
+
     const memoChanged =
       editMemo.trim() !==
       (
@@ -596,6 +725,15 @@ export default function InvestmentTradeHistory({
         number;
 
       unitPrice?:
+        number;
+
+      fxRate?:
+        number;
+
+      feeKrw?:
+        number;
+
+      taxKrw?:
         number;
 
       settlementKrw?:
@@ -637,6 +775,30 @@ export default function InvestmentTradeHistory({
     }
 
 
+    if (
+      fxRateChanged
+    ) {
+      payload.fxRate =
+        fxRate;
+    }
+
+
+    if (
+      feeChanged
+    ) {
+      payload.feeKrw =
+        feeKrw;
+    }
+
+
+    if (
+      taxChanged
+    ) {
+      payload.taxKrw =
+        taxKrw;
+    }
+
+
     /*
      * 수량 또는 단가를 변경했는데
      * 실제 결제금액을 비워두었다면
@@ -652,7 +814,10 @@ export default function InvestmentTradeHistory({
         settlementKrw !==
           trade.settlementKrw ||
         quantityChanged ||
-        unitPriceChanged
+        unitPriceChanged ||
+        fxRateChanged ||
+        feeChanged ||
+        taxChanged
       )
     ) {
       payload.settlementKrw =
@@ -863,7 +1028,7 @@ export default function InvestmentTradeHistory({
             styles.summaryTitle
           }
         >
-          거래내역
+          거래내역 · 수정/수수료 보정
         </span>
 
 
@@ -1158,6 +1323,19 @@ export default function InvestmentTradeHistory({
                       </p>
 
 
+                      {(trade.feeKrw > 0 || trade.taxKrw > 0) && (
+                        <p className={styles.meta}>
+                          수수료 {formatCurrency(trade.feeKrw)}
+                          {trade.taxKrw > 0 && (
+                            <>
+                              {" · "}
+                              세금 {formatCurrency(trade.taxKrw)}
+                            </>
+                          )}
+                        </p>
+                      )}
+
+
                       {trade.tradeType ===
                         "매도" &&
                         trade.realizedPnlKrw !==
@@ -1406,6 +1584,70 @@ export default function InvestmentTradeHistory({
                               </label>
 
 
+                              {trade.currency !== "KRW" && (
+                                <label className={styles.editField}>
+                                  <span className={styles.editLabel}>
+                                    체결환율
+                                  </span>
+
+                                  <input
+                                    className={styles.input}
+                                    type="number"
+                                    inputMode="decimal"
+                                    min="0"
+                                    step="any"
+                                    value={editFxRate}
+                                    onChange={event => {
+                                      setEditFxRate(event.target.value);
+                                      setEditSettlementKrw("");
+                                    }}
+                                  />
+                                </label>
+                              )}
+
+
+                              <label className={styles.editField}>
+                                <span className={styles.editLabel}>
+                                  수수료
+                                  <span className={styles.optional}>선택</span>
+                                </span>
+
+                                <input
+                                  className={styles.input}
+                                  type="number"
+                                  inputMode="numeric"
+                                  min="0"
+                                  step="1"
+                                  value={editFeeKrw}
+                                  onChange={event =>
+                                    setEditFeeKrw(event.target.value)
+                                  }
+                                  placeholder="0"
+                                />
+                              </label>
+
+
+                              <label className={styles.editField}>
+                                <span className={styles.editLabel}>
+                                  세금 · 제세금
+                                  <span className={styles.optional}>선택</span>
+                                </span>
+
+                                <input
+                                  className={styles.input}
+                                  type="number"
+                                  inputMode="numeric"
+                                  min="0"
+                                  step="1"
+                                  value={editTaxKrw}
+                                  onChange={event =>
+                                    setEditTaxKrw(event.target.value)
+                                  }
+                                  placeholder="0"
+                                />
+                              </label>
+
+
                               <label
                                 className={
                                   styles.editField
@@ -1490,9 +1732,9 @@ export default function InvestmentTradeHistory({
                                 styles.editHelper
                               }
                             >
-                              수량이나 체결단가를 변경하면 실제 결제금액은
-                              비워집니다. 실제 금액을 모르면 그대로 두면
-                              자동으로 다시 계산됩니다.
+                              수량·체결단가·환율·수수료·세금을 수정할 수 있습니다.
+                              실제 결제금액을 따로 확인하지 못했다면 비워두세요.
+                              입력한 값으로 결제금액과 예수금, 평단, 실현손익을 다시 계산합니다.
                             </p>
 
 
