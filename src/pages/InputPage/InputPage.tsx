@@ -19,6 +19,12 @@ import {
 } from "../../api/bootstrapCache";
 import { createTransaction } from "../../api/transactions";
 import { getDashboard, getDashboardSnapshot } from "../../api/dashboard";
+import InvestmentTradeForm
+  from "../../components/investment/InvestmentTradeForm/InvestmentTradeForm";
+import type {
+  DashboardData,
+  InvestmentAccountSummary
+} from "../../types/dashboard";
 import {
   applyAccountPreferences,
   applyCategoryPreferences,
@@ -41,7 +47,7 @@ import { getSeoulDateString } from "../../utils/dateTime";
 import styles from "./InputPage.module.css";
 
 type TransactionType = "지출" | "수입" | "이체";
-type InputMode = "expense" | "income" | "transfer";
+type InputMode = "expense" | "income" | "transfer" | "investment";
 type CreateTransactionPayload = Parameters<typeof createTransaction>[0];
 
 interface Account {
@@ -190,7 +196,8 @@ type PickerKind =
   | "creditCard"
   | "cardSource"
   | "loanSource"
-  | "loanAccount";
+  | "loanAccount"
+  | "investmentAccount";
 
 interface PickerItem {
   value: string;
@@ -385,6 +392,10 @@ function getModeLabel(
     return "이체";
   }
 
+  if (mode === "investment") {
+    return "투자";
+  }
+
   return "지출";
 }
 
@@ -535,7 +546,8 @@ function readInputDraft(
     if (
       value.mode !== "expense" &&
       value.mode !== "income" &&
-      value.mode !== "transfer"
+      value.mode !== "transfer" &&
+      value.mode !== "investment"
     ) {
       return null;
     }
@@ -815,6 +827,37 @@ export default function InputPage({
       (hasLaunchPreset ? "" : initialDraft?.toAccountId || "")
     );
 
+  useEffect(
+    () => {
+      if (!hasLaunchPreset) {
+        return;
+      }
+
+      if (launchMode) {
+        setMode(launchMode);
+      }
+
+      if (launchFromAccountId) {
+        setFromAccountId(launchFromAccountId);
+      }
+
+      if (launchToAccountId) {
+        setToAccountId(launchToAccountId);
+      }
+
+      if (launchCategoryId) {
+        setCategoryId(launchCategoryId);
+      }
+    },
+    [
+      hasLaunchPreset,
+      launchMode,
+      launchFromAccountId,
+      launchToAccountId,
+      launchCategoryId
+    ]
+  );
+
   const [
     billingMonth,
     setBillingMonth
@@ -934,6 +977,29 @@ export default function InputPage({
   ] =
     useState("");
 
+
+  const [
+    investmentDashboard,
+    setInvestmentDashboard
+  ] = useState<DashboardData | null>(
+    () => getDashboardSnapshot()
+  );
+
+  const [
+    investmentLoading,
+    setInvestmentLoading
+  ] = useState(false);
+
+  const [
+    investmentError,
+    setInvestmentError
+  ] = useState("");
+
+  const [
+    selectedInvestmentAccountId,
+    setSelectedInvestmentAccountId
+  ] = useState("");
+
   useEffect(
     () => {
       if (!success) {
@@ -956,6 +1022,10 @@ export default function InputPage({
 
   useEffect(
     () => {
+      if (mode === "investment") {
+        return;
+      }
+
       saveInputDraft(
         userName,
         {
@@ -993,6 +1063,58 @@ export default function InputPage({
       loanPrincipalAmount,
       loanInterestAmount
     ]
+  );
+
+
+  useEffect(
+    () => {
+      if (mode !== "investment") {
+        return;
+      }
+
+      let active = true;
+      const snapshot = getDashboardSnapshot();
+
+      if (snapshot) {
+        setInvestmentDashboard(snapshot);
+      }
+
+      setInvestmentLoading(!snapshot);
+      setInvestmentError("");
+
+      void getDashboard(undefined, { forceRefresh: true })
+        .then(data => {
+          if (!active) {
+            return;
+          }
+
+          setInvestmentDashboard(data);
+          setInvestmentError("");
+        })
+        .catch(loadError => {
+          if (!active) {
+            return;
+          }
+
+          if (!snapshot) {
+            setInvestmentError(
+              loadError instanceof Error
+                ? loadError.message
+                : "투자계좌 정보를 불러오지 못했습니다."
+            );
+          }
+        })
+        .finally(() => {
+          if (active) {
+            setInvestmentLoading(false);
+          }
+        });
+
+      return () => {
+        active = false;
+      };
+    },
+    [mode]
   );
 
 
@@ -1323,6 +1445,91 @@ export default function InputPage({
       ]
     );
 
+  const investmentAccounts =
+    useMemo(
+      () =>
+        (investmentDashboard?.investments.accounts ?? [])
+          .slice()
+          .sort((first, second) => {
+            const firstRank = ownerMatchesUser(first.owner, userName)
+              ? 0
+              : first.owner === "공동"
+                ? 1
+                : 2;
+            const secondRank = ownerMatchesUser(second.owner, userName)
+              ? 0
+              : second.owner === "공동"
+                ? 1
+                : 2;
+
+            return (
+              firstRank - secondRank ||
+              first.owner.localeCompare(second.owner, "ko-KR") ||
+              first.accountName.localeCompare(second.accountName, "ko-KR")
+            );
+          }),
+      [investmentDashboard, userName]
+    );
+
+  const investmentAccountIds =
+    useMemo(
+      () =>
+        new Set(
+          investmentAccounts.map(account => account.accountId)
+        ),
+      [investmentAccounts]
+    );
+
+  const selectedInvestmentAccount =
+    useMemo<InvestmentAccountSummary | null>(
+      () =>
+        investmentAccounts.find(
+          account => account.accountId === selectedInvestmentAccountId
+        ) ?? null,
+      [investmentAccounts, selectedInvestmentAccountId]
+    );
+
+  const selectedInvestmentHoldings =
+    useMemo(
+      () =>
+        (investmentDashboard?.investments.holdings ?? []).filter(
+          holding => holding.accountId === selectedInvestmentAccountId
+        ),
+      [investmentDashboard, selectedInvestmentAccountId]
+    );
+
+  useEffect(
+    () => {
+      if (mode !== "investment") {
+        return;
+      }
+
+      if (
+        selectedInvestmentAccountId &&
+        investmentAccounts.some(
+          account => account.accountId === selectedInvestmentAccountId
+        )
+      ) {
+        return;
+      }
+
+      setSelectedInvestmentAccountId(
+        investmentAccounts[0]?.accountId || ""
+      );
+    },
+    [
+      mode,
+      investmentAccounts,
+      selectedInvestmentAccountId
+    ]
+  );
+
+  async function refreshInvestmentDashboard() {
+    const data = await getDashboard(undefined, { forceRefresh: true });
+    setInvestmentDashboard(data);
+  }
+
+
   const accounts =
     useMemo(
       () => {
@@ -1379,16 +1586,18 @@ export default function InputPage({
   const activePickerSelectedAccountId =
     activePicker === "paymentMethod"
       ? paymentMethodId
-      : activePicker === "incomeAccount" ||
-          activePicker === "toAccount" ||
-          activePicker === "creditCard" ||
-          activePicker === "loanAccount"
-        ? toAccountId
-        : activePicker === "fromAccount" ||
-            activePicker === "cardSource" ||
-            activePicker === "loanSource"
-          ? fromAccountId
-          : "";
+      : activePicker === "investmentAccount"
+        ? selectedInvestmentAccountId
+        : activePicker === "incomeAccount" ||
+            activePicker === "toAccount" ||
+            activePicker === "creditCard" ||
+            activePicker === "loanAccount"
+          ? toAccountId
+          : activePicker === "fromAccount" ||
+              activePicker === "cardSource" ||
+              activePicker === "loanSource"
+            ? fromAccountId
+            : "";
 
   const activePickerSelectedAccount =
     useMemo(
@@ -2019,24 +2228,6 @@ export default function InputPage({
       mode ===
       "transfer"
     ) {
-      setFromAccountId("");
-      setToAccountId("");
-      setAmount("");
-      setLoanPrincipalAmount(
-        nextCategoryId === LOAN_REPAYMENT_PICKER_ID
-          ? String(DEFAULT_EQUAL_PRINCIPAL_REPAYMENT_KRW)
-          : ""
-      );
-      setLoanInterestAmount("");
-
-      if (nextCategoryId === LOAN_REPAYMENT_PICKER_ID && !spendingTarget) {
-        setSpendingTarget(
-          (bootstrap?.spendingTargets || []).includes(userName)
-            ? userName
-            : "공동"
-        );
-      }
-
       const nextCategory =
         categories.find(
           category =>
@@ -2045,17 +2236,108 @@ export default function InputPage({
         ) ??
         null;
 
-      if (
+      const nextIsLoanRepayment =
+        nextCategoryId ===
+        LOAN_REPAYMENT_PICKER_ID;
+
+      const nextIsCardSettlement =
         isCardSettlementCategory(
           nextCategory
-        )
-      ) {
+        );
+
+      const selectedFromAccount =
+        allAccounts.find(
+          account =>
+            account.accountId ===
+            fromAccountId
+        ) ??
+        null;
+
+      const selectedToAccount =
+        allAccounts.find(
+          account =>
+            account.accountId ===
+            toAccountId
+        ) ??
+        null;
+
+      setAmount("");
+      setLoanPrincipalAmount(
+        nextIsLoanRepayment
+          ? String(DEFAULT_EQUAL_PRINCIPAL_REPAYMENT_KRW)
+          : ""
+      );
+      setLoanInterestAmount("");
+
+      if (nextIsLoanRepayment) {
+        if (
+          selectedFromAccount &&
+          !isLoanSourceAccount(
+            selectedFromAccount
+          )
+        ) {
+          setFromAccountId("");
+        }
+
+        if (
+          selectedToAccount &&
+          !isLoanAccount(
+            selectedToAccount
+          )
+        ) {
+          setToAccountId("");
+        }
+
+        if (!spendingTarget) {
+          setSpendingTarget(
+            (bootstrap?.spendingTargets || []).includes(userName)
+              ? userName
+              : "공동"
+          );
+        }
+      } else if (nextIsCardSettlement) {
+        if (
+          selectedFromAccount &&
+          (
+            selectedFromAccount.accountType !== "자산" ||
+            selectedFromAccount.subType === "주식"
+          )
+        ) {
+          setFromAccountId("");
+        }
+
+        if (
+          selectedToAccount &&
+          selectedToAccount.subType !==
+            "신용카드"
+        ) {
+          setToAccountId("");
+        }
+
         setBillingMonth(
           date.slice(
             0,
             7
           )
         );
+      } else {
+        if (
+          selectedFromAccount &&
+          !isTransferAssetAccount(
+            selectedFromAccount
+          )
+        ) {
+          setFromAccountId("");
+        }
+
+        if (
+          selectedToAccount &&
+          !isTransferAssetAccount(
+            selectedToAccount
+          )
+        ) {
+          setToAccountId("");
+        }
       }
 
       cardAmountEditedRef.current = false;
@@ -2128,6 +2410,14 @@ export default function InputPage({
             userName
           )
       );
+
+    if (kind === "investmentAccount") {
+      return uniqueAccounts(
+        orderedAllAccounts.filter(
+          account => investmentAccountIds.has(account.accountId)
+        )
+      );
+    }
 
     if (kind === "loanSource") {
       return uniqueAccounts(
@@ -2235,6 +2525,8 @@ export default function InputPage({
         return "다른 명의 출금계좌";
       case "loanAccount":
         return "다른 명의 대출계좌";
+      case "investmentAccount":
+        return "다른 명의 투자계좌";
     }
   }
 
@@ -2443,6 +2735,8 @@ export default function InputPage({
         return "상환 출금계좌 선택";
       case "loanAccount":
         return "대출계좌 선택";
+      case "investmentAccount":
+        return "투자계좌 선택";
     }
   }
 
@@ -2461,6 +2755,8 @@ export default function InputPage({
       case "creditCard":
       case "loanAccount":
         return toAccountId;
+      case "investmentAccount":
+        return selectedInvestmentAccountId;
       case "fromAccount":
       case "cardSource":
       case "loanSource":
@@ -2483,6 +2779,9 @@ export default function InputPage({
       setSpendingTarget(value);
       requestMemory.current = null;
       clearFeedback();
+    } else if (kind === "investmentAccount") {
+      setSelectedInvestmentAccountId(value);
+      setInvestmentError("");
     } else if (kind === "creditCard") {
       handleCardChange(value);
     } else if (
@@ -3339,6 +3638,10 @@ export default function InputPage({
               [
                 "transfer",
                 "이체"
+              ],
+              [
+                "investment",
+                "투자"
               ]
             ] as const
           ).map(
@@ -3370,6 +3673,78 @@ export default function InputPage({
         }
       </div>
 
+      {mode === "investment" ? (
+        <div className={styles.form}>
+          <section className={styles.card}>
+            <div className={styles.conditionalSection}>
+              <h2 className={styles.sectionTitle}>투자 매수 · 매도</h2>
+
+              <label className={styles.field}>
+                <span className={styles.fieldLabel}>
+                  투자계좌 <span className={styles.required}>*</span>
+                </span>
+
+                <button
+                  type="button"
+                  className={styles.pickerButton}
+                  disabled={investmentLoading || investmentAccounts.length === 0}
+                  onClick={() => setActivePicker("investmentAccount")}
+                >
+                  <span
+                    className={
+                      selectedInvestmentAccountId
+                        ? styles.pickerValue
+                        : styles.pickerPlaceholder
+                    }
+                  >
+                    {selectedInvestmentAccount
+                      ? `${selectedInvestmentAccount.accountName}${
+                          selectedInvestmentAccount.owner
+                            ? `(${selectedInvestmentAccount.owner})`
+                            : ""
+                        }`
+                      : investmentLoading
+                        ? "투자계좌 불러오는 중"
+                        : "선택하세요"}
+                  </span>
+                  <span className={styles.pickerChevron} aria-hidden="true">⌄</span>
+                </button>
+
+                <p className={styles.helper}>
+                  주식·ETF·금처럼 실제 보유종목의 매수·매도만 기록합니다. 예수금이나 CMA 발행어음처럼 현금으로 관리할 금액은 종목으로 입력하지 말고 이체·예수금으로 관리하세요.
+                </p>
+              </label>
+            </div>
+
+            {investmentLoading && !investmentDashboard && (
+              <div className={styles.loading}>투자계좌 정보를 불러오는 중입니다.</div>
+            )}
+
+            {investmentError && (
+              <p className={styles.error} role="alert">
+                {investmentError}
+              </p>
+            )}
+
+            {!investmentLoading &&
+              !investmentError &&
+              investmentAccounts.length === 0 && (
+                <p className={styles.helper}>
+                  등록된 투자계좌가 없습니다. 자산 또는 설정에서 투자계좌를 먼저 추가해주세요.
+                </p>
+              )}
+
+            {selectedInvestmentAccount && (
+              <InvestmentTradeForm
+                key={selectedInvestmentAccount.accountId}
+                account={selectedInvestmentAccount}
+                holdings={selectedInvestmentHoldings}
+                onSaved={refreshInvestmentDashboard}
+              />
+            )}
+          </section>
+        </div>
+      ) : (
       <form
         className={
           styles.form
@@ -4662,6 +5037,7 @@ export default function InputPage({
           </div>
         </section>
       </form>
+      )}
 
       {activePicker && (
         <div
