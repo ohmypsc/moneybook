@@ -149,9 +149,9 @@ function prioritizeAccountsForUser(
       account,
       index,
       rank:
-        account.owner === userName
+        getAccountOwner(account) === userName
           ? 0
-          : account.owner === "공동"
+          : getAccountOwner(account) === "공동"
             ? 1
             : 2
     }))
@@ -301,6 +301,66 @@ function getAccountLabel(
     account.displayName ||
     account.accountName ||
     account.accountId
+  );
+}
+
+function getAccountOwner(
+  account: Account
+) {
+  const explicitOwner =
+    String(account.owner || "").trim();
+
+  if (explicitOwner) {
+    return explicitOwner;
+  }
+
+  const label =
+    getAccountLabel(account);
+
+  const ownerMatch =
+    label.match(/\(([^()]+)\)\s*$/);
+
+  return ownerMatch?.[1]?.trim() || "";
+}
+
+function isOtherOwnerAccount(
+  account: Account,
+  userName: string
+) {
+  const owner =
+    getAccountOwner(account);
+
+  return Boolean(
+    owner &&
+    owner !== userName &&
+    owner !== "공동"
+  );
+}
+
+function uniqueAccounts(
+  accounts: Account[]
+) {
+  const seen =
+    new Set<string>();
+
+  return accounts.filter(
+    account => {
+      if (seen.has(account.accountId)) {
+        return false;
+      }
+
+      seen.add(account.accountId);
+      return true;
+    }
+  );
+}
+
+function isAccountPickerKind(
+  kind: PickerKind
+): kind is Exclude<PickerKind, "category" | "spendingTarget"> {
+  return (
+    kind !== "category" &&
+    kind !== "spendingTarget"
   );
 }
 
@@ -740,8 +800,8 @@ export default function InputPage({
     );
 
   const [
-    showOtherPaymentMethods,
-    setShowOtherPaymentMethods
+    showOtherOwnerAccounts,
+    setShowOtherOwnerAccounts
   ] = useState(false);
 
   useEffect(
@@ -1031,84 +1091,73 @@ export default function InputPage({
       ]
     );
 
-  const primaryPaymentMethodAccounts =
+  const orderedAllAccounts =
     useMemo(
       () =>
-        accounts.filter(
-          account =>
-            !account.owner ||
-            account.owner === userName ||
-            account.owner === "공동"
-        ),
-      [accounts, userName]
-    );
-
-  const otherPaymentMethodAccounts =
-    useMemo(
-      () => {
-        const candidates =
-          allAccounts.filter(
-            account =>
-              Boolean(account.owner) &&
-              account.owner !== userName &&
-              account.owner !== "공동" &&
-              (
-                visibleAccountIds.has(account.accountId) ||
-                account.subType === "신용카드" ||
-                account.subType === "체크카드"
-              )
-          );
-
-        return preferences
+        preferences
           ? sortAccountsByPreferences(
-              candidates,
+              allAccounts,
               preferences
             )
-          : candidates;
-      },
+          : allAccounts.slice(),
       [
         allAccounts,
-        preferences,
-        userName,
-        visibleAccountIds
+        preferences
       ]
     );
 
-  const selectedPaymentMethodAccount =
+  const activePickerSelectedAccountId =
+    activePicker === "paymentMethod"
+      ? paymentMethodId
+      : activePicker === "incomeAccount" ||
+          activePicker === "toAccount" ||
+          activePicker === "creditCard"
+        ? toAccountId
+        : activePicker === "fromAccount" ||
+            activePicker === "cardSource"
+          ? fromAccountId
+          : "";
+
+  const activePickerSelectedAccount =
     useMemo(
       () =>
         allAccounts.find(
           account =>
             account.accountId ===
-            paymentMethodId
+            activePickerSelectedAccountId
         ) ?? null,
-      [allAccounts, paymentMethodId]
+      [
+        allAccounts,
+        activePickerSelectedAccountId
+      ]
     );
 
-  const selectedPaymentMethodIsOtherOwner =
+  const activePickerSelectedAccountIsOtherOwner =
     Boolean(
-      selectedPaymentMethodAccount?.owner &&
-      selectedPaymentMethodAccount.owner !== userName &&
-      selectedPaymentMethodAccount.owner !== "공동"
+      activePickerSelectedAccount &&
+      isOtherOwnerAccount(
+        activePickerSelectedAccount,
+        userName
+      )
     );
-
-  const otherPaymentMethodsExpanded =
-    showOtherPaymentMethods;
 
   useEffect(
     () => {
-      if (activePicker === "paymentMethod") {
-        setShowOtherPaymentMethods(
-          selectedPaymentMethodIsOtherOwner
-        );
+      if (
+        !activePicker ||
+        !isAccountPickerKind(activePicker)
+      ) {
+        setShowOtherOwnerAccounts(false);
         return;
       }
 
-      setShowOtherPaymentMethods(false);
+      setShowOtherOwnerAccounts(
+        activePickerSelectedAccountIsOtherOwner
+      );
     },
     [
       activePicker,
-      selectedPaymentMethodIsOtherOwner
+      activePickerSelectedAccountIsOtherOwner
     ]
   );
 
@@ -1724,10 +1773,12 @@ export default function InputPage({
     );
 
     const card =
-      creditCards.find(
+      allAccounts.find(
         account =>
           account.accountId ===
-          accountId
+            accountId &&
+          account.subType ===
+            "신용카드"
       );
 
     setFromAccountId(
@@ -1759,6 +1810,160 @@ export default function InputPage({
     return account
       ? getAccountLabel(account)
       : "선택하세요";
+  }
+
+  function getAccountPickerSource(
+    kind: Exclude<PickerKind, "category" | "spendingTarget">
+  ) {
+    const otherOwnerAccounts =
+      orderedAllAccounts.filter(
+        account =>
+          isOtherOwnerAccount(
+            account,
+            userName
+          )
+      );
+
+    if (kind === "paymentMethod") {
+      return uniqueAccounts([
+        ...accounts,
+        ...otherOwnerAccounts.filter(
+          account =>
+            visibleAccountIds.has(account.accountId) ||
+            account.subType === "신용카드" ||
+            account.subType === "체크카드"
+        )
+      ]);
+    }
+
+    if (kind === "creditCard") {
+      return uniqueAccounts([
+        ...creditCards,
+        ...otherOwnerAccounts.filter(
+          account =>
+            account.subType === "신용카드"
+        )
+      ]);
+    }
+
+    if (kind === "cardSource") {
+      return uniqueAccounts([
+        ...cardSourceAccounts,
+        ...otherOwnerAccounts.filter(
+          account =>
+            account.accountId !== toAccountId &&
+            account.accountType === "자산" &&
+            account.subType !== "주식"
+        )
+      ]);
+    }
+
+    return uniqueAccounts([
+      ...accounts,
+      ...otherOwnerAccounts
+    ]);
+  }
+
+  function getAccountPickerGroups(
+    kind: Exclude<PickerKind, "category" | "spendingTarget">
+  ) {
+    const source =
+      getAccountPickerSource(kind);
+
+    return {
+      primary: source.filter(
+        account =>
+          !isOtherOwnerAccount(
+            account,
+            userName
+          )
+      ),
+      other: source.filter(
+        account =>
+          isOtherOwnerAccount(
+            account,
+            userName
+          )
+      )
+    };
+  }
+
+  function getOtherOwnerPickerLabel(
+    kind: Exclude<PickerKind, "category" | "spendingTarget">
+  ) {
+    switch (kind) {
+      case "paymentMethod":
+        return "다른 명의 결제수단";
+      case "incomeAccount":
+        return "다른 명의 입금계좌";
+      case "fromAccount":
+        return "다른 명의 보내는 계좌";
+      case "toAccount":
+        return "다른 명의 받는 계좌";
+      case "creditCard":
+        return "다른 명의 카드";
+      case "cardSource":
+        return "다른 명의 출금계좌";
+    }
+  }
+
+  function renderAccountPickerOptions(
+    kind: Exclude<PickerKind, "category" | "spendingTarget">
+  ) {
+    const groups =
+      getAccountPickerGroups(kind);
+
+    return (
+      <>
+        {groups.other.length > 0 && (
+          <>
+            <button
+              type="button"
+              className={styles.sheetMoreOption}
+              aria-expanded={showOtherOwnerAccounts}
+              onClick={() =>
+                setShowOtherOwnerAccounts(
+                  current => !current
+                )
+              }
+            >
+              <span>
+                {getOtherOwnerPickerLabel(kind)}
+                <strong>
+                  {groups.other.length}개 · {showOtherOwnerAccounts ? "접기" : "더보기"}
+                </strong>
+              </span>
+              <span
+                className={styles.sheetMoreChevron}
+                aria-hidden="true"
+              >
+                {showOtherOwnerAccounts ? "⌃" : "⌄"}
+              </span>
+            </button>
+
+            {showOtherOwnerAccounts && (
+              <>
+                <div className={styles.sheetGroupLabel}>
+                  다른 명의
+                </div>
+                {groups.other
+                  .map(getAccountPickerItem)
+                  .map(item => renderPickerOption(kind, item))}
+                {groups.primary.length > 0 && (
+                  <div className={styles.sheetGroupLabel}>
+                    내 명의 · 공동
+                  </div>
+                )}
+              </>
+            )}
+          </>
+        )}
+
+        {groups.primary
+          .map(getAccountPickerItem)
+          .map(item => renderPickerOption(kind, item))}
+      </>
+    );
   }
 
   function getPickerItems(
@@ -1804,19 +2009,15 @@ export default function InputPage({
         );
     }
 
-    let source: Account[] = accounts;
-
-    if (kind === "creditCard") {
-      source = creditCards;
-    } else if (kind === "cardSource") {
-      source = cardSourceAccounts;
+    if (!isAccountPickerKind(kind)) {
+      return [];
     }
 
-    return source.map(
+    return getAccountPickerSource(kind).map(
       account => ({
         value: account.accountId,
         label: getAccountLabel(account),
-        meta: [account.subType, account.owner]
+        meta: [account.subType, getAccountOwner(account)]
           .filter(Boolean)
           .join(" · ")
       })
@@ -1860,7 +2061,7 @@ export default function InputPage({
     return {
       value: account.accountId,
       label: getAccountLabel(account),
-      meta: [account.subType, account.owner]
+      meta: [account.subType, getAccountOwner(account)]
         .filter(Boolean)
         .join(" · ")
     };
@@ -3758,55 +3959,10 @@ export default function InputPage({
             </div>
 
             <div className={styles.sheetList}>
-              {activePicker === "paymentMethod" ? (
-                <>
-                  {primaryPaymentMethodAccounts
-                    .map(getAccountPickerItem)
+              {isAccountPickerKind(activePicker)
+                ? renderAccountPickerOptions(activePicker)
+                : getPickerItems(activePicker)
                     .map(item => renderPickerOption(activePicker, item))}
-
-                  {otherPaymentMethodAccounts.length > 0 && (
-                    <>
-                      <button
-                        type="button"
-                        className={styles.sheetMoreOption}
-                        aria-expanded={otherPaymentMethodsExpanded}
-                        onClick={() =>
-                          setShowOtherPaymentMethods(
-                            current => !current
-                          )
-                        }
-                      >
-                        <span>
-                          다른 명의 결제수단
-                          <strong>
-                            {otherPaymentMethodAccounts.length}개 · {otherPaymentMethodsExpanded ? "접기" : "더보기"}
-                          </strong>
-                        </span>
-                        <span
-                          className={styles.sheetMoreChevron}
-                          aria-hidden="true"
-                        >
-                          {otherPaymentMethodsExpanded ? "⌃" : "⌄"}
-                        </span>
-                      </button>
-
-                      {otherPaymentMethodsExpanded && (
-                        <>
-                          <div className={styles.sheetGroupLabel}>
-                            다른 명의
-                          </div>
-                          {otherPaymentMethodAccounts
-                            .map(getAccountPickerItem)
-                            .map(item => renderPickerOption(activePicker, item))}
-                        </>
-                      )}
-                    </>
-                  )}
-                </>
-              ) : (
-                getPickerItems(activePicker)
-                  .map(item => renderPickerOption(activePicker, item))
-              )}
             </div>
           </section>
         </div>
