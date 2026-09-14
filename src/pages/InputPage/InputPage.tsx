@@ -4402,7 +4402,6 @@ export default function InputPage({
           {
             mode ===
               "transfer" &&
-            categoryId &&
             !isCardTransfer &&
             !isLoanRepayment && (
               <div
