@@ -850,6 +850,16 @@ export default function AssetsPage({
     0
   );
 
+  const visibleInvestmentCashTotal = visibleInvestmentAccounts.reduce(
+    (sum, account) => sum + Number(account.currentCashKrw || 0),
+    0
+  );
+
+  const visibleInvestmentRealizedPnlTotal = visibleInvestmentAccounts.reduce(
+    (sum, account) => sum + Number(account.realizedPnlKrw || 0),
+    0
+  );
+
 
   const selectedAccount =
     investmentAccounts.find(
@@ -1785,9 +1795,7 @@ export default function AssetsPage({
                     예수금{" "}
                     <strong>
                       {formatCurrency(
-                        dashboard
-                          ?.investments
-                          .cashTotal
+                        visibleInvestmentCashTotal
                       )}
                     </strong>
                   </span>
@@ -1798,10 +1806,7 @@ export default function AssetsPage({
                       style={{
                         color:
                           (
-                            dashboard
-                              ?.investments
-                              .realizedPnlTotal ??
-                            0
+                            visibleInvestmentRealizedPnlTotal
                           ) <
                           0
                             ? "var(--color-error)"
@@ -1809,9 +1814,7 @@ export default function AssetsPage({
                       }}
                     >
                       {formatSignedCurrency(
-                        dashboard
-                          ?.investments
-                          .realizedPnlTotal
+                        visibleInvestmentRealizedPnlTotal
                       )}
                     </strong>
                   </span>

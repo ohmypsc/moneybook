@@ -739,6 +739,11 @@ export default function InputPage({
       null
     );
 
+  const [
+    showOtherPaymentMethods,
+    setShowOtherPaymentMethods
+  ] = useState(false);
+
   useEffect(
     () => {
       if (!activePicker) {
@@ -763,6 +768,7 @@ export default function InputPage({
     },
     [activePicker]
   );
+
 
 
   const [
@@ -1024,6 +1030,87 @@ export default function InputPage({
         accounts
       ]
     );
+
+  const primaryPaymentMethodAccounts =
+    useMemo(
+      () =>
+        accounts.filter(
+          account =>
+            !account.owner ||
+            account.owner === userName ||
+            account.owner === "공동"
+        ),
+      [accounts, userName]
+    );
+
+  const otherPaymentMethodAccounts =
+    useMemo(
+      () => {
+        const candidates =
+          allAccounts.filter(
+            account =>
+              Boolean(account.owner) &&
+              account.owner !== userName &&
+              account.owner !== "공동" &&
+              (
+                visibleAccountIds.has(account.accountId) ||
+                account.subType === "신용카드" ||
+                account.subType === "체크카드"
+              )
+          );
+
+        return preferences
+          ? sortAccountsByPreferences(
+              candidates,
+              preferences
+            )
+          : candidates;
+      },
+      [
+        allAccounts,
+        preferences,
+        userName,
+        visibleAccountIds
+      ]
+    );
+
+  const selectedPaymentMethodAccount =
+    useMemo(
+      () =>
+        allAccounts.find(
+          account =>
+            account.accountId ===
+            paymentMethodId
+        ) ?? null,
+      [allAccounts, paymentMethodId]
+    );
+
+  const selectedPaymentMethodIsOtherOwner =
+    Boolean(
+      selectedPaymentMethodAccount?.owner &&
+      selectedPaymentMethodAccount.owner !== userName &&
+      selectedPaymentMethodAccount.owner !== "공동"
+    );
+
+  const otherPaymentMethodsExpanded =
+    showOtherPaymentMethods;
+
+  useEffect(
+    () => {
+      if (activePicker === "paymentMethod") {
+        setShowOtherPaymentMethods(
+          selectedPaymentMethodIsOtherOwner
+        );
+        return;
+      }
+
+      setShowOtherPaymentMethods(false);
+    },
+    [
+      activePicker,
+      selectedPaymentMethodIsOtherOwner
+    ]
+  );
 
   const creditCards =
     useMemo(
@@ -1734,6 +1821,49 @@ export default function InputPage({
           .join(" · ")
       })
     );
+  }
+
+  function renderPickerOption(
+    kind: PickerKind,
+    item: PickerItem
+  ) {
+    const selected =
+      getPickerSelectedValue(kind) ===
+      item.value;
+
+    return (
+      <button
+        type="button"
+        key={item.value}
+        className={`${styles.sheetOption} ${selected ? styles.sheetOptionSelected : ""}`}
+        onClick={() => applyPickerValue(kind, item.value)}
+      >
+        <span className={styles.sheetOptionText}>
+          <strong>{item.label}</strong>
+          {item.meta && <span>{item.meta}</span>}
+        </span>
+        {selected && (
+          <span
+            className={styles.sheetCheck}
+            aria-hidden="true"
+          >
+            ✓
+          </span>
+        )}
+      </button>
+    );
+  }
+
+  function getAccountPickerItem(
+    account: Account
+  ): PickerItem {
+    return {
+      value: account.accountId,
+      label: getAccountLabel(account),
+      meta: [account.subType, account.owner]
+        .filter(Boolean)
+        .join(" · ")
+    };
   }
 
   function getPickerTitle(
@@ -3628,24 +3758,55 @@ export default function InputPage({
             </div>
 
             <div className={styles.sheetList}>
-              {getPickerItems(activePicker).map(item => {
-                const selected = getPickerSelectedValue(activePicker) === item.value;
+              {activePicker === "paymentMethod" ? (
+                <>
+                  {primaryPaymentMethodAccounts
+                    .map(getAccountPickerItem)
+                    .map(item => renderPickerOption(activePicker, item))}
 
-                return (
-                  <button
-                    type="button"
-                    key={item.value}
-                    className={`${styles.sheetOption} ${selected ? styles.sheetOptionSelected : ""}`}
-                    onClick={() => applyPickerValue(activePicker, item.value)}
-                  >
-                    <span className={styles.sheetOptionText}>
-                      <strong>{item.label}</strong>
-                      {item.meta && <span>{item.meta}</span>}
-                    </span>
-                    {selected && <span className={styles.sheetCheck} aria-hidden="true">✓</span>}
-                  </button>
-                );
-              })}
+                  {otherPaymentMethodAccounts.length > 0 && (
+                    <>
+                      <button
+                        type="button"
+                        className={styles.sheetMoreOption}
+                        aria-expanded={otherPaymentMethodsExpanded}
+                        onClick={() =>
+                          setShowOtherPaymentMethods(
+                            current => !current
+                          )
+                        }
+                      >
+                        <span>
+                          다른 명의 결제수단
+                          <strong>
+                            {otherPaymentMethodAccounts.length}개 · {otherPaymentMethodsExpanded ? "접기" : "더보기"}
+                          </strong>
+                        </span>
+                        <span
+                          className={styles.sheetMoreChevron}
+                          aria-hidden="true"
+                        >
+                          {otherPaymentMethodsExpanded ? "⌃" : "⌄"}
+                        </span>
+                      </button>
+
+                      {otherPaymentMethodsExpanded && (
+                        <>
+                          <div className={styles.sheetGroupLabel}>
+                            다른 명의
+                          </div>
+                          {otherPaymentMethodAccounts
+                            .map(getAccountPickerItem)
+                            .map(item => renderPickerOption(activePicker, item))}
+                        </>
+                      )}
+                    </>
+                  )}
+                </>
+              ) : (
+                getPickerItems(activePicker)
+                  .map(item => renderPickerOption(activePicker, item))
+              )}
             </div>
           </section>
         </div>
