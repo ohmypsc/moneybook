@@ -540,13 +540,65 @@
 }
 
 .success {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 72px);
+  left: 50%;
+  z-index: 1200;
+
+  width: min(calc(100vw - 32px), 440px);
   margin: 0;
+  padding: 15px 18px;
 
-  color: var(--color-primary);
+  transform: translateX(-50%);
 
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.5;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 72%, white);
+  border-radius: var(--radius-lg);
+
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22);
+
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.45;
+  text-align: center;
+
+  pointer-events: none;
+
+  animation: successToastIn 0.22s ease-out both;
+}
+
+.success::before {
+  content: "✓";
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 24px;
+  height: 24px;
+  margin-right: 8px;
+
+  border-radius: 999px;
+
+  background: color-mix(in srgb, white 20%, transparent);
+
+  font-size: 15px;
+  font-weight: 900;
+  vertical-align: -1px;
+}
+
+@keyframes successToastIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -10px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
 }
 
 
@@ -1360,51 +1412,4 @@
 .benefitRewardAllButton:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-
-.sheetMoreOption {
-  width: 100%;
-  min-height: 52px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 4px;
-  border: 0;
-  border-bottom: 1px solid rgba(220, 229, 229, 0.68);
-  background: transparent;
-  color: var(--color-primary);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.sheetMoreOption > span:first-child {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.sheetMoreOption strong {
-  font-size: 11px;
-  font-weight: 800;
-  color: var(--color-text-secondary);
-}
-
-.sheetMoreChevron {
-  flex: 0 0 auto;
-  color: var(--color-text-secondary);
-  font-size: 18px;
-  line-height: 1;
-}
-
-.sheetGroupLabel {
-  padding: 12px 4px 6px;
-  background: var(--color-surface-soft);
-  color: var(--color-text-secondary);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: -0.01em;
 }
