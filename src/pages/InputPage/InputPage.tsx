@@ -87,6 +87,42 @@ interface ApiResult {
   };
 }
 
+interface AccountsResponse {
+  success: boolean;
+  data?: {
+    total: number;
+    items: Account[];
+  };
+  error?: {
+    code?: string;
+    message?: string;
+  };
+}
+
+interface CategoriesResponse {
+  success: boolean;
+  data?: {
+    total: number;
+    items: Category[];
+  };
+  error?: {
+    code?: string;
+    message?: string;
+  };
+}
+
+interface CategoryMutationResponse {
+  success: boolean;
+  data?: {
+    created?: boolean;
+    category?: Category;
+  };
+  error?: {
+    code?: string;
+    message?: string;
+  };
+}
+
 interface RequestMemory {
   fingerprint: string;
   requestId: string;
@@ -105,6 +141,8 @@ interface InputDraft {
   billingMonth: string;
   memo: string;
   benefitRewardUsedAmount: string;
+  loanPrincipalAmount: string;
+  loanInterestAmount: string;
 }
 
 interface CardBillingInfo {
@@ -116,6 +154,9 @@ interface CardBillingInfo {
 
 const CARD_PAYMENT_CATEGORY = "카드정기결제";
 const CARD_PREPAYMENT_CATEGORY = "카드선결제";
+const LOAN_REPAYMENT_PICKER_ID = "__moneybook_loan_repayment__";
+const LOAN_PRINCIPAL_CATEGORY_NAME = "대출원금상환";
+const LOAN_INTEREST_CATEGORY_NAME = "대출이자";
 const INPUT_DRAFT_KEY_PREFIX =
   "moneybook:input-draft:v1:";
 
@@ -132,12 +173,46 @@ type PickerKind =
   | "fromAccount"
   | "toAccount"
   | "creditCard"
-  | "cardSource";
+  | "cardSource"
+  | "loanSource"
+  | "loanAccount";
 
 interface PickerItem {
   value: string;
   label: string;
   meta?: string;
+}
+
+function ownerMatchesUser(
+  owner: string,
+  userName: string
+) {
+  const normalizedOwner = String(owner || "").trim();
+  const normalizedUser = String(userName || "").trim();
+
+  if (!normalizedOwner || !normalizedUser) {
+    return false;
+  }
+
+  return (
+    normalizedOwner === normalizedUser ||
+    (normalizedOwner.length >= 2 && normalizedUser.endsWith(normalizedOwner)) ||
+    (normalizedUser.length >= 2 && normalizedOwner.endsWith(normalizedUser))
+  );
+}
+
+function isLoanAccount(account: Account) {
+  return (
+    account.accountType === "부채" &&
+    (account.subType || "").includes("대출")
+  );
+}
+
+function isLoanSourceAccount(account: Account) {
+  return (
+    account.accountType === "자산" &&
+    account.subType !== "주식"
+  );
 }
 
 function prioritizeAccountsForUser(
@@ -149,7 +224,7 @@ function prioritizeAccountsForUser(
       account,
       index,
       rank:
-        getAccountOwner(account) === userName
+        ownerMatchesUser(getAccountOwner(account), userName)
           ? 0
           : getAccountOwner(account) === "공동"
             ? 1
@@ -332,7 +407,7 @@ function isOtherOwnerAccount(
 
   return Boolean(
     owner &&
-    owner !== userName &&
+    !ownerMatchesUser(owner, userName) &&
     owner !== "공동"
   );
 }
@@ -467,6 +542,14 @@ function readInputDraft(
       benefitRewardUsedAmount:
         typeof value.benefitRewardUsedAmount === "string"
           ? value.benefitRewardUsedAmount
+          : "",
+      loanPrincipalAmount:
+        typeof value.loanPrincipalAmount === "string"
+          ? value.loanPrincipalAmount
+          : "",
+      loanInterestAmount:
+        typeof value.loanInterestAmount === "string"
+          ? value.loanInterestAmount
           : ""
     };
   } catch {
@@ -515,7 +598,9 @@ function saveInputDraft(
       draft.toAccountId ||
       draft.description.trim() ||
       draft.memo.trim() ||
-      draft.benefitRewardUsedAmount
+      draft.benefitRewardUsedAmount ||
+      draft.loanPrincipalAmount ||
+      draft.loanInterestAmount
     );
 
     if (!hasMeaningfulInput) {
@@ -576,6 +661,11 @@ export default function InputPage({
     setBootstrapError
   ] =
     useState("");
+
+  const [
+    freshHouseholdAccounts,
+    setFreshHouseholdAccounts
+  ] = useState<Account[]>([]);
 
   const [
     mode,
@@ -718,6 +808,20 @@ export default function InputPage({
   );
 
   const [
+    loanPrincipalAmount,
+    setLoanPrincipalAmount
+  ] = useState(
+    initialDraft?.loanPrincipalAmount || ""
+  );
+
+  const [
+    loanInterestAmount,
+    setLoanInterestAmount
+  ] = useState(
+    initialDraft?.loanInterestAmount || ""
+  );
+
+  const [
     benefitPreview,
     setBenefitPreview
   ] = useState<BenefitPreview | null>(null);
@@ -769,7 +873,9 @@ export default function InputPage({
           billingMonth,
           description,
           memo,
-          benefitRewardUsedAmount
+          benefitRewardUsedAmount,
+          loanPrincipalAmount,
+          loanInterestAmount
         }
       );
     },
@@ -786,7 +892,9 @@ export default function InputPage({
       billingMonth,
       description,
       memo,
-      benefitRewardUsedAmount
+      benefitRewardUsedAmount,
+      loanPrincipalAmount,
+      loanInterestAmount
     ]
   );
 
@@ -905,6 +1013,32 @@ export default function InputPage({
       };
     },
     []
+  );
+
+  useEffect(
+    () => {
+      let active = true;
+
+      void apiRequest<AccountsResponse>(
+        `/api/accounts?includeDeleted=false&_=${Date.now()}`,
+        { cache: "no-store" }
+      )
+        .then(response => {
+          if (!active || !response.success || !response.data) {
+            return;
+          }
+
+          setFreshHouseholdAccounts(response.data.items || []);
+        })
+        .catch(() => {
+          // bootstrap 계좌 목록으로 계속 동작합니다.
+        });
+
+      return () => {
+        active = false;
+      };
+    },
+    [userName]
   );
 
   useEffect(
@@ -1036,6 +1170,10 @@ export default function InputPage({
       ]
     );
 
+  const isLoanRepayment =
+    mode === "transfer" &&
+    categoryId === LOAN_REPAYMENT_PICKER_ID;
+
   const isCardTransfer =
     mode ===
       "transfer" &&
@@ -1050,8 +1188,25 @@ export default function InputPage({
       : "카드값 결제";
 
   const allAccounts =
-    bootstrap?.accounts ??
-    [];
+    useMemo(
+      () => {
+        const merged = new Map<string, Account>();
+
+        (bootstrap?.accounts ?? []).forEach(account => {
+          merged.set(account.accountId, account);
+        });
+
+        freshHouseholdAccounts.forEach(account => {
+          merged.set(account.accountId, account);
+        });
+
+        return Array.from(merged.values());
+      },
+      [
+        bootstrap,
+        freshHouseholdAccounts
+      ]
+    );
 
   const accounts =
     useMemo(
@@ -1111,10 +1266,12 @@ export default function InputPage({
       ? paymentMethodId
       : activePicker === "incomeAccount" ||
           activePicker === "toAccount" ||
-          activePicker === "creditCard"
+          activePicker === "creditCard" ||
+          activePicker === "loanAccount"
         ? toAccountId
         : activePicker === "fromAccount" ||
-            activePicker === "cardSource"
+            activePicker === "cardSource" ||
+            activePicker === "loanSource"
           ? fromAccountId
           : "";
 
@@ -1593,6 +1750,8 @@ export default function InputPage({
     setFromAccountId("");
     setToAccountId("");
     setBenefitRewardUsedAmount("");
+    setLoanPrincipalAmount("");
+    setLoanInterestAmount("");
   }
 
   function handleModeChange(
@@ -1683,6 +1842,47 @@ export default function InputPage({
       normalized
     );
 
+    if (isLoanRepayment) {
+      if (!fromAccountId) {
+        return "돈이 나갈 계좌를 선택해주세요.";
+      }
+
+      if (!toAccountId) {
+        return "상환할 대출계좌를 선택해주세요.";
+      }
+
+      if (fromAccountId === toAccountId) {
+        return "출금계좌와 대출계좌는 같을 수 없습니다.";
+      }
+
+      const loanAccount = allAccounts.find(
+        account => account.accountId === toAccountId
+      );
+
+      if (!loanAccount || !isLoanAccount(loanAccount)) {
+        return "대출계좌를 다시 선택해주세요.";
+      }
+
+      const principal = Number(loanPrincipalAmount || 0);
+      const interest = Number(loanInterestAmount || 0);
+
+      if (
+        !Number.isFinite(principal) ||
+        principal < 0 ||
+        !Number.isFinite(interest) ||
+        interest < 0 ||
+        principal + interest <= 0
+      ) {
+        return "원금 또는 이자 금액을 입력해주세요.";
+      }
+
+      if (interest > 0 && !spendingTarget) {
+        return "이자 지출대상을 선택해주세요.";
+      }
+
+      return null;
+    }
+
     if (isCardTransfer) {
       cardAmountEditedRef.current = true;
     }
@@ -1690,6 +1890,23 @@ export default function InputPage({
     requestMemory.current =
       null;
 
+    clearFeedback();
+  }
+
+  function handleLoanAmountChange(
+    kind: "principal" | "interest",
+    value: string
+  ) {
+    const digits = value.replace(/[^\d]/g, "");
+    const normalized = digits.replace(/^0+(?=\d)/, "");
+
+    if (kind === "principal") {
+      setLoanPrincipalAmount(normalized);
+    } else {
+      setLoanInterestAmount(normalized);
+    }
+
+    requestMemory.current = null;
     clearFeedback();
   }
 
@@ -1731,6 +1948,16 @@ export default function InputPage({
       setFromAccountId("");
       setToAccountId("");
       setAmount("");
+      setLoanPrincipalAmount("");
+      setLoanInterestAmount("");
+
+      if (nextCategoryId === LOAN_REPAYMENT_PICKER_ID && !spendingTarget) {
+        setSpendingTarget(
+          (bootstrap?.spendingTargets || []).includes(userName)
+            ? userName
+            : "공동"
+        );
+      }
 
       const nextCategory =
         categories.find(
@@ -1824,6 +2051,18 @@ export default function InputPage({
           )
       );
 
+    if (kind === "loanSource") {
+      return uniqueAccounts(
+        orderedAllAccounts.filter(isLoanSourceAccount)
+      );
+    }
+
+    if (kind === "loanAccount") {
+      return uniqueAccounts(
+        orderedAllAccounts.filter(isLoanAccount)
+      );
+    }
+
     if (kind === "paymentMethod") {
       return uniqueAccounts([
         ...accounts,
@@ -1904,6 +2143,10 @@ export default function InputPage({
         return "다른 명의 카드";
       case "cardSource":
         return "다른 명의 출금계좌";
+      case "loanSource":
+        return "다른 명의 출금계좌";
+      case "loanAccount":
+        return "다른 명의 대출계좌";
     }
   }
 
@@ -1970,27 +2213,46 @@ export default function InputPage({
     kind: PickerKind
   ): PickerItem[] {
     if (kind === "category") {
+      const inputCategories = categories.filter(
+        category =>
+          category.name !== LOAN_PRINCIPAL_CATEGORY_NAME &&
+          category.name !== LOAN_INTEREST_CATEGORY_NAME
+      );
+
       const visibleCategories = mode === "transfer"
         ? [
-            ...categories.filter(
+            ...inputCategories.filter(
               category => category.name === CARD_PAYMENT_CATEGORY
             ),
-            ...categories.filter(
+            ...inputCategories.filter(
               category => category.name === CARD_PREPAYMENT_CATEGORY
             ),
-            ...categories.filter(
+            ...inputCategories.filter(
               category => !isCardSettlementCategory(category)
             )
           ]
-        : categories;
+        : inputCategories;
 
-      return visibleCategories.map(
+      const items = visibleCategories.map(
         category => ({
           value: category.categoryId,
           label: getCategoryLabel(category),
           meta: category.type
         })
       );
+
+      if (mode === "transfer") {
+        return [
+          {
+            value: LOAN_REPAYMENT_PICKER_ID,
+            label: "대출 상환",
+            meta: "이체"
+          },
+          ...items
+        ];
+      }
+
+      return items;
     }
 
     if (kind === "spendingTarget") {
@@ -2089,6 +2351,10 @@ export default function InputPage({
         return "결제할 카드 선택";
       case "cardSource":
         return "출금계좌 선택";
+      case "loanSource":
+        return "상환 출금계좌 선택";
+      case "loanAccount":
+        return "대출계좌 선택";
     }
   }
 
@@ -2105,9 +2371,11 @@ export default function InputPage({
       case "incomeAccount":
       case "toAccount":
       case "creditCard":
+      case "loanAccount":
         return toAccountId;
       case "fromAccount":
       case "cardSource":
+      case "loanSource":
         return fromAccountId;
     }
   }
@@ -2129,7 +2397,11 @@ export default function InputPage({
       clearFeedback();
     } else if (kind === "creditCard") {
       handleCardChange(value);
-    } else if (kind === "fromAccount" || kind === "cardSource") {
+    } else if (
+      kind === "fromAccount" ||
+      kind === "cardSource" ||
+      kind === "loanSource"
+    ) {
       setFromAccountId(value);
       requestMemory.current = null;
       clearFeedback();
@@ -2143,6 +2415,10 @@ export default function InputPage({
   }
 
   function getCategoryValueLabel() {
+    if (isLoanRepayment) {
+      return "대출 상환";
+    }
+
     return selectedCategory
       ? getCategoryLabel(selectedCategory)
       : "선택하세요";
@@ -2341,6 +2617,168 @@ export default function InputPage({
     };
   }
 
+  async function loadCategoriesByType(
+    type: TransactionType
+  ) {
+    const response = await apiRequest<CategoriesResponse>(
+      `/api/categories?type=${encodeURIComponent(type)}&_=${Date.now()}`,
+      { cache: "no-store" }
+    );
+
+    return response.data?.items || [];
+  }
+
+  async function ensureLoanCategory(
+    type: TransactionType,
+    name: string
+  ) {
+    const bootstrapMatch = (bootstrap?.categories || []).find(
+      category =>
+        category.type === type &&
+        category.name === name
+    );
+
+    if (bootstrapMatch) {
+      return bootstrapMatch;
+    }
+
+    const current = await loadCategoriesByType(type);
+    const currentMatch = current.find(
+      category => category.name === name
+    );
+
+    if (currentMatch) {
+      return currentMatch;
+    }
+
+    try {
+      const created = await apiRequest<CategoryMutationResponse>(
+        "/api/categories",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            type,
+            name,
+            active: true
+          })
+        }
+      );
+
+      if (created.data?.category) {
+        return created.data.category;
+      }
+    } catch (createError) {
+      const refreshed = await loadCategoriesByType(type);
+      const duplicate = refreshed.find(
+        category => category.name === name
+      );
+
+      if (duplicate) {
+        return duplicate;
+      }
+
+      throw createError;
+    }
+
+    throw new Error(`${name} 카테고리를 준비하지 못했습니다.`);
+  }
+
+  async function submitLoanRepayment() {
+    const principal = Math.max(0, Number(loanPrincipalAmount || 0));
+    const interest = Math.max(0, Number(loanInterestAmount || 0));
+    const total = principal + interest;
+    const loanAccount = allAccounts.find(
+      account => account.accountId === toAccountId
+    );
+    const loanLabel = loanAccount
+      ? getAccountLabel(loanAccount)
+      : "대출";
+
+    const fingerprint = JSON.stringify({
+      kind: "loan-repayment",
+      date,
+      fromAccountId,
+      toAccountId,
+      principal,
+      interest,
+      spendingTarget,
+      description: description.trim(),
+      memo: memo.trim()
+    });
+
+    let requestId: string;
+
+    if (requestMemory.current?.fingerprint === fingerprint) {
+      requestId = requestMemory.current.requestId;
+    } else {
+      requestId = createRequestId();
+      requestMemory.current = { fingerprint, requestId };
+    }
+
+    const [principalCategory, interestCategory] = await Promise.all([
+      principal > 0
+        ? ensureLoanCategory("이체", LOAN_PRINCIPAL_CATEGORY_NAME)
+        : Promise.resolve(null),
+      interest > 0
+        ? ensureLoanCategory("지출", LOAN_INTEREST_CATEGORY_NAME)
+        : Promise.resolve(null)
+    ]);
+
+    const groupId = `LOAN_${requestId}`;
+    const baseDescription = description.trim();
+    const baseMemo = memo.trim();
+
+    if (principal > 0 && principalCategory) {
+      enqueuePendingTransaction({
+        owner: userName,
+        label: `대출 원금 · ${principal.toLocaleString("ko-KR")}원 · ${loanLabel}`,
+        payload: {
+          date,
+          type: "이체",
+          categoryId: principalCategory.categoryId,
+          amount: principal,
+          fromAccountId,
+          toAccountId,
+          description: baseDescription || `${loanLabel} 원금 상환`,
+          memo: baseMemo,
+          groupId,
+          requestId: `${requestId}_PRINCIPAL`
+        }
+      });
+    }
+
+    if (interest > 0 && interestCategory) {
+      enqueuePendingTransaction({
+        owner: userName,
+        label: `대출 이자 · ${interest.toLocaleString("ko-KR")}원 · ${loanLabel}`,
+        payload: {
+          date,
+          type: "지출",
+          categoryId: interestCategory.categoryId,
+          amount: interest,
+          paymentMethodId: fromAccountId,
+          spendingTarget,
+          description: baseDescription || `${loanLabel} 이자`,
+          memo: baseMemo,
+          groupId,
+          requestId: `${requestId}_INTEREST`
+        }
+      });
+    }
+
+    clearInputDraft(userName);
+    setAmount("");
+    setCategoryId("");
+    setLoanPrincipalAmount("");
+    setLoanInterestAmount("");
+    resetAccountSelections();
+    setDescription("");
+    setMemo("");
+    setBenefitRewardUsedAmount("");
+    requestMemory.current = null;
+    setSuccess(`대출 상환 ${total.toLocaleString("ko-KR")}원 저장 대기열에 추가했습니다.`);
+  }
+
   function buildPayload(
     requestId: string
   ):
@@ -2379,7 +2817,7 @@ export default function InputPage({
     };
   }
 
-  function handleSubmit(
+  async function handleSubmit(
     event:
       FormEvent<HTMLFormElement>
   ) {
@@ -2409,6 +2847,24 @@ export default function InputPage({
     if (
       !bootstrap
     ) {
+      return;
+    }
+
+    if (isLoanRepayment) {
+      submitGuard.current = true;
+      setSubmitting(true);
+
+      try {
+        await submitLoanRepayment();
+      } catch (submitError) {
+        setError(getErrorMessage(submitError));
+      } finally {
+        setSubmitting(false);
+        window.setTimeout(() => {
+          submitGuard.current = false;
+        }, 250);
+      }
+
       return;
     }
 
@@ -2835,7 +3291,7 @@ export default function InputPage({
               </button>
 
               <p className={styles.helper}>
-                카드값 결제나 선결제를 선택하면 카드 결제용 입력 화면으로 바뀝니다.
+                대출 상환은 원금과 이자를 자동 분리하고, 카드값 결제나 선결제는 카드 결제용 화면으로 바뀝니다.
               </p>
             </label>
           )}
@@ -2977,7 +3433,7 @@ export default function InputPage({
             </label>
           )}
 
-          {mode === "transfer" && categoryId && !isCardTransfer && (
+          {mode === "transfer" && categoryId && !isCardTransfer && !isLoanRepayment && (
             <label
               className={
                 styles.amountField
@@ -3278,10 +3734,136 @@ export default function InputPage({
           }
 
           {
+            mode === "transfer" &&
+            isLoanRepayment && (
+              <div className={styles.conditionalSection}>
+                <h2 className={styles.sectionTitle}>
+                  대출 상환
+                </h2>
+
+                <div className={styles.cardPaymentNotice}>
+                  <span
+                    className={styles.cardPaymentNoticeIcon}
+                    aria-hidden="true"
+                  >
+                    💡
+                  </span>
+                  <p className={styles.cardPaymentNoticeText}>
+                    <strong>원금은 대출잔액 감소</strong>로, 이자는 <strong>지출</strong>로 나눠 자동 기록합니다.
+                  </p>
+                </div>
+
+                <label className={styles.field}>
+                  <span className={styles.fieldLabel}>
+                    돈이 나갈 계좌 <span className={styles.required}>*</span>
+                  </span>
+                  <button
+                    type="button"
+                    className={styles.pickerButton}
+                    disabled={submitting}
+                    onClick={() => setActivePicker("loanSource")}
+                  >
+                    <span className={fromAccountId ? styles.pickerValue : styles.pickerPlaceholder}>
+                      {getAccountValueLabel(fromAccountId)}
+                    </span>
+                    <span className={styles.pickerChevron} aria-hidden="true">⌄</span>
+                  </button>
+                </label>
+
+                <label className={styles.field}>
+                  <span className={styles.fieldLabel}>
+                    상환할 대출계좌 <span className={styles.required}>*</span>
+                  </span>
+                  <button
+                    type="button"
+                    className={styles.pickerButton}
+                    disabled={submitting}
+                    onClick={() => setActivePicker("loanAccount")}
+                  >
+                    <span className={toAccountId ? styles.pickerValue : styles.pickerPlaceholder}>
+                      {getAccountValueLabel(toAccountId)}
+                    </span>
+                    <span className={styles.pickerChevron} aria-hidden="true">⌄</span>
+                  </button>
+                </label>
+
+                <div className={styles.fieldPair}>
+                  <label className={styles.field}>
+                    <span className={styles.fieldLabel}>원금</span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="off"
+                      className={styles.input}
+                      placeholder="0"
+                      value={
+                        loanPrincipalAmount
+                          ? Number(loanPrincipalAmount).toLocaleString("ko-KR")
+                          : ""
+                      }
+                      disabled={submitting}
+                      onChange={event =>
+                        handleLoanAmountChange("principal", event.target.value)
+                      }
+                    />
+                  </label>
+
+                  <label className={styles.field}>
+                    <span className={styles.fieldLabel}>이자</span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="off"
+                      className={styles.input}
+                      placeholder="0"
+                      value={
+                        loanInterestAmount
+                          ? Number(loanInterestAmount).toLocaleString("ko-KR")
+                          : ""
+                      }
+                      disabled={submitting}
+                      onChange={event =>
+                        handleLoanAmountChange("interest", event.target.value)
+                      }
+                    />
+                  </label>
+                </div>
+
+                <div className={styles.cardBillingBox}>
+                  <span>원금 {Number(loanPrincipalAmount || 0).toLocaleString("ko-KR")}원</span>
+                  <span>이자 {Number(loanInterestAmount || 0).toLocaleString("ko-KR")}원</span>
+                  <strong>총 납입액 {(Number(loanPrincipalAmount || 0) + Number(loanInterestAmount || 0)).toLocaleString("ko-KR")}원</strong>
+                  <small>원금만 대출잔액을 줄이고, 이자는 월 지출 통계에 포함됩니다.</small>
+                </div>
+
+                {Number(loanInterestAmount || 0) > 0 && (
+                  <label className={styles.field}>
+                    <span className={styles.fieldLabel}>
+                      이자 지출대상 <span className={styles.required}>*</span>
+                    </span>
+                    <button
+                      type="button"
+                      className={styles.pickerButton}
+                      disabled={submitting}
+                      onClick={() => setActivePicker("spendingTarget")}
+                    >
+                      <span className={spendingTarget ? styles.pickerValue : styles.pickerPlaceholder}>
+                        {spendingTarget || "선택하세요"}
+                      </span>
+                      <span className={styles.pickerChevron} aria-hidden="true">⌄</span>
+                    </button>
+                  </label>
+                )}
+              </div>
+            )
+          }
+
+          {
             mode ===
               "transfer" &&
             categoryId &&
-            !isCardTransfer && (
+            !isCardTransfer &&
+            !isLoanRepayment && (
               <div
                 className={
                   styles.conditionalSection
@@ -3920,11 +4502,13 @@ export default function InputPage({
             >
               {
                 `${
-                  isCardTransfer
-                    ? cardTransferLabel
-                    : getModeLabel(
-                        mode
-                      )
+                  isLoanRepayment
+                    ? "대출 상환"
+                    : isCardTransfer
+                      ? cardTransferLabel
+                      : getModeLabel(
+                          mode
+                        )
                 } 저장`
               }
             </button>
