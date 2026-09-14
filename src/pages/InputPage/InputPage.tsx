@@ -157,6 +157,7 @@ const CARD_PREPAYMENT_CATEGORY = "카드선결제";
 const LOAN_REPAYMENT_PICKER_ID = "__moneybook_loan_repayment__";
 const LOAN_PRINCIPAL_CATEGORY_NAME = "대출원금상환";
 const LOAN_INTEREST_CATEGORY_NAME = "대출이자";
+const DEFAULT_EQUAL_PRINCIPAL_REPAYMENT_KRW = 791666;
 const INPUT_DRAFT_KEY_PREFIX =
   "moneybook:input-draft:v1:";
 
@@ -1174,6 +1175,24 @@ export default function InputPage({
     mode === "transfer" &&
     categoryId === LOAN_REPAYMENT_PICKER_ID;
 
+  const loanRepaymentTotal =
+    Math.max(0, Number(amount || 0));
+
+  const loanRepaymentPrincipal =
+    Math.max(
+      0,
+      Number(
+        loanPrincipalAmount ||
+        DEFAULT_EQUAL_PRINCIPAL_REPAYMENT_KRW
+      )
+    );
+
+  const loanRepaymentInterest =
+    Math.max(
+      0,
+      loanRepaymentTotal - loanRepaymentPrincipal
+    );
+
   const isCardTransfer =
     mode ===
       "transfer" &&
@@ -1842,47 +1861,6 @@ export default function InputPage({
       normalized
     );
 
-    if (isLoanRepayment) {
-      if (!fromAccountId) {
-        return "돈이 나갈 계좌를 선택해주세요.";
-      }
-
-      if (!toAccountId) {
-        return "상환할 대출계좌를 선택해주세요.";
-      }
-
-      if (fromAccountId === toAccountId) {
-        return "출금계좌와 대출계좌는 같을 수 없습니다.";
-      }
-
-      const loanAccount = allAccounts.find(
-        account => account.accountId === toAccountId
-      );
-
-      if (!loanAccount || !isLoanAccount(loanAccount)) {
-        return "대출계좌를 다시 선택해주세요.";
-      }
-
-      const principal = Number(loanPrincipalAmount || 0);
-      const interest = Number(loanInterestAmount || 0);
-
-      if (
-        !Number.isFinite(principal) ||
-        principal < 0 ||
-        !Number.isFinite(interest) ||
-        interest < 0 ||
-        principal + interest <= 0
-      ) {
-        return "원금 또는 이자 금액을 입력해주세요.";
-      }
-
-      if (interest > 0 && !spendingTarget) {
-        return "이자 지출대상을 선택해주세요.";
-      }
-
-      return null;
-    }
-
     if (isCardTransfer) {
       cardAmountEditedRef.current = true;
     }
@@ -1948,7 +1926,11 @@ export default function InputPage({
       setFromAccountId("");
       setToAccountId("");
       setAmount("");
-      setLoanPrincipalAmount("");
+      setLoanPrincipalAmount(
+        nextCategoryId === LOAN_REPAYMENT_PICKER_ID
+          ? String(DEFAULT_EQUAL_PRINCIPAL_REPAYMENT_KRW)
+          : ""
+      );
       setLoanInterestAmount("");
 
       if (nextCategoryId === LOAN_REPAYMENT_PICKER_ID && !spendingTarget) {
@@ -2519,6 +2501,45 @@ export default function InputPage({
       mode ===
       "transfer"
     ) {
+      if (isLoanRepayment) {
+        if (!fromAccountId) {
+          return "돈이 나갈 계좌를 선택해주세요.";
+        }
+
+        if (!toAccountId) {
+          return "상환할 대출계좌를 선택해주세요.";
+        }
+
+        if (fromAccountId === toAccountId) {
+          return "출금계좌와 대출계좌는 같을 수 없습니다.";
+        }
+
+        const loanAccount = allAccounts.find(
+          account => account.accountId === toAccountId
+        );
+
+        if (!loanAccount || !isLoanAccount(loanAccount)) {
+          return "대출계좌를 다시 선택해주세요.";
+        }
+
+        if (
+          !Number.isFinite(loanRepaymentPrincipal) ||
+          loanRepaymentPrincipal <= 0
+        ) {
+          return "이번 달 원금을 입력해주세요.";
+        }
+
+        if (numericAmount < loanRepaymentPrincipal) {
+          return `총 상환액은 원금 ${Math.round(loanRepaymentPrincipal).toLocaleString("ko-KR")}원 이상이어야 합니다.`;
+        }
+
+        if (loanRepaymentInterest > 0 && !spendingTarget) {
+          return "이자 지출대상을 선택해주세요.";
+        }
+
+        return null;
+      }
+
       if (
         isCardTransfer
       ) {
@@ -2684,9 +2705,9 @@ export default function InputPage({
   }
 
   async function submitLoanRepayment() {
-    const principal = Math.max(0, Number(loanPrincipalAmount || 0));
-    const interest = Math.max(0, Number(loanInterestAmount || 0));
-    const total = principal + interest;
+    const total = loanRepaymentTotal;
+    const principal = loanRepaymentPrincipal;
+    const interest = loanRepaymentInterest;
     const loanAccount = allAccounts.find(
       account => account.accountId === toAccountId
     );
@@ -3749,7 +3770,7 @@ export default function InputPage({
                     💡
                   </span>
                   <p className={styles.cardPaymentNoticeText}>
-                    <strong>원금은 대출잔액 감소</strong>로, 이자는 <strong>지출</strong>로 나눠 자동 기록합니다.
+                    <strong>총 상환액만 입력</strong>하면 원금균등상환 원금 <strong>791,666원</strong>을 기준으로 이자를 자동 계산합니다. 마지막 회차처럼 원금이 달라지는 경우에는 아래 원금만 직접 수정할 수 있습니다.
                   </p>
                 </div>
 
@@ -3787,15 +3808,40 @@ export default function InputPage({
                   </button>
                 </label>
 
+                <label className={styles.amountField}>
+                  <span className={styles.fieldLabel}>
+                    총 상환액 <span className={styles.required}>*</span>
+                  </span>
+                  <div className={styles.amountWrap}>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="off"
+                      className={styles.amountInput}
+                      placeholder="0"
+                      value={
+                        amount
+                          ? Number(amount).toLocaleString("ko-KR")
+                          : ""
+                      }
+                      disabled={submitting}
+                      onChange={event =>
+                        handleAmountChange(event.target.value)
+                      }
+                    />
+                    <span className={styles.amountUnit}>원</span>
+                  </div>
+                </label>
+
                 <div className={styles.fieldPair}>
                   <label className={styles.field}>
-                    <span className={styles.fieldLabel}>원금</span>
+                    <span className={styles.fieldLabel}>이번 달 원금</span>
                     <input
                       type="text"
                       inputMode="numeric"
                       autoComplete="off"
                       className={styles.input}
-                      placeholder="0"
+                      placeholder={DEFAULT_EQUAL_PRINCIPAL_REPAYMENT_KRW.toLocaleString("ko-KR")}
                       value={
                         loanPrincipalAmount
                           ? Number(loanPrincipalAmount).toLocaleString("ko-KR")
@@ -3809,34 +3855,29 @@ export default function InputPage({
                   </label>
 
                   <label className={styles.field}>
-                    <span className={styles.fieldLabel}>이자</span>
+                    <span className={styles.fieldLabel}>자동 계산 이자</span>
                     <input
                       type="text"
-                      inputMode="numeric"
-                      autoComplete="off"
                       className={styles.input}
-                      placeholder="0"
                       value={
-                        loanInterestAmount
-                          ? Number(loanInterestAmount).toLocaleString("ko-KR")
+                        amount
+                          ? loanRepaymentInterest.toLocaleString("ko-KR")
                           : ""
                       }
-                      disabled={submitting}
-                      onChange={event =>
-                        handleLoanAmountChange("interest", event.target.value)
-                      }
+                      placeholder="총 상환액 입력 후 계산"
+                      readOnly
                     />
                   </label>
                 </div>
 
                 <div className={styles.cardBillingBox}>
-                  <span>원금 {Number(loanPrincipalAmount || 0).toLocaleString("ko-KR")}원</span>
-                  <span>이자 {Number(loanInterestAmount || 0).toLocaleString("ko-KR")}원</span>
-                  <strong>총 납입액 {(Number(loanPrincipalAmount || 0) + Number(loanInterestAmount || 0)).toLocaleString("ko-KR")}원</strong>
-                  <small>원금만 대출잔액을 줄이고, 이자는 월 지출 통계에 포함됩니다.</small>
+                  <span>총 상환액 {loanRepaymentTotal.toLocaleString("ko-KR")}원</span>
+                  <span>원금 {loanRepaymentPrincipal.toLocaleString("ko-KR")}원</span>
+                  <strong>이자 {loanRepaymentInterest.toLocaleString("ko-KR")}원</strong>
+                  <small>원금만 대출잔액을 줄이고, 총 상환액에서 원금을 뺀 금액은 대출이자 지출로 기록됩니다.</small>
                 </div>
 
-                {Number(loanInterestAmount || 0) > 0 && (
+                {loanRepaymentInterest > 0 && (
                   <label className={styles.field}>
                     <span className={styles.fieldLabel}>
                       이자 지출대상 <span className={styles.required}>*</span>
