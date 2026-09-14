@@ -1712,6 +1712,17 @@ function SettingsHome(
 
             {
                 key:
+                    "accounts",
+
+                title:
+                    "자산 관리",
+
+                description:
+                    "자산 추가·수정과 입력 화면 노출·순서"
+            },
+
+            {
+                key:
                     "automation",
 
                 title:

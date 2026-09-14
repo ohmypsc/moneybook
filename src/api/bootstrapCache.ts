@@ -38,6 +38,9 @@ const MASTER_MUTATION_PATHS =
 const BOOTSTRAP_MUTATION_PATHS =
   new Set([
     SETTINGS_PATH,
+    "/api/settings/automation",
+    "/api/settings/ledger-start-date",
+    "/api/settings/ledger-start-date/clear",
     ...MASTER_MUTATION_PATHS
   ]);
 

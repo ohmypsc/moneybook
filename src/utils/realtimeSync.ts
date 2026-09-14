@@ -41,7 +41,8 @@ const MASTER_ENTITY_TYPES = new Set([
   "account",
   "category",
   "input_preferences",
-  "ledger_config"
+  "ledger_config",
+  "automation_settings"
 ]);
 
 const INVESTMENT_ENTITY_TYPES = new Set([
