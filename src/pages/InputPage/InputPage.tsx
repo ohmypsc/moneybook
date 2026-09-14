@@ -164,6 +164,10 @@ const INPUT_DRAFT_KEY_PREFIX =
 interface InputPageProps {
   userName: string;
   initialDate?: string | null;
+  initialMode?: InputMode | null;
+  initialFromAccountId?: string | null;
+  initialToAccountId?: string | null;
+  initialCategoryId?: string | null;
 }
 
 type PickerKind =
@@ -626,10 +630,21 @@ function saveInputDraft(
 
 export default function InputPage({
   userName,
-  initialDate = null
+  initialDate = null,
+  initialMode = null,
+  initialFromAccountId = null,
+  initialToAccountId = null,
+  initialCategoryId = null
 }: InputPageProps) {
   const today =
     getToday();
+
+  const hasLaunchPreset = Boolean(
+    initialMode ||
+    initialFromAccountId ||
+    initialToAccountId ||
+    initialCategoryId
+  );
 
   const initialDraft =
     useMemo(
@@ -677,6 +692,7 @@ export default function InputPage({
     setMode
   ] =
     useState<InputMode>(
+      initialMode ||
       initialDraft?.mode ||
       "expense"
     );
@@ -687,7 +703,7 @@ export default function InputPage({
   ] =
     useState(
       initialDate ||
-      initialDraft?.date ||
+      (hasLaunchPreset ? null : initialDraft?.date) ||
       today
     );
 
@@ -706,8 +722,9 @@ export default function InputPage({
     setAmount
   ] =
     useState(
-      initialDraft?.amount ||
-      ""
+      hasLaunchPreset
+        ? ""
+        : initialDraft?.amount || ""
     );
 
   const [
@@ -715,8 +732,8 @@ export default function InputPage({
     setCategoryId
   ] =
     useState(
-      initialDraft?.categoryId ||
-      ""
+      initialCategoryId ||
+      (hasLaunchPreset ? "" : initialDraft?.categoryId || "")
     );
 
   const [
@@ -724,8 +741,9 @@ export default function InputPage({
     setPaymentMethodId
   ] =
     useState(
-      initialDraft?.paymentMethodId ||
-      ""
+      hasLaunchPreset
+        ? ""
+        : initialDraft?.paymentMethodId || ""
     );
 
   const [
@@ -733,8 +751,9 @@ export default function InputPage({
     setSpendingTarget
   ] =
     useState(
-      initialDraft?.spendingTarget ||
-      ""
+      hasLaunchPreset
+        ? ""
+        : initialDraft?.spendingTarget || ""
     );
 
   const [
@@ -742,8 +761,8 @@ export default function InputPage({
     setFromAccountId
   ] =
     useState(
-      initialDraft?.fromAccountId ||
-      ""
+      initialFromAccountId ||
+      (hasLaunchPreset ? "" : initialDraft?.fromAccountId || "")
     );
 
   const [
@@ -751,8 +770,8 @@ export default function InputPage({
     setToAccountId
   ] =
     useState(
-      initialDraft?.toAccountId ||
-      ""
+      initialToAccountId ||
+      (hasLaunchPreset ? "" : initialDraft?.toAccountId || "")
     );
 
   const [
@@ -760,11 +779,13 @@ export default function InputPage({
     setBillingMonth
   ] =
     useState(
-      initialDraft?.billingMonth ||
-      (initialDate || initialDraft?.date || today).slice(
-        0,
-        7
-      )
+      hasLaunchPreset
+        ? (initialDate || today).slice(0, 7)
+        : initialDraft?.billingMonth ||
+          (initialDate || initialDraft?.date || today).slice(
+            0,
+            7
+          )
     );
 
   const [
@@ -772,8 +793,9 @@ export default function InputPage({
     setDescription
   ] =
     useState(
-      initialDraft?.description ||
-      ""
+      hasLaunchPreset
+        ? ""
+        : initialDraft?.description || ""
     );
 
   const [
@@ -781,8 +803,9 @@ export default function InputPage({
     setMemo
   ] =
     useState(
-      initialDraft?.memo ||
-      ""
+      hasLaunchPreset
+        ? ""
+        : initialDraft?.memo || ""
     );
 
   const [
@@ -809,21 +832,29 @@ export default function InputPage({
     benefitRewardUsedAmount,
     setBenefitRewardUsedAmount
   ] = useState(
-    initialDraft?.benefitRewardUsedAmount || ""
+    hasLaunchPreset
+      ? ""
+      : initialDraft?.benefitRewardUsedAmount || ""
   );
 
   const [
     loanPrincipalAmount,
     setLoanPrincipalAmount
   ] = useState(
-    initialDraft?.loanPrincipalAmount || ""
+    initialCategoryId === LOAN_REPAYMENT_PICKER_ID
+      ? String(DEFAULT_EQUAL_PRINCIPAL_REPAYMENT_KRW)
+      : hasLaunchPreset
+        ? ""
+        : initialDraft?.loanPrincipalAmount || ""
   );
 
   const [
     loanInterestAmount,
     setLoanInterestAmount
   ] = useState(
-    initialDraft?.loanInterestAmount || ""
+    hasLaunchPreset
+      ? ""
+      : initialDraft?.loanInterestAmount || ""
   );
 
   const [
