@@ -99,6 +99,10 @@ export default function HistoryPage({
   onCopyTransaction
 }: HistoryPageProps) {
   const [view, setView] = useState<HistoryView>("calendar");
+  const [calendarEditTarget, setCalendarEditTarget] = useState<{
+    transactionId: string;
+    date: string;
+  } | null>(null);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<TransactionFilter>("전체");
   const [searchDateFrom, setSearchDateFrom] = useState("");
@@ -183,6 +187,14 @@ export default function HistoryPage({
         setSearchLoading(false);
       }
     }
+  }
+
+  function openSearchResultForEdit(transaction: Transaction) {
+    setCalendarEditTarget({
+      transactionId: transaction.transactionId,
+      date: transaction.date
+    });
+    setView("calendar");
   }
 
   function resetSearchFilters() {
@@ -384,7 +396,10 @@ export default function HistoryPage({
       </div>
 
       {view === "calendar" && (
-        <CalendarPage onAddTransaction={onAddTransaction} />
+        <CalendarPage
+          onAddTransaction={onAddTransaction}
+          openTransaction={calendarEditTarget}
+        />
       )}
 
       {view === "search" && (
@@ -533,6 +548,13 @@ export default function HistoryPage({
                           }
                         />
                       </strong>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => openSearchResultForEdit(transaction)}
+                      >
+                        수정
+                      </Button>
                       {onCopyTransaction && (
                         <Button
                           variant="ghost"

@@ -1,5 +1,39 @@
 import { DurableObject } from "cloudflare:workers";
 
+import {
+  clearCookie,
+  createCookie,
+  createSessionToken,
+  getLoginUsers,
+  getSession,
+  isSameOrigin,
+  safeEqual
+} from "./auth.js";
+
+import {
+  dateOnly as mbD1DateOnly,
+  estimateBillingMonth as mbD1EstimateBilling,
+  monthOnly as mbD1MonthOnly
+} from "./domain/date.js";
+
+import {
+  recurringOccurrenceDate as mbD1RecurringOccurrenceDate,
+  recurringPayload as mbD1RecurringPayload,
+  recurringRuleActiveForMonth as mbD1RecurringRuleActiveForMonth
+} from "./domain/automation.js";
+
+import {
+  getLoginRateLimitStatus,
+  recordLoginFailureState
+} from "./domain/loginRateLimit.js";
+
+import {
+  lookupInvestmentSymbol,
+  normalizeInvestmentLookupCode,
+  normalizeInvestmentSearchQuery,
+  searchInvestmentSymbols
+} from "./investmentSymbols.js";
+
 /**
  * 우리 가계부 Cloudflare Worker
  * - 미영·승철 로그인과 400일 슬라이딩 세션
@@ -8,18 +42,11 @@ import { DurableObject } from "cloudflare:workers";
  * - 거래·투자·설정 API
  */
 
-const COOKIE_NAME = "__Host-moneybook_session";
-const SESSION_MAX_AGE = 60 * 60 * 24 * 400;
 const BOOTSTRAP_TTL_MS = 5 * 60 * 1000;
 const DASHBOARD_TTL_MS = 30 * 1000;
 const BACKEND_WARM_INTERVAL_MS = 2 * 60 * 1000;
-const SYMBOL_LOOKUP_TTL_MS = 24 * 60 * 60 * 1000;
-const SYMBOL_LOOKUP_MAX_ENTRIES = 200;
-const SYMBOL_SEARCH_TTL_MS = 6 * 60 * 60 * 1000;
-const SYMBOL_SEARCH_MAX_ENTRIES = 120;
 
 const encoder = new TextEncoder();
-const decoder = new TextDecoder();
 
 let bootstrapMemory = null;
 let bootstrapOrigin = "";
@@ -36,8 +63,6 @@ let dashboardGeneration = 0;
 let lastAppsScriptActivityAt = 0;
 let warmPromise = null;
 
-const symbolLookupMemory = new Map();
-const symbolSearchMemory = new Map();
 
 const GET_ROUTES = {
   "/api/categories": {
@@ -330,452 +355,6 @@ function isObject(
     typeof value === "object" &&
     !Array.isArray(value)
   );
-}
-
-function isSameOrigin(
-  request
-) {
-  const origin =
-    request.headers.get(
-      "Origin"
-    );
-
-  return (
-    !origin ||
-    origin ===
-      new URL(
-        request.url
-      ).origin
-  );
-}
-
-function getLoginUsers(
-  env
-) {
-  if (
-    !env.LOGIN_USERS
-  ) {
-    throw new Error(
-      "LOGIN_USERS Secret이 설정되지 않았습니다."
-    );
-  }
-
-  let users;
-
-  try {
-    users =
-      JSON.parse(
-        env.LOGIN_USERS
-      );
-  } catch {
-    throw new Error(
-      "LOGIN_USERS가 올바른 JSON 형식이 아닙니다."
-    );
-  }
-
-  if (
-    !isObject(
-      users
-    )
-  ) {
-    throw new Error(
-      "LOGIN_USERS 형식이 올바르지 않습니다."
-    );
-  }
-
-  return users;
-}
-
-async function safeEqual(
-  valueA,
-  valueB
-) {
-  const [
-    hashA,
-    hashB
-  ] =
-    await Promise.all([
-      crypto.subtle.digest(
-        "SHA-256",
-        encoder.encode(
-          String(valueA)
-        )
-      ),
-
-      crypto.subtle.digest(
-        "SHA-256",
-        encoder.encode(
-          String(valueB)
-        )
-      )
-    ]);
-
-  const bytesA =
-    new Uint8Array(
-      hashA
-    );
-
-  const bytesB =
-    new Uint8Array(
-      hashB
-    );
-
-  let difference = 0;
-
-  for (
-    let index = 0;
-    index < bytesA.length;
-    index += 1
-  ) {
-    difference |=
-      bytesA[index] ^
-      bytesB[index];
-  }
-
-  return (
-    difference === 0
-  );
-}
-
-function bytesToBase64Url(
-  bytes
-) {
-  let binary = "";
-
-  for (
-    const byte
-    of bytes
-  ) {
-    binary +=
-      String.fromCharCode(
-        byte
-      );
-  }
-
-  return btoa(
-    binary
-  )
-    .replace(
-      /\+/g,
-      "-"
-    )
-    .replace(
-      /\//g,
-      "_"
-    )
-    .replace(
-      /=+$/g,
-      ""
-    );
-}
-
-function base64UrlToBytes(
-  value
-) {
-  let text =
-    String(value)
-      .replace(
-        /-/g,
-        "+"
-      )
-      .replace(
-        /_/g,
-        "/"
-      );
-
-  text +=
-    "=".repeat(
-      (
-        4 -
-        (
-          text.length %
-          4
-        )
-      ) %
-      4
-    );
-
-  const binary =
-    atob(
-      text
-    );
-
-  return Uint8Array.from(
-    binary,
-    character =>
-      character.charCodeAt(
-        0
-      )
-  );
-}
-
-async function getSessionKey(
-  env
-) {
-  if (
-    !env.SESSION_SECRET
-  ) {
-    throw new Error(
-      "SESSION_SECRET Secret이 설정되지 않았습니다."
-    );
-  }
-
-  return crypto.subtle.importKey(
-    "raw",
-    encoder.encode(
-      env.SESSION_SECRET
-    ),
-    {
-      name: "HMAC",
-      hash: "SHA-256"
-    },
-    false,
-    [
-      "sign",
-      "verify"
-    ]
-  );
-}
-
-async function createSessionToken(
-  name,
-  env
-) {
-  const now =
-    Math.floor(
-      Date.now() /
-      1000
-    );
-
-  const payload = {
-    v: 1,
-    name,
-    iat: now,
-    exp:
-      now +
-      SESSION_MAX_AGE
-  };
-
-  const body =
-    bytesToBase64Url(
-      encoder.encode(
-        JSON.stringify(
-          payload
-        )
-      )
-    );
-
-  const signature =
-    await crypto.subtle.sign(
-      "HMAC",
-      await getSessionKey(
-        env
-      ),
-      encoder.encode(
-        body
-      )
-    );
-
-  return (
-    `${body}.${bytesToBase64Url(
-      new Uint8Array(
-        signature
-      )
-    )}`
-  );
-}
-
-async function verifySessionToken(
-  token,
-  env
-) {
-  if (
-    !token ||
-    typeof token !==
-      "string"
-  ) {
-    return null;
-  }
-
-  const parts =
-    token.split(
-      "."
-    );
-
-  if (
-    parts.length !== 2
-  ) {
-    return null;
-  }
-
-  const [
-    body,
-    signature
-  ] =
-    parts;
-
-  try {
-    const valid =
-      await crypto.subtle.verify(
-        "HMAC",
-        await getSessionKey(
-          env
-        ),
-        base64UrlToBytes(
-          signature
-        ),
-        encoder.encode(
-          body
-        )
-      );
-
-    if (
-      !valid
-    ) {
-      return null;
-    }
-
-    const payload =
-      JSON.parse(
-        decoder.decode(
-          base64UrlToBytes(
-            body
-          )
-        )
-      );
-
-    if (
-      !isObject(
-        payload
-      ) ||
-      payload.v !== 1 ||
-      typeof payload.name !==
-        "string" ||
-      !Number.isFinite(
-        payload.exp
-      ) ||
-      payload.exp <=
-        Math.floor(
-          Date.now() /
-          1000
-        )
-    ) {
-      return null;
-    }
-
-    return payload;
-  } catch {
-    return null;
-  }
-}
-
-function getCookie(
-  request,
-  name
-) {
-  const raw =
-    request.headers.get(
-      "Cookie"
-    );
-
-  if (
-    !raw
-  ) {
-    return "";
-  }
-
-  for (
-    const cookie
-    of raw.split(";")
-  ) {
-    const part =
-      cookie.trim();
-
-    const index =
-      part.indexOf(
-        "="
-      );
-
-    if (
-      index > -1 &&
-      part
-        .slice(
-          0,
-          index
-        )
-        .trim() ===
-        name
-    ) {
-      return part.slice(
-        index + 1
-      );
-    }
-  }
-
-  return "";
-}
-
-function createCookie(
-  token
-) {
-  return [
-    `${COOKIE_NAME}=${token}`,
-    "Path=/",
-    `Max-Age=${SESSION_MAX_AGE}`,
-    "HttpOnly",
-    "Secure",
-    "SameSite=Strict"
-  ].join(
-    "; "
-  );
-}
-
-function clearCookie() {
-  return [
-    `${COOKIE_NAME}=`,
-    "Path=/",
-    "Max-Age=0",
-    "Expires=Thu, 01 Jan 1970 00:00:00 GMT",
-    "HttpOnly",
-    "Secure",
-    "SameSite=Strict"
-  ].join(
-    "; "
-  );
-}
-
-async function getSession(
-  request,
-  env
-) {
-  const payload =
-    await verifySessionToken(
-      getCookie(
-        request,
-        COOKIE_NAME
-      ),
-      env
-    );
-
-  if (
-    !payload
-  ) {
-    return null;
-  }
-
-  const users =
-    getLoginUsers(
-      env
-    );
-
-  return Object.prototype
-    .hasOwnProperty
-    .call(
-      users,
-      payload.name
-    )
-      ? payload
-      : null;
 }
 
 function markAppsScriptActivity() {
@@ -1674,6 +1253,64 @@ async function readJsonObject(
   }
 }
 
+function loginRateLimitKey(request) {
+  return (
+    request.headers.get("CF-Connecting-IP") ||
+    request.headers.get("X-Forwarded-For")?.split(",")[0]?.trim() ||
+    "unknown"
+  );
+}
+
+async function getHouseholdRealtimeStub(env) {
+  if (!env.HOUSEHOLD_REALTIME) {
+    return null;
+  }
+
+  const namespace = env.HOUSEHOLD_REALTIME;
+  return typeof namespace.getByName === "function"
+    ? namespace.getByName(MB_D1_HOUSEHOLD_ID)
+    : namespace.get(namespace.idFromName(MB_D1_HOUSEHOLD_ID));
+}
+
+async function checkLoginRateLimit(request, env) {
+  try {
+    const stub = await getHouseholdRealtimeStub(env);
+    if (!stub) return { blocked: false, retryAfterSeconds: 0 };
+
+    const response = await stub.fetch(
+      "https://moneybook-realtime.internal/auth/rate-limit/check",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: loginRateLimitKey(request) })
+      }
+    );
+
+    if (!response.ok) return { blocked: false, retryAfterSeconds: 0 };
+    return await response.json();
+  } catch {
+    return { blocked: false, retryAfterSeconds: 0 };
+  }
+}
+
+async function updateLoginRateLimit(request, env, action) {
+  try {
+    const stub = await getHouseholdRealtimeStub(env);
+    if (!stub) return;
+
+    await stub.fetch(
+      `https://moneybook-realtime.internal/auth/rate-limit/${action}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: loginRateLimitKey(request) })
+      }
+    );
+  } catch {
+    // rate limit storage failure should not make the household app unavailable
+  }
+}
+
 async function handleLogin(
   request,
   env,
@@ -1732,6 +1369,20 @@ async function handleLogin(
     );
   }
 
+  const rateLimit =
+    await checkLoginRateLimit(
+      request,
+      env
+    );
+
+  if (rateLimit.blocked) {
+    return errorResponse(
+      "LOGIN_RATE_LIMITED",
+      "로그인 시도가 너무 많습니다. 잠시 후 다시 시도해주세요.",
+      429
+    );
+  }
+
   const users =
     getLoginUsers(
       env
@@ -1758,12 +1409,24 @@ async function handleLogin(
       )
     )
   ) {
+    await updateLoginRateLimit(
+      request,
+      env,
+      "failure"
+    );
+
     return errorResponse(
       "INVALID_LOGIN",
       "이름 또는 비밀번호를 확인해주세요.",
       401
     );
   }
+
+  await updateLoginRateLimit(
+    request,
+    env,
+    "success"
+  );
 
   const token =
     await createSessionToken(
@@ -2064,273 +1727,6 @@ async function handleInvestmentCashBaseline(
   );
 }
 
-function normalizeInvestmentLookupCode(value) {
-  const code = String(value || "")
-    .trim()
-    .toUpperCase();
-
-  if (!code) {
-    return "";
-  }
-
-  if (!/^[A-Z0-9.^_-]{1,24}$/.test(code)) {
-    return "";
-  }
-
-  return code;
-}
-
-function inferInvestmentMarket(code) {
-  return /^\d+$/.test(code)
-    ? "국내"
-    : "해외";
-}
-
-function normalizeYahooSymbol(symbol) {
-  return String(symbol || "")
-    .trim()
-    .toUpperCase();
-}
-
-function yahooBaseSymbol(symbol) {
-  return normalizeYahooSymbol(symbol)
-    .replace(/\.(KS|KQ)$/i, "");
-}
-
-function yahooQuoteName(quote) {
-  return String(
-    quote?.longname ||
-    quote?.shortname ||
-    quote?.displayName ||
-    ""
-  ).trim();
-}
-
-function scoreYahooQuote(quote, code) {
-  const symbol = normalizeYahooSymbol(
-    quote?.symbol
-  );
-
-  const base = yahooBaseSymbol(symbol);
-  const exchange = String(
-    quote?.exchange || ""
-  ).toUpperCase();
-  const quoteType = String(
-    quote?.quoteType || ""
-  ).toUpperCase();
-
-  let score = 0;
-
-  if (symbol === code) score += 100;
-  if (base === code) score += 90;
-
-  if (
-    /^\d+$/.test(code) &&
-    (exchange === "KSC" ||
-      exchange === "KOE" ||
-      /\.(KS|KQ)$/.test(symbol))
-  ) {
-    score += 30;
-  }
-
-  if (
-    [
-      "EQUITY",
-      "ETF",
-      "MUTUALFUND",
-      "FUND"
-    ].includes(quoteType)
-  ) {
-    score += 15;
-  }
-
-  if (yahooQuoteName(quote)) {
-    score += 5;
-  }
-
-  return score;
-}
-
-function chooseYahooQuote(quotes, code) {
-  return (Array.isArray(quotes) ? quotes : [])
-    .filter(quote => yahooQuoteName(quote))
-    .map(quote => ({
-      quote,
-      score: scoreYahooQuote(quote, code)
-    }))
-    .filter(item => item.score > 0)
-    .sort((a, b) => b.score - a.score)[0]
-    ?.quote || null;
-}
-
-async function fetchYahooSymbolSearch(query) {
-  const endpoint = new URL(
-    "https://query1.finance.yahoo.com/v1/finance/search"
-  );
-
-  endpoint.searchParams.set("q", query);
-  endpoint.searchParams.set("quotesCount", "8");
-  endpoint.searchParams.set("newsCount", "0");
-  endpoint.searchParams.set("listsCount", "0");
-  endpoint.searchParams.set("lang", "ko-KR");
-  endpoint.searchParams.set("region", "KR");
-  endpoint.searchParams.set(
-    "enableFuzzyQuery",
-    "false"
-  );
-
-  const controller = new AbortController();
-  const timeout = setTimeout(
-    () => controller.abort(),
-    3500
-  );
-
-  let response;
-
-  try {
-    response = await fetch(
-      endpoint.toString(),
-      {
-        headers: {
-          "Accept": "application/json",
-          "User-Agent":
-            "Mozilla/5.0 moneybook-symbol-lookup"
-        },
-        signal: controller.signal
-      }
-    );
-  } finally {
-    clearTimeout(timeout);
-  }
-
-  if (!response.ok) {
-    return [];
-  }
-
-  const data = await response.json();
-  return Array.isArray(data?.quotes)
-    ? data.quotes
-    : [];
-}
-
-function rememberSymbolLookup(code, data) {
-  symbolLookupMemory.set(
-    code,
-    {
-      data,
-      expiresAt:
-        Date.now() + SYMBOL_LOOKUP_TTL_MS
-    }
-  );
-
-  if (
-    symbolLookupMemory.size >
-    SYMBOL_LOOKUP_MAX_ENTRIES
-  ) {
-    const oldestKey =
-      symbolLookupMemory.keys().next().value;
-
-    if (oldestKey) {
-      symbolLookupMemory.delete(oldestKey);
-    }
-  }
-}
-
-async function lookupInvestmentSymbol(code) {
-  const cached =
-    symbolLookupMemory.get(code);
-
-  if (
-    cached &&
-    cached.expiresAt > Date.now()
-  ) {
-    return cached.data;
-  }
-
-  const inferredMarket =
-    inferInvestmentMarket(code);
-
-  let quotes = [];
-
-  try {
-    quotes = await fetchYahooSymbolSearch(code);
-
-    let match = chooseYahooQuote(
-      quotes,
-      code
-    );
-
-    if (
-      !match &&
-      inferredMarket === "국내"
-    ) {
-      const fallbackResults =
-        await Promise.all([
-          fetchYahooSymbolSearch(`${code}.KS`),
-          fetchYahooSymbolSearch(`${code}.KQ`)
-        ]);
-
-      match = chooseYahooQuote(
-        fallbackResults.flat(),
-        code
-      );
-    }
-
-    if (match) {
-      const symbol = normalizeYahooSymbol(
-        match.symbol
-      );
-      const exchange = String(
-        match.exchange ||
-        match.exchDisp ||
-        ""
-      ).trim();
-
-      const domestic =
-        /^\d+$/.test(code) ||
-        /\.(KS|KQ)$/.test(symbol) ||
-        ["KSC", "KOE"].includes(
-          String(match.exchange || "")
-            .toUpperCase()
-        );
-
-      const result = {
-        found: true,
-        stockCode: code,
-        stockName: yahooQuoteName(match),
-        market: domestic ? "국내" : "해외",
-        symbol,
-        exchange,
-        source: "yahoo-finance"
-      };
-
-      rememberSymbolLookup(code, result);
-      return result;
-    }
-  } catch {
-    // 외부 조회 실패는 매매 기록 자체를 막지 않는다.
-  }
-
-  const result = {
-    found: false,
-    stockCode: code,
-    stockName: "",
-    market: inferredMarket,
-    source: "fallback"
-  };
-
-  // 실패 결과는 짧게만 캐시해서 일시 장애가 오래 남지 않게 한다.
-  symbolLookupMemory.set(
-    code,
-    {
-      data: result,
-      expiresAt: Date.now() + 5 * 60 * 1000
-    }
-  );
-
-  return result;
-}
-
 async function handleInvestmentSymbolLookup(url) {
   const code = normalizeInvestmentLookupCode(
     url.searchParams.get("code")
@@ -2360,442 +1756,6 @@ async function handleInvestmentSymbolLookup(url) {
           : "private, max-age=300"
     }
   );
-}
-
-function normalizeInvestmentSearchQuery(value) {
-  return String(value || "")
-    .normalize("NFKC")
-    .replace(/[\u0000-\u001f\u007f]/g, "")
-    .trim()
-    .slice(0, 60);
-}
-
-function applyKoreanFundAliases(value) {
-  let query = String(value || "");
-
-  const replacements = [
-    [/코덱스/gi, "KODEX"],
-    [/타이거/gi, "TIGER"],
-    [/에이스/gi, "ACE"],
-    [/라이즈/gi, "RISE"],
-    [/솔/gi, "SOL"],
-    [/플러스/gi, "PLUS"],
-    [/타임폴리오/gi, "TIMEFOLIO"]
-  ];
-
-  for (const [pattern, replacement] of replacements) {
-    query = query.replace(pattern, replacement);
-  }
-
-  return query;
-}
-
-function compactInvestmentSearchText(value) {
-  return String(value || "")
-    .normalize("NFKC")
-    .toUpperCase()
-    .replace(/\s+/g, "");
-}
-
-function normalizeKrxShortCode(value) {
-  const raw = String(value || "")
-    .trim()
-    .toUpperCase();
-
-  if (/^A[0-9A-Z]{6}$/.test(raw)) {
-    return raw.slice(1);
-  }
-
-  return raw;
-}
-
-function krxFinderRows(data) {
-  if (Array.isArray(data?.block1)) return data.block1;
-  if (Array.isArray(data?.output)) return data.output;
-  return [];
-}
-
-async function fetchKrxFinder(query, bld, assetType) {
-  const controller = new AbortController();
-  const timeout = setTimeout(
-    () => controller.abort(),
-    3500
-  );
-
-  const body = new URLSearchParams();
-  body.set("locale", "ko_KR");
-  body.set("mktsel", "ALL");
-  body.set("typeNo", "0");
-  body.set("searchText", query);
-  body.set("bld", bld);
-
-  let response;
-
-  try {
-    response = await fetch(
-      "https://data.krx.co.kr/comm/bldAttendant/getJsonData.cmd",
-      {
-        method: "POST",
-        headers: {
-          "Accept": "application/json, text/plain, */*",
-          "Content-Type":
-            "application/x-www-form-urlencoded; charset=UTF-8",
-          "Referer": "https://data.krx.co.kr/",
-          "User-Agent":
-            "Mozilla/5.0 moneybook-krx-symbol-search"
-        },
-        body: body.toString(),
-        signal: controller.signal
-      }
-    );
-  } finally {
-    clearTimeout(timeout);
-  }
-
-  if (!response.ok) return [];
-
-  let data;
-
-  try {
-    data = await response.json();
-  } catch {
-    return [];
-  }
-
-  return krxFinderRows(data)
-    .map(row => {
-      const stockCode = normalizeKrxShortCode(
-        row?.short_code ||
-          row?.shortCode ||
-          row?.ISU_SRT_CD ||
-          row?.isuSrtCd ||
-          ""
-      );
-
-      const stockName = String(
-        row?.codeName ||
-          row?.isuNm ||
-          row?.ISU_NM ||
-          row?.ISU_ABBRV ||
-          ""
-      ).trim();
-
-      if (!stockCode || !stockName) return null;
-
-      return {
-        stockCode,
-        stockName,
-        market: "국내",
-        symbol: stockCode,
-        exchange: String(
-          row?.marketName ||
-            row?.marketEngName ||
-            row?.MKT_NM ||
-            "KRX"
-        ).trim(),
-        assetType,
-        source: "krx"
-      };
-    })
-    .filter(Boolean);
-}
-
-function krxGoldSpotSearchItem() {
-  return {
-    stockCode: "04020000",
-    stockName: "금 현물 99.99_1Kg",
-    market: "국내",
-    symbol: "04020000",
-    exchange: "KRX 금시장",
-    assetType: "금현물",
-    source: "krx-gold"
-  };
-}
-
-function yahooSearchItem(quote) {
-  const symbol = normalizeYahooSymbol(
-    quote?.symbol
-  );
-
-  const stockName = yahooQuoteName(quote);
-  const exchangeCode = String(
-    quote?.exchange || ""
-  ).toUpperCase();
-  const exchange = String(
-    quote?.exchDisp || quote?.exchange || ""
-  ).trim();
-  const quoteType = String(
-    quote?.quoteType || ""
-  ).toUpperCase();
-
-  if (!symbol || !stockName) return null;
-
-  if (
-    ![
-      "EQUITY",
-      "ETF",
-      "MUTUALFUND",
-      "FUND"
-    ].includes(quoteType)
-  ) {
-    return null;
-  }
-
-  const domestic =
-    /\.(KS|KQ)$/.test(symbol) ||
-    ["KSC", "KOE"].includes(exchangeCode);
-
-  const stockCode = domestic
-    ? yahooBaseSymbol(symbol)
-    : symbol;
-
-  return {
-    stockCode,
-    stockName,
-    market: domestic ? "국내" : "해외",
-    symbol,
-    exchange,
-    assetType:
-      quoteType === "ETF"
-        ? "ETF"
-        : quoteType === "EQUITY"
-          ? "주식"
-          : "펀드",
-    source: "yahoo-finance"
-  };
-}
-
-function scoreInvestmentSearchItem(item, query) {
-  const rawQuery = compactInvestmentSearchText(query);
-  const aliasedText = applyKoreanFundAliases(query);
-  const aliasQuery = compactInvestmentSearchText(
-    aliasedText
-  );
-  const name = compactInvestmentSearchText(
-    item.stockName
-  );
-  const code = compactInvestmentSearchText(
-    item.stockCode
-  );
-  const haystack = `${name}${code}${compactInvestmentSearchText(item.exchange || "")}${compactInvestmentSearchText(item.assetType || "")}`;
-
-  const tokenTerms = aliasedText
-    .split(/\s+/)
-    .map(compactInvestmentSearchText)
-    .filter(Boolean);
-
-  let score = 0;
-
-  for (const term of new Set([rawQuery, aliasQuery])) {
-    if (!term) continue;
-
-    if (code === term) score = Math.max(score, 220);
-    if (name === term) score = Math.max(score, 210);
-    if (name.startsWith(term)) score = Math.max(score, 180);
-    if (name.includes(term)) score = Math.max(score, 150);
-    if (code.startsWith(term)) score = Math.max(score, 140);
-    if (code.includes(term)) score = Math.max(score, 120);
-  }
-
-  if (
-    tokenTerms.length > 1 &&
-    tokenTerms.every(term => haystack.includes(term))
-  ) {
-    score = Math.max(score, 170);
-  }
-
-  /*
-   * KRX라는 이유만으로 무관한 종목을 검색 결과에 남기지 않습니다.
-   * 실제 검색어와 일치한 경우에만 국내 공식 데이터에 작은 가산점을 줍니다.
-   */
-  if (
-    score > 0 &&
-    (item.source === "krx" || item.source === "krx-gold")
-  ) {
-    score += 25;
-  }
-
-  return score;
-}
-
-function buildKrxSearchQueries(query) {
-  const full = applyKoreanFundAliases(query).trim();
-  const knownBrands = new Set([
-    "KODEX",
-    "TIGER",
-    "ACE",
-    "RISE",
-    "SOL",
-    "PLUS",
-    "TIMEFOLIO"
-  ]);
-
-  const tokens = full
-    .split(/\s+/)
-    .map(token => token.trim())
-    .filter(Boolean);
-
-  const fallbackToken = tokens
-    .filter(token => !knownBrands.has(token.toUpperCase()))
-    .sort((a, b) => b.length - a.length)[0];
-
-  return Array.from(
-    new Set(
-      [full, fallbackToken]
-        .filter(Boolean)
-    )
-  ).slice(0, 2);
-}
-
-function dedupeInvestmentSearchItems(items, query) {
-  const byKey = new Map();
-
-  for (const item of items) {
-    if (!item?.stockCode || !item?.stockName) continue;
-
-    const key = `${item.market}:${String(
-      item.stockCode
-    ).toUpperCase()}`;
-
-    const existing = byKey.get(key);
-
-    if (!existing) {
-      byKey.set(key, item);
-      continue;
-    }
-
-    // 동일 국내 종목이면 KRX의 한글 정식 종목명을 우선한다.
-    if (
-      existing.source !== "krx" &&
-      item.source === "krx"
-    ) {
-      byKey.set(key, item);
-    }
-  }
-
-  return Array.from(byKey.values())
-    .map(item => ({
-      item,
-      score: scoreInvestmentSearchItem(item, query)
-    }))
-    .filter(entry => entry.score > 0)
-    .sort((a, b) =>
-      b.score - a.score ||
-      a.item.stockName.localeCompare(
-        b.item.stockName,
-        "ko"
-      )
-    )
-    .slice(0, 40)
-    .map(entry => entry.item);
-}
-
-function rememberSymbolSearch(key, data) {
-  symbolSearchMemory.set(
-    key,
-    {
-      data,
-      expiresAt: Date.now() + SYMBOL_SEARCH_TTL_MS
-    }
-  );
-
-  if (
-    symbolSearchMemory.size >
-    SYMBOL_SEARCH_MAX_ENTRIES
-  ) {
-    const oldestKey =
-      symbolSearchMemory.keys().next().value;
-
-    if (oldestKey) {
-      symbolSearchMemory.delete(oldestKey);
-    }
-  }
-}
-
-async function searchInvestmentSymbols(query) {
-  const normalized = normalizeInvestmentSearchQuery(
-    query
-  );
-
-  if (!normalized) {
-    return { query: "", items: [] };
-  }
-
-  const cacheKey = normalized.toLocaleLowerCase("ko");
-  const cached = symbolSearchMemory.get(cacheKey);
-
-  if (
-    cached &&
-    cached.expiresAt > Date.now()
-  ) {
-    return cached.data;
-  }
-
-  const domesticQuery =
-    applyKoreanFundAliases(normalized);
-  const krxQueries = buildKrxSearchQueries(
-    normalized
-  );
-
-  const tasks = [
-    ...krxQueries.flatMap(krxQuery => [
-      fetchKrxFinder(
-        krxQuery,
-        "dbms/comm/finder/finder_stkisu",
-        "주식"
-      ),
-      fetchKrxFinder(
-        krxQuery,
-        "dbms/comm/finder/finder_secuprodisu",
-        "ETF·ETN"
-      )
-    ]),
-    fetchYahooSymbolSearch(domesticQuery).then(
-      quotes =>
-        quotes
-          .map(yahooSearchItem)
-          .filter(Boolean)
-    )
-  ];
-
-  const settled = await Promise.allSettled(tasks);
-  const fulfilledExternalItems =
-    settled.flatMap(result =>
-      result.status === "fulfilled"
-        ? result.value
-        : []
-    );
-  const externalProviderSucceeded =
-    settled.some(result =>
-      result.status === "fulfilled"
-    );
-  const combined = [
-    krxGoldSpotSearchItem(),
-    ...fulfilledExternalItems
-  ];
-
-  const data = {
-    query: normalized,
-    items: dedupeInvestmentSearchItems(
-      combined,
-      normalized
-    )
-  };
-
-  // 외부 제공처가 모두 일시 실패한 경우에는 짧게만 캐시한다.
-  if (!externalProviderSucceeded) {
-    symbolSearchMemory.set(
-      cacheKey,
-      {
-        data,
-        expiresAt: Date.now() + 2 * 60 * 1000
-      }
-    );
-  } else {
-    rememberSymbolSearch(cacheKey, data);
-  }
-
-  return data;
 }
 
 async function handleInvestmentSymbolSearch(url) {
@@ -2968,30 +1928,6 @@ function mbD1Now() {
   return new Date().toISOString();
 }
 
-function mbD1DateOnly(value) {
-  const text = mbD1Text(value);
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
-  if (!match) return "";
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  if (
-    date.getUTCFullYear() !== year ||
-    date.getUTCMonth() !== month - 1 ||
-    date.getUTCDate() !== day
-  ) return "";
-  return text;
-}
-
-function mbD1MonthOnly(value) {
-  const text = mbD1Text(value);
-  const match = /^(\d{4})-(\d{2})$/.exec(text);
-  if (!match) return "";
-  const month = Number(match[2]);
-  return month >= 1 && month <= 12 ? text : "";
-}
-
 function mbD1TimestampMs(value) {
   const text = mbD1Text(value);
   if (!text) return null;
@@ -3051,18 +1987,6 @@ function mbD1AccountActive(row) {
     return (start === null || year >= start) && (end === null || year <= end);
   }
   return mbD1Bool(row.is_active);
-}
-
-function mbD1EstimateBilling(dateText, cutoff, paymentDay) {
-  const date = mbD1DateOnly(dateText);
-  if (!date || !cutoff || !paymentDay) return null;
-  const [year, month, day] = date.split("-").map(Number);
-  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
-  const effectiveCutoff = Math.min(Number(cutoff), lastDay);
-  let offset = day <= effectiveCutoff ? 0 : 1;
-  if (Number(paymentDay) <= Number(cutoff)) offset += 1;
-  const target = new Date(Date.UTC(year, month - 1 + offset, 1));
-  return `${target.getUTCFullYear()}-${String(target.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
 function mbD1Envelope(data) {
@@ -4071,39 +2995,6 @@ async function mbD1PreviewBenefit(env, body) {
   };
 }
 
-function mbD1RecurringOccurrenceDate(rule, month) {
-  if (!mbD1MonthOnly(month)) return "";
-  const [year, monthNumber] = month.split("-").map(Number);
-  const lastDay = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
-  return `${month}-${String(Math.min(rule.dayOfMonth, lastDay)).padStart(2, "0")}`;
-}
-
-function mbD1RecurringRuleActiveForMonth(rule, month) {
-  if (!rule.enabled) return false;
-  if (rule.startMonth && month < rule.startMonth) return false;
-  if (rule.endMonth && month > rule.endMonth) return false;
-  return true;
-}
-
-function mbD1RecurringPayload(rule, date, requestId) {
-  const base = {
-    date,
-    type: rule.type,
-    amount: rule.amount,
-    categoryId: rule.categoryId,
-    description: rule.description || rule.name,
-    memo: rule.memo,
-    requestId
-  };
-  if (rule.type === "지출") {
-    return { ...base, paymentMethodId: rule.paymentMethodId, spendingTarget: rule.spendingTarget };
-  }
-  if (rule.type === "수입") {
-    return { ...base, toAccountId: rule.toAccountId };
-  }
-  return { ...base, fromAccountId: rule.fromAccountId, toAccountId: rule.toAccountId };
-}
-
 async function mbD1RecurringAlreadyCreated(env, ruleId, month) {
   const requestId = `RECUR_${ruleId}_${month}`;
   const row = await mbD1First(
@@ -4671,10 +3562,8 @@ async function mbD1GetChangesData(env, url) {
 async function mbD1RealtimePoke(env, detail = {}) {
   if (!env.HOUSEHOLD_REALTIME) return;
   try {
-    const namespace = env.HOUSEHOLD_REALTIME;
-    const stub = typeof namespace.getByName === "function"
-      ? namespace.getByName(MB_D1_HOUSEHOLD_ID)
-      : namespace.get(namespace.idFromName(MB_D1_HOUSEHOLD_ID));
+    const stub = await getHouseholdRealtimeStub(env);
+    if (!stub) return;
     await stub.fetch("https://moneybook-realtime.internal/broadcast", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -6179,6 +5068,56 @@ export class HouseholdRealtime extends DurableObject {
 
   async fetch(request) {
     const url = new URL(request.url);
+
+    if (
+      request.method === "POST" &&
+      url.pathname.startsWith("/auth/rate-limit/")
+    ) {
+      let body;
+      try {
+        body = await request.json();
+      } catch {
+        return Response.json({ error: "invalid request" }, { status: 400 });
+      }
+
+      const key = String(body?.key || "").trim().slice(0, 200);
+      if (!key) {
+        return Response.json({ error: "missing key" }, { status: 400 });
+      }
+
+      const storageKey = `login-rate:${key}`;
+      const current = await this.ctx.storage.get(storageKey);
+      const now = Date.now();
+
+      if (url.pathname.endsWith("/check")) {
+        const status = getLoginRateLimitStatus(current, now);
+        if (!status.blocked && current) {
+          if (status.record.failures.length > 0) {
+            await this.ctx.storage.put(storageKey, status.record);
+          } else {
+            await this.ctx.storage.delete(storageKey);
+          }
+        }
+        return Response.json({
+          blocked: status.blocked,
+          retryAfterSeconds: Math.max(0, Math.ceil(status.retryAfterMs / 1000))
+        });
+      }
+
+      if (url.pathname.endsWith("/failure")) {
+        const next = recordLoginFailureState(current, now);
+        await this.ctx.storage.put(storageKey, next);
+        return Response.json({ ok: true });
+      }
+
+      if (url.pathname.endsWith("/success")) {
+        await this.ctx.storage.delete(storageKey);
+        return Response.json({ ok: true });
+      }
+
+      return Response.json({ error: "unknown action" }, { status: 404 });
+    }
+
     if (request.method === "POST" && url.pathname === "/broadcast") {
       let payload;
       try {
@@ -6497,10 +5436,7 @@ export default {
         if (!env.HOUSEHOLD_REALTIME) {
           return errorResponse("REALTIME_BINDING_UNAVAILABLE", "실시간 WebSocket 바인딩이 아직 활성화되지 않았습니다.", 503);
         }
-        const namespace = env.HOUSEHOLD_REALTIME;
-        const stub = typeof namespace.getByName === "function"
-          ? namespace.getByName(MB_D1_HOUSEHOLD_ID)
-          : namespace.get(namespace.idFromName(MB_D1_HOUSEHOLD_ID));
+        const stub = await getHouseholdRealtimeStub(env);
         return stub.fetch(request);
       }
 

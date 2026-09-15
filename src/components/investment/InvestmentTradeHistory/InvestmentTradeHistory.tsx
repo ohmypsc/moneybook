@@ -18,6 +18,7 @@ import type {
 import { Button } from "../../common/Button/Button";
 import { Card } from "../../common/Card/Card";
 import { formatMoney } from "../../common/Money/Money";
+import { confirmAction } from "../../../utils/confirmAction";
 
 import styles
   from "./InvestmentTradeHistory.module.css";
@@ -872,15 +873,16 @@ export default function InvestmentTradeHistory({
 
 
     const confirmed =
-      window.confirm(
-        [
+      await confirmAction({
+        title: "투자 거래 삭제",
+        message: [
           `${label} ${trade.tradeType} 거래를 삭제할까요?`,
           "",
           "삭제하면 보유수량, 평단 및 예수금이 다시 계산됩니다."
-        ].join(
-          "\n"
-        )
-      );
+        ].join("\n"),
+        confirmLabel: "삭제",
+        tone: "danger"
+      });
 
 
     if (
@@ -943,15 +945,15 @@ export default function InvestmentTradeHistory({
 
 
     const confirmed =
-      window.confirm(
-        [
+      await confirmAction({
+        title: "투자 거래 복원",
+        message: [
           `${label} ${trade.tradeType} 거래를 복원할까요?`,
           "",
           "복원하면 보유수량, 평단 및 예수금이 다시 계산됩니다."
-        ].join(
-          "\n"
-        )
-      );
+        ].join("\n"),
+        confirmLabel: "복원"
+      });
 
 
     if (

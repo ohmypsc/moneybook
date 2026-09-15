@@ -29,5 +29,59 @@
       "type": "image/png",
       "purpose": "maskable"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "지출 입력",
+      "short_name": "지출",
+      "description": "지출 입력 화면 바로 열기",
+      "url": "/?shortcut=expense",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "수입 입력",
+      "short_name": "수입",
+      "description": "수입 입력 화면 바로 열기",
+      "url": "/?shortcut=income",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "이체 입력",
+      "short_name": "이체",
+      "description": "이체 입력 화면 바로 열기",
+      "url": "/?shortcut=transfer",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "내역 보기",
+      "short_name": "내역",
+      "description": "가계부 내역 바로 열기",
+      "url": "/?shortcut=history",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
   ]
 }

@@ -27,6 +27,7 @@ import type {
 import { markLedgerChanged } from "../../utils/ledgerEvents";
 import { clearBootstrapMemoryCache } from "../../api/bootstrapCache";
 import { getSeoulDateString } from "../../utils/dateTime";
+import { confirmAction } from "../../utils/confirmAction";
 import { Button } from "../../components/common/Button/Button";
 import { Card } from "../../components/common/Card/Card";
 import { formatMoney } from "../../components/common/Money/Money";
@@ -284,7 +285,14 @@ export default function AutomationSettingsPanel() {
   }
 
   async function handleDeleteRecurring(rule: RecurringTransactionRule) {
-    if (!window.confirm(`'${rule.name}' 고정 거래 설정을 삭제할까요? 이미 생성된 거래는 지워지지 않습니다.`)) return;
+    if (
+      !(await confirmAction({
+        title: "고정 거래 삭제",
+        message: `‘${rule.name}’ 고정 거래 설정을 삭제할까요?\n\n이미 생성된 거래는 지워지지 않습니다.`,
+        confirmLabel: "삭제",
+        tone: "danger"
+      }))
+    ) return;
     setBusyRuleId(rule.id);
     setError("");
     try {

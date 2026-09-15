@@ -7,8 +7,13 @@
     "dev": "vite",
     "prebuild": "node scripts/generate-pwa-icons.mjs",
     "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test tests/*.test.*",
+    "check:worker": "node --check worker/index.js && node --check worker/auth.js && node --check worker/investmentSymbols.js && node --check worker/domain/date.js && node --check worker/domain/automation.js && node --check worker/domain/loginRateLimit.js",
+    "check": "npm run typecheck && npm test && npm run check:worker && npm run check:boundaries",
     "preview": "vite preview",
-    "deploy": "npm run build && wrangler deploy --config dist/moneybook/wrangler.json"
+    "deploy": "npm run build && wrangler deploy --config dist/moneybook/wrangler.json",
+    "check:boundaries": "node scripts/check-source-boundaries.mjs"
   },
   "dependencies": {
     "react": "19.2.8",

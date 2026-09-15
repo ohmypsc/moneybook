@@ -1,26 +1,21 @@
 import {
   markLedgerChanged
-} from "../utils/ledgerEvents";
+} from "../utils/ledgerEvents.ts";
+
+import {
+  syncInputPreferencesFromBootstrapPayload
+} from "../utils/inputPreferences.ts";
 
 interface CachedBootstrapResponse {
   body: string;
-  status: number;
-  statusText: string;
-  contentType: string;
   expiresAt: number;
 }
-
-const BOOTSTRAP_PATH =
-  "/api/bootstrap";
-
-const SETTINGS_PATH =
-  "/api/settings/input-preferences";
 
 const BOOTSTRAP_TTL_MS =
   Number.POSITIVE_INFINITY;
 
-const FETCH_PATCH_MARKER =
-  "__moneybookBootstrapCacheFetchPatched";
+const SETTINGS_PATH =
+  "/api/settings/input-preferences";
 
 const MASTER_MUTATION_PATHS =
   new Set([
@@ -66,75 +61,8 @@ let bootstrapCache:
   CachedBootstrapResponse | null =
     null;
 
-let bootstrapPrefetchPromise:
-  Promise<void> | null =
-    null;
-
 let bootstrapCacheGeneration =
   0;
-
-
-function getRequestUrl(
-  input: RequestInfo | URL
-) {
-  if (
-    typeof window ===
-    "undefined"
-  ) {
-    return null;
-  }
-
-  try {
-    const raw =
-      typeof input ===
-      "string"
-        ? input
-        : input instanceof URL
-          ? input.toString()
-          : input.url;
-
-    return new URL(
-      raw,
-      window.location.origin
-    );
-
-  } catch {
-    return null;
-  }
-}
-
-
-function getRequestMethod(
-  input: RequestInfo | URL,
-  init?: RequestInit
-) {
-  const method =
-    init?.method ||
-    (
-      typeof Request !==
-        "undefined" &&
-      input instanceof Request
-        ? input.method
-        : "GET"
-    );
-
-  return String(
-    method || "GET"
-  ).toUpperCase();
-}
-
-
-function isSameOriginUrl(
-  url: URL | null
-) {
-  return !!(
-    url &&
-    typeof window !==
-      "undefined" &&
-    url.origin ===
-      window.location.origin
-  );
-}
 
 
 function clearExpiredBootstrapCache() {
@@ -144,33 +72,26 @@ function clearExpiredBootstrapCache() {
       Date.now()
   ) {
     bootstrapCache = null;
-    bootstrapCacheGeneration +=
-      1;
+    bootstrapCacheGeneration += 1;
   }
 }
 
 
 export function clearBootstrapMemoryCache() {
   bootstrapCache = null;
-
-  bootstrapPrefetchPromise =
-    null;
-
-  bootstrapCacheGeneration +=
-    1;
+  bootstrapCacheGeneration += 1;
 }
 
 
 export function getBootstrapCacheGeneration() {
   clearExpiredBootstrapCache();
-
   return bootstrapCacheGeneration;
 }
 
 
 /**
  * 이미 프리페치된 bootstrap 응답이 있으면 첫 렌더에서 바로 꺼내 씁니다.
- * InputPage가 캐시 응답을 기다리느라 잠깐 로딩 화면을 보여주는 현상을 줄입니다.
+ * 매번 새 객체를 반환해서 호출 측이 캐시 원본을 실수로 변경하지 않게 합니다.
  */
 export function getCachedBootstrapPayload<T>() {
   clearExpiredBootstrapCache();
@@ -180,45 +101,25 @@ export function getCachedBootstrapPayload<T>() {
   }
 
   try {
-    return JSON.parse(bootstrapCache.body) as T;
+    return JSON.parse(
+      bootstrapCache.body
+    ) as T;
   } catch {
     return null;
   }
 }
 
 
-function responseFromBootstrapCache(
-  cached:
-    CachedBootstrapResponse
-) {
-  return new Response(
-    cached.body,
-    {
-      status:
-        cached.status,
-
-      statusText:
-        cached.statusText,
-
-      headers: {
-        "Content-Type":
-          cached.contentType ||
-          "application/json; charset=utf-8",
-
-        "Cache-Control":
-          "no-store"
-      }
-    }
-  );
-}
-
-
-async function rememberBootstrapResponse(
-  response: Response,
+/**
+ * 네트워크 요청을 시작했을 때의 generation과 현재 generation이 같을 때만
+ * bootstrap을 기억합니다. 요청 도중 설정이 변경된 경우 오래된 응답이
+ * 새 캐시를 덮어쓰지 못합니다.
+ */
+export function rememberBootstrapPayload(
+  payload: unknown,
   requestGeneration: number
 ) {
   if (
-    !response.ok ||
     requestGeneration !==
       bootstrapCacheGeneration
   ) {
@@ -226,343 +127,61 @@ async function rememberBootstrapResponse(
   }
 
   try {
-    const clone =
-      response.clone();
-
-    const body =
-      await clone.text();
-
     const parsed =
-      JSON.parse(body) as {
+      payload as {
         success?: boolean;
       };
 
     if (
-      parsed?.success ===
-      false ||
+      parsed?.success === false ||
       requestGeneration !==
         bootstrapCacheGeneration
     ) {
       return;
     }
 
+    const body =
+      JSON.stringify(payload);
+
     bootstrapCache = {
       body,
-
-      status:
-        response.status,
-
-      statusText:
-        response.statusText,
-
-      contentType:
-        response.headers.get(
-          "Content-Type"
-        ) ||
-        "application/json; charset=utf-8",
-
       expiresAt:
         Date.now() +
         BOOTSTRAP_TTL_MS
     };
 
+    syncInputPreferencesFromBootstrapPayload(
+      payload
+    );
   } catch {
     /*
-     * 캐시 저장 실패가 실제 bootstrap 요청을
-     * 실패시키면 안 됩니다.
+     * 캐시 저장 또는 로컬 백업 동기화 실패가
+     * 실제 bootstrap 요청을 실패시키면 안 됩니다.
      */
   }
 }
 
 
-async function responseSucceeded(
-  response: Response
-) {
-  if (!response.ok) {
-    return false;
-  }
-
-  try {
-    const payload =
-      await response
-        .clone()
-        .json() as {
-          success?: boolean;
-        };
-
-    return (
-      payload?.success !==
-      false
-    );
-
-  } catch {
-    return true;
-  }
-}
-
-
-async function inspectMutationResponse(
-  response: Response,
+/**
+ * apiRequest가 성공한 뒤 한 번만 호출합니다.
+ * 전역 fetch monkey patch 대신 모든 mutation 부수효과를 이 경로로 모읍니다.
+ */
+export function handleSuccessfulApiMutation(
   pathname: string
 ) {
-  const invalidatesBootstrap =
+  if (
     BOOTSTRAP_MUTATION_PATHS.has(
       pathname
-    );
-
-  const changesLedger =
-    LEDGER_MUTATION_PATHS.has(
-      pathname
-    );
-
-  if (
-    !invalidatesBootstrap &&
-    !changesLedger
-  ) {
-    return;
-  }
-
-  const succeeded =
-    await responseSucceeded(
-      response
-    );
-
-  if (!succeeded) {
-    return;
-  }
-
-  if (
-    invalidatesBootstrap
+    )
   ) {
     clearBootstrapMemoryCache();
   }
 
   if (
-    changesLedger
+    LEDGER_MUTATION_PATHS.has(
+      pathname
+    )
   ) {
     markLedgerChanged();
   }
 }
-
-
-function installBootstrapCacheFetch() {
-  if (
-    typeof window ===
-      "undefined" ||
-    typeof window.fetch !==
-      "function"
-  ) {
-    return;
-  }
-
-  const markedWindow =
-    window as typeof window & {
-      [FETCH_PATCH_MARKER]?:
-        boolean;
-    };
-
-  if (
-    markedWindow[
-      FETCH_PATCH_MARKER
-    ]
-  ) {
-    return;
-  }
-
-  const originalFetch =
-    window.fetch.bind(
-      window
-    );
-
-  markedWindow[
-    FETCH_PATCH_MARKER
-  ] =
-    true;
-
-  window.fetch =
-    (async (
-      input:
-        RequestInfo | URL,
-      init?:
-        RequestInit
-    ) => {
-      const url =
-        getRequestUrl(
-          input
-        );
-
-      const method =
-        getRequestMethod(
-          input,
-          init
-        );
-
-      const sameOrigin =
-        isSameOriginUrl(
-          url
-        );
-
-      const isBootstrapRequest =
-        sameOrigin &&
-        method === "GET" &&
-        url?.pathname ===
-          BOOTSTRAP_PATH;
-
-      if (
-        isBootstrapRequest
-      ) {
-        clearExpiredBootstrapCache();
-
-        if (
-          bootstrapCache
-        ) {
-          return responseFromBootstrapCache(
-            bootstrapCache
-          );
-        }
-
-        /*
-         * 로그인 직후 App의 bootstrap 프리페치가 아직 진행 중이면
-         * InputPage가 같은 /api/bootstrap 요청을 하나 더 보내지 않습니다.
-         * 기존 프리페치가 끝날 때까지 기다린 뒤 메모리 캐시를 재사용합니다.
-         */
-        if (
-          bootstrapPrefetchPromise
-        ) {
-          await bootstrapPrefetchPromise;
-
-          clearExpiredBootstrapCache();
-
-          if (
-            bootstrapCache
-          ) {
-            return responseFromBootstrapCache(
-              bootstrapCache
-            );
-          }
-        }
-      }
-
-      const requestGeneration =
-        bootstrapCacheGeneration;
-
-      const response =
-        await originalFetch(
-          input,
-          init
-        );
-
-      if (
-        isBootstrapRequest
-      ) {
-        await rememberBootstrapResponse(
-          response,
-          requestGeneration
-        );
-      }
-
-      if (
-        sameOrigin &&
-        method !== "GET" &&
-        url
-      ) {
-        await inspectMutationResponse(
-          response,
-          url.pathname
-        );
-      }
-
-      return response;
-    }) as typeof window.fetch;
-}
-
-
-/**
- * 홈을 보고 있는 동안 bootstrap을 미리 받아 둡니다.
- * 실제 InputPage가 열릴 때는 같은 응답을 브라우저 메모리에서
- * 즉시 돌려주므로 별도 네트워크 대기를 하지 않습니다.
- */
-export async function prefetchBootstrap() {
-  if (
-    typeof window ===
-    "undefined"
-  ) {
-    return;
-  }
-
-  clearExpiredBootstrapCache();
-
-  if (
-    bootstrapCache
-  ) {
-    return;
-  }
-
-  if (
-    bootstrapPrefetchPromise
-  ) {
-    return bootstrapPrefetchPromise;
-  }
-
-  const task =
-    (async () => {
-      const response =
-        await window.fetch(
-          BOOTSTRAP_PATH,
-          {
-            method:
-              "GET",
-
-            credentials:
-              "same-origin",
-
-            headers: {
-              Accept:
-                "application/json"
-            }
-          }
-        );
-
-      if (!response.ok) {
-        throw new Error(
-          "입력 정보를 미리 불러오지 못했습니다."
-        );
-      }
-
-      /*
-       * body를 실제로 사용할 필요는 없지만
-       * 요청 완료는 보장합니다.
-       */
-      await response
-        .clone()
-        .text();
-    })()
-      .catch(
-        () => {
-          /*
-           * 프리페치 실패는 홈 화면을 막지 않습니다.
-           * InputPage가 열릴 때 정상 요청을 다시 시도합니다.
-           */
-        }
-      );
-
-  bootstrapPrefetchPromise =
-    task;
-
-  void task.finally(
-    () => {
-      if (
-        bootstrapPrefetchPromise ===
-          task
-      ) {
-        bootstrapPrefetchPromise =
-          null;
-      }
-    }
-  );
-
-  return task;
-}
-
-
-installBootstrapCacheFetch();

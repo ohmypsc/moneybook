@@ -1,0 +1,52 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: var(--space-5);
+  background: rgb(15 23 42 / 42%);
+  backdrop-filter: blur(3px);
+}
+
+.dialog {
+  width: min(100%, 24rem);
+  padding: var(--space-6);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.title {
+  margin: 0;
+  font-size: 1.1rem;
+  line-height: 1.35;
+  color: var(--color-text);
+}
+
+.message {
+  margin: var(--space-3) 0 0;
+  white-space: pre-line;
+  line-height: 1.6;
+  color: var(--color-text-muted);
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+}
+
+@media (max-width: 420px) {
+  .backdrop {
+    align-items: end;
+    padding: var(--space-3);
+  }
+
+  .dialog {
+    width: 100%;
+    border-radius: var(--radius-xl);
+  }
+}

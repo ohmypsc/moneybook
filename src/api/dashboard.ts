@@ -17,6 +17,11 @@ import type {
 import {
   subscribeLedgerChanges
 } from "../utils/ledgerEvents";
+import {
+  clearPersistedDashboardSnapshot,
+  readPersistedDashboardSnapshot,
+  rememberPersistedDashboardSnapshot
+} from "./dashboardPersistence";
 
 
 type DashboardCacheEntry = {
@@ -25,6 +30,9 @@ type DashboardCacheEntry = {
 
   fetchedAt:
     number;
+
+  source:
+    "network" | "persisted";
 };
 
 
@@ -89,6 +97,15 @@ function isFresh(
   month?:
     string
 ) {
+  /*
+   * 기기에 저장해 둔 스냅샷은 화면을 즉시 채우는 용도입니다.
+   * 온라인으로 다시 연 경우에는 저장 시각이 최근이어도 항상 서버의
+   * 최신 값을 확인해 persisted 상태를 network 상태로 승격합니다.
+   */
+  if (entry.source === "persisted") {
+    return false;
+  }
+
   return (
     Date.now() -
       entry.fetchedAt <=
@@ -99,15 +116,58 @@ function isFresh(
 }
 
 
+function hydratePersistedCurrentDashboard() {
+  const key = getCacheKey();
+
+  if (dashboardCache.has(key)) {
+    return;
+  }
+
+  const persisted =
+    readPersistedDashboardSnapshot();
+
+  if (!persisted) {
+    return;
+  }
+
+  dashboardCache.set(
+    key,
+    {
+      data: persisted.data,
+      fetchedAt: persisted.fetchedAt,
+      source: "persisted"
+    }
+  );
+}
+
+
+export function getDashboardSnapshotInfo(
+  month?: string
+) {
+  if (!month) {
+    hydratePersistedCurrentDashboard();
+  }
+
+  const entry =
+    dashboardCache.get(
+      getCacheKey(month)
+    );
+
+  return entry
+    ? { ...entry }
+    : null;
+}
+
+
 export function getDashboardSnapshot(
   month?: string
 ) {
-  return dashboardCache.get(
-    getCacheKey(
-      month
-    )
-  )?.data ??
-    null;
+  return getDashboardSnapshotInfo(month)?.data ?? null;
+}
+
+
+export function clearDashboardPersistentSnapshot() {
+  clearPersistedDashboardSnapshot();
 }
 
 
@@ -262,14 +322,24 @@ export async function getDashboard(
             requestGeneration ===
             dashboardGeneration
           ) {
+            const fetchedAt =
+              Date.now();
+
             dashboardCache.set(
               key,
               {
                 data,
-                fetchedAt:
-                  Date.now()
+                fetchedAt,
+                source: "network"
               }
             );
+
+            if (!month) {
+              rememberPersistedDashboardSnapshot(
+                data,
+                fetchedAt
+              );
+            }
           }
 
 

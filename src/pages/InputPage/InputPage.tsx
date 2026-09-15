@@ -11,8 +11,7 @@ import { getBootstrap } from "../../api/bootstrap";
 import { previewBenefit } from "../../api/automation";
 import type {
   AutomationSettings,
-  BenefitPreview,
-  BenefitRule
+  BenefitPreview
 } from "../../api/automation";
 import {
   getBootstrapCacheGeneration,
@@ -20,11 +19,10 @@ import {
 } from "../../api/bootstrapCache";
 import { createTransaction } from "../../api/transactions";
 import { getDashboard, getDashboardSnapshot } from "../../api/dashboard";
-import InvestmentTradeForm
-  from "../../components/investment/InvestmentTradeForm/InvestmentTradeForm";
-import InvestmentTradeHistory
-  from "../../components/investment/InvestmentTradeHistory/InvestmentTradeHistory";
 import { Button } from "../../components/common/Button/Button";
+import { BottomSheet } from "../../components/common/BottomSheet/BottomSheet";
+import { PendingTransactionPanel } from "./PendingTransactionPanel";
+import { InvestmentInputSection } from "./InvestmentInputSection";
 import { Money, formatMoney } from "../../components/common/Money/Money";
 import type {
   DashboardData,
@@ -42,8 +40,6 @@ import {
   enqueuePendingTransaction,
   getLastPendingTransactionCompletion,
   getPendingTransactions,
-  retryAllFailedPendingTransactions,
-  retryPendingTransaction,
   subscribePendingTransactions
 } from "../../utils/pendingTransactionQueue";
 import type {
@@ -51,27 +47,42 @@ import type {
 } from "../../utils/pendingTransactionQueue";
 import { getSeoulDateString } from "../../utils/dateTime";
 import { subscribeLedgerChanges } from "../../utils/ledgerEvents";
+import { confirmAction } from "../../utils/confirmAction";
+import {
+  CARD_PAYMENT_CATEGORY,
+  CARD_PREPAYMENT_CATEGORY,
+  LOAN_INTEREST_CATEGORY_NAME,
+  LOAN_PRINCIPAL_CATEGORY_NAME,
+  LOAN_REPAYMENT_PICKER_ID,
+  getAccountLabel,
+  getAccountOwner,
+  getBackendType,
+  getCategoryLabel,
+  getModeLabel,
+  isAccountPickerKind,
+  isBenefitRuleActive,
+  isCardSettlementCategory,
+  isLoanAccount,
+  isLoanSourceAccount,
+  isOtherOwnerAccount,
+  isTransferAssetAccount,
+  ownerMatchesUser,
+  prioritizeAccountsForUser,
+  uniqueAccounts,
+  type Account,
+  type Category,
+  type InputMode,
+  type PickerKind,
+  type TransactionType
+} from "./inputDomain";
+import {
+  clearInputDraft,
+  readInputDraft,
+  saveInputDraft
+} from "./inputDraft";
 import styles from "./InputPage.module.css";
 
-type TransactionType = "지출" | "수입" | "이체";
-type InputMode = "expense" | "income" | "transfer" | "investment";
 type CreateTransactionPayload = Parameters<typeof createTransaction>[0];
-
-interface Account {
-  accountId: string;
-  accountName?: string;
-  displayName: string;
-  accountType: string;
-  subType: string;
-  owner?: string;
-  paymentAccountId?: string | null;
-}
-
-interface Category {
-  categoryId: string;
-  type: TransactionType;
-  name: string;
-}
 
 interface ApiResult {
   success?: boolean;
@@ -122,23 +133,6 @@ interface RequestMemory {
   requestId: string;
 }
 
-interface InputDraft {
-  mode: InputMode;
-  date: string;
-  amount: string;
-  description: string;
-  categoryId: string;
-  paymentMethodId: string;
-  spendingTarget: string;
-  fromAccountId: string;
-  toAccountId: string;
-  billingMonth: string;
-  memo: string;
-  benefitRewardUsedAmount: string;
-  loanPrincipalAmount: string;
-  loanInterestAmount: string;
-}
-
 interface CardBillingInfo {
   usage: number;
   payments: number;
@@ -146,14 +140,7 @@ interface CardBillingInfo {
 }
 
 
-const CARD_PAYMENT_CATEGORY = "카드정기결제";
-const CARD_PREPAYMENT_CATEGORY = "카드선결제";
-const LOAN_REPAYMENT_PICKER_ID = "__moneybook_loan_repayment__";
-const LOAN_PRINCIPAL_CATEGORY_NAME = "대출원금상환";
-const LOAN_INTEREST_CATEGORY_NAME = "대출이자";
 const DEFAULT_EQUAL_PRINCIPAL_REPAYMENT_KRW = 791666;
-const INPUT_DRAFT_KEY_PREFIX =
-  "moneybook:input-draft:v1:";
 
 interface InputPageProps {
   userName: string;
@@ -184,82 +171,10 @@ interface InputHistoryState {
   } | null;
 }
 
-type PickerKind =
-  | "category"
-  | "paymentMethod"
-  | "spendingTarget"
-  | "incomeAccount"
-  | "fromAccount"
-  | "toAccount"
-  | "creditCard"
-  | "cardSource"
-  | "loanSource"
-  | "loanAccount"
-  | "investmentAccount";
-
 interface PickerItem {
   value: string;
   label: string;
   meta?: string;
-}
-
-function ownerMatchesUser(
-  owner: string,
-  userName: string
-) {
-  const normalizedOwner = String(owner || "").trim();
-  const normalizedUser = String(userName || "").trim();
-
-  if (!normalizedOwner || !normalizedUser) {
-    return false;
-  }
-
-  return (
-    normalizedOwner === normalizedUser ||
-    (normalizedOwner.length >= 2 && normalizedUser.endsWith(normalizedOwner)) ||
-    (normalizedUser.length >= 2 && normalizedOwner.endsWith(normalizedUser))
-  );
-}
-
-function isLoanAccount(account: Account) {
-  return (
-    account.accountType === "부채" &&
-    (account.subType || "").includes("대출")
-  );
-}
-
-function isLoanSourceAccount(account: Account) {
-  return (
-    account.accountType === "자산" &&
-    account.subType !== "주식"
-  );
-}
-
-function isTransferAssetAccount(account: Account) {
-  return account.accountType === "자산";
-}
-
-function prioritizeAccountsForUser(
-  accounts: Account[],
-  userName: string
-) {
-  return accounts
-    .map((account, index) => ({
-      account,
-      index,
-      rank:
-        ownerMatchesUser(getAccountOwner(account), userName)
-          ? 0
-          : getAccountOwner(account) === "공동"
-            ? 1
-            : 2
-    }))
-    .sort(
-      (first, second) =>
-        first.rank - second.rank ||
-        first.index - second.index
-    )
-    .map(item => item.account);
 }
 
 let bootstrapPromise: Promise<BootstrapData> | null = null;
@@ -330,11 +245,6 @@ async function loadBootstrap(): Promise<BootstrapData> {
   return bootstrapPromise;
 }
 
-function getToday() {
-  return getSeoulDateString();
-}
-
-
 function createRequestId() {
   if (
     globalThis.crypto &&
@@ -365,289 +275,6 @@ function getErrorMessage(
   return "저장 중 오류가 발생했습니다.";
 }
 
-function getBackendType(
-  mode: InputMode
-): TransactionType {
-  if (mode === "income") {
-    return "수입";
-  }
-
-  if (mode === "transfer") {
-    return "이체";
-  }
-
-  return "지출";
-}
-
-function getModeLabel(
-  mode: InputMode
-) {
-  if (mode === "income") {
-    return "수입";
-  }
-
-  if (mode === "transfer") {
-    return "이체";
-  }
-
-  if (mode === "investment") {
-    return "투자";
-  }
-
-  return "지출";
-}
-
-function getAccountLabel(
-  account: Account
-) {
-  return (
-    account.displayName ||
-    account.accountName ||
-    account.accountId
-  );
-}
-
-function getAccountOwner(
-  account: Account
-) {
-  const explicitOwner =
-    String(account.owner || "").trim();
-
-  if (explicitOwner) {
-    return explicitOwner;
-  }
-
-  const label =
-    getAccountLabel(account);
-
-  const ownerMatch =
-    label.match(/\(([^()]+)\)\s*$/);
-
-  return ownerMatch?.[1]?.trim() || "";
-}
-
-function isOtherOwnerAccount(
-  account: Account,
-  userName: string
-) {
-  const owner =
-    getAccountOwner(account);
-
-  return Boolean(
-    owner &&
-    !ownerMatchesUser(owner, userName) &&
-    owner !== "공동"
-  );
-}
-
-function uniqueAccounts(
-  accounts: Account[]
-) {
-  const seen =
-    new Set<string>();
-
-  return accounts.filter(
-    account => {
-      if (seen.has(account.accountId)) {
-        return false;
-      }
-
-      seen.add(account.accountId);
-      return true;
-    }
-  );
-}
-
-function isAccountPickerKind(
-  kind: PickerKind
-): kind is Exclude<PickerKind, "category" | "spendingTarget"> {
-  return (
-    kind !== "category" &&
-    kind !== "spendingTarget"
-  );
-}
-
-function getCategoryLabel(
-  category: Category
-) {
-  if (
-    category.name ===
-    CARD_PAYMENT_CATEGORY
-  ) {
-    return "카드값 결제";
-  }
-
-  if (
-    category.name ===
-    CARD_PREPAYMENT_CATEGORY
-  ) {
-    return "카드 선결제";
-  }
-
-  return category.name;
-}
-
-function isCardSettlementCategory(
-  category: Category | null
-) {
-  return !!(
-    category &&
-    (
-      category.name ===
-        CARD_PAYMENT_CATEGORY ||
-      category.name ===
-        CARD_PREPAYMENT_CATEGORY
-    )
-  );
-}
-
-function isBenefitRuleActive(
-  rule: BenefitRule,
-  date: string
-) {
-  if (!rule.enabled || rule.kind === "none" || rule.ratePercent <= 0) {
-    return false;
-  }
-
-  if (rule.validFrom && date < rule.validFrom) {
-    return false;
-  }
-
-  if (rule.validTo && date > rule.validTo) {
-    return false;
-  }
-
-  return true;
-}
-
-function readInputDraft(
-  userName: string
-): InputDraft | null {
-  if (
-    typeof window === "undefined" ||
-    !userName
-  ) {
-    return null;
-  }
-
-  try {
-    const raw = window.localStorage.getItem(
-      `${INPUT_DRAFT_KEY_PREFIX}${userName}`
-    );
-
-    if (!raw) {
-      return null;
-    }
-
-    const value = JSON.parse(raw) as Partial<InputDraft>;
-
-    if (
-      value.mode !== "expense" &&
-      value.mode !== "income" &&
-      value.mode !== "transfer" &&
-      value.mode !== "investment"
-    ) {
-      return null;
-    }
-
-    return {
-      mode: value.mode,
-      date: typeof value.date === "string" ? value.date : "",
-      amount: typeof value.amount === "string" ? value.amount : "",
-      description: typeof value.description === "string" ? value.description : "",
-      categoryId:
-        typeof value.categoryId === "string" ? value.categoryId : "",
-      paymentMethodId:
-        typeof value.paymentMethodId === "string" ? value.paymentMethodId : "",
-      spendingTarget:
-        typeof value.spendingTarget === "string" ? value.spendingTarget : "",
-      fromAccountId:
-        typeof value.fromAccountId === "string" ? value.fromAccountId : "",
-      toAccountId:
-        typeof value.toAccountId === "string" ? value.toAccountId : "",
-      billingMonth:
-        typeof value.billingMonth === "string" ? value.billingMonth : "",
-      memo: typeof value.memo === "string" ? value.memo : "",
-      benefitRewardUsedAmount:
-        typeof value.benefitRewardUsedAmount === "string"
-          ? value.benefitRewardUsedAmount
-          : "",
-      loanPrincipalAmount:
-        typeof value.loanPrincipalAmount === "string"
-          ? value.loanPrincipalAmount
-          : "",
-      loanInterestAmount:
-        typeof value.loanInterestAmount === "string"
-          ? value.loanInterestAmount
-          : ""
-    };
-  } catch {
-    return null;
-  }
-}
-
-function clearInputDraft(
-  userName: string
-) {
-  if (
-    typeof window === "undefined" ||
-    !userName
-  ) {
-    return;
-  }
-
-  try {
-    window.localStorage.removeItem(
-      `${INPUT_DRAFT_KEY_PREFIX}${userName}`
-    );
-  } catch {
-    // 임시저장 정리 실패가 실제 거래 저장을 막지는 않게 합니다.
-  }
-}
-
-
-function saveInputDraft(
-  userName: string,
-  draft: InputDraft
-) {
-  if (
-    typeof window === "undefined" ||
-    !userName
-  ) {
-    return;
-  }
-
-  try {
-    const hasMeaningfulInput = !!(
-      draft.amount ||
-      draft.categoryId ||
-      draft.paymentMethodId ||
-      draft.spendingTarget ||
-      draft.fromAccountId ||
-      draft.toAccountId ||
-      draft.description.trim() ||
-      draft.memo.trim() ||
-      draft.benefitRewardUsedAmount ||
-      draft.loanPrincipalAmount ||
-      draft.loanInterestAmount
-    );
-
-    if (!hasMeaningfulInput) {
-      window.localStorage.removeItem(
-        `${INPUT_DRAFT_KEY_PREFIX}${userName}`
-      );
-      return;
-    }
-
-    window.localStorage.setItem(
-      `${INPUT_DRAFT_KEY_PREFIX}${userName}`,
-      JSON.stringify(draft)
-    );
-  } catch {
-    // 임시저장 실패가 실제 거래 입력을 막지는 않게 합니다.
-  }
-}
-
 export default function InputPage({
   userName,
   initialDate = null,
@@ -662,7 +289,7 @@ export default function InputPage({
   initialMemo = null
 }: InputPageProps) {
   const today =
-    getToday();
+    getSeoulDateString();
 
   const historyLaunchState =
     (typeof window !== "undefined"
@@ -2097,7 +1724,7 @@ export default function InputPage({
     setSuccess("");
   }
 
-  function loadFailedTransactionForEdit(
+  async function loadFailedTransactionForEdit(
     item: PendingTransactionRecord
   ) {
     const hasCurrentInput = !!(
@@ -2112,9 +1739,11 @@ export default function InputPage({
 
     if (
       hasCurrentInput &&
-      !window.confirm(
-        "현재 작성 중인 내용을 저장 실패 항목으로 바꿀까요? 작성 중인 내용은 덮어씁니다."
-      )
+      !(await confirmAction({
+        title: "작성 내용 바꾸기",
+        message: "현재 작성 중인 내용을 저장 실패 항목으로 바꿀까요?\n\n작성 중인 내용은 덮어씁니다.",
+        confirmLabel: "바꾸기"
+      }))
     ) {
       return;
     }
@@ -3477,9 +3106,11 @@ export default function InputPage({
 
     if (
       possibleDuplicate &&
-      !window.confirm(
-        `같은 날짜에 ${formatMoney(numericAmount)} ${backendType} 내역이 이미 있습니다.\n\n중복이 아니라면 그대로 저장하세요.`
-      )
+      !(await confirmAction({
+        title: "중복 거래 확인",
+        message: `같은 날짜에 ${formatMoney(numericAmount)} ${backendType} 내역이 이미 있습니다.\n\n중복이 아니라면 그대로 저장하세요.`,
+        confirmLabel: "그래도 저장"
+      }))
     ) {
       return;
     }
@@ -3792,85 +3423,17 @@ export default function InputPage({
       </div>
 
       {mode === "investment" ? (
-        <div className={styles.form}>
-          <section className={styles.card}>
-            <div className={styles.conditionalSection}>
-              <h2 className={styles.sectionTitle}>투자 매수 · 매도</h2>
-
-              <label className={styles.field}>
-                <span className={styles.fieldLabel}>
-                  투자계좌 <span className={styles.required}>*</span>
-                </span>
-
-                <button
-                  type="button"
-                  className={styles.pickerButton}
-                  disabled={investmentLoading || investmentAccounts.length === 0}
-                  onClick={() => setActivePicker("investmentAccount")}
-                >
-                  <span
-                    className={
-                      selectedInvestmentAccountId
-                        ? styles.pickerValue
-                        : styles.pickerPlaceholder
-                    }
-                  >
-                    {selectedInvestmentAccount
-                      ? `${selectedInvestmentAccount.accountName}${
-                          selectedInvestmentAccount.owner
-                            ? `(${selectedInvestmentAccount.owner})`
-                            : ""
-                        }`
-                      : investmentLoading
-                        ? "투자계좌 불러오는 중"
-                        : "선택하세요"}
-                  </span>
-                  <span className={styles.pickerChevron} aria-hidden="true">⌄</span>
-                </button>
-
-                <p className={styles.helper}>
-                  주식·ETF·금처럼 실제 보유종목의 매수·매도만 기록합니다. 예수금이나 CMA 발행어음처럼 현금으로 관리할 금액은 종목으로 입력하지 말고 이체·예수금으로 관리하세요.
-                </p>
-              </label>
-            </div>
-
-            {investmentLoading && !investmentDashboard && (
-              <div className={styles.loading}>투자계좌 정보를 불러오는 중입니다.</div>
-            )}
-
-            {investmentError && (
-              <p className={styles.error} role="alert">
-                {investmentError}
-              </p>
-            )}
-
-            {!investmentLoading &&
-              !investmentError &&
-              investmentAccounts.length === 0 && (
-                <p className={styles.helper}>
-                  등록된 투자계좌가 없습니다. 자산 또는 설정에서 투자계좌를 먼저 추가해주세요.
-                </p>
-              )}
-
-            {selectedInvestmentAccount && (
-              <>
-                <InvestmentTradeForm
-                  key={`form:${selectedInvestmentAccount.accountId}`}
-                  account={selectedInvestmentAccount}
-                  holdings={selectedInvestmentHoldings}
-                  onSaved={refreshInvestmentDashboard}
-                />
-
-                <InvestmentTradeHistory
-                  key={`history:${selectedInvestmentAccount.accountId}`}
-                  accountId={selectedInvestmentAccount.accountId}
-                  refreshKey={investmentTradeHistoryRefreshKey}
-                  onChanged={refreshInvestmentDashboard}
-                />
-              </>
-            )}
-          </section>
-        </div>
+        <InvestmentInputSection
+          loading={investmentLoading}
+          hasDashboard={Boolean(investmentDashboard)}
+          error={investmentError}
+          accounts={investmentAccounts}
+          selectedAccount={selectedInvestmentAccount}
+          selectedHoldings={selectedInvestmentHoldings}
+          tradeHistoryRefreshKey={investmentTradeHistoryRefreshKey}
+          onPickAccount={() => setActivePicker("investmentAccount")}
+          onDashboardChanged={refreshInvestmentDashboard}
+        />
       ) : (
       <form
         className={
@@ -4950,155 +4513,12 @@ export default function InputPage({
             </>
           )}
 
-          {
-            savingCount > 0 && (
-              <div
-                className={
-                  styles.queueStatus
-                }
-                role="status"
-              >
-                <strong>
-                  저장 중 · {savingCount}건
-                </strong>
-
-                <span>
-                  입력은 계속할 수 있어요. 서버 확인 후 완료됩니다.
-                </span>
-              </div>
-            )
-          }
-
-          {
-            failedTransactions.length > 0 && (
-              <div
-                className={
-                  styles.queueFailure
-                }
-                role="alert"
-              >
-                <div
-                  className={
-                    styles.queueFailureHeader
-                  }
-                >
-                  <strong>
-                    저장 실패 · {failedTransactions.length}건
-                  </strong>
-
-                  {
-                    failedTransactions.length > 1 && (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={
-                          () =>
-                            retryAllFailedPendingTransactions(
-                              userName
-                            )
-                        }
-                      >
-                        모두 다시 시도
-                      </Button>
-                    )
-                  }
-                </div>
-
-                {
-                  failedTransactions
-                    .slice(0, 3)
-                    .map(
-                      item => (
-                        <div
-                          key={
-                            item.id
-                          }
-                          className={
-                            styles.queueFailureItem
-                          }
-                        >
-                          <div>
-                            <span
-                              className={
-                                styles.queueFailureLabel
-                              }
-                            >
-                              {item.label}
-                            </span>
-
-                            <span
-                              className={
-                                styles.queueFailureMessage
-                              }
-                            >
-                              {item.failureKind === "network"
-                                ? "인터넷 연결이 돌아오면 자동으로 다시 저장합니다."
-                                : item.error}
-                            </span>
-                          </div>
-
-                          <div
-                            className={
-                              styles.queueFailureActions
-                            }
-                          >
-                            {
-                              item.failureKind !== "network" && (
-                                <Button
-                                  variant="secondary"
-                                  size="sm"
-                                  onClick={
-                                    () =>
-                                      loadFailedTransactionForEdit(
-                                        item
-                                      )
-                                  }
-                                >
-                                  수정
-                                </Button>
-                              )
-                            }
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={
-                                () =>
-                                  retryPendingTransaction(
-                                    userName,
-                                    item.id
-                                  )
-                              }
-                            >
-                              다시 시도
-                            </Button>
-                            <Button
-                              variant="dangerSoft"
-                              size="sm"
-                              onClick={
-                                () => {
-                                  if (
-                                    window.confirm(
-                                      "이 저장 실패 항목을 대기열에서 삭제할까요?"
-                                    )
-                                  ) {
-                                    discardPendingTransaction(
-                                      userName,
-                                      item.id
-                                    );
-                                  }
-                                }
-                              }
-                            >
-                              삭제
-                            </Button>
-                          </div>
-                        </div>
-                      )
-                    )
-                }
-              </div>
-            )
-          }
+          <PendingTransactionPanel
+            userName={userName}
+            savingCount={savingCount}
+            failedTransactions={failedTransactions}
+            onEditFailed={loadFailedTransactionForEdit}
+          />
 
           {
             error && (
@@ -5152,41 +4572,15 @@ export default function InputPage({
       )}
 
       {activePicker && (
-        <div
-          className={styles.sheetBackdrop}
-          role="presentation"
-          onClick={() => setActivePicker(null)}
+        <BottomSheet
+          title={getPickerTitle(activePicker)}
+          onClose={() => setActivePicker(null)}
         >
-          <section
-            className={styles.sheet}
-            role="dialog"
-            aria-modal="true"
-            aria-label={getPickerTitle(activePicker)}
-            onClick={event => event.stopPropagation()}
-          >
-            <div className={styles.sheetHandle} aria-hidden="true" />
-            <div className={styles.sheetHeader}>
-              <h2>{getPickerTitle(activePicker)}</h2>
-              <Button
-                variant="soft"
-                size="sm"
-                iconOnly
-                className={styles.sheetClose}
-                aria-label="닫기"
-                onClick={() => setActivePicker(null)}
-              >
-                ×
-              </Button>
-            </div>
-
-            <div className={styles.sheetList}>
-              {isAccountPickerKind(activePicker)
-                ? renderAccountPickerOptions(activePicker)
-                : getPickerItems(activePicker)
-                    .map(item => renderPickerOption(activePicker, item))}
-            </div>
-          </section>
-        </div>
+          {isAccountPickerKind(activePicker)
+            ? renderAccountPickerOptions(activePicker)
+            : getPickerItems(activePicker)
+                .map(item => renderPickerOption(activePicker, item))}
+        </BottomSheet>
       )}
     </main>
   );

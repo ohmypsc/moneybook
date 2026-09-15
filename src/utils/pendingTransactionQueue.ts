@@ -71,6 +71,15 @@ function isLikelyNetworkError(error: unknown) {
     return true;
   }
 
+  if (
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    (error as { code?: unknown }).code === "REQUEST_TIMEOUT"
+  ) {
+    return true;
+  }
+
   const message =
     getErrorMessage(error)
       .toLowerCase();

@@ -1,3 +1,7 @@
+import {
+  forwardRef
+} from "react";
+
 import type {
   ButtonHTMLAttributes,
   ReactNode
@@ -19,7 +23,7 @@ export type ButtonSize =
   | "lg"
   | "xl";
 
-type ButtonProps =
+export type ButtonProps =
   ButtonHTMLAttributes<HTMLButtonElement> & {
     children: ReactNode;
     variant?: ButtonVariant;
@@ -30,42 +34,50 @@ type ButtonProps =
     loadingLabel?: string;
   };
 
-export function Button({
-  children,
-  variant = "primary",
-  size = "md",
-  fullWidth = false,
-  iconOnly = false,
-  loading = false,
-  loadingLabel = "처리 중",
-  className = "",
-  disabled,
-  type = "button",
-  ...props
-}: ButtonProps) {
-  const classNames = [
-    styles.button,
-    styles[variant],
-    styles[size],
-    fullWidth ? styles.fullWidth : "",
-    iconOnly ? styles.iconOnly : "",
-    className
-  ].filter(Boolean).join(" ");
+export const Button =
+  forwardRef<
+    HTMLButtonElement,
+    ButtonProps
+  >(function Button(
+    {
+      children,
+      variant = "primary",
+      size = "md",
+      fullWidth = false,
+      iconOnly = false,
+      loading = false,
+      loadingLabel = "처리 중",
+      className = "",
+      disabled,
+      type = "button",
+      ...props
+    },
+    ref
+  ) {
+    const classNames = [
+      styles.button,
+      styles[variant],
+      styles[size],
+      fullWidth ? styles.fullWidth : "",
+      iconOnly ? styles.iconOnly : "",
+      className
+    ].filter(Boolean).join(" ");
 
-  return (
-    <button
-      type={type}
-      className={classNames}
-      disabled={disabled || loading}
-      aria-busy={loading || undefined}
-      {...props}
-    >
-      {loading ? (
-        <>
-          <span className={styles.spinner} aria-hidden="true" />
-          <span>{loadingLabel}</span>
-        </>
-      ) : children}
-    </button>
-  );
-}
+    return (
+      <button
+        ref={ref}
+        type={type}
+        className={classNames}
+        disabled={disabled || loading}
+        aria-busy={loading || undefined}
+        {...props}
+      >
+        {loading ? (
+          <>
+            <span className={styles.spinner} aria-hidden="true" />
+            <span>{loadingLabel}</span>
+          </>
+        ) : children}
+      </button>
+    );
+  });

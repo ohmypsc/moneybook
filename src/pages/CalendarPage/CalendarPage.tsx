@@ -1,6 +1,7 @@
 import {
     useEffect,
     useMemo,
+    useRef,
     useState
 } from "react";
 
@@ -49,6 +50,10 @@ import {
 import {
     subscribeLedgerChanges
 } from "../../utils/ledgerEvents";
+
+import {
+    confirmAction
+} from "../../utils/confirmAction";
 
 import { Button } from "../../components/common/Button/Button";
 import { Card } from "../../components/common/Card/Card";
@@ -652,9 +657,16 @@ function formatDeletedAt(
 
 type CalendarPageProps = {
     onAddTransaction?: (date: string) => void;
+    openTransaction?: {
+        transactionId: string;
+        date: string;
+    } | null;
 };
 
-export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
+export default function CalendarPage({
+    onAddTransaction,
+    openTransaction = null
+}: CalendarPageProps) {
     const today =
         getToday();
 
@@ -762,6 +774,9 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
         useState<
             string | null
         >(null);
+
+    const externalEditHandledRef =
+        useRef<string | null>(null);
 
     const [
         editForm,
@@ -935,6 +950,61 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
         [
             month,
             reloadKey
+        ]
+    );
+
+    useEffect(
+        () => {
+            if (!openTransaction) {
+                externalEditHandledRef.current = null;
+                return;
+            }
+
+            const targetMonth =
+                openTransaction.date.slice(0, 7);
+
+            if (month !== targetMonth) {
+                setMonth(targetMonth);
+            }
+
+            setSelectedDate(openTransaction.date);
+        },
+        [
+            openTransaction?.transactionId,
+            openTransaction?.date,
+            month
+        ]
+    );
+
+    useEffect(
+        () => {
+            if (
+                !openTransaction ||
+                month !== openTransaction.date.slice(0, 7) ||
+                externalEditHandledRef.current === openTransaction.transactionId
+            ) {
+                return;
+            }
+
+            const transaction = transactions.find(
+                item =>
+                    item.transactionId === openTransaction.transactionId &&
+                    !item.isDeleted
+            );
+
+            if (!transaction) {
+                return;
+            }
+
+            externalEditHandledRef.current =
+                openTransaction.transactionId;
+            void startEdit(transaction);
+        },
+        [
+            openTransaction?.transactionId,
+            openTransaction?.date,
+            month,
+            transactions
         ]
     );
 
@@ -2107,11 +2177,18 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
             CalendarTransaction
     ) {
         const confirmed =
-            window.confirm(
-                `${transaction.category || transaction.type} ${formatCurrency(
-                    transaction.amount
-                )} 거래를 삭제할까요?`
-            );
+            await confirmAction({
+                title:
+                    "거래 삭제",
+                message:
+                    `${transaction.category || transaction.type} ${formatCurrency(
+                        transaction.amount
+                    )} 거래를 삭제할까요?`,
+                confirmLabel:
+                    "삭제",
+                tone:
+                    "danger"
+            });
 
         if (!confirmed) {
             return;
@@ -2239,11 +2316,16 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
         }
 
         const confirmed =
-            window.confirm(
-                `${transaction.category || transaction.type} ${formatCurrency(
-                    transaction.amount
-                )} 거래를 복원할까요?`
-            );
+            await confirmAction({
+                title:
+                    "거래 복원",
+                message:
+                    `${transaction.category || transaction.type} ${formatCurrency(
+                        transaction.amount
+                    )} 거래를 복원할까요?`,
+                confirmLabel:
+                    "복원"
+            });
 
         if (!confirmed) {
             return;

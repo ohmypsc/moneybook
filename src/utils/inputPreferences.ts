@@ -41,9 +41,6 @@ export interface SharedInputPreferencesState {
 const STORAGE_KEY =
   "moneybook.inputPreferences.v1";
 
-const FETCH_PATCH_MARKER =
-  "__moneybookInputPreferencesFetchPatched";
-
 const TRANSACTION_TYPES:
   PreferenceTransactionType[] = [
     "지출",
@@ -604,138 +601,6 @@ export function syncInputPreferencesFromBootstrapPayload(
 }
 
 
-function isBootstrapRequest(
-  input: RequestInfo | URL
-) {
-  if (
-    typeof window ===
-    "undefined"
-  ) {
-    return false;
-  }
-
-  try {
-    let value: string;
-
-    if (
-      typeof input ===
-      "string"
-    ) {
-      value = input;
-
-    } else if (
-      input instanceof URL
-    ) {
-      value =
-        input.toString();
-
-    } else {
-      value =
-        input.url;
-    }
-
-    const url =
-      new URL(
-        value,
-        window.location.origin
-      );
-
-    return (
-      url.origin ===
-        window.location.origin &&
-      url.pathname ===
-        "/api/bootstrap"
-    );
-
-  } catch {
-    return false;
-  }
-}
-
-
-/**
- * InputPage 자체를 다시 쓰지 않고도 서버 공통 설정을
- * 적용하기 위한 얇은 bootstrap 동기화 계층입니다.
- *
- * /api/bootstrap의 네트워크 요청을 추가하지 않습니다.
- * 기존 요청의 응답 복사본만 읽고 localStorage를 갱신한 뒤
- * 원래 Response를 그대로 반환합니다.
- */
-function installBootstrapPreferenceSync() {
-  if (
-    typeof window ===
-      "undefined" ||
-    typeof window.fetch !==
-      "function"
-  ) {
-    return;
-  }
-
-  const markedWindow =
-    window as typeof window & {
-      [FETCH_PATCH_MARKER]?:
-        boolean;
-    };
-
-  if (
-    markedWindow[
-      FETCH_PATCH_MARKER
-    ]
-  ) {
-    return;
-  }
-
-  const originalFetch =
-    window.fetch.bind(
-      window
-    );
-
-  markedWindow[
-    FETCH_PATCH_MARKER
-  ] =
-    true;
-
-  window.fetch =
-    (async (
-      input:
-        RequestInfo | URL,
-      init?:
-        RequestInit
-    ) => {
-      const response =
-        await originalFetch(
-          input,
-          init
-        );
-
-      if (
-        response.ok &&
-        isBootstrapRequest(
-          input
-        )
-      ) {
-        try {
-          const payload =
-            await response
-              .clone()
-              .json() as unknown;
-
-          syncInputPreferencesFromBootstrapPayload(
-            payload
-          );
-
-        } catch {
-          /*
-           * 설정 동기화 실패가 bootstrap 자체를
-           * 실패시키면 안 됩니다.
-           */
-        }
-      }
-
-      return response;
-    }) as typeof window.fetch;
-}
-
 
 function getOrderIndex(
   order: string[],
@@ -865,5 +730,3 @@ export function applyAccountPreferences<
   );
 }
 
-
-installBootstrapPreferenceSync();

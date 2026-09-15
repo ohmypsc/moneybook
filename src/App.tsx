@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useRef,
   useState
 } from "react";
 
@@ -18,9 +19,12 @@ import {
 } from "./api/client";
 
 import {
-  clearBootstrapMemoryCache,
-  prefetchBootstrap
+  clearBootstrapMemoryCache
 } from "./api/bootstrapCache";
+
+import {
+  prefetchBootstrap
+} from "./api/bootstrap";
 
 import {
   getCurrentCalendarMonth,
@@ -28,6 +32,7 @@ import {
 } from "./api/calendarCache";
 
 import {
+  clearDashboardPersistentSnapshot,
   getDashboard,
   invalidateDashboardCache
 } from "./api/dashboard";
@@ -60,6 +65,14 @@ import {
 import {
   markLedgerChanged
 } from "./utils/ledgerEvents";
+
+import {
+  subscribeAuthExpired
+} from "./utils/authEvents";
+
+import {
+  parseAppShortcut
+} from "./utils/appShortcut";
 
 import type {
   User
@@ -94,6 +107,10 @@ import {
 import {
   Card
 } from "./components/common/Card/Card";
+
+import {
+  ConfirmDialogHost
+} from "./components/common/ConfirmDialog/ConfirmDialog";
 
 import type {
   NavigationKey
@@ -559,6 +576,10 @@ export default function App() {
     });
 
 
+  const shortcutHandledRef =
+    useRef(false);
+
+
   useEffect(
     () => {
       if (
@@ -619,6 +640,59 @@ export default function App() {
           handlePopState
         );
       };
+    },
+    [
+      status,
+      user
+    ]
+  );
+
+
+  useEffect(
+    () => {
+      if (
+        status !== "authenticated" ||
+        !user ||
+        shortcutHandledRef.current
+      ) {
+        return;
+      }
+
+      const shortcut =
+        parseAppShortcut(
+          window.location.search
+        );
+
+      if (!shortcut) {
+        return;
+      }
+
+      shortcutHandledRef.current = true;
+
+      const preset: InputLaunchPreset | null =
+        shortcut.navigation === "input"
+          ? { mode: shortcut.mode }
+          : null;
+
+      setInputInitialDate(null);
+      setInputPreset(preset);
+      setActiveNavigation(shortcut.navigation);
+
+      window.history.replaceState(
+        createHistoryState(
+          shortcut.navigation,
+          null,
+          preset
+        ),
+        "",
+        window.location.pathname
+      );
+
+      if (shortcut.navigation === "input") {
+        void prefetchBootstrap().catch(() => {
+          /* InputPage에서 필요할 때 다시 요청합니다. */
+        });
+      }
     },
     [
       status,
@@ -763,6 +837,23 @@ export default function App() {
       status,
       user
     ]
+  );
+
+
+  useEffect(
+    () =>
+      subscribeAuthExpired(
+        () => {
+          if (status !== "authenticated") {
+            return;
+          }
+
+          resetToGuest(
+            "로그인 세션이 만료되었습니다. 다시 로그인해주세요."
+          );
+        }
+      ),
+    [status]
   );
 
 
@@ -1143,47 +1234,31 @@ export default function App() {
 
 
 
+  function resetToGuest(
+    message = ""
+  ) {
+    invalidateDashboardCache();
+    clearDashboardPersistentSnapshot();
+    clearBootstrapMemoryCache();
+    clearInvestmentPrefetchCache();
+    clearManagedSettingsCache();
+
+    saveLastAuthenticatedUser(null);
+    setUser(null);
+    setStatus("guest");
+    setActiveNavigation("home");
+    setLoginError(message);
+
+    window.history.replaceState({}, "");
+  }
+
+
   async function handleLogout() {
     try {
       await logout();
 
     } finally {
-      invalidateDashboardCache();
-
-      clearBootstrapMemoryCache();
-
-      clearInvestmentPrefetchCache();
-
-      clearManagedSettingsCache();
-
-
-      saveLastAuthenticatedUser(
-        null
-      );
-
-      setUser(
-        null
-      );
-
-
-      setStatus(
-        "guest"
-      );
-
-
-      setActiveNavigation(
-        "home"
-      );
-
-
-      setLoginError(
-        ""
-      );
-
-      window.history.replaceState(
-        {},
-        ""
-      );
+      resetToGuest();
     }
   }
 
@@ -1360,21 +1435,25 @@ export default function App() {
 
 
   return (
-    <AppShell
-      activeNavigation={
-        activeNavigation
-      }
-      pendingTransactionCount={
-        pendingTransactionSummary.total
-      }
-      pendingTransactionFailedCount={
-        pendingTransactionSummary.failed
-      }
-      onNavigate={
-        handleNavigate
-      }
-    >
-      {pageContent}
-    </AppShell>
+    <>
+      <AppShell
+        activeNavigation={
+          activeNavigation
+        }
+        pendingTransactionCount={
+          pendingTransactionSummary.total
+        }
+        pendingTransactionFailedCount={
+          pendingTransactionSummary.failed
+        }
+        onNavigate={
+          handleNavigate
+        }
+      >
+        {pageContent}
+      </AppShell>
+
+      <ConfirmDialogHost />
+    </>
   );
 }

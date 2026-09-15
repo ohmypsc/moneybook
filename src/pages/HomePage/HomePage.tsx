@@ -6,7 +6,8 @@ import {
 
 import {
   getDashboard,
-  getDashboardSnapshot
+  getDashboardSnapshot,
+  getDashboardSnapshotInfo
 } from "../../api/dashboard";
 
 import {
@@ -38,6 +39,7 @@ import {
 import { Button } from "../../components/common/Button/Button";
 import { Card } from "../../components/common/Card/Card";
 import { Money } from "../../components/common/Money/Money";
+import { DataFreshnessNotice } from "../../components/common/DataFreshnessNotice/DataFreshnessNotice";
 import PwaInstallPrompt from "../../components/pwa/PwaInstallPrompt/PwaInstallPrompt";
 
 import styles
@@ -116,11 +118,17 @@ export default function HomePage({
   onCopyTransaction
 }: HomePageProps) {
   const [needsInitialRefresh] = useState(() => isLedgerDirty());
-  const [initialDashboard] = useState<DashboardData | null>(
-    () => getDashboardSnapshot()
+  const [initialDashboardInfo] = useState(
+    () => getDashboardSnapshotInfo()
   );
+  const initialDashboard = initialDashboardInfo?.data ?? null;
   const [dashboard, setDashboard] = useState<DashboardData | null>(
     initialDashboard
+  );
+  const [fallbackSnapshotAt, setFallbackSnapshotAt] = useState<number | null>(
+    initialDashboardInfo?.source === "persisted"
+      ? initialDashboardInfo.fetchedAt
+      : null
   );
   const [loading, setLoading] = useState(initialDashboard === null);
   const [errorMessage, setErrorMessage] = useState("");
@@ -171,15 +179,18 @@ export default function HomePage({
       });
 
       setDashboard(data);
+      setFallbackSnapshotAt(null);
       clearLedgerDirty();
       markBackgroundRefreshed("dashboard");
       setLastUpdatedLabel(getSeoulTimestampLabel());
       setErrorMessage("");
     } catch (error) {
-      const fallback = getDashboardSnapshot();
+      const fallbackInfo = getDashboardSnapshotInfo();
+      const fallback = fallbackInfo?.data ?? null;
 
       if (fallback) {
         setDashboard(fallback);
+        setFallbackSnapshotAt(fallbackInfo?.fetchedAt ?? null);
       } else if (!options.background) {
         setDashboard(null);
         setErrorMessage(
@@ -203,12 +214,21 @@ export default function HomePage({
         const data = await getDashboard();
         if (cancelled) return;
         setDashboard(data);
+        setFallbackSnapshotAt(null);
         clearLedgerDirty();
         markBackgroundRefreshed("dashboard");
         setLastUpdatedLabel(getSeoulTimestampLabel());
         setErrorMessage("");
       } catch (error) {
-        if (cancelled || getDashboardSnapshot()) return;
+        if (cancelled) return;
+
+        const fallbackInfo = getDashboardSnapshotInfo();
+        if (fallbackInfo) {
+          setDashboard(fallbackInfo.data);
+          setFallbackSnapshotAt(fallbackInfo.fetchedAt);
+          return;
+        }
+
         setErrorMessage(
           error instanceof Error
             ? error.message
@@ -219,7 +239,11 @@ export default function HomePage({
       }
     }
 
-    if (needsInitialRefresh || !initialDashboard) {
+    if (
+      needsInitialRefresh ||
+      !initialDashboard ||
+      initialDashboardInfo?.source === "persisted"
+    ) {
       void loadDashboard();
     } else {
       setLastUpdatedLabel(getSeoulTimestampLabel());
@@ -391,6 +415,10 @@ export default function HomePage({
           </div>
         </div>
       </header>
+
+      {fallbackSnapshotAt && (
+        <DataFreshnessNotice fetchedAt={fallbackSnapshotAt} />
+      )}
 
       <Card as="section" className={styles.summaryCard}>
         <div className={styles.summaryHeader}>

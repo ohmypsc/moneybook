@@ -7,7 +7,8 @@ import {
 
 import {
   getDashboard,
-  getDashboardSnapshot
+  getDashboardSnapshot,
+  getDashboardSnapshotInfo
 } from "../../api/dashboard";
 
 import {
@@ -27,7 +28,7 @@ import InvestmentTradeHistory
 
 import {
   AccountSettings
-} from "../SettingsPage/SettingsPage";
+} from "../SettingsPage/AccountSettings";
 
 import {
   updateManagedAccount
@@ -50,6 +51,7 @@ import {
 import { Button } from "../../components/common/Button/Button";
 import { Card } from "../../components/common/Card/Card";
 import { Money, formatMoney } from "../../components/common/Money/Money";
+import { DataFreshnessNotice } from "../../components/common/DataFreshnessNotice/DataFreshnessNotice";
 
 import type {
   DashboardData
@@ -248,15 +250,24 @@ export default function AssetsPage({
   ] = useState("전체");
 
   const [
-    initialDashboard
+    initialDashboardInfo
   ] =
-    useState<
-      DashboardData |
-      null
-    >(
+    useState(
       () =>
-        getDashboardSnapshot()
+        getDashboardSnapshotInfo()
     );
+
+  const initialDashboard =
+    initialDashboardInfo?.data ?? null;
+
+  const [
+    fallbackSnapshotAt,
+    setFallbackSnapshotAt
+  ] = useState<number | null>(
+    initialDashboardInfo?.source === "persisted"
+      ? initialDashboardInfo.fetchedAt
+      : null
+  );
 
   const [
     dashboard,
@@ -550,6 +561,10 @@ export default function AssetsPage({
         data
       );
 
+      setFallbackSnapshotAt(
+        null
+      );
+
       setRewardBalances(
         Object.fromEntries(
           benefitBalances.map(
@@ -570,10 +585,17 @@ export default function AssetsPage({
     } catch (
       err
     ) {
-      if (
-        !dashboard &&
-        !getDashboardSnapshot()
-      ) {
+      const fallbackInfo =
+        getDashboardSnapshotInfo();
+
+      if (fallbackInfo) {
+        setDashboard(
+          fallbackInfo.data
+        );
+        setFallbackSnapshotAt(
+          fallbackInfo.fetchedAt
+        );
+      } else if (!dashboard) {
         setError(
           err instanceof Error
             ? err.message
@@ -1260,6 +1282,11 @@ export default function AssetsPage({
           </Button>
         </div>
       </header>
+
+
+      {fallbackSnapshotAt && (
+        <DataFreshnessNotice fetchedAt={fallbackSnapshotAt} />
+      )}
 
 
       <Card
