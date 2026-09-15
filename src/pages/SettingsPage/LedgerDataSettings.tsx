@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 
 import { getTransactions } from "../../api/transactions";
-import { createMoneybookBackup } from "../../api/dataBackup";
 import type { Transaction } from "../../api/transactions";
 import { restoreTransaction } from "../../api/transactionMutations";
 import {
@@ -11,6 +10,7 @@ import {
 } from "../../api/settingsManagement";
 import { markLedgerChanged } from "../../utils/ledgerEvents";
 import { getSeoulFileDate } from "../../utils/dateTime";
+import { BackupRestorePanel } from "./BackupRestorePanel";
 import { confirmAction } from "../../utils/confirmAction";
 import { Button } from "../../components/common/Button/Button";
 import { Card } from "../../components/common/Card/Card";
@@ -568,37 +568,7 @@ export function LedgerDataSettings() {
     }
 
 
-    async function handleJsonBackup() {
-        setBusyKey("backup");
-        setError("");
-        setFeedback("");
 
-        try {
-            const backup = await createMoneybookBackup();
-            const blob = new Blob(
-                [JSON.stringify(backup, null, 2)],
-                { type: "application/json;charset=utf-8" }
-            );
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.href = url;
-            link.download = `우리_가계부_전체백업_${getSeoulFileDate()}.json`;
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            URL.revokeObjectURL(url);
-
-            setFeedback(
-                `전체 백업을 저장했습니다. 거래 ${backup.payload.transactions.length.toLocaleString("ko-KR")}건이 포함되었습니다.`
-            );
-        } catch (backupError) {
-            setError(
-                getErrorMessage(backupError, "전체 백업을 만들지 못했습니다.")
-            );
-        } finally {
-            setBusyKey("");
-        }
-    }
 
 
     return (
@@ -886,29 +856,23 @@ export function LedgerDataSettings() {
 
             <Card as="section">
                 <div className={styles.sectionHeading}>
-                    <h2>백업 · 내보내기</h2>
-                    <p>CSV는 거래 확인용, JSON은 계좌·설정·투자·삭제내역까지 포함한 전체 보관용입니다.</p>
+                    <h2>거래 CSV</h2>
+                    <p>스프레드시트에서 거래를 확인하거나 별도 분석할 때 사용합니다.</p>
                 </div>
 
-                <div className={styles.backupActions}>
-                    <Button
-                        variant="secondary"
-                        fullWidth
-                        disabled={Boolean(busyKey)}
-                        onClick={() => void handleExport()}
-                    >
-                        {busyKey === "export" ? "CSV 만드는 중..." : "전체 거래 CSV"}
-                    </Button>
-
-                    <Button
-                        fullWidth
-                        disabled={Boolean(busyKey)}
-                        onClick={() => void handleJsonBackup()}
-                    >
-                        {busyKey === "backup" ? "백업 만드는 중..." : "전체 데이터 JSON 백업"}
-                    </Button>
-                </div>
+                <Button
+                    variant="secondary"
+                    fullWidth
+                    disabled={Boolean(busyKey)}
+                    loading={busyKey === "export"}
+                    loadingLabel="CSV 만드는 중"
+                    onClick={() => void handleExport()}
+                >
+                    전체 거래 CSV 내려받기
+                </Button>
             </Card>
+
+            <BackupRestorePanel />
 
             <Card as="section">
                 <Button

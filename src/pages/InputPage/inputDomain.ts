@@ -3,6 +3,16 @@ import type { BenefitRule } from "../../api/automation";
 export type TransactionType = "지출" | "수입" | "이체";
 export type InputMode = "expense" | "income" | "transfer" | "investment";
 
+export const INPUT_MODE_OPTIONS: ReadonlyArray<{
+  value: InputMode;
+  label: string;
+}> = [
+  { value: "expense", label: "지출" },
+  { value: "income", label: "수입" },
+  { value: "transfer", label: "이체" },
+  { value: "investment", label: "투자" }
+];
+
 export interface Account {
   accountId: string;
   accountName?: string;

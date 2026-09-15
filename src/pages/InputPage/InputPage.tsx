@@ -22,6 +22,7 @@ import { getDashboard, getDashboardSnapshot } from "../../api/dashboard";
 import { Button } from "../../components/common/Button/Button";
 import { PendingTransactionPanel } from "./PendingTransactionPanel";
 import { InputPickerSheet } from "./InputPickerSheet";
+import { InputModeTabs } from "./InputModeTabs";
 import { PickerFieldButton } from "./PickerFieldButton";
 import { InvestmentInputSection } from "./InvestmentInputSection";
 import { Money, formatMoney } from "../../components/common/Money/Money";
@@ -2907,60 +2908,7 @@ export default function InputPage({
         <h1 className={styles.title}>거래 입력</h1>
       </header>
 
-      <div
-        className={
-          styles.typeTabs
-        }
-        aria-label="거래 유형"
-      >
-        {
-          (
-            [
-              [
-                "expense",
-                "지출"
-              ],
-              [
-                "income",
-                "수입"
-              ],
-              [
-                "transfer",
-                "이체"
-              ],
-              [
-                "investment",
-                "투자"
-              ]
-            ] as const
-          ).map(
-            ([
-              value,
-              label
-            ]) => {
-              const active =
-                mode === value;
-
-              return (
-                <button
-                  type="button"
-                  key={value}
-                  className={[
-                    styles.typeButton,
-                    active
-                      ? styles.typeButtonActive
-                      : ""
-                  ].join(" ")}
-                  aria-pressed={active}
-                  onClick={() => handleModeChange(value)}
-                >
-                  {label}
-                </button>
-              );
-            }
-          )
-        }
-      </div>
+      <InputModeTabs value={mode} onChange={handleModeChange} />
 
       {mode === "investment" ? (
         <InvestmentInputSection

@@ -36,6 +36,7 @@ const BOOTSTRAP_MUTATION_PATHS =
     "/api/settings/automation",
     "/api/settings/ledger-start-date",
     "/api/settings/ledger-start-date/clear",
+    "/api/backup/restore",
     ...MASTER_MUTATION_PATHS
   ]);
 
@@ -54,7 +55,8 @@ const LEDGER_MUTATION_PATHS =
     "/api/investments/trades",
     "/api/investments/trades/update",
     "/api/investments/trades/delete",
-    "/api/investments/trades/restore"
+    "/api/investments/trades/restore",
+    "/api/backup/restore"
   ]);
 
 let bootstrapCache:

@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  INPUT_MODE_OPTIONS,
   getAccountOwner,
   getBackendType,
   getCategoryLabel,
@@ -75,3 +76,13 @@ test("benefit rule activity respects enabled/rate/date boundaries", () => {
   assert.equal(isBenefitRuleActive({ ...base, enabled: false } as any, "2026-06-01"), false);
   assert.equal(isBenefitRuleActive(base as any, "2027-01-01"), false);
 });
+
+test("input mode options keep one canonical order and label set", () => {
+  assert.deepEqual(INPUT_MODE_OPTIONS, [
+    { value: "expense", label: "지출" },
+    { value: "income", label: "수입" },
+    { value: "transfer", label: "이체" },
+    { value: "investment", label: "투자" }
+  ]);
+});
+

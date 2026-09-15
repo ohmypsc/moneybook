@@ -42,13 +42,15 @@ const MASTER_ENTITY_TYPES = new Set([
   "category",
   "input_preferences",
   "ledger_config",
-  "automation_settings"
+  "automation_settings",
+  "backup_restore"
 ]);
 
 const INVESTMENT_ENTITY_TYPES = new Set([
   "account",
   "holding",
-  "investment_trade"
+  "investment_trade",
+  "backup_restore"
 ]);
 
 function readLastSeq() {

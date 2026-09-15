@@ -1448,3 +1448,99 @@ summary::after {
     grid-template-columns: 1fr;
   }
 }
+
+.hiddenFileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.restorePreview {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+}
+
+.restorePreviewHeader {
+  display: grid;
+  gap: 4px;
+}
+
+.restorePreviewHeader strong {
+  color: var(--color-text-primary);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.restorePreviewHeader span {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
+
+.restoreCountGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.restoreCountItem {
+  display: grid;
+  gap: 3px;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+
+.restoreCountItem span,
+.restoreCountItem small {
+  color: var(--color-text-secondary);
+  font-size: 10px;
+}
+
+.restoreCountItem strong {
+  color: var(--color-text-primary);
+  font-size: 16px;
+}
+
+.restoreWarning {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--color-danger) 28%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-danger) 7%, var(--color-surface));
+}
+
+.restoreWarning p {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.restoreNotes {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+@media (max-width: 420px) {
+  .restoreCountGrid {
+    grid-template-columns: 1fr;
+  }
+}

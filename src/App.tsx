@@ -819,7 +819,8 @@ export default function App() {
             "category",
             "input_preferences",
             "ledger_config",
-            "automation_settings"
+            "automation_settings",
+            "backup_restore"
           ]);
 
           if (
