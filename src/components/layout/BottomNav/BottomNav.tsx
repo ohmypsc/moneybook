@@ -2,22 +2,12 @@ import styles
   from "./BottomNav.module.css";
 
 
-/*
- * transactions / investments는
- * 기존 App.tsx와의 중간 배포 호환을 위해
- * 잠시 타입에만 남겨둠.
- *
- * 실제 하단 메뉴에는 표시하지 않음.
- * App.tsx 교체 후 추후 제거 가능.
- */
 export type NavigationKey =
   | "home"
   | "calendar"
   | "input"
   | "assets"
-  | "settings"
-  | "transactions"
-  | "investments";
+  | "settings";
 
 
 type BottomNavProps = {
@@ -29,6 +19,12 @@ type BottomNavProps = {
       navigation:
         NavigationKey
     ) => void;
+
+  pendingTransactionCount?:
+    number;
+
+  pendingTransactionFailedCount?:
+    number;
 };
 
 
@@ -83,8 +79,23 @@ const RIGHT_ITEMS:
 
 export function BottomNav({
   activeNavigation,
-  onNavigate
+  onNavigate,
+  pendingTransactionCount = 0,
+  pendingTransactionFailedCount = 0
 }: BottomNavProps) {
+
+  const hasPendingTransactions =
+    pendingTransactionCount > 0;
+
+  const hasFailedTransactions =
+    pendingTransactionFailedCount > 0;
+
+  const pendingLabel =
+    hasFailedTransactions
+      ? `저장 실패 ${pendingTransactionFailedCount}건`
+      : hasPendingTransactions
+        ? `동기화 대기 ${pendingTransactionCount}건`
+        : "";
 
   return (
     <nav
@@ -148,7 +159,9 @@ export function BottomNav({
           }
 
           aria-label={
-            "거래 입력"
+            pendingLabel
+              ? `거래 입력, ${pendingLabel}`
+              : "거래 입력"
           }
 
           onClick={
@@ -163,6 +176,29 @@ export function BottomNav({
               styles.inputIconWrap
             }
           >
+            {
+              hasPendingTransactions && (
+                <span
+                  className={[
+                    styles.pendingBadge,
+                    hasFailedTransactions
+                      ? styles.pendingBadgeFailed
+                      : ""
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  aria-hidden="true"
+                  title={pendingLabel}
+                >
+                  {
+                    pendingTransactionCount > 99
+                      ? "99+"
+                      : pendingTransactionCount
+                  }
+                </span>
+              )
+            }
+
             <svg
               className={
                 styles.inputIcon

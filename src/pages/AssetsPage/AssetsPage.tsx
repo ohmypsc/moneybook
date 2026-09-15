@@ -47,6 +47,10 @@ import {
   getSeoulDateString
 } from "../../utils/dateTime";
 
+import { Button } from "../../components/common/Button/Button";
+import { Card } from "../../components/common/Card/Card";
+import { Money, formatMoney } from "../../components/common/Money/Money";
+
 import type {
   DashboardData
 } from "../../types/dashboard";
@@ -75,11 +79,7 @@ function formatCurrency(
     return "-";
   }
 
-  return (
-    Math.round(value)
-      .toLocaleString("ko-KR") +
-    "원"
-  );
+  return formatMoney(value);
 }
 
 
@@ -97,17 +97,7 @@ function formatSignedCurrency(
     return "-";
   }
 
-  const sign =
-    value > 0
-      ? "+"
-      : "";
-
-  return (
-    sign +
-    Math.round(value)
-      .toLocaleString("ko-KR") +
-    "원"
-  );
+  return formatMoney(value, { showPlus: true });
 }
 
 
@@ -212,13 +202,11 @@ interface AssetInputPreset {
 interface AssetsPageProps {
   userName: string;
   onOpenInput?: (preset: AssetInputPreset) => void;
-  refreshRevision?: number;
 }
 
 export default function AssetsPage({
   userName,
-  onOpenInput,
-  refreshRevision = 0
+  onOpenInput
 }: AssetsPageProps) {
   function openInput(preset: AssetInputPreset) {
     if (onOpenInput) {
@@ -508,8 +496,15 @@ export default function AssetsPage({
     >(null);
 
 
+  const [
+    quoteRefreshing,
+    setQuoteRefreshing
+  ] = useState(false);
+
+
   async function loadDashboard(
-    forceRefresh = false
+    forceRefresh = false,
+    refreshQuotes = false
   ) {
     const cachedDashboard =
       getDashboardSnapshot();
@@ -542,7 +537,8 @@ export default function AssetsPage({
           getDashboard(
             undefined,
             {
-              forceRefresh
+              forceRefresh,
+              refreshQuotes
             }
           ),
           getBenefitRewardBalances().catch(
@@ -588,6 +584,21 @@ export default function AssetsPage({
       setLoading(
         false
       );
+    }
+  }
+
+
+  async function handleRefreshInvestmentQuotes() {
+    if (quoteRefreshing) {
+      return;
+    }
+
+    setQuoteRefreshing(true);
+
+    try {
+      await loadDashboard(true, true);
+    } finally {
+      setQuoteRefreshing(false);
     }
   }
 
@@ -651,18 +662,6 @@ export default function AssetsPage({
       void loadDashboard();
     },
     []
-  );
-
-
-  useEffect(
-    () => {
-      if (refreshRevision <= 0) {
-        return;
-      }
-
-      void loadDashboard(true);
-    },
-    [refreshRevision]
   );
 
 
@@ -938,6 +937,16 @@ export default function AssetsPage({
     (sum, account) => sum + Number(account.realizedPnlKrw || 0),
     0
   );
+
+  const visibleInvestmentAccountIds = new Set(
+    visibleInvestmentAccounts.map(account => account.accountId)
+  );
+
+  const visibleStaleManualPrices = (dashboard?.investments.staleManualPrices || [])
+    .filter(item => visibleInvestmentAccountIds.has(item.accountId));
+
+  const visibleCashBaselinePending = (dashboard?.investments.cashBaselinePending || [])
+    .filter(item => visibleInvestmentAccountIds.has(item.accountId));
 
   const visibleLiabilityTotal = visibleLiabilityAccounts.reduce(
     (sum, account) =>
@@ -1227,15 +1236,10 @@ export default function AssetsPage({
           <h1 className={styles.title}>자산</h1>
           <p className={styles.headerHint}>항목을 누르면 상세와 관리 기능이 열립니다.</p>
         </div>
-        <div
-          style={{
-            display: "flex",
-            gap: 8
-          }}
-        >
-          <button
-            type="button"
-            className={styles.addAccountButton}
+        <div className={styles.headerActions}>
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() =>
               openInput({
                 mode: "transfer"
@@ -1243,26 +1247,25 @@ export default function AssetsPage({
             }
           >
             이체 입력
-          </button>
+          </Button>
 
-          <button
-            type="button"
-            className={styles.addAccountButton}
+          <Button
+            size="sm"
             onClick={() => {
               setEditingAccountId(null);
               setCreatingAccount(true);
             }}
           >
             + 추가
-          </button>
+          </Button>
         </div>
       </header>
 
 
-      <section
-        className={
-          styles.summaryCard
-        }
+      <Card
+        as="section"
+        padding="none"
+        className={styles.summaryCard}
       >
         {loading && (
           <p
@@ -1296,26 +1299,26 @@ export default function AssetsPage({
                 className={`${styles.summaryHeroValue} ${summary.netWorth < 0 ? styles.summaryHeroNegative : ""}`}
                 title={formatCurrency(summary.netWorth)}
               >
-                {formatCurrency(summary.netWorth)}
+                <Money amount={summary.netWorth} />
               </strong>
 
               <div className={styles.summarySecondary}>
                 <div>
                   <span>총자산</span>
                   <strong title={formatCurrency(summary.assets)}>
-                    {formatCurrency(summary.assets)}
+                    <Money amount={summary.assets} absolute />
                   </strong>
                 </div>
                 <div>
                   <span>총부채</span>
                   <strong title={formatCurrency(summary.liabilities)}>
-                    {formatCurrency(summary.liabilities)}
+                    <Money amount={summary.liabilities} absolute />
                   </strong>
                 </div>
               </div>
             </div>
           )}
-      </section>
+      </Card>
 
 
       <div
@@ -1649,16 +1652,18 @@ export default function AssetsPage({
                                   </div>
 
                                   <div className={styles.modalHeaderActions}>
-                                    <button
-                                      type="button"
-                                      className={styles.editAccountButton}
+                                    <Button
+                                      variant="secondary"
+                                      size="sm"
                                       onClick={() => setEditingAccountId(selectedCashAccount.accountId)}
                                     >
                                       편집
-                                    </button>
-                                    <button
-                                      type="button"
+                                    </Button>
+                                    <Button
                                       className={styles.modalCloseButton}
+                                      variant="soft"
+                                      size="sm"
+                                      iconOnly
                                       aria-label="상세 닫기"
                                       onClick={() => {
                                         setSelectedCashAccountId(null);
@@ -1666,7 +1671,7 @@ export default function AssetsPage({
                                       }}
                                     >
                                       ×
-                                    </button>
+                                    </Button>
                                   </div>
                                 </div>
 
@@ -1725,8 +1730,9 @@ export default function AssetsPage({
                                     styles.reconcileActions
                                   }
                                 >
-                                  <button
-                                    type="button"
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
                                     onClick={() => {
                                       const accountId =
                                         selectedCashAccount.accountId;
@@ -1739,10 +1745,11 @@ export default function AssetsPage({
                                     }}
                                   >
                                     여기서 보내기
-                                  </button>
+                                  </Button>
 
-                                  <button
-                                    type="button"
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
                                     onClick={() => {
                                       const accountId =
                                         selectedCashAccount.accountId;
@@ -1755,17 +1762,15 @@ export default function AssetsPage({
                                     }}
                                   >
                                     여기로 받기
-                                  </button>
+                                  </Button>
                                 </div>
 
                                 {
                                   reconcileAccountId !==
                                     selectedCashAccount.accountId ? (
-                                    <button
-                                      type="button"
-                                      className={
-                                        styles.reconcileButton
-                                      }
+                                    <Button
+                                      variant="secondary"
+                                      size="sm"
                                       onClick={
                                         () => {
                                           setReconcileAccountId(
@@ -1783,7 +1788,7 @@ export default function AssetsPage({
                                       }
                                     >
                                       실제 잔액과 맞추기
-                                    </button>
+                                    </Button>
                                   ) : (
                                     <div
                                       className={
@@ -1843,8 +1848,9 @@ export default function AssetsPage({
                                           styles.reconcileActions
                                         }
                                       >
-                                        <button
-                                          type="button"
+                                        <Button
+                                          variant="secondary"
+                                          size="sm"
                                           onClick={
                                             () => {
                                               setReconcileAccountId(
@@ -1855,12 +1861,11 @@ export default function AssetsPage({
                                           }
                                         >
                                           취소
-                                        </button>
-                                        <button
-                                          type="button"
-                                          disabled={
-                                            reconcileSaving
-                                          }
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          loading={reconcileSaving}
+                                          loadingLabel="저장 중"
                                           onClick={
                                             () =>
                                               void handleReconcileAccount(
@@ -1868,12 +1873,8 @@ export default function AssetsPage({
                                               )
                                           }
                                         >
-                                          {
-                                            reconcileSaving
-                                              ? "저장 중"
-                                              : "맞추기"
-                                          }
-                                        </button>
+                                          맞추기
+                                        </Button>
                                       </div>
                                     </div>
                                   )
@@ -2047,9 +2048,9 @@ export default function AssetsPage({
 
                         {
                           account.subType === "대출" && (
-                            <button
-                              type="button"
-                              className={styles.reconcileButton}
+                            <Button
+                              variant="secondary"
+                              size="sm"
                               style={{
                                 width: "100%",
                                 marginTop: 8
@@ -2063,7 +2064,7 @@ export default function AssetsPage({
                               }
                             >
                               대출 상환 입력
-                            </button>
+                            </Button>
                           )
                         }
                       </li>
@@ -2100,17 +2101,28 @@ export default function AssetsPage({
               visibleInvestmentAccounts
                 .length >
                 0 && (
-                <span
-                  className={
-                    styles.sectionCount
-                  }
-                >
-                  {
-                    visibleInvestmentAccounts
-                      .length
-                  }
-                  개 계좌
-                </span>
+                <div className={styles.sectionHeadingActions}>
+                  <span
+                    className={
+                      styles.sectionCount
+                    }
+                  >
+                    {
+                      visibleInvestmentAccounts
+                        .length
+                    }
+                    개 계좌
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    loading={quoteRefreshing}
+                    loadingLabel="갱신 중"
+                    onClick={() => void handleRefreshInvestmentQuotes()}
+                  >
+                    시세 새로고침
+                  </Button>
+                </div>
               )}
           </div>
 
@@ -2178,6 +2190,46 @@ export default function AssetsPage({
                 </div>
               </div>
             )}
+
+
+          {!loading && (visibleCashBaselinePending.length > 0 || visibleStaleManualPrices.length > 0) && (
+            <Card padding="sm" tone="soft" shadow="none" className={styles.investmentWarnings}>
+              {visibleCashBaselinePending.map(item => (
+                <div key={`cash:${item.accountId}`} className={styles.investmentWarningRow}>
+                  <div>
+                    <strong>예수금 기준 미설정</strong>
+                    <span>{item.accountName}의 현재 예수금을 한 번 입력해주세요.</span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedAccountId(item.accountId)}
+                  >
+                    설정
+                  </Button>
+                </div>
+              ))}
+
+              {visibleStaleManualPrices.map(item => (
+                <div key={`quote:${item.holdingId}`} className={styles.investmentWarningRow}>
+                  <div>
+                    <strong>수동 시세 갱신 필요</strong>
+                    <span>
+                      {item.stockName || item.stockCode}
+                      {item.elapsedDays === null ? " · 갱신일 없음" : ` · ${item.elapsedDays}일 전`}
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedAccountId(item.accountId)}
+                  >
+                    확인
+                  </Button>
+                </div>
+              ))}
+            </Card>
+          )}
 
 
           {loading && (
@@ -2432,22 +2484,24 @@ export default function AssetsPage({
                                     )}
                                   </strong>
 
-                                  <button
-                                    type="button"
-                                    className={styles.editAccountButton}
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
                                     onClick={() => setEditingAccountId(selectedAccount.accountId)}
                                   >
                                     편집
-                                  </button>
+                                  </Button>
 
-                                  <button
-                                    type="button"
+                                  <Button
                                     className={styles.modalCloseButton}
+                                    variant="soft"
+                                    size="sm"
+                                    iconOnly
                                     aria-label="상세 닫기"
                                     onClick={() => setSelectedAccountId(null)}
                                   >
                                     ×
-                                  </button>
+                                  </Button>
                                 </div>
                               </div>
 
@@ -2524,8 +2578,9 @@ export default function AssetsPage({
                                   styles.reconcileActions
                                 }
                               >
-                                <button
-                                  type="button"
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
                                   onClick={() => {
                                     const accountId =
                                       selectedAccount.accountId;
@@ -2537,10 +2592,10 @@ export default function AssetsPage({
                                   }}
                                 >
                                   여기서 보내기
-                                </button>
+                                </Button>
 
-                                <button
-                                  type="button"
+                                <Button
+                                  size="sm"
                                   onClick={() => {
                                     const accountId =
                                       selectedAccount.accountId;
@@ -2552,7 +2607,7 @@ export default function AssetsPage({
                                   }}
                                 >
                                   여기로 받기
-                                </button>
+                                </Button>
                               </div>
 
 
@@ -2602,22 +2657,16 @@ export default function AssetsPage({
                                       placeholder="예: 327500"
                                     />
 
-                                    <button
-                                      type="button"
-                                      className={
-                                        styles.cashButton
-                                      }
+                                    <Button
+                                      size="sm"
                                       onClick={
                                         handleSaveCashBaseline
                                       }
-                                      disabled={
-                                        cashSaving
-                                      }
+                                      loading={cashSaving}
+                                      loadingLabel="저장 중..."
                                     >
-                                      {cashSaving
-                                        ? "저장 중..."
-                                        : "설정"}
-                                    </button>
+                                      설정
+                                    </Button>
                                   </div>
                                 </div>
                               )}
@@ -2677,22 +2726,16 @@ export default function AssetsPage({
                                         }
                                       />
 
-                                      <button
-                                        type="button"
-                                        className={
-                                          styles.cashButton
-                                        }
+                                      <Button
+                                        size="sm"
                                         onClick={
                                           handleSaveCashBaseline
                                         }
-                                        disabled={
-                                          cashSaving
-                                        }
+                                        loading={cashSaving}
+                                        loadingLabel="저장 중..."
                                       >
-                                        {cashSaving
-                                          ? "저장 중..."
-                                          : "저장"}
-                                      </button>
+                                        저장
+                                      </Button>
                                     </div>
                                   </div>
                                 </details>
@@ -2998,15 +3041,13 @@ export default function AssetsPage({
                                                     }
                                                   />
 
-                                                  <button
-                                                    type="button"
-                                                    className={
-                                                      styles.cashButton
-                                                    }
-                                                    disabled={
+                                                  <Button
+                                                    size="sm"
+                                                    loading={
                                                       manualPriceSavingId ===
                                                         holding.holdingId
                                                     }
+                                                    loadingLabel="저장 중"
                                                     onClick={
                                                       () =>
                                                         void handleSaveManualPrice(
@@ -3016,11 +3057,8 @@ export default function AssetsPage({
                                                         )
                                                     }
                                                   >
-                                                    {manualPriceSavingId ===
-                                                      holding.holdingId
-                                                      ? "저장 중..."
-                                                      : "시세 저장"}
-                                                  </button>
+                                                    시세 저장
+                                                  </Button>
                                                 </div>
 
                                                 {manualPriceErrors[

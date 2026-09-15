@@ -1,29 +1,48 @@
-const lastRefreshAt = new Map<string, number>();
+const lastSuccessfulRefreshAt = new Map<string, number>();
+const lastRefreshAttemptAt = new Map<string, number>();
+
+const DUPLICATE_ATTEMPT_GUARD_MS = 5_000;
 
 export function shouldBackgroundRefresh(
   key: string,
   minimumIntervalMs = 60_000
 ) {
   const now = Date.now();
-  const previous = lastRefreshAt.get(key) || 0;
+  const previousSuccess =
+    lastSuccessfulRefreshAt.get(key) || 0;
 
-  if (now - previous < minimumIntervalMs) {
+  if (now - previousSuccess < minimumIntervalMs) {
     return false;
   }
 
-  lastRefreshAt.set(key, now);
+  const previousAttempt =
+    lastRefreshAttemptAt.get(key) || 0;
+
+  if (now - previousAttempt < DUPLICATE_ATTEMPT_GUARD_MS) {
+    return false;
+  }
+
+  /*
+   * focus + visibilitychange가 거의 동시에 발생하는 경우의
+   * 중복 호출만 짧게 막습니다. 실제 성공 시각은
+   * markBackgroundRefreshed()에서만 기록합니다.
+   */
+  lastRefreshAttemptAt.set(key, now);
   return true;
 }
 
 export function markBackgroundRefreshed(key: string) {
-  lastRefreshAt.set(key, Date.now());
+  lastSuccessfulRefreshAt.set(key, Date.now());
+  lastRefreshAttemptAt.delete(key);
 }
 
 export function clearBackgroundRefreshMark(key?: string) {
   if (key) {
-    lastRefreshAt.delete(key);
+    lastSuccessfulRefreshAt.delete(key);
+    lastRefreshAttemptAt.delete(key);
     return;
   }
 
-  lastRefreshAt.clear();
+  lastSuccessfulRefreshAt.clear();
+  lastRefreshAttemptAt.clear();
 }

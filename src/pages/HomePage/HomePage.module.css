@@ -61,11 +61,7 @@
 }
 
 .summaryCard {
-  padding: 18px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-card);
+  /* 카드 표면/테두리/그림자는 공통 Card가 관리합니다. */
 }
 
 .summaryHeader {
@@ -123,10 +119,6 @@
 .cardList,
 .rankList {
   overflow: hidden;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-card);
 }
 
 .cardRow,
@@ -189,9 +181,6 @@
 .loadingCard,
 .errorCard {
   padding: 20px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
 }
 .loadingLineShort,
 .loadingLineLong,
@@ -201,18 +190,6 @@
 .loadingGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 24px; }
 .loadingGrid div { height: 48px; }
 .errorCard p { margin: 0; color: var(--color-error); font-size: 14px; line-height: 1.6; }
-.retryButton {
-  width: 100%;
-  min-height: 46px;
-  margin-top: 16px;
-  padding: 0 16px;
-  border: 0;
-  border-radius: var(--radius-md);
-  background: var(--color-primary);
-  color: var(--color-primary-text);
-  font: inherit;
-  font-weight: 700;
-}
 
 /* 로딩/오류 화면의 기존 헤더 클래스 호환 */
 .monthLabel { margin: 0 0 4px; color: var(--color-text-secondary); font-size: 13px; font-weight: 700; }
@@ -309,15 +286,9 @@
   font-size: 12px;
 }
 
-.detailHeader button {
-  width: 36px;
-  height: 36px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--color-surface-soft);
-  font-size: 24px;
-  line-height: 1;
-  cursor: pointer;
+.detailClose {
+  font-size: 22px;
+  font-weight: 500;
 }
 
 .detailState,
@@ -345,7 +316,7 @@
   border-bottom: 1px solid var(--color-border);
 }
 
-.detailRow > div {
+.detailRow > div:first-child {
   min-width: 0;
   display: grid;
   gap: 3px;
@@ -366,6 +337,13 @@
 .detailRow b {
   flex: 0 0 auto;
   font-size: 14px;
+}
+
+.detailRowActions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
 }
 
 @media (min-width: 720px) {

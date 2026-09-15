@@ -118,6 +118,16 @@ export interface HoldingSummary {
   isDeleted: boolean;
 }
 
+export interface StaleManualPriceItem {
+  holdingId: string;
+  accountId: string;
+  accountName: string;
+  stockCode: string;
+  stockName: string;
+  lastUpdated: string | null;
+  elapsedDays: number | null;
+}
+
 export interface CashBaselinePendingItem {
   accountId: string;
   accountName: string;
@@ -129,7 +139,7 @@ export interface DashboardInvestments {
   realizedPnlTotal: number;
   accounts: InvestmentAccountSummary[];
   holdings: HoldingSummary[];
-  staleManualPrices: unknown[];
+  staleManualPrices: StaleManualPriceItem[];
   cashBaselinePending: CashBaselinePendingItem[];
 }
 

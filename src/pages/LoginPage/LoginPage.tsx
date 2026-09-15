@@ -6,6 +6,9 @@ import type {
   FormEvent
 } from "react";
 
+import { Button } from "../../components/common/Button/Button";
+import { Card } from "../../components/common/Card/Card";
+
 import styles from
   "./LoginPage.module.css";
 
@@ -68,10 +71,10 @@ function LoginPage({
         styles.page
       }
     >
-      <section
-        className={
-          styles.card
-        }
+      <Card
+        as="section"
+        padding="lg"
+        className={styles.card}
       >
         <div
           className={
@@ -165,21 +168,16 @@ function LoginPage({
           </label>
 
 
-          <button
+          <Button
             type="submit"
-
-            disabled={
-              loading ||
-              !name.trim() ||
-              !password
-            }
+            fullWidth
+            size="lg"
+            loading={loading}
+            loadingLabel="로그인 중..."
+            disabled={!name.trim() || !password}
           >
-            {
-              loading
-                ? "로그인 중..."
-                : "로그인"
-            }
-          </button>
+            로그인
+          </Button>
         </form>
 
 
@@ -198,7 +196,7 @@ function LoginPage({
             </p>
           )
         }
-      </section>
+      </Card>
     </main>
   );
 }

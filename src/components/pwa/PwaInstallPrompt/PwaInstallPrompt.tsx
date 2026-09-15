@@ -13,6 +13,9 @@ import type {
   PwaInstallState
 } from "../../../utils/pwaInstall";
 
+import { Button } from "../../common/Button/Button";
+import { Card } from "../../common/Card/Card";
+
 import styles
   from "./PwaInstallPrompt.module.css";
 
@@ -74,17 +77,11 @@ export default function PwaInstallPrompt() {
     }
   }
 
-  const buttonLabel =
-    installing
-      ? "설치 중..."
-      : installState.nativeAvailable
-        ? "홈 화면에 설치"
-        : showInstructions
-          ? "설치 방법 닫기"
-          : "설치 방법 보기";
+
 
   return (
-    <section
+    <Card
+      as="section"
       className={styles.panel}
       aria-labelledby="pwa-install-title"
     >
@@ -110,14 +107,18 @@ export default function PwaInstallPrompt() {
         </div>
       </div>
 
-      <button
-        type="button"
-        className={styles.primaryButton}
+      <Button
+        fullWidth
+        loading={installing}
+        loadingLabel="설치 중..."
         onClick={() => void handleInstall()}
-        disabled={installing}
       >
-        {buttonLabel}
-      </button>
+        {installState.nativeAvailable
+          ? "홈 화면에 설치"
+          : showInstructions
+            ? "설치 방법 닫기"
+            : "설치 방법 보기"}
+      </Button>
 
       {showInstructions && (
         <div
@@ -141,6 +142,6 @@ export default function PwaInstallPrompt() {
           )}
         </div>
       )}
-    </section>
+    </Card>
   );
 }

@@ -96,35 +96,3 @@ export interface InvestmentAccount {
 export interface LedgerConfig {
   ledgerStartDate: string | null;
 }
-
-export interface BootstrapData {
-  backendVersion: string;
-
-  transactionTypes:
-    TransactionType[];
-
-  investmentTradeTypes:
-    InvestmentTradeType[];
-
-  members: string[];
-
-  spendingTargets: string[];
-
-  accounts: Account[];
-
-  categories: Category[];
-
-  investmentAccounts:
-    InvestmentAccount[];
-
-  ledgerConfig:
-    LedgerConfig;
-}
-
-export interface BootstrapResponse {
-  success: true;
-
-  apiVersion: string;
-
-  data: BootstrapData;
-}

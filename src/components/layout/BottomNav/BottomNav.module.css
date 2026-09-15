@@ -68,6 +68,7 @@
 }
 
 .inputIconWrap {
+  position: relative;
   width: 34px;
   height: 34px;
   display: grid;
@@ -92,4 +93,28 @@
 
 .inputActive .inputIconWrap {
   background: var(--color-primary-hover);
+}
+
+.pendingBadge {
+  position: absolute;
+  top: -6px;
+  right: -10px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--color-surface);
+  border-radius: var(--radius-full);
+  background: var(--color-primary-hover);
+  color: var(--color-primary-text);
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: var(--shadow-card);
+}
+
+.pendingBadgeFailed {
+  background: var(--color-danger);
 }

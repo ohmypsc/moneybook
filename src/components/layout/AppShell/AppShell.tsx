@@ -16,12 +16,17 @@ type AppShellProps = {
     navigation: NavigationKey
   ) => void;
 
+  pendingTransactionCount?: number;
+  pendingTransactionFailedCount?: number;
+
   children: ReactNode;
 };
 
 export function AppShell({
   activeNavigation,
   onNavigate,
+  pendingTransactionCount = 0,
+  pendingTransactionFailedCount = 0,
   children,
 }: AppShellProps) {
   return (
@@ -33,6 +38,12 @@ export function AppShell({
       <BottomNav
         activeNavigation={
           activeNavigation
+        }
+        pendingTransactionCount={
+          pendingTransactionCount
+        }
+        pendingTransactionFailedCount={
+          pendingTransactionFailedCount
         }
         onNavigate={onNavigate}
       />

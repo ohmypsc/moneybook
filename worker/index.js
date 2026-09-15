@@ -3217,17 +3217,21 @@ function mbD1MapTransactionRow(row) {
   };
 }
 
+const MB_D1_TRANSACTION_FROM = `
+  FROM transactions t
+  LEFT JOIN categories c ON c.category_id=t.category_id
+  LEFT JOIN accounts fa ON fa.account_id=t.from_account_id
+  LEFT JOIN accounts ta ON ta.account_id=t.to_account_id
+  LEFT JOIN accounts pm ON pm.account_id=t.payment_method_id
+`;
+
 const MB_D1_TRANSACTION_SELECT = `
   SELECT t.*,
          c.name AS category_name,
          fa.display_name AS from_account_name,
          ta.display_name AS to_account_name,
          pm.display_name AS payment_method_name
-  FROM transactions t
-  LEFT JOIN categories c ON c.category_id=t.category_id
-  LEFT JOIN accounts fa ON fa.account_id=t.from_account_id
-  LEFT JOIN accounts ta ON ta.account_id=t.to_account_id
-  LEFT JOIN accounts pm ON pm.account_id=t.payment_method_id
+  ${MB_D1_TRANSACTION_FROM}
 `;
 
 async function mbD1AllTransactions(env, includeDeleted = false) {
@@ -3633,6 +3637,8 @@ async function mbD1BuildDashboard(env, monthValue = "") {
     ))
     .map((holding) => ({
       holdingId: holding.holdingId,
+      accountId: holding.accountId,
+      accountName: holding.accountName,
       stockCode: holding.stockCode,
       stockName: holding.stockName,
       lastUpdated: holding.lastUpdated,
@@ -4265,7 +4271,6 @@ async function mbD1GetAccountsData(env, url) {
 
 async function mbD1GetTransactionsData(env, url) {
   const includeDeleted = ["1", "true"].includes((url.searchParams.get("includeDeleted") || "").toLowerCase());
-  let items = await mbD1AllTransactions(env, includeDeleted);
   const type = mbD1Text(url.searchParams.get("type"));
   const categoryId = mbD1Text(url.searchParams.get("categoryId"));
   const accountId = mbD1Text(url.searchParams.get("accountId"));
@@ -4274,42 +4279,97 @@ async function mbD1GetTransactionsData(env, url) {
   const amountRaw = mbD1Text(url.searchParams.get("amount"));
   const dateFrom = mbD1Text(url.searchParams.get("dateFrom"));
   const dateTo = mbD1Text(url.searchParams.get("dateTo"));
+
   if (dateFrom && !mbD1DateOnly(dateFrom)) mbD1Fail("INVALID_DATE_FROM", "dateFrom은 YYYY-MM-DD 형식이어야 합니다.");
   if (dateTo && !mbD1DateOnly(dateTo)) mbD1Fail("INVALID_DATE_TO", "dateTo는 YYYY-MM-DD 형식이어야 합니다.");
   if (dateFrom && dateTo && dateFrom > dateTo) mbD1Fail("INVALID_DATE_RANGE", "조회 시작일은 종료일보다 늦을 수 없습니다.");
+
   let amount = null;
   if (amountRaw) {
     amount = Number(amountRaw);
     if (!Number.isFinite(amount) || amount < 0) mbD1Fail("INVALID_AMOUNT_FILTER", "amount는 0 이상의 숫자여야 합니다.");
   }
-  items = items.filter((item) => {
-    if (type && item.type !== type) return false;
-    if (categoryId && item.categoryId !== categoryId) return false;
-    if (accountId && item.fromAccountId !== accountId && item.toAccountId !== accountId && item.paymentMethodId !== accountId) return false;
-    if (spendingTarget && item.spendingTarget !== spendingTarget) return false;
-    if (dateFrom && item.date < dateFrom) return false;
-    if (dateTo && item.date > dateTo) return false;
-    if (amount !== null && Math.abs(item.amount - amount) > 0.000001) return false;
-    if (q) {
-      const text = [
-        item.type,
-        item.category,
-        item.fromAccount,
-        item.toAccount,
-        item.paymentMethod,
-        item.spendingTarget,
-        item.description,
-        item.memo
-      ].filter(Boolean).join(" ").toLowerCase();
-      if (!text.includes(q)) return false;
-    }
-    return true;
-  });
-  const total = items.length;
-  const limit = Math.max(0, Math.min(1000, Number(url.searchParams.get("limit")) || 0));
-  const offset = Math.max(0, Number(url.searchParams.get("offset")) || 0);
-  if (limit) items = items.slice(offset, offset + limit);
-  return { total, items };
+
+  const rawLimit = Number(url.searchParams.get("limit")) || 0;
+  const rawOffset = Number(url.searchParams.get("offset")) || 0;
+  const limit = Math.max(0, Math.min(1000, Math.floor(rawLimit)));
+  const offset = Math.max(0, Math.floor(rawOffset));
+
+  const where = ["t.household_id=?"];
+  const binds = [MB_D1_HOUSEHOLD_ID];
+
+  if (!includeDeleted) where.push("t.deleted_at IS NULL");
+  if (type) {
+    where.push("t.type=?");
+    binds.push(type);
+  }
+  if (categoryId) {
+    where.push("t.category_id=?");
+    binds.push(categoryId);
+  }
+  if (accountId) {
+    where.push("(t.from_account_id=? OR t.to_account_id=? OR t.payment_method_id=?)");
+    binds.push(accountId, accountId, accountId);
+  }
+  if (spendingTarget) {
+    where.push("t.spending_target=?");
+    binds.push(spendingTarget);
+  }
+  if (dateFrom) {
+    where.push("t.date>=?");
+    binds.push(dateFrom);
+  }
+  if (dateTo) {
+    where.push("t.date<=?");
+    binds.push(dateTo);
+  }
+  if (amount !== null) {
+    where.push("ABS(t.amount - ?) <= 0.000001");
+    binds.push(amount);
+  }
+  if (q) {
+    const escaped = q.replace(/[\\%_]/g, (value) => `\\${value}`);
+    const like = `%${escaped}%`;
+    where.push(`LOWER(
+      COALESCE(t.type,'') || ' ' ||
+      COALESCE(c.name,'') || ' ' ||
+      COALESCE(fa.display_name,'') || ' ' ||
+      COALESCE(ta.display_name,'') || ' ' ||
+      COALESCE(pm.display_name,'') || ' ' ||
+      COALESCE(t.spending_target,'') || ' ' ||
+      COALESCE(t.description,'') || ' ' ||
+      COALESCE(t.memo,'')
+    ) LIKE ? ESCAPE '\\'`);
+    binds.push(like);
+  }
+
+  const whereSql = `WHERE ${where.join(" AND ")}`;
+  const countRow = await mbD1First(
+    env,
+    `SELECT COUNT(*) AS total ${MB_D1_TRANSACTION_FROM} ${whereSql}`,
+    binds
+  );
+  const total = mbD1Number(countRow?.total, 0);
+
+  const listBinds = [...binds];
+  let pagingSql = "";
+  if (limit > 0) {
+    pagingSql = " LIMIT ? OFFSET ?";
+    listBinds.push(limit, offset);
+  }
+
+  const rows = await mbD1All(
+    env,
+    `${MB_D1_TRANSACTION_SELECT}
+     ${whereSql}
+     ORDER BY t.date DESC, COALESCE(t.source_row,0) DESC, t.created_at DESC${pagingSql}`,
+    listBinds
+  );
+
+  return {
+    total,
+    items: rows.map(mbD1MapTransactionRow)
+  };
 }
 
 async function mbD1GetAssetSnapshotsData(env, url) {
@@ -4427,12 +4487,26 @@ async function mbD1BuildTransactionModel(env, payload, current = null, forCreate
   const amount = Number(mbD1Has(payload, "amount") ? payload.amount : source.amount);
   if (!Number.isFinite(amount) || amount <= 0) mbD1Fail("INVALID_NUMBER", "금액은 0보다 큰 숫자여야 합니다.");
   const categoryId = mbD1Text(mbD1Has(payload, "categoryId") ? payload.categoryId : source.categoryId);
-  const category = await mbD1CategoryById(env, categoryId, false);
-  if (!category || (forCreate && !category.active)) mbD1Fail("CATEGORY_NOT_FOUND", "사용 가능한 카테고리를 찾을 수 없습니다.");
+  const keepsExistingCategory = !forCreate && categoryId === mbD1Text(source.categoryId);
+  const category = await mbD1CategoryById(env, categoryId, keepsExistingCategory);
+  if (!category || ((!category.active || category.isDeleted) && !keepsExistingCategory)) {
+    mbD1Fail("CATEGORY_NOT_FOUND", "사용 가능한 카테고리를 찾을 수 없습니다.");
+  }
   if (category.type !== type) mbD1Fail("CATEGORY_TYPE_MISMATCH", `선택한 카테고리는 \"${category.type}\" 유형입니다.`);
+
   const rawAccounts = await mbD1RawAccounts(env);
-  const accounts = rawAccounts.map(mbD1MapAccountRow).filter((account) => account.active && !account.isDeleted);
+  const accounts = rawAccounts.map(mbD1MapAccountRow);
   const accountMap = new Map(accounts.map((account) => [account.accountId, account]));
+  const keepsExistingType = !forCreate && type === mbD1Text(source.type);
+
+  function resolveTransactionAccount(id, existingIds, code, message) {
+    const account = accountMap.get(id);
+    const keepsExistingAccount = !forCreate && existingIds.some((existingId) => mbD1Text(existingId) === id);
+    if (!account || ((!account.active || account.isDeleted) && !keepsExistingAccount)) {
+      mbD1Fail(code, message);
+    }
+    return account;
+  }
   let fromAccount = null;
   let toAccount = null;
   let paymentMethod = null;
@@ -4440,8 +4514,12 @@ async function mbD1BuildTransactionModel(env, payload, current = null, forCreate
   if (type === "수입") {
     const toId = mbD1Text(mbD1Has(payload, "toAccountId") ? payload.toAccountId : source.toAccountId);
     if (!toId) mbD1Fail("INCOME_TO_REQUIRED", "수입 거래에는 입금수단이 필요합니다.");
-    toAccount = accountMap.get(toId);
-    if (!toAccount) mbD1Fail("TO_ACCOUNT_NOT_FOUND", "입금수단을 찾을 수 없습니다.");
+    toAccount = resolveTransactionAccount(
+      toId,
+      keepsExistingType ? [source.toAccountId] : [],
+      "TO_ACCOUNT_NOT_FOUND",
+      "입금수단을 찾을 수 없습니다."
+    );
     if (mbD1Has(payload, "fromAccountId") && mbD1Text(payload.fromAccountId)) mbD1Fail("INCOME_FROM_NOT_ALLOWED", "수입 거래에는 출금수단을 사용할 수 없습니다.");
     if (mbD1Has(payload, "paymentMethodId") && mbD1Text(payload.paymentMethodId)) mbD1Fail("INCOME_PAYMENT_NOT_ALLOWED", "수입 거래에는 결제수단을 사용할 수 없습니다.");
   }
@@ -4452,8 +4530,12 @@ async function mbD1BuildTransactionModel(env, payload, current = null, forCreate
         : (source.paymentMethodId || source.fromAccountId)
     );
     if (!paymentId) mbD1Fail("PAYMENT_METHOD_REQUIRED", "지출 거래에는 결제수단이 필요합니다.");
-    paymentMethod = accountMap.get(paymentId);
-    if (!paymentMethod) mbD1Fail("PAYMENT_METHOD_NOT_FOUND", "결제수단을 찾을 수 없습니다.");
+    paymentMethod = resolveTransactionAccount(
+      paymentId,
+      keepsExistingType ? [source.paymentMethodId, source.fromAccountId] : [],
+      "PAYMENT_METHOD_NOT_FOUND",
+      "결제수단을 찾을 수 없습니다."
+    );
     spendingTarget = mbD1Text(mbD1Has(payload, "spendingTarget") ? payload.spendingTarget : source.spendingTarget);
     if (!spendingTarget) mbD1Fail("SPENDING_TARGET_REQUIRED", "지출 거래에는 지출대상이 필요합니다.");
     if (spendingTarget !== "공동") {
@@ -4461,9 +4543,17 @@ async function mbD1BuildTransactionModel(env, payload, current = null, forCreate
       if (!member) mbD1Fail("INVALID_SPENDING_TARGET", "사용할 수 없는 지출대상입니다.");
     }
     if (paymentMethod.subType === "체크카드") {
-      if (!paymentMethod.paymentAccountId) mbD1Fail("CHECK_CARD_ACCOUNT_MISSING", `${paymentMethod.displayName}의 결제계좌가 설정되어 있지 않습니다.`);
-      fromAccount = accountMap.get(paymentMethod.paymentAccountId);
-      if (!fromAccount) mbD1Fail("CHECK_CARD_ACCOUNT_NOT_FOUND", `${paymentMethod.displayName}의 연결 통장을 찾을 수 없습니다.`);
+      const keepsExistingPaymentMethod = keepsExistingType && paymentId === mbD1Text(source.paymentMethodId || source.fromAccountId);
+      const paymentAccountId = keepsExistingPaymentMethod && source.fromAccountId
+        ? mbD1Text(source.fromAccountId)
+        : mbD1Text(paymentMethod.paymentAccountId);
+      if (!paymentAccountId) mbD1Fail("CHECK_CARD_ACCOUNT_MISSING", `${paymentMethod.displayName}의 결제계좌가 설정되어 있지 않습니다.`);
+      fromAccount = resolveTransactionAccount(
+        paymentAccountId,
+        keepsExistingPaymentMethod ? [source.fromAccountId] : [],
+        "CHECK_CARD_ACCOUNT_NOT_FOUND",
+        `${paymentMethod.displayName}의 연결 통장을 찾을 수 없습니다.`
+      );
     } else {
       fromAccount = paymentMethod;
     }
@@ -4474,10 +4564,18 @@ async function mbD1BuildTransactionModel(env, payload, current = null, forCreate
     const toId = mbD1Text(mbD1Has(payload, "toAccountId") ? payload.toAccountId : source.toAccountId);
     if (!fromId || !toId) mbD1Fail("TRANSFER_ACCOUNT_REQUIRED", "이체에는 보내는 수단과 받는 수단이 모두 필요합니다.");
     if (fromId === toId) mbD1Fail("SAME_TRANSFER_ACCOUNT", "이체의 보내는 수단과 받는 수단은 같을 수 없습니다.");
-    fromAccount = accountMap.get(fromId);
-    toAccount = accountMap.get(toId);
-    if (!fromAccount) mbD1Fail("FROM_ACCOUNT_NOT_FOUND", "보내는 수단을 찾을 수 없습니다.");
-    if (!toAccount) mbD1Fail("TO_ACCOUNT_NOT_FOUND", "받는 수단을 찾을 수 없습니다.");
+    fromAccount = resolveTransactionAccount(
+      fromId,
+      keepsExistingType ? [source.fromAccountId] : [],
+      "FROM_ACCOUNT_NOT_FOUND",
+      "보내는 수단을 찾을 수 없습니다."
+    );
+    toAccount = resolveTransactionAccount(
+      toId,
+      keepsExistingType ? [source.toAccountId] : [],
+      "TO_ACCOUNT_NOT_FOUND",
+      "받는 수단을 찾을 수 없습니다."
+    );
     if (mbD1Has(payload, "paymentMethodId") && mbD1Text(payload.paymentMethodId)) mbD1Fail("TRANSFER_PAYMENT_NOT_ALLOWED", "이체에는 결제수단을 사용할 수 없습니다.");
   }
   const billingInput = mbD1Has(payload, "billingMonth")
@@ -5937,7 +6035,7 @@ async function mbD1RefreshQuotes(env, force = false) {
   if (!env.DB) return;
   if (!force && Date.now() - mbD1LastQuoteRefreshAt < MB_D1_QUOTE_REFRESH_MS) return;
   if (mbD1QuoteRefreshPromise) return mbD1QuoteRefreshPromise;
-  mbD1LastQuoteRefreshAt = Date.now();
+
   mbD1QuoteRefreshPromise = (async () => {
     const holdings = (await mbD1Holdings(env, false)).filter((holding) => holding.quoteMode === "자동");
     for (const holding of holdings) {
@@ -5949,6 +6047,8 @@ async function mbD1RefreshQuotes(env, force = false) {
         "UPDATE holdings SET current_price=?,fx_rate=?,value_krw=?,return_rate=?,updated_at=? WHERE household_id=? AND holding_id=?"
       ).bind(quote.price, quote.fx, valueKrw, returnRate, mbD1Now(), MB_D1_HOUSEHOLD_ID, holding.holdingId).run();
     }
+
+    mbD1LastQuoteRefreshAt = Date.now();
   })().finally(() => {
     mbD1QuoteRefreshPromise = null;
   });
@@ -6014,7 +6114,14 @@ async function mbD1ProductionRoute(request, url, session, env, ctx) {
     if (request.method === "GET") {
       if (path === "/api/bootstrap") return mbD1Envelope(await mbD1BuildBootstrap(env));
       if (path === "/api/dashboard") {
-        if (ctx?.waitUntil) ctx.waitUntil(mbD1RefreshQuotes(env, false));
+        const refreshQuotes = url.searchParams.get("refreshQuotes") === "1";
+
+        if (refreshQuotes) {
+          await mbD1RefreshQuotes(env, true);
+        } else if (ctx?.waitUntil) {
+          ctx.waitUntil(mbD1RefreshQuotes(env, false));
+        }
+
         return mbD1Envelope(await mbD1BuildDashboard(env, mbD1Text(url.searchParams.get("month"))));
       }
       if (path === "/api/categories") return mbD1Envelope(await mbD1GetCategoriesData(env, url));
@@ -6110,6 +6217,50 @@ export class HouseholdRealtime extends DurableObject {
 }
 
 export default {
+  async scheduled(
+    _controller,
+    env,
+    ctx
+  ) {
+    if (!env.DB) {
+      console.error("[moneybook cron] D1 binding is missing.");
+      return;
+    }
+
+    const automationSession = {
+      name: "자동화"
+    };
+
+    try {
+      const result = await mbD1ProcessRecurring(
+        env,
+        automationSession,
+        {}
+      );
+
+      if (result.created.length > 0) {
+        if (ctx?.waitUntil) {
+          ctx.waitUntil(
+            mbD1RealtimePoke(env, {
+              path: "/cron/automations/recurring",
+              changedBy: automationSession.name
+            })
+          );
+        }
+
+        console.log(
+          `[moneybook cron] recurring transactions created: ${result.created.length}`
+        );
+      }
+    } catch (error) {
+      console.error(
+        "[moneybook cron] recurring transaction processing failed",
+        error
+      );
+      throw error;
+    }
+  },
+
   async fetch(
     request,
     env,
@@ -6223,6 +6374,16 @@ export default {
         normalizedPath ===
           "/api/admin/migrate-d1"
       ) {
+        const adminSession =
+          await getSession(
+            request,
+            env
+          );
+
+        if (!adminSession) {
+          return unauthorized();
+        }
+
         return new Response(`<!doctype html>
 <html lang="ko">
 <head>
@@ -6255,6 +6416,16 @@ export default {
         normalizedPath ===
           "/api/admin/verify-d1"
       ) {
+        const adminSession =
+          await getSession(
+            request,
+            env
+          );
+
+        if (!adminSession) {
+          return unauthorized();
+        }
+
         return new Response(`<!doctype html>
 <html lang="ko">
 <head>
@@ -6606,7 +6777,7 @@ export default {
           const dst = targetTxMap.get(id);
           if (!dst) continue;
           const textChecks = [
-            ["requestId",src.requestId,dst.request_id],["날짜",src.date,dst.date],["유형",src.type,dst.type],["카테고리",src.categoryId,dst.category_id],["출금계좌",src.fromAccountId,dst.from_account_id],["입금계좌",src.toAccountId,dst.to_account_id],["결제수단",src.paymentMethodId,dst.payment_method_id],["지출대상",src.spendingTarget,dst.spending_target],["메모",src.memo,dst.memo],["청구월수정",src.billingOverride,dst.billing_month_override],["청구월",src.billingMonth,dst.billing_month],["그룹",src.groupId,dst.group_id],["취소원거래",src.reversalOf,dst.reversal_of],["작성자",src.createdBy,dst.created_by],["수정자",src.updatedBy,dst.updated_by],["삭제자",src.deletedBy,dst.deleted_by]
+            ["requestId",src.requestId,dst.request_id],["날짜",src.date,dst.date],["유형",src.type,dst.type],["카테고리",src.categoryId,dst.category_id],["출금계좌",src.fromAccountId,dst.from_account_id],["입금계좌",src.toAccountId,dst.to_account_id],["결제수단",src.paymentMethodId,dst.payment_method_id],["지출대상",src.spendingTarget,dst.spending_target],["설명",src.description,dst.description],["메모",src.memo,dst.memo],["청구월수정",src.billingOverride,dst.billing_month_override],["청구월",src.billingMonth,dst.billing_month],["그룹",src.groupId,dst.group_id],["취소원거래",src.reversalOf,dst.reversal_of],["작성자",src.createdBy,dst.created_by],["수정자",src.updatedBy,dst.updated_by],["삭제자",src.deletedBy,dst.deleted_by]
           ];
           for (const [label,a,b] of textChecks) if (auditText(a) !== auditText(b)) pushIssue("거래", `${id} ${label} 불일치: Sheets=${auditText(a)} / D1=${auditText(b)}`);
           if (!auditNumberEqual(src.amount,dst.amount)) pushIssue("거래", `${id} 금액 불일치: Sheets=${src.amount} / D1=${dst.amount}`);
@@ -7151,7 +7322,7 @@ ${warnings.length ? `<p class="warn">경고는 GOOGLEFINANCE 시세처럼 검증
           const total = Number(data?.total) || items.length;
           const memberMap = await migrationMemberMap();
           const statements = items.map((item) => env.DB.prepare(
-            "INSERT INTO transactions (transaction_id,household_id,request_id,date,type,category_id,amount,from_account_id,to_account_id,payment_method_id,spending_target,spender_member_id,entered_by_member_id,description,memo,billing_month_override,billing_month,group_id,reversal_of,version,taxpayer_member_id,tax_category_code,created_at,updated_at,created_by,updated_by,deleted_at,deleted_by,source_row) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(transaction_id) DO UPDATE SET household_id=excluded.household_id,request_id=excluded.request_id,date=excluded.date,type=excluded.type,category_id=excluded.category_id,amount=excluded.amount,from_account_id=excluded.from_account_id,to_account_id=excluded.to_account_id,payment_method_id=excluded.payment_method_id,spending_target=excluded.spending_target,spender_member_id=excluded.spender_member_id,entered_by_member_id=excluded.entered_by_member_id,memo=excluded.memo,billing_month_override=excluded.billing_month_override,billing_month=excluded.billing_month,group_id=excluded.group_id,reversal_of=NULL,created_at=excluded.created_at,updated_at=excluded.updated_at,created_by=excluded.created_by,updated_by=excluded.updated_by,deleted_at=excluded.deleted_at,deleted_by=excluded.deleted_by,source_row=excluded.source_row"
+            "INSERT INTO transactions (transaction_id,household_id,request_id,date,type,category_id,amount,from_account_id,to_account_id,payment_method_id,spending_target,spender_member_id,entered_by_member_id,description,memo,billing_month_override,billing_month,group_id,reversal_of,version,taxpayer_member_id,tax_category_code,created_at,updated_at,created_by,updated_by,deleted_at,deleted_by,source_row) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(transaction_id) DO UPDATE SET household_id=excluded.household_id,request_id=excluded.request_id,date=excluded.date,type=excluded.type,category_id=excluded.category_id,amount=excluded.amount,from_account_id=excluded.from_account_id,to_account_id=excluded.to_account_id,payment_method_id=excluded.payment_method_id,spending_target=excluded.spending_target,spender_member_id=excluded.spender_member_id,entered_by_member_id=excluded.entered_by_member_id,description=excluded.description,memo=excluded.memo,billing_month_override=excluded.billing_month_override,billing_month=excluded.billing_month,group_id=excluded.group_id,reversal_of=NULL,created_at=excluded.created_at,updated_at=excluded.updated_at,created_by=excluded.created_by,updated_by=excluded.updated_by,deleted_at=excluded.deleted_at,deleted_by=excluded.deleted_by,source_row=excluded.source_row"
           ).bind(
             item.transactionId,
             "HH_MAIN",
@@ -7166,7 +7337,7 @@ ${warnings.length ? `<p class="warn">경고는 GOOGLEFINANCE 시세처럼 검증
             item.spendingTarget || null,
             memberMap.get(String(item.spendingTarget || "").trim()) || null,
             memberMap.get(String(item.createdBy || "").trim()) || null,
-            null,
+            item.description || null,
             item.memo || null,
             item.billingOverride || null,
             item.billingMonth || null,
@@ -7458,7 +7629,7 @@ ${warnings.length ? `<p class="warn">경고는 GOOGLEFINANCE 시세처럼 검증
               "month"
             ) || "",
             url.searchParams.get(
-              "refresh"
+              "refreshQuotes"
             ) === "1"
           )
         );
@@ -7545,11 +7716,14 @@ ${warnings.length ? `<p class="warn">경고는 GOOGLEFINANCE 시세처럼 검증
     } catch (
       error
     ) {
+      console.error(
+        "[moneybook worker] unhandled error",
+        error
+      );
+
       return errorResponse(
         "WORKER_ERROR",
-        error instanceof Error
-          ? error.message
-          : String(error),
+        "서버 처리 중 오류가 발생했습니다.",
         500
       );
     }

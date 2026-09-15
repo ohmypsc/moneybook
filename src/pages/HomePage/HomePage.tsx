@@ -35,6 +35,11 @@ import {
   getSeoulTimestampLabel
 } from "../../utils/dateTime";
 
+import { Button } from "../../components/common/Button/Button";
+import { Card } from "../../components/common/Card/Card";
+import { Money } from "../../components/common/Money/Money";
+import PwaInstallPrompt from "../../components/pwa/PwaInstallPrompt/PwaInstallPrompt";
+
 import styles
   from "./HomePage.module.css";
 
@@ -48,34 +53,6 @@ interface DashboardCardView {
   name: string;
   paymentDay: number | null;
   owner: string;
-}
-
-function formatWon(value: number) {
-  const safeValue = Number.isFinite(value) ? value : 0;
-
-  return (
-    new Intl.NumberFormat("ko-KR").format(
-      Math.round(Math.abs(safeValue))
-    ) + "원"
-  );
-}
-
-function formatSignedWon(value: number) {
-  const safeValue = Number.isFinite(value) ? value : 0;
-
-  if (safeValue > 0) return `+${formatWon(safeValue)}`;
-  if (safeValue < 0) return `-${formatWon(safeValue)}`;
-  return "0원";
-}
-
-function formatBalanceWon(value: number) {
-  const safeValue = Number.isFinite(value) ? value : 0;
-
-  return (
-    new Intl.NumberFormat("ko-KR").format(
-      Math.round(safeValue)
-    ) + "원"
-  );
 }
 
 function formatMonth(month: string) {
@@ -117,6 +94,10 @@ function getTransactionMeta(transaction: Transaction) {
   ].filter(Boolean).join(" · ");
 }
 
+interface HomePageProps {
+  onCopyTransaction?: (transaction: Transaction) => void;
+}
+
 const TOGETHER_START = "2026-07-11";
 
 function getTogetherDays() {
@@ -131,7 +112,9 @@ function getTogetherDays() {
   return Math.max(1, difference + 1);
 }
 
-export default function HomePage() {
+export default function HomePage({
+  onCopyTransaction
+}: HomePageProps) {
   const [needsInitialRefresh] = useState(() => isLedgerDirty());
   const [initialDashboard] = useState<DashboardData | null>(
     () => getDashboardSnapshot()
@@ -350,11 +333,11 @@ export default function HomePage() {
           <p className={styles.monthLabel}>가계부</p>
           <h1>불러오는 중</h1>
         </header>
-        <section className={styles.loadingCard}>
+        <Card as="section" className={styles.loadingCard}>
           <div className={styles.loadingLineShort} />
           <div className={styles.loadingLineLong} />
           <div className={styles.loadingGrid}><div /><div /></div>
-        </section>
+        </Card>
       </main>
     );
   }
@@ -366,16 +349,16 @@ export default function HomePage() {
           <p className={styles.monthLabel}>가계부</p>
           <h1>데이터를 불러오지 못했어요</h1>
         </header>
-        <section className={styles.errorCard}>
+        <Card as="section" className={styles.errorCard}>
           <p>{errorMessage}</p>
-          <button
-            type="button"
-            className={styles.retryButton}
+          <Button
+            fullWidth
+            size="lg"
             onClick={() => void loadDashboard({ forceRefresh: true })}
           >
             다시 불러오기
-          </button>
-        </section>
+          </Button>
+        </Card>
       </main>
     );
   }
@@ -409,7 +392,7 @@ export default function HomePage() {
         </div>
       </header>
 
-      <section className={styles.summaryCard}>
+      <Card as="section" className={styles.summaryCard}>
         <div className={styles.summaryHeader}>
           <h2>우리 집 한눈에</h2>
           <div className={styles.summaryMeta}>
@@ -422,7 +405,7 @@ export default function HomePage() {
           <div className={styles.summaryRow}>
             <span className={styles.summaryLabel}>우리 순자산</span>
             <strong className={netWorth < 0 ? styles.negativeAmount : styles.netAmount}>
-              {formatBalanceWon(netWorth)}
+              <Money amount={netWorth} />
             </strong>
           </div>
           <button
@@ -431,7 +414,7 @@ export default function HomePage() {
             onClick={() => void openMonthlyDetail("수입")}
           >
             <span className={styles.summaryLabel}>수입 <small>내역 보기</small></span>
-            <strong className={styles.incomeAmount}>{formatWon(monthIncome)}</strong>
+            <strong className={styles.incomeAmount}><Money amount={monthIncome} absolute tone="income" /></strong>
           </button>
           <button
             type="button"
@@ -439,16 +422,16 @@ export default function HomePage() {
             onClick={() => void openMonthlyDetail("지출")}
           >
             <span className={styles.summaryLabel}>지출 <small>내역 보기</small></span>
-            <strong className={styles.expenseAmount}>{formatWon(monthExpense)}</strong>
+            <strong className={styles.expenseAmount}><Money amount={monthExpense} absolute tone="expense" /></strong>
           </button>
           <div className={styles.summaryRow}>
             <span className={styles.summaryLabel}>순현금흐름</span>
             <strong className={monthNetCashFlow < 0 ? styles.negativeAmount : styles.netAmount}>
-              {formatSignedWon(monthNetCashFlow)}
+              <Money amount={monthNetCashFlow} showPlus tone={monthNetCashFlow < 0 ? "negative" : "positive"} />
             </strong>
           </div>
         </div>
-      </section>
+      </Card>
 
       <section className={styles.section}>
         <div className={styles.sectionHeader}>
@@ -458,19 +441,19 @@ export default function HomePage() {
           </div>
         </div>
 
-        <div className={styles.rankList}>
+        <Card padding="none" className={styles.rankList}>
           {topCategories.length > 0 ? (
             topCategories.map((item, index) => (
               <div key={item.name} className={styles.rankRow}>
                 <span className={styles.rankNumber}>{index + 1}</span>
                 <strong className={styles.rankName}>{item.name}</strong>
-                <span className={styles.rankAmount}>{formatWon(item.amount)}</span>
+                <span className={styles.rankAmount}><Money amount={item.amount} absolute /></span>
               </div>
             ))
           ) : (
             <p className={styles.emptyText}>이번 달 지출 내역이 없습니다.</p>
           )}
-        </div>
+        </Card>
       </section>
 
       <section className={styles.section}>
@@ -479,10 +462,10 @@ export default function HomePage() {
             <h2>카드 결제 예정</h2>
             <span className={styles.sectionHint}>이번 달 남은 결제액</span>
           </div>
-          <strong className={styles.sectionTotal}>{formatWon(cardSummary.total)}</strong>
+          <strong className={styles.sectionTotal}><Money amount={cardSummary.total} absolute /></strong>
         </div>
 
-        <div className={styles.cardList}>
+        <Card padding="none" className={styles.cardList}>
           {cardSummary.cards.length > 0 ? (
             cardSummary.cards.map(card => (
               <div key={card.accountId} className={styles.cardRow}>
@@ -499,15 +482,17 @@ export default function HomePage() {
                   </div>
                 </div>
                 <strong className={styles.cardAmount}>
-                  {formatWon(card.estimatedRemaining)}
+                  <Money amount={card.estimatedRemaining} absolute />
                 </strong>
               </div>
             ))
           ) : (
             <p className={styles.emptyText}>이번 달 결제 예정액이 없습니다.</p>
           )}
-        </div>
+        </Card>
       </section>
+
+      <PwaInstallPrompt />
 
       {detailType && (
         <div
@@ -527,7 +512,7 @@ export default function HomePage() {
                 <strong>{formatMonth(dashboard.month)} {detailType} 내역</strong>
                 <span>{detailItems.length.toLocaleString("ko-KR")}건</span>
               </div>
-              <button type="button" aria-label="닫기" onClick={() => setDetailType(null)}>×</button>
+              <Button className={styles.detailClose} variant="soft" size="sm" iconOnly aria-label="닫기" onClick={() => setDetailType(null)}>×</Button>
             </div>
 
             {detailLoading && <p className={styles.detailState}>내역을 불러오는 중입니다.</p>}
@@ -546,9 +531,24 @@ export default function HomePage() {
                       <small>{getTransactionMeta(transaction)}</small>
                       {transaction.memo && <em>{transaction.memo}</em>}
                     </div>
-                    <b className={detailType === "수입" ? styles.incomeAmount : styles.expenseAmount}>
-                      {detailType === "수입" ? "+" : "-"}{formatWon(transaction.amount)}
-                    </b>
+                    <div className={styles.detailRowActions}>
+                      <b className={detailType === "수입" ? styles.incomeAmount : styles.expenseAmount}>
+                        <Money
+                          amount={detailType === "수입" ? transaction.amount : -transaction.amount}
+                          showPlus={detailType === "수입"}
+                          tone={detailType === "수입" ? "income" : "expense"}
+                        />
+                      </b>
+                      {onCopyTransaction && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onCopyTransaction(transaction)}
+                        >
+                          복사 입력
+                        </Button>
+                      )}
+                    </div>
                   </article>
                 ))}
               </div>

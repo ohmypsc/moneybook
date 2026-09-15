@@ -23,13 +23,6 @@
   line-height: 1.3;
 }
 
-.description {
-  margin: var(--space-2) 0 0;
-  color: var(--color-text-secondary);
-  font-size: 14px;
-  line-height: 1.6;
-}
-
 /* =========================================================
    월 이동
    ========================================================= */
@@ -56,40 +49,9 @@
   text-align: center;
 }
 
-.iconButton,
-.todayButton,
-.refreshButton {
-  min-height: 40px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.iconButton {
-  width: 40px;
-  padding: 0;
-}
-
-.todayButton,
-.refreshButton {
-  padding: 0 12px;
-}
-
 .toolbarActions {
   display: flex;
   gap: var(--space-2);
-}
-
-.iconButton:disabled,
-.todayButton:disabled,
-.refreshButton:disabled {
-  opacity: 0.55;
-  cursor: default;
 }
 
 /* =========================================================
@@ -107,14 +69,7 @@
   margin-bottom: var(--space-4);
 }
 
-.summaryCard {
-  min-width: 0;
-  padding: 15px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-card);
-}
+.summaryCard { min-width: 0; }
 
 .summaryLabel {
   display: block;
@@ -189,10 +144,6 @@
 .calendarCard {
   overflow: hidden;
   margin-bottom: var(--space-5);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-card);
 }
 
 .weekdays {
@@ -593,25 +544,6 @@
     gap: 4px;
   }
 
-  .iconButton,
-  .todayButton,
-  .refreshButton {
-    min-height: 44px;
-  }
-
-  .iconButton,
-  .refreshButton {
-    width: 44px;
-  }
-
-  .todayButton {
-    padding: 0 10px;
-  }
-
-  .refreshButton {
-    padding: 0;
-  }
-
   .filterButton {
     min-height: 44px;
     padding: 0 16px;
@@ -715,53 +647,8 @@
   margin-top: 10px;
 }
 
-.editButton,
-.deleteButton,
-.editCloseButton,
-.editCancelButton,
-.editSaveButton,
-.undoButton {
-  border-radius: var(--radius-md);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.editButton,
-.deleteButton,
-.editCancelButton {
-  min-height: 36px;
-  padding: 0 12px;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-}
-
-.editButton,
-.editCancelButton {
-  color: var(--color-text-primary);
-}
-
-.deleteButton {
-  color: var(--color-error);
-}
-
-.editButton:disabled,
-.deleteButton:disabled,
-.editCloseButton:disabled,
-.editCancelButton:disabled,
-.editSaveButton:disabled,
-.undoButton:disabled {
-  opacity: 0.55;
-  cursor: default;
-}
-
 .editPanel {
   margin-top: 12px;
-  padding: 13px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-soft);
 }
 
 .editHeader {
@@ -783,17 +670,6 @@
   margin: 0;
   font-size: 15px;
   line-height: 1.4;
-}
-
-.editCloseButton {
-  flex: 0 0 auto;
-  width: 34px;
-  height: 34px;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
-  font-size: 18px;
-  line-height: 1;
 }
 
 .editNotice {
@@ -865,144 +741,9 @@
   margin-top: 12px;
 }
 
-.editSaveButton {
-  min-height: 36px;
-  padding: 0 14px;
-  border: 1px solid var(--color-primary);
-  background: var(--color-primary);
-  color: var(--color-primary-text);
-}
-
 /* =========================================================
    삭제 거래 목록 / 복원
    ========================================================= */
-
-.deletedSection {
-  margin-top: var(--space-5);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-card);
-}
-
-.deletedSummary {
-  min-height: 66px;
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: 13px 15px;
-  color: var(--color-text-primary);
-  cursor: pointer;
-  list-style: none;
-}
-
-.deletedSummary::-webkit-details-marker {
-  display: none;
-}
-
-.deletedSummary::after {
-  content: "⌄";
-  flex: 0 0 auto;
-  color: var(--color-text-secondary);
-  font-size: 16px;
-  line-height: 1;
-  transition: transform 0.15s ease;
-}
-
-.deletedSection[open]
-.deletedSummary::after {
-  transform: rotate(180deg);
-}
-
-.deletedSummaryText {
-  min-width: 0;
-  display: grid;
-  flex: 1;
-  gap: 3px;
-}
-
-.deletedSummaryText strong {
-  font-size: 14px;
-}
-
-.deletedSummaryText span {
-  color: var(--color-text-secondary);
-  font-size: 11px;
-  line-height: 1.45;
-}
-
-.deletedCount {
-  flex: 0 0 auto;
-  color: var(--color-text-secondary);
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.deletedBody {
-  padding: 0 14px 14px;
-}
-
-.deletedEmpty {
-  margin: 0;
-  padding: 17px 12px;
-  border-top: 1px solid var(--color-border);
-  color: var(--color-text-secondary);
-  font-size: 12px;
-  line-height: 1.55;
-  text-align: center;
-}
-
-.deletedList {
-  display: grid;
-  gap: var(--space-2);
-  margin: 0;
-  padding: 12px 0 0;
-  border-top: 1px solid var(--color-border);
-  list-style: none;
-}
-
-.deletedItem {
-  padding: 13px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-soft);
-}
-
-.deletedFooter {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid var(--color-border);
-}
-
-.deletedAudit {
-  min-width: 0;
-  color: var(--color-text-secondary);
-  font-size: 10px;
-  line-height: 1.45;
-}
-
-.restoreButton {
-  flex: 0 0 auto;
-  min-height: 36px;
-  padding: 0 13px;
-  border: 1px solid var(--color-primary);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-primary);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.restoreButton:disabled {
-  opacity: 0.55;
-  cursor: default;
-}
 
 /* =========================================================
    삭제 직후 실행 취소
@@ -1050,34 +791,9 @@
   white-space: nowrap;
 }
 
-.undoButton {
-  flex: 0 0 auto;
-  min-height: 36px;
-  padding: 0 12px;
-  border: 1px solid var(--color-primary);
-  background: var(--color-primary);
-  color: var(--color-primary-text);
-}
-
 @media (max-width: 520px) {
   .transactionTop {
     gap: 8px;
-  }
-
-  .editButton,
-  .deleteButton,
-  .editCancelButton,
-  .editSaveButton,
-  .restoreButton,
-  .undoButton {
-    min-height: 44px;
-    padding-right: 14px;
-    padding-left: 14px;
-  }
-
-  .editCloseButton {
-    width: 44px;
-    height: 44px;
   }
 
   .editGrid {
@@ -1099,19 +815,7 @@
     font-size: 16px;
   }
 
-  .deletedSummary {
-    padding: 12px;
-  }
-
-  .deletedBody {
-    padding: 0 10px 10px;
-  }
-
-  .deletedFooter {
-    align-items: flex-end;
-  }
-
-  .undoBar {
+.undoBar {
     bottom:
       calc(
         82px +
@@ -1139,10 +843,6 @@
   letter-spacing: -0.035em;
 }
 
-.description {
-  display: none;
-}
-
 .toolbar {
   margin-bottom: 10px;
 }
@@ -1157,10 +857,6 @@
   gap: 0;
   margin-bottom: 12px;
   overflow: hidden;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-card);
 }
 
 .summaryCard {
@@ -1208,9 +904,7 @@
   color: var(--color-primary);
 }
 
-.calendarCard,
 .detailSection {
-  border-color: var(--color-border);
   box-shadow: var(--shadow-card);
 }
 
@@ -1218,19 +912,6 @@
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.addTransactionButton {
-  min-height: 34px;
-  padding: 0 11px;
-  border: 1px solid rgba(71, 106, 132, 0.2);
-  border-radius: 999px;
-  background: var(--color-surface-blue);
-  color: var(--color-primary);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 800;
-  white-space: nowrap;
 }
 
 @media (max-width: 390px) {
@@ -1243,12 +924,7 @@
     gap: 8px;
   }
 
-  .todayButton {
-    padding-right: 10px;
-    padding-left: 10px;
-  }
-
-  .summaryCard {
+.summaryCard {
     padding-right: 5px;
     padding-left: 5px;
   }
@@ -1266,103 +942,7 @@
   }
 }
 
-.trashLauncher {
-  margin-top: 18px;
-}
-
-.trashButton {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 13px 14px;
-  border: 1px solid var(--color-border);
-  border-radius: 14px;
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  text-align: left;
-  cursor: pointer;
-}
-
-.trashButton span {
-  font-weight: 800;
-}
-
-.trashButton small {
-  color: var(--color-text-secondary);
-  font-size: 11px;
-  text-align: right;
-}
-
-.trashBackdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 90;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  padding: 16px;
-  background: rgb(0 0 0 / 0.38);
-}
-
-.trashModal {
-  width: min(680px, 100%);
-  max-height: min(78vh, 760px);
-  overflow: auto;
-  border-radius: 20px 20px 16px 16px;
-  background: var(--color-surface);
-  box-shadow: 0 20px 60px rgb(0 0 0 / 0.2);
-  padding: 18px;
-}
-
-.trashHeader {
-  position: sticky;
-  top: -18px;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin: -18px -18px 14px;
-  padding: 18px;
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface);
-}
-
-.trashHeader > div {
-  display: grid;
-  gap: 3px;
-}
-
-.trashHeader strong {
-  font-size: 17px;
-}
-
-.trashHeader span {
-  color: var(--color-text-secondary);
-  font-size: 12px;
-}
-
-.trashHeader button {
-  width: 36px;
-  height: 36px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--color-surface-soft);
-  font-size: 24px;
-  line-height: 1;
-  cursor: pointer;
-}
-
 @media (min-width: 720px) {
-  .trashBackdrop {
-    align-items: center;
-  }
-
-  .trashModal {
-    border-radius: 20px;
-  }
 }
 
 @media (max-width: 640px) {

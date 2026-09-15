@@ -27,6 +27,9 @@ import type {
 import { markLedgerChanged } from "../../utils/ledgerEvents";
 import { clearBootstrapMemoryCache } from "../../api/bootstrapCache";
 import { getSeoulDateString } from "../../utils/dateTime";
+import { Button } from "../../components/common/Button/Button";
+import { Card } from "../../components/common/Card/Card";
+import { formatMoney } from "../../components/common/Money/Money";
 import styles from "./SettingsPage.module.css";
 
 interface RecurringFormState {
@@ -98,7 +101,7 @@ function recurringToForm(rule: RecurringTransactionRule): RecurringFormState {
 }
 
 function formatAmount(value: number) {
-  return `${Math.round(value).toLocaleString("ko-KR")}원`;
+  return formatMoney(value);
 }
 
 function accountLabel(account: ManagedAccount) {
@@ -106,7 +109,7 @@ function accountLabel(account: ManagedAccount) {
 }
 
 function recurringTypeSummary(rule: RecurringTransactionRule) {
-  if (rule.mode === "auto") return "자동 등록(앱 열 때)";
+  if (rule.mode === "auto") return "자동 등록(매일 확인)";
   return "확인 후 등록";
 }
 
@@ -134,7 +137,7 @@ export default function AutomationSettingsPanel() {
 
   const spendingTargets = useMemo(() => {
     const names = Array.from(
-      new Set(
+      new Set<string>(
         activeAccounts
           .map(account => account.owner)
           .filter(owner => owner && owner !== "공동")
@@ -325,10 +328,10 @@ export default function AutomationSettingsPanel() {
       {error && <p className={styles.error}>{error}</p>}
       {feedback && <p className={styles.feedback}>{feedback}</p>}
 
-      <section className={styles.cardSection}>
+      <Card as="section">
         <div className={styles.sectionHeading}>
           <h2>고정 거래</h2>
-          <p>월급·적금·회비처럼 반복되는 거래를 미리 등록합니다. 자동 등록은 해당 날짜 이후 부부 중 한 명이 앱을 처음 열 때 실행됩니다.</p>
+          <p>월급·적금·회비처럼 반복되는 거래를 미리 등록합니다. 자동 등록은 서버가 매일 확인하며, 앱을 열 때도 한 번 더 확인합니다.</p>
         </div>
 
         {settings.recurringRules.length === 0 ? (
@@ -357,31 +360,27 @@ export default function AutomationSettingsPanel() {
                   </span>
                   <div className={styles.rowActions}>
                     {rule.enabled && rule.mode === "confirm" && due && !due.alreadyCreated && (
-                      <button
-                        type="button"
-                        className={styles.primaryButton}
+                      <Button
                         disabled={Boolean(busyRuleId)}
                         onClick={() => void handleCreateRecurringNow(rule)}
                       >
                         이번 달 등록
-                      </button>
+                      </Button>
                     )}
-                    <button
-                      type="button"
-                      className={styles.secondaryButton}
+                    <Button
+                      variant="secondary"
                       disabled={Boolean(busyRuleId)}
                       onClick={() => beginEditRecurring(rule)}
                     >
                       수정
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.secondaryButton}
+                    </Button>
+                    <Button
+                      variant="secondary"
                       disabled={Boolean(busyRuleId)}
                       onClick={() => void handleDeleteRecurring(rule)}
                     >
                       삭제
-                    </button>
+                    </Button>
                   </div>
                 </li>
               );
@@ -391,14 +390,14 @@ export default function AutomationSettingsPanel() {
 
         {!showRecurringForm && (
           <div className={styles.rowActions}>
-            <button type="button" className={styles.primaryButton} onClick={beginNewRecurring}>
+            <Button onClick={beginNewRecurring}>
               고정 거래 추가
-            </button>
+            </Button>
           </div>
         )}
 
         {showRecurringForm && (
-          <div className={styles.formCard}>
+          <Card className={styles.formCard}>
             <div className={styles.formHeader}>
               <h2>{recurringForm.id ? "고정 거래 수정" : "고정 거래 추가"}</h2>
               <p>설정한 날짜가 31일인데 해당 월이 더 짧으면 그 달의 마지막 날로 자동 조정합니다.</p>
@@ -462,7 +461,7 @@ export default function AutomationSettingsPanel() {
                   onChange={event => setRecurringForm(current => ({ ...current, mode: event.target.value as RecurringMode }))}
                 >
                   <option value="confirm">확인 후 등록</option>
-                  <option value="auto">자동 등록(앱을 열면)</option>
+                  <option value="auto">자동 등록(매일 자동 확인)</option>
                 </select>
               </label>
 
@@ -595,9 +594,8 @@ export default function AutomationSettingsPanel() {
             </label>
 
             <div className={styles.rowActions}>
-              <button
-                type="button"
-                className={styles.secondaryButton}
+              <Button
+                variant="secondary"
                 disabled={savingRecurring}
                 onClick={() => {
                   setShowRecurringForm(false);
@@ -605,19 +603,18 @@ export default function AutomationSettingsPanel() {
                 }}
               >
                 취소
-              </button>
-              <button
-                type="button"
-                className={styles.primaryButton}
-                disabled={savingRecurring}
+              </Button>
+              <Button
+                loading={savingRecurring}
+                loadingLabel="저장 중..."
                 onClick={() => void handleSaveRecurring()}
               >
-                {savingRecurring ? "저장 중..." : "저장"}
-              </button>
+                저장
+              </Button>
             </div>
-          </div>
+          </Card>
         )}
-      </section>
+      </Card>
 
     </div>
   );

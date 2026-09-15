@@ -20,20 +20,6 @@
 }
 
 
-.eyebrow {
-  margin:
-    0
-    0
-    var(--space-1);
-
-  color:
-    var(--color-text-secondary);
-
-  font-size: 13px;
-  font-weight: 700;
-}
-
-
 .pageTitle,
 .detailTitle {
   margin: 0;
@@ -46,7 +32,6 @@
 }
 
 
-.pageDescription,
 .detailDescription {
   margin:
     var(--space-2)
@@ -62,45 +47,9 @@
 
 
 .backButton {
-  display: inline-flex;
-
-  align-items: center;
-
-  gap: 4px;
-
-  min-height: 38px;
-
-  margin:
-    0
-    0
-    var(--space-3);
-
-  padding:
-    0
-    10px
-    0
-    6px;
-
-  border:
-    1px solid
-    var(--color-border);
-
-  border-radius:
-    var(--radius-md);
-
-  background:
-    var(--color-surface);
-
-  color:
-    var(--color-text-primary);
-
-  font: inherit;
-
-  font-size: 13px;
-  font-weight: 800;
-
-  cursor: pointer;
+  margin: 0 0 var(--space-3);
 }
+
 
 
 .backButton span {
@@ -136,19 +85,6 @@
 
 .menuCard {
   overflow: hidden;
-
-  border:
-    1px solid
-    var(--color-border);
-
-  border-radius:
-    var(--radius-lg);
-
-  background:
-    var(--color-surface);
-
-  box-shadow:
-    var(--shadow-card);
 }
 
 
@@ -244,23 +180,6 @@
 }
 
 
-.cardSection,
-.formCard {
-  padding: 18px;
-
-  border:
-    1px solid
-    var(--color-border);
-
-  border-radius:
-    var(--radius-lg);
-
-  background:
-    var(--color-surface);
-
-  box-shadow:
-    var(--shadow-card);
-}
 
 
 .sectionHeading {
@@ -296,7 +215,6 @@
 }
 
 
-.notice,
 .error,
 .feedback {
   margin: 0;
@@ -320,7 +238,6 @@
 }
 
 
-.notice,
 .feedback {
   color:
     var(--color-text-primary);
@@ -567,7 +484,6 @@
 }
 
 
-.compactActions,
 .rowActions,
 .formActions {
   flex: 0 0 auto;
@@ -578,235 +494,6 @@
   justify-content: flex-end;
 
   gap: 6px;
-}
-
-
-.iconButton,
-.visibilityButton,
-.visibleButton,
-.primaryButton,
-.secondaryButton,
-.primarySmallButton,
-.secondarySmallButton,
-.dangerSmallButton,
-.restoreButton,
-.fullWidthButton,
-.logoutButton,
-.closeButton {
-  border-radius:
-    var(--radius-md);
-
-  font: inherit;
-  font-weight: 800;
-
-  cursor: pointer;
-}
-
-
-.iconButton {
-  width: 36px;
-  height: 36px;
-
-  padding: 0;
-
-  border:
-    1px solid
-    var(--color-border);
-
-  background:
-    var(--color-surface);
-
-  color:
-    var(--color-text-primary);
-
-  font-size: 13px;
-}
-
-
-.visibilityButton,
-.visibleButton {
-  min-width: 46px;
-  min-height: 34px;
-
-  padding:
-    0
-    9px;
-
-  border:
-    1px solid
-    var(--color-border);
-
-  background:
-    var(--color-surface);
-
-  font-size: 10px;
-}
-
-
-.visibilityButton {
-  color:
-    var(--color-text-secondary);
-}
-
-
-.visibleButton {
-  color:
-    var(--color-primary);
-}
-
-
-.primaryButton,
-.secondaryButton,
-.fullWidthButton,
-.logoutButton {
-  min-height: 42px;
-
-  padding:
-    0
-    15px;
-
-  font-size: 12px;
-}
-
-
-.primaryButton {
-  border:
-    1px solid
-    var(--color-primary);
-
-  background:
-    var(--color-primary);
-
-  color:
-    var(--color-primary-text);
-}
-
-
-.secondaryButton,
-.fullWidthButton {
-  border:
-    1px solid
-    var(--color-border);
-
-  background:
-    var(--color-surface);
-
-  color:
-    var(--color-text-primary);
-}
-
-
-.primarySmallButton,
-.secondarySmallButton,
-.dangerSmallButton,
-.restoreButton {
-  min-height: 34px;
-
-  padding:
-    0
-    10px;
-
-  font-size: 10px;
-}
-
-
-.primarySmallButton {
-  border:
-    1px solid
-    var(--color-primary);
-
-  background:
-    var(--color-primary);
-
-  color:
-    var(--color-primary-text);
-}
-
-
-.secondarySmallButton,
-.dangerSmallButton,
-.restoreButton {
-  border:
-    1px solid
-    var(--color-border);
-
-  background:
-    var(--color-surface);
-}
-
-
-.secondarySmallButton {
-  color:
-    var(--color-text-primary);
-}
-
-
-.dangerSmallButton {
-  color:
-    var(--color-error);
-}
-
-
-.restoreButton {
-  color:
-    var(--color-primary);
-}
-
-
-.iconButton:disabled,
-.visibilityButton:disabled,
-.visibleButton:disabled,
-.primaryButton:disabled,
-.secondaryButton:disabled,
-.primarySmallButton:disabled,
-.secondarySmallButton:disabled,
-.dangerSmallButton:disabled,
-.restoreButton:disabled,
-.fullWidthButton:disabled,
-.logoutButton:disabled,
-.closeButton:disabled {
-  opacity: 0.5;
-
-  cursor: default;
-}
-
-
-.stickyActions {
-  position: sticky;
-
-  bottom:
-    calc(
-      76px +
-      env(
-        safe-area-inset-bottom
-      )
-    );
-
-  z-index: 5;
-
-  display: grid;
-
-  grid-template-columns:
-    1fr
-    2fr;
-
-  gap:
-    var(--space-2);
-
-  padding: 10px;
-
-  border:
-    1px solid
-    var(--color-border);
-
-  border-radius:
-    var(--radius-lg);
-
-  background:
-    var(--color-surface);
-
-  box-shadow:
-    var(--shadow-card);
 }
 
 
@@ -1135,28 +822,6 @@ summary::after {
 }
 
 
-.closeButton {
-  flex: 0 0 auto;
-
-  width: 36px;
-  height: 36px;
-
-  padding: 0;
-
-  border:
-    1px solid
-    var(--color-border);
-
-  background:
-    var(--color-surface);
-
-  color:
-    var(--color-text-secondary);
-
-  font-size: 20px;
-}
-
-
 .formGrid {
   display: grid;
 
@@ -1201,11 +866,6 @@ summary::after {
 
   gap:
     var(--space-3);
-}
-
-
-.fullWidthButton {
-  width: 100%;
 }
 
 
@@ -1301,21 +961,6 @@ summary::after {
 }
 
 
-.logoutButton {
-  width: 100%;
-
-  border:
-    1px solid
-    var(--color-border);
-
-  background:
-    var(--color-surface);
-
-  color:
-    var(--color-error);
-}
-
-
 @media (
   max-width:
     560px
@@ -1331,12 +976,6 @@ summary::after {
   .pageTitle,
   .detailTitle {
     font-size: 24px;
-  }
-
-
-  .cardSection,
-  .formCard {
-    padding: 14px;
   }
 
 
@@ -1369,18 +1008,7 @@ summary::after {
   }
 
 
-  .compactActions {
-    gap: 4px;
-  }
-
-
-  .iconButton {
-    width: 34px;
-    height: 34px;
-  }
-
-
-  .inlineEdit {
+.inlineEdit {
     grid-template-columns:
       1fr
       1fr;
@@ -1404,12 +1032,7 @@ summary::after {
 
 
   .topActionRow
-  .primaryButton {
-    width: 100%;
-  }
-
-
-  .dateSettingRow {
+.dateSettingRow {
     align-items:
       stretch;
 
@@ -1477,50 +1100,10 @@ summary::after {
     font-size: 16px;
   }
 
-  .iconButton,
-  .closeButton {
-    width: 44px;
-    height: 44px;
-  }
-
-  .visibilityButton,
-  .visibleButton {
-    min-width: 52px;
-    min-height: 44px;
-    padding-right: 11px;
-    padding-left: 11px;
-    font-size: 11px;
-  }
-
-  .primaryButton,
-  .secondaryButton,
-  .fullWidthButton,
-  .logoutButton {
-    min-height: 48px;
-    font-size: 13px;
-  }
-
-  .primarySmallButton,
-  .secondarySmallButton,
-  .dangerSmallButton,
-  .restoreButton {
-    min-height: 44px;
-    padding-right: 12px;
-    padding-left: 12px;
-    font-size: 11px;
-  }
-
   .deletedSection summary {
     min-height: 44px;
   }
 
-  .stickyActions {
-    bottom:
-      calc(
-        76px +
-        env(safe-area-inset-bottom)
-      );
-  }
 }
 
 /* v2.2.13 - drag reorder + inline account editor */
@@ -1582,10 +1165,6 @@ summary::after {
   margin-bottom: 18px;
 }
 
-.pageHeader .eyebrow,
-.pageHeader .pageDescription {
-  display: none;
-}
 
 .pageTitle,
 .detailTitle {
@@ -1602,12 +1181,6 @@ summary::after {
   margin-bottom: 8px;
   color: var(--color-text-secondary);
   font-size: 11px;
-}
-
-.menuCard {
-  border-color: var(--color-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-card);
 }
 
 .menuRow {
@@ -1817,11 +1390,6 @@ summary::after {
   width: 18px;
   height: 18px;
   margin: 0;
-}
-
-.automationBenefitList {
-  display: grid;
-  gap: 12px;
 }
 
 .automationBenefitCard {

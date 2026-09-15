@@ -27,6 +27,10 @@ import {
   getSeoulDateString
 } from "../../../utils/dateTime";
 
+import { Button } from "../../common/Button/Button";
+import { Card } from "../../common/Card/Card";
+import { formatMoney } from "../../common/Money/Money";
+
 import styles from "./InvestmentTradeForm.module.css";
 
 interface InvestmentTradeFormProps {
@@ -72,7 +76,7 @@ function formatCurrency(value: number | null | undefined) {
     return "-";
   }
 
-  return `${Math.round(value).toLocaleString("ko-KR")}원`;
+  return formatMoney(value);
 }
 
 function normalizeMarket(value: string | null | undefined): Market {
@@ -754,24 +758,24 @@ export default function InvestmentTradeForm({
             </span>
           </div>
 
-          <button
-            type="button"
-            className={styles.changeInstrumentButton}
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => {
               resetSelection();
               setShowResults(true);
             }}
           >
             변경
-          </button>
+          </Button>
         </div>
       ) : manualMode && tradeType === "매수" ? (
         <div className={styles.manualBox}>
           <div className={styles.manualHeader}>
             <strong>종목 직접 입력</strong>
-            <button
-              type="button"
-              className={styles.textButton}
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => {
                 setManualMode(false);
                 setShowResults(true);
@@ -779,7 +783,7 @@ export default function InvestmentTradeForm({
               }}
             >
               검색으로 돌아가기
-            </button>
+            </Button>
           </div>
 
           <div className={styles.grid}>
@@ -827,13 +831,12 @@ export default function InvestmentTradeForm({
             </select>
           </label>
 
-          <button
-            type="button"
-            className={styles.secondaryButton}
+          <Button
+            variant="secondary"
             onClick={confirmManualInstrument}
           >
             이 종목 사용
-          </button>
+          </Button>
         </div>
       ) : (
         <div className={styles.searchSection}>
@@ -876,7 +879,7 @@ export default function InvestmentTradeForm({
           </label>
 
           {showResults && (
-            <div className={styles.searchPanel}>
+            <Card padding="none" className={styles.searchPanel}>
               {localMatches.length > 0 && (
                 <div className={styles.resultGroup}>
                   <div className={styles.resultGroupTitle}>
@@ -978,7 +981,7 @@ export default function InvestmentTradeForm({
                   검색이 안 되는 종목은 직접 입력
                 </button>
               )}
-            </div>
+            </Card>
           )}
         </div>
       )}
@@ -1177,21 +1180,19 @@ export default function InvestmentTradeForm({
       {error && <p className={styles.error}>{error}</p>}
       {success && <p className={styles.success}>{success}</p>}
 
-      <button
-        className={styles.submitButton}
+      <Button
         type="submit"
+        fullWidth
+        size="lg"
+        loading={saving}
+        loadingLabel="저장 중..."
         disabled={
-          saving ||
           !selectedInstrument ||
           (tradeType === "매도" && sellableHoldings.length === 0)
         }
       >
-        {saving
-          ? "저장 중..."
-          : tradeType === "매수"
-            ? "매수 내역 저장"
-            : "매도 내역 저장"}
-      </button>
+        {tradeType === "매수" ? "매수 내역 저장" : "매도 내역 저장"}
+      </Button>
     </form>
   );
 }

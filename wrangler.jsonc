@@ -15,6 +15,30 @@
     }
   ],
 
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "HOUSEHOLD_REALTIME",
+        "class_name": "HouseholdRealtime"
+      }
+    ]
+  },
+
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "HouseholdRealtime"
+      ]
+    }
+  ],
+
+  "triggers": {
+    "crons": [
+      "5 15 * * *"
+    ]
+  },
+
   "assets": {
     "not_found_handling": "single-page-application",
 

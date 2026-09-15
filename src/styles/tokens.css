@@ -2,6 +2,7 @@
   --color-bg: #f5f8f7;
   --color-surface: #ffffff;
   --color-surface-soft: #edf3f1;
+  --color-surface-subtle: #f7f8fa;
   --color-surface-tint: #f2f7f9;
   --color-surface-blue: #e4eff4;
   --color-surface-sage: #e7f0eb;
@@ -9,10 +10,12 @@
   --color-text: #263746;
   --color-text-primary: #263746;
   --color-text-secondary: #71808a;
+  --color-text-tertiary: #96a2a9;
 
   --color-primary: #476a84;
   --color-primary-hover: #3b5b72;
   --color-primary-text: #ffffff;
+  --color-focus-ring: rgba(71, 106, 132, 0.22);
 
   --color-sage: #8ea997;
   --color-mint: #b9d8cf;
@@ -21,12 +24,18 @@
   --color-expense: #b96666;
 
   --color-border: #dce5e5;
+  --color-border-strong: #cbd9d9;
+  --color-surface-hover: #e5eeeb;
   --color-error: #b45d5d;
+  --color-danger: #b45d5d;
+  --color-danger-hover: #9f4e4e;
+  --color-danger-soft: #f8eaea;
 
   --radius-sm: 9px;
   --radius-md: 14px;
   --radius-lg: 20px;
   --radius-xl: 26px;
+  --radius-full: 999px;
 
   --space-1: 4px;
   --space-2: 8px;
@@ -35,6 +44,11 @@
   --space-5: 20px;
   --space-6: 24px;
   --space-8: 32px;
+
+  --control-height-sm: 36px;
+  --control-height-md: 44px;
+  --control-height-lg: 48px;
+  --control-height-xl: 54px;
 
   --content-width: 640px;
 

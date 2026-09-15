@@ -1,6 +1,7 @@
 import { getCalendarTransactions } from "./calendar";
-import type { CalendarTransaction } from "./calendar";
+import type { CalendarTransaction, GetCalendarTransactionsParams } from "./calendar";
 import { subscribeLedgerChanges } from "../utils/ledgerEvents";
+import { getSeoulMonthString } from "../utils/dateTime";
 
 interface MonthCacheEntry {
     items: CalendarTransaction[];
@@ -26,12 +27,7 @@ function pad(value: number) {
 }
 
 export function getCurrentCalendarMonth() {
-    const now = new Date();
-
-    return [
-        now.getFullYear(),
-        pad(now.getMonth() + 1)
-    ].join("-");
+    return getSeoulMonthString();
 }
 
 function getMonthBounds(month: string) {
@@ -74,6 +70,38 @@ function getTtl(month: string) {
     return month === getCurrentCalendarMonth()
         ? CURRENT_MONTH_TTL_MS
         : ARCHIVE_MONTH_TTL_MS;
+}
+
+async function loadAllCalendarTransactions(
+    params: GetCalendarTransactionsParams
+) {
+    const pageSize = 1000;
+    const items: CalendarTransaction[] = [];
+    let offset = 0;
+    let total = 0;
+
+    do {
+        const page = await getCalendarTransactions({
+            ...params,
+            limit: pageSize,
+            offset
+        });
+
+        const pageItems = Array.isArray(page.items)
+            ? page.items
+            : [];
+
+        total = Math.max(0, Number(page.total || 0));
+        items.push(...pageItems);
+
+        if (pageItems.length === 0) {
+            break;
+        }
+
+        offset += pageItems.length;
+    } while (items.length < total);
+
+    return items;
 }
 
 function isFresh(
@@ -143,19 +171,16 @@ export async function loadCalendarMonth(
         Promise<CalendarTransaction[]>;
 
     request =
-        getCalendarTransactions({
+        loadAllCalendarTransactions({
             dateFrom,
-            dateTo,
-            limit: 1000
+            dateTo
         })
-            .then(result => {
+            .then(resultItems => {
                 const items =
-                    Array.isArray(result.items)
-                        ? result.items.filter(
-                              item =>
-                                  !item.isDeleted
-                          )
-                        : [];
+                    resultItems.filter(
+                        item =>
+                            !item.isDeleted
+                    );
 
                 if (
                     requestGeneration ===
@@ -231,17 +256,12 @@ export async function loadDeletedCalendarMonth(
         Promise<CalendarTransaction[]>;
 
     request =
-        getCalendarTransactions({
+        loadAllCalendarTransactions({
             dateFrom,
             dateTo,
-            includeDeleted: true,
-            limit: 1000
+            includeDeleted: true
         })
-            .then(result => {
-                const allItems =
-                    Array.isArray(result.items)
-                        ? result.items
-                        : [];
+            .then(allItems => {
 
                 const deletedItems =
                     allItems.filter(

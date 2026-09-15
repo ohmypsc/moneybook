@@ -256,98 +256,9 @@
    신규 종목
    ========================================================= */
 
-.newHoldingBox {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-
-  padding:
-    var(--space-4);
-
-  background:
-    var(--color-surface-soft);
-
-  border:
-    1px solid
-    var(--color-border);
-
-  border-radius:
-    var(--radius-md);
-}
-
-
-.subTitle {
-  margin: 0;
-
-  font-size: 14px;
-  font-weight: 800;
-}
-
-
 /* =========================================================
    기존 보유종목 요약
    ========================================================= */
-
-.holdingPreview {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-
-  padding:
-    12px;
-
-  border:
-    1px solid
-    var(--color-border);
-
-  border-radius:
-    var(--radius-md);
-
-  background:
-    var(--color-surface-soft);
-}
-
-
-.holdingPreview > div:first-child {
-  min-width: 0;
-
-  display: grid;
-  gap: 2px;
-}
-
-
-.holdingPreview strong {
-  overflow: hidden;
-
-  font-size: 14px;
-
-  text-overflow:
-    ellipsis;
-
-  white-space:
-    nowrap;
-}
-
-
-.holdingPreview span {
-  color:
-    var(--color-text-secondary);
-
-  font-size: 12px;
-}
-
-
-.holdingQuantity {
-  flex-shrink: 0;
-
-  color:
-    var(--color-text-primary);
-
-  font-size: 13px;
-  font-weight: 700;
-}
-
 
 /* =========================================================
    상세 입력
@@ -478,8 +389,7 @@
    ========================================================= */
 
 .error,
-.success,
-.empty {
+.success {
   margin: 0;
 
   padding:
@@ -512,57 +422,9 @@
 }
 
 
-.empty {
-  color:
-    var(--color-text-secondary);
-
-  background:
-    var(--color-surface-soft);
-}
-
-
 /* =========================================================
    저장 버튼
    ========================================================= */
-
-.submitButton {
-  width: 100%;
-  min-height: 48px;
-
-  border: 0;
-
-  border-radius:
-    var(--radius-md);
-
-  background:
-    var(--color-primary);
-
-  color:
-    var(--color-primary-text);
-
-  font: inherit;
-  font-size: 15px;
-  font-weight: 800;
-
-  cursor: pointer;
-
-  -webkit-tap-highlight-color:
-    transparent;
-}
-
-
-.submitButton:active:not(:disabled) {
-  transform:
-    scale(0.99);
-}
-
-
-.submitButton:disabled {
-  opacity: 0.55;
-
-  cursor: default;
-}
-
 
 /* =========================================================
    작은 화면
@@ -605,34 +467,6 @@
    종목코드 자동 조회
    ========================================================= */
 
-.lookupBox,
-.lookupResult,
-.manualMetaBox {
-  border:
-    1px solid
-    var(--color-border);
-
-  border-radius:
-    var(--radius-md);
-}
-
-.lookupBox {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-
-  min-height: 44px;
-  padding: 0 12px;
-
-  background:
-    var(--color-surface);
-
-  color:
-    var(--color-text-secondary);
-
-  font-size: 13px;
-}
-
 .lookupSpinner {
   width: 14px;
   height: 14px;
@@ -653,88 +487,6 @@
   to {
     transform: rotate(360deg);
   }
-}
-
-.lookupResult {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-
-  padding: 12px;
-
-  background:
-    var(--color-surface);
-}
-
-.lookupResult > div {
-  min-width: 0;
-
-  display: grid;
-  gap: 3px;
-}
-
-.lookupResult strong {
-  overflow: hidden;
-
-  font-size: 15px;
-
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.lookupResult span {
-  color:
-    var(--color-text-secondary);
-
-  font-size: 12px;
-}
-
-.metaEditButton {
-  flex-shrink: 0;
-
-  min-height: 34px;
-  padding: 0 10px;
-
-  border:
-    1px solid
-    var(--color-border);
-
-  border-radius:
-    var(--radius-sm);
-
-  background:
-    var(--color-surface-soft);
-
-  color:
-    var(--color-text-secondary);
-
-  font: inherit;
-  font-size: 12px;
-  font-weight: 700;
-
-  cursor: pointer;
-}
-
-.manualMetaBox {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-
-  padding: 12px;
-
-  background:
-    var(--color-surface);
-}
-
-.lookupNotice {
-  margin: 0;
-
-  color:
-    var(--color-text-secondary);
-
-  font-size: 12px;
-  line-height: 1.5;
 }
 
 /* =========================================================
@@ -786,14 +538,7 @@
 
 .searchPanel {
   overflow: hidden;
-
   margin-top: 8px;
-
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-
-  background: var(--color-surface);
-  box-shadow: var(--shadow-card);
 }
 
 .resultGroup + .resultGroup {
@@ -928,22 +673,6 @@
   white-space: nowrap;
 }
 
-.changeInstrumentButton,
-.textButton {
-  flex-shrink: 0;
-
-  border: 0;
-  background: transparent;
-
-  color: var(--color-primary);
-
-  font: inherit;
-  font-size: 12px;
-  font-weight: 800;
-
-  cursor: pointer;
-}
-
 .manualBox {
   display: flex;
   flex-direction: column;
@@ -966,22 +695,6 @@
 
 .manualHeader strong {
   font-size: 14px;
-}
-
-.secondaryButton {
-  min-height: 44px;
-
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-
-  font: inherit;
-  font-size: 14px;
-  font-weight: 800;
-
-  cursor: pointer;
 }
 
 /* v2.2.16 - 종목 검색 결과를 더 많이 보여주되 화면 안에서 스크롤 */

@@ -43,6 +43,10 @@ import type {
 } from "../../api/automation";
 
 import {
+    getBootstrap
+} from "../../api/bootstrap";
+
+import {
     clearBootstrapMemoryCache
 } from "../../api/bootstrapCache";
 
@@ -95,6 +99,12 @@ import {
 
 import PwaInstallPrompt
     from "../../components/pwa/PwaInstallPrompt/PwaInstallPrompt";
+
+import { Button } from "../../components/common/Button/Button";
+
+import { Card } from "../../components/common/Card/Card";
+import { formatMoney } from "../../components/common/Money/Money";
+import type { BootstrapData, BootstrapResponse } from "../../types/bootstrap";
 
 import AutomationSettingsPanel
     from "./AutomationSettingsPanel";
@@ -161,47 +171,6 @@ interface InputCategory {
     categoryId: string;
     type: PreferenceTransactionType;
     name: string;
-}
-
-
-interface BootstrapData {
-    transactionTypes:
-        PreferenceTransactionType[];
-
-    members:
-        string[];
-
-    spendingTargets:
-        string[];
-
-    accounts:
-        InputAccount[];
-
-    categories:
-        InputCategory[];
-
-    inputPreferences?:
-        SharedInputPreferencesState;
-}
-
-
-interface BootstrapResponse {
-    success:
-        boolean;
-
-    apiVersion?:
-        string;
-
-    data?:
-        BootstrapData;
-
-    error?: {
-        code?:
-            string;
-
-        message?:
-            string;
-    };
 }
 
 
@@ -782,20 +751,13 @@ function formatKrw(
         undefined
 ) {
     if (
-        value ===
-            undefined ||
-        !Number.isFinite(
-            value
-        )
+        value === undefined ||
+        !Number.isFinite(value)
     ) {
         return "-";
     }
 
-    return `${Math.round(
-        value
-    ).toLocaleString(
-        "ko-KR"
-    )}원`;
+    return formatMoney(value);
 }
 
 
@@ -803,13 +765,19 @@ function csvCell(
     value:
         unknown
 ) {
-    const text =
+    const rawText =
         value === null ||
         value === undefined
             ? ""
             : String(
                 value
             );
+
+    const text =
+        typeof value === "number" ||
+        !/^[=+@-]/.test(rawText)
+            ? rawText
+            : `'${rawText}`;
 
     return `"${text.replace(
         /"/g,
@@ -1438,11 +1406,9 @@ function useInputPreferenceData() {
 
                 try {
                     const response =
-                        await apiRequest<
+                        await getBootstrap<
                             BootstrapResponse
-                        >(
-                            "/api/bootstrap"
-                        );
+                        >();
 
                     if (
                         !response.success ||
@@ -1767,11 +1733,7 @@ function SettingsHome(
                     부부 공통
                 </h2>
 
-                <div
-                    className={
-                        styles.menuCard
-                    }
-                >
+                <Card padding="none" className={styles.menuCard}>
                     {
                         sharedItems.map(
                             item => (
@@ -1820,7 +1782,7 @@ function SettingsHome(
                             )
                         )
                     }
-                </div>
+                </Card>
             </section>
 
             <section
@@ -1836,11 +1798,7 @@ function SettingsHome(
                     내 설정
                 </h2>
 
-                <div
-                    className={
-                        styles.menuCard
-                    }
-                >
+                <Card padding="none" className={styles.menuCard}>
                     <button
                         type="button"
                         className={
@@ -1876,7 +1834,7 @@ function SettingsHome(
                             ›
                         </span>
                     </button>
-                </div>
+                </Card>
             </section>
         </>
     );
@@ -1905,11 +1863,10 @@ function DetailHeader(
                 styles.detailHeader
             }
         >
-            <button
-                type="button"
-                className={
-                    styles.backButton
-                }
+            <Button
+                variant="secondary"
+                size="sm"
+                className={styles.backButton}
                 onClick={
                     onBack
                 }
@@ -1921,7 +1878,7 @@ function DetailHeader(
                 </span>
 
                 설정
-            </button>
+            </Button>
 
             <h1
                 className={
@@ -2759,11 +2716,7 @@ function CategorySettings() {
                 styles.settingsBody
             }
         >
-            <section
-                className={
-                    styles.cardSection
-                }
-            >
+            <Card as="section">
                 <div
                     className={
                         styles.segmentedControl
@@ -2836,13 +2789,8 @@ function CategorySettings() {
                         }
                     </p>
 
-                    <button
-                        type="button"
-                        className={
-                            reordering
-                                ? styles.primaryButton
-                                : styles.secondaryButton
-                        }
+                    <Button
+                        variant={reordering ? "primary" : "secondary"}
                         disabled={
                             Boolean(
                                 busyKey
@@ -2888,7 +2836,7 @@ function CategorySettings() {
                                     ? "완료"
                                     : "순서 변경"
                         }
-                    </button>
+                    </Button>
                 </div>
 
                 {
@@ -2942,11 +2890,8 @@ function CategorySettings() {
                                 />
                             </label>
 
-                            <button
-                                type="button"
-                                className={
-                                    styles.primaryButton
-                                }
+                            <Button
+                                
                                 disabled={
                                     Boolean(
                                         busyKey
@@ -2964,7 +2909,7 @@ function CategorySettings() {
                                         ? "추가 중..."
                                         : "추가"
                                 }
-                            </button>
+                            </Button>
                         </div>
                     )
                 }
@@ -3192,11 +3137,9 @@ function CategorySettings() {
                                                                                 }
                                                                             />
 
-                                                                            <button
-                                                                                type="button"
-                                                                                className={
-                                                                                    styles.secondarySmallButton
-                                                                                }
+                                                                            <Button
+                                                                                variant="secondary"
+                                                                                size="sm"
                                                                                 onClick={
                                                                                     () =>
                                                                                         setEditingId(
@@ -3205,13 +3148,10 @@ function CategorySettings() {
                                                                                 }
                                                                             >
                                                                                 취소
-                                                                            </button>
+                                                                            </Button>
 
-                                                                            <button
-                                                                                type="button"
-                                                                                className={
-                                                                                    styles.primarySmallButton
-                                                                                }
+                                                                            <Button
+                                                                                size="sm"
                                                                                 onClick={
                                                                                     () =>
                                                                                         void handleRename(
@@ -3220,7 +3160,7 @@ function CategorySettings() {
                                                                                 }
                                                                             >
                                                                                 저장
-                                                                            </button>
+                                                                            </Button>
                                                                         </div>
                                                                     )
                                                                     : (
@@ -3477,11 +3417,9 @@ function CategorySettings() {
                                                                 }
                                                             </span>
 
-                                                            <button
-                                                                type="button"
-                                                                className={
-                                                                    styles.restoreButton
-                                                                }
+                                                            <Button
+                                                                variant="soft"
+                                                                size="sm"
                                                                 onClick={
                                                                     () =>
                                                                         void runMutation(
@@ -3497,7 +3435,7 @@ function CategorySettings() {
                                                                 }
                                                             >
                                                                 복원
-                                                            </button>
+                                                            </Button>
                                                         </li>
                                                     )
                                                 )
@@ -3508,7 +3446,7 @@ function CategorySettings() {
                         </details>
                     )
                 }
-            </section>
+            </Card>
         </div>
     );
 }
@@ -4951,11 +4889,7 @@ export function AccountSettings({
 
     function renderAccountForm() {
         return (
-            <section
-                                                className={
-                                                    styles.formCard
-                                                }
-                                            >
+            <Card as="section" className={styles.formCard}>
                                                 <div
                                                     className={
                                                         styles.formHeader
@@ -4975,11 +4909,10 @@ export function AccountSettings({
                                                         </p>
                                                     </div>
 
-                                                    <button
-                                                        type="button"
-                                                        className={
-                                                            styles.closeButton
-                                                        }
+                                                    <Button
+                                                        variant="soft"
+                                                        size="sm"
+                                                        iconOnly
                                                         aria-label="입력창 닫기"
                                                         disabled={
                                                             Boolean(
@@ -4991,7 +4924,7 @@ export function AccountSettings({
                                                         }
                                                     >
                                                         ×
-                                                    </button>
+                                                    </Button>
                                                 </div>
 
                                                 <div
@@ -5696,23 +5629,17 @@ export function AccountSettings({
                                                         styles.formActions
                                                     }
                                                 >
-                                                    <button
-                                                        type="button"
-                                                        className={
-                                                            styles.secondaryButton
-                                                        }
+                                                    <Button
+                                                        variant="secondary"
                                                         onClick={
                                                             closeForm
                                                         }
                                                     >
                                                         취소
-                                                    </button>
+                                                    </Button>
 
-                                                    <button
-                                                        type="button"
-                                                        className={
-                                                            styles.primaryButton
-                                                        }
+                                                    <Button
+                                                        
                                                         onClick={
                                                             () =>
                                                                 void handleSave()
@@ -5725,9 +5652,9 @@ export function AccountSettings({
                                                                     ? "수정 저장"
                                                                     : "추가"
                                                         }
-                                                    </button>
+                                                    </Button>
                                                 </div>
-                                            </section>
+                                            </Card>
         );
     }
 
@@ -5811,11 +5738,7 @@ export function AccountSettings({
                 styles.settingsBody
             }
         >
-            <section
-                className={
-                    styles.cardSection
-                }
-            >
+            <Card as="section">
                 <div
                     className={
                         styles.segmentedControl
@@ -5890,7 +5813,7 @@ export function AccountSettings({
                         )
                     }
                 </div>
-            </section>
+            </Card>
 
             <div
                 className={
@@ -5912,11 +5835,8 @@ export function AccountSettings({
                 >
                     {
                         !reordering && (
-                            <button
-                                type="button"
-                                className={
-                                    styles.primaryButton
-                                }
+                            <Button
+                                
                                 disabled={
                                     Boolean(
                                         busyKey
@@ -5927,17 +5847,12 @@ export function AccountSettings({
                                 }
                             >
                                 항목 추가
-                            </button>
+                            </Button>
                         )
                     }
 
-                    <button
-                        type="button"
-                        className={
-                            reordering
-                                ? styles.primaryButton
-                                : styles.secondaryButton
-                        }
+                    <Button
+                        variant={reordering ? "primary" : "secondary"}
                         disabled={
                             Boolean(
                                 busyKey
@@ -5987,7 +5902,7 @@ export function AccountSettings({
                                     ? "완료"
                                     : "순서 변경"
                         }
-                    </button>
+                    </Button>
                 </div>
             </div>
 
@@ -6051,11 +5966,7 @@ export function AccountSettings({
                 )
             }
 
-            <section
-                className={
-                    styles.cardSection
-                }
-            >
+            <Card as="section">
                 {
                     loading
                         ? (
@@ -6502,11 +6413,9 @@ export function AccountSettings({
                                                                 }
                                                             </span>
 
-                                                            <button
-                                                                type="button"
-                                                                className={
-                                                                    styles.restoreButton
-                                                                }
+                                                            <Button
+                                                                variant="soft"
+                                                                size="sm"
                                                                 onClick={
                                                                     () =>
                                                                         void runMutation(
@@ -6522,7 +6431,7 @@ export function AccountSettings({
                                                                 }
                                                             >
                                                                 복원
-                                                            </button>
+                                                            </Button>
                                                         </li>
                                                     )
                                                 )
@@ -6533,7 +6442,7 @@ export function AccountSettings({
                         </details>
                     )
                 }
-            </section>
+            </Card>
         </div>
     );
 }
@@ -6840,7 +6749,7 @@ function LedgerDataSettings() {
 
         if (
             !window.confirm(
-                `${transaction.date} ${title} ${Math.round(transaction.amount).toLocaleString("ko-KR")}원 거래를 복원할까요?`
+                `${transaction.date} ${title} ${formatMoney(transaction.amount)} 거래를 복원할까요?`
             )
         ) {
             return;
@@ -7097,11 +7006,7 @@ function LedgerDataSettings() {
                 )
             }
 
-            <section
-                className={
-                    styles.cardSection
-                }
-            >
+            <Card as="section">
                 <div
                     className={
                         styles.sectionHeading
@@ -7162,11 +7067,8 @@ function LedgerDataSettings() {
                                         styles.rowActions
                                     }
                                 >
-                                    <button
-                                        type="button"
-                                        className={
-                                            styles.secondaryButton
-                                        }
+                                    <Button
+                                        variant="secondary"
                                         disabled={
                                             Boolean(
                                                 busyKey
@@ -7178,13 +7080,10 @@ function LedgerDataSettings() {
                                         }
                                     >
                                         제한 해제
-                                    </button>
+                                    </Button>
 
-                                    <button
-                                        type="button"
-                                        className={
-                                            styles.primaryButton
-                                        }
+                                    <Button
+                                        
                                         disabled={
                                             Boolean(
                                                 busyKey
@@ -7196,18 +7095,14 @@ function LedgerDataSettings() {
                                         }
                                     >
                                         시작일 저장
-                                    </button>
+                                    </Button>
                                 </div>
                             </div>
                         )
                 }
-            </section>
+            </Card>
 
-            <section
-                className={
-                    styles.cardSection
-                }
-            >
+            <Card as="section">
                 <div
                     className={
                         styles.sectionHeading
@@ -7291,13 +7186,6 @@ function LedgerDataSettings() {
                                                 transaction.category ||
                                                 transaction.type;
 
-                                            const prefix =
-                                                transaction.type === "수입"
-                                                    ? "+"
-                                                    : transaction.type === "지출"
-                                                        ? "-"
-                                                        : "";
-
                                             const restoring =
                                                 restoringTransactionId ===
                                                 transaction.transactionId;
@@ -7325,8 +7213,12 @@ function LedgerDataSettings() {
                                                             {" · "}
                                                             {transaction.type}
                                                             {" · "}
-                                                            {prefix}
-                                                            {Math.round(transaction.amount).toLocaleString("ko-KR")}원
+                                                            {formatMoney(
+                                                                transaction.type === "지출"
+                                                                    ? -transaction.amount
+                                                                    : transaction.amount,
+                                                                { showPlus: transaction.type === "수입" }
+                                                            )}
                                                             {
                                                                 transaction.deletedBy
                                                                     ? ` · 삭제 ${transaction.deletedBy}`
@@ -7335,11 +7227,9 @@ function LedgerDataSettings() {
                                                         </span>
                                                     </span>
 
-                                                    <button
-                                                        type="button"
-                                                        className={
-                                                            styles.restoreButton
-                                                        }
+                                                    <Button
+                                                        variant="soft"
+                                                        size="sm"
                                                         disabled={
                                                             Boolean(
                                                                 restoringTransactionId
@@ -7357,7 +7247,7 @@ function LedgerDataSettings() {
                                                                 ? "복원 중..."
                                                                 : "복원"
                                                         }
-                                                    </button>
+                                                    </Button>
                                                 </li>
                                             );
                                         }
@@ -7367,18 +7257,12 @@ function LedgerDataSettings() {
                         )
                     }
                 </details>
-            </section>
+            </Card>
 
-            <section
-                className={
-                    styles.cardSection
-                }
-            >
-                <button
-                    type="button"
-                    className={
-                        styles.fullWidthButton
-                    }
+            <Card as="section">
+                <Button
+                    variant="secondary"
+                    fullWidth
                     disabled={
                         Boolean(
                             busyKey
@@ -7390,27 +7274,21 @@ function LedgerDataSettings() {
                     }
                 >
                     전체 거래 CSV로 내보내기
-                </button>
-            </section>
+                </Button>
+            </Card>
 
-            <section
-                className={
-                    styles.cardSection
-                }
-            >
-                <button
-                    type="button"
-                    className={
-                        styles.fullWidthButton
-                    }
+            <Card as="section">
+                <Button
+                    variant="secondary"
+                    fullWidth
                     onClick={
                         () =>
                             window.location.reload()
                     }
                 >
                     최신 데이터 다시 불러오기
-                </button>
-            </section>
+                </Button>
+            </Card>
         </div>
     );
 }
@@ -7512,11 +7390,7 @@ function ProfileSettings() {
                 styles.settingsBody
             }
         >
-            <section
-                className={
-                    styles.cardSection
-                }
-            >
+            <Card as="section">
                 <div
                     className={
                         styles.profileRow
@@ -7557,13 +7431,9 @@ function ProfileSettings() {
                         </span>
                     </span>
                 </div>
-            </section>
+            </Card>
 
-            <section
-                className={
-                    styles.cardSection
-                }
-            >
+            <Card as="section">
                 <div
                     className={
                         styles.sectionHeading
@@ -7614,15 +7484,15 @@ function ProfileSettings() {
                         </dd>
                     </div>
                 </dl>
-            </section>
+            </Card>
 
             <PwaInstallPrompt />
 
-            <button
-                type="button"
-                className={
-                    styles.logoutButton
-                }
+            <Button
+                variant="dangerSoft"
+                fullWidth
+                loading={loggingOut}
+                loadingLabel="로그아웃 중..."
                 disabled={
                     loggingOut
                 }
@@ -7631,18 +7501,21 @@ function ProfileSettings() {
                         void handleLogout()
                 }
             >
-                {
-                    loggingOut
-                        ? "로그아웃 중..."
-                        : "로그아웃"
-                }
-            </button>
+                로그아웃
+            </Button>
         </div>
     );
 }
 
 
-export default function SettingsPage() {
+interface SettingsPageProps {
+    refreshRevision?: number;
+}
+
+
+export default function SettingsPage({
+    refreshRevision = 0
+}: SettingsPageProps) {
     const [
         view,
         setView
@@ -7845,28 +7718,36 @@ export default function SettingsPage() {
                             {
                                 view ===
                                     "categories" && (
-                                    <CategorySettings />
+                                    <CategorySettings
+                                        key={`categories:${refreshRevision}`}
+                                    />
                                 )
                             }
 
                             {
                                 view ===
                                     "accounts" && (
-                                    <AccountSettings />
+                                    <AccountSettings
+                                        key={`accounts:${refreshRevision}`}
+                                    />
                                 )
                             }
 
                             {
                                 view ===
                                     "automation" && (
-                                    <AutomationSettingsPanel />
+                                    <AutomationSettingsPanel
+                                        key={`automation:${refreshRevision}`}
+                                    />
                                 )
                             }
 
                             {
                                 view ===
                                     "ledger" && (
-                                    <LedgerDataSettings />
+                                    <LedgerDataSettings
+                                        key={`ledger:${refreshRevision}`}
+                                    />
                                 )
                             }
 

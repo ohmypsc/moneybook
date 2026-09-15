@@ -47,8 +47,10 @@ import {
 } from "./api/automation";
 
 import {
+  getPendingTransactions,
   startPendingTransactionQueue,
-  stopPendingTransactionQueue
+  stopPendingTransactionQueue,
+  subscribePendingTransactions
 } from "./utils/pendingTransactionQueue";
 
 import {
@@ -62,6 +64,10 @@ import {
 import type {
   User
 } from "./types/api";
+
+import type {
+  Transaction
+} from "./api/transactions";
 
 import LoginPage
   from "./pages/LoginPage/LoginPage";
@@ -84,6 +90,10 @@ import SettingsPage
 import {
   AppShell
 } from "./components/layout/AppShell/AppShell";
+
+import {
+  Card
+} from "./components/common/Card/Card";
 
 import type {
   NavigationKey
@@ -164,10 +174,39 @@ function saveLastAuthenticatedUser(
 
 type InputLaunchPreset = {
   mode: "expense" | "income" | "transfer";
+  amount?: number | null;
   fromAccountId?: string | null;
   toAccountId?: string | null;
   categoryId?: string | null;
+  paymentMethodId?: string | null;
+  spendingTarget?: string | null;
+  description?: string | null;
+  memo?: string | null;
 };
+
+
+function createInputPresetFromTransaction(
+  transaction: Transaction
+): InputLaunchPreset {
+  const mode: InputLaunchPreset["mode"] =
+    transaction.type === "수입"
+      ? "income"
+      : transaction.type === "이체"
+        ? "transfer"
+        : "expense";
+
+  return {
+    mode,
+    amount: transaction.amount,
+    categoryId: transaction.categoryId,
+    fromAccountId: transaction.fromAccountId,
+    toAccountId: transaction.toAccountId,
+    paymentMethodId: transaction.paymentMethodId,
+    spendingTarget: transaction.spendingTarget,
+    description: transaction.description,
+    memo: transaction.memo
+  };
+}
 
 
 type AppHistoryState = {
@@ -510,6 +549,16 @@ export default function App() {
     useState(0);
 
 
+  const [
+    pendingTransactionSummary,
+    setPendingTransactionSummary
+  ] =
+    useState({
+      total: 0,
+      failed: 0
+    });
+
+
   useEffect(
     () => {
       if (
@@ -598,6 +647,10 @@ export default function App() {
         !user
       ) {
         stopPendingTransactionQueue();
+        setPendingTransactionSummary({
+          total: 0,
+          failed: 0
+        });
         return;
       }
 
@@ -605,7 +658,30 @@ export default function App() {
         user.name
       );
 
+      const updatePendingTransactionSummary = () => {
+        const pendingTransactions =
+          getPendingTransactions(
+            user.name
+          );
+
+        setPendingTransactionSummary({
+          total: pendingTransactions.length,
+          failed: pendingTransactions.filter(
+            transaction =>
+              transaction.status === "failed"
+          ).length
+        });
+      };
+
+      updatePendingTransactionSummary();
+
+      const unsubscribe =
+        subscribePendingTransactions(
+          updatePendingTransactionSummary
+        );
+
       return () => {
+        unsubscribe();
         stopPendingTransactionQueue(
           user.name
         );
@@ -637,7 +713,6 @@ export default function App() {
 
           invalidateDashboardCache();
           markLedgerChanged();
-          setRemoteRevision(value => value + 1);
         })
         .catch(() => {
         });
@@ -664,10 +739,23 @@ export default function App() {
 
       return startRealtimeSync({
         userName: user.name,
-        onRemoteChange: () => {
-          setRemoteRevision(
-            value => value + 1
-          );
+        onRemoteChange: changes => {
+          const settingsEntityTypes = new Set([
+            "account",
+            "category",
+            "input_preferences",
+            "ledger_config",
+            "automation_settings"
+          ]);
+
+          if (
+            changes.length === 0 ||
+            changes.some(change => settingsEntityTypes.has(change.entityType))
+          ) {
+            setRemoteRevision(
+              value => value + 1
+            );
+          }
         }
       });
     },
@@ -1110,10 +1198,10 @@ export default function App() {
           styles.center
         }
       >
-        <section
-          className={
-            styles.panel
-          }
+        <Card
+          as="section"
+          padding="lg"
+          className={styles.panel}
         >
           <h1>
             우리 가계부
@@ -1122,7 +1210,7 @@ export default function App() {
           <p>
             로그인 상태를 확인하고 있습니다.
           </p>
-        </section>
+        </Card>
       </main>
     );
   }
@@ -1159,7 +1247,15 @@ export default function App() {
   ) {
     pageContent = (
       <HomePage
-        key={`home:${remoteRevision}`}
+        onCopyTransaction={
+          transaction => {
+            navigateTo(
+              "input",
+              null,
+              createInputPresetFromTransaction(transaction)
+            );
+          }
+        }
       />
     );
 
@@ -1169,12 +1265,20 @@ export default function App() {
   ) {
     pageContent = (
       <HistoryPage
-        key={`history:${remoteRevision}`}
         onAddTransaction={
           date => {
             navigateTo(
               "input",
               date
+            );
+          }
+        }
+        onCopyTransaction={
+          transaction => {
+            navigateTo(
+              "input",
+              null,
+              createInputPresetFromTransaction(transaction)
             );
           }
         }
@@ -1205,6 +1309,21 @@ export default function App() {
         initialCategoryId={
           inputPreset?.categoryId ?? null
         }
+        initialAmount={
+          inputPreset?.amount ?? null
+        }
+        initialPaymentMethodId={
+          inputPreset?.paymentMethodId ?? null
+        }
+        initialSpendingTarget={
+          inputPreset?.spendingTarget ?? null
+        }
+        initialDescription={
+          inputPreset?.description ?? null
+        }
+        initialMemo={
+          inputPreset?.memo ?? null
+        }
       />
     );
 
@@ -1216,9 +1335,6 @@ export default function App() {
       <AssetsPage
         userName={
           user.name
-        }
-        refreshRevision={
-          remoteRevision
         }
         onOpenInput={
           preset => {
@@ -1235,7 +1351,9 @@ export default function App() {
   } else {
     pageContent = (
       <SettingsPage
-        key={`settings:${remoteRevision}`}
+        refreshRevision={
+          remoteRevision
+        }
       />
     );
   }
@@ -1245,6 +1363,12 @@ export default function App() {
     <AppShell
       activeNavigation={
         activeNavigation
+      }
+      pendingTransactionCount={
+        pendingTransactionSummary.total
+      }
+      pendingTransactionFailedCount={
+        pendingTransactionSummary.failed
       }
       onNavigate={
         handleNavigate

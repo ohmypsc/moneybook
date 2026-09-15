@@ -26,101 +26,11 @@
     var(--space-6);
 }
 
-
-.manageButton {
-  min-height: 38px;
-
-  padding:
-    0
-    13px;
-
-  border:
-    1px solid
-    var(--color-border);
-
-  border-radius:
-    var(--radius-md);
-
-  background:
-    var(--color-surface);
-
-  color:
-    var(--color-primary);
-
-  font: inherit;
-  font-size: 13px;
-  font-weight: 800;
-
-  cursor: pointer;
+.headerActions {
+  display: flex;
+  gap: var(--space-2);
 }
 
-
-.manageHeader {
-  margin-bottom:
-    var(--space-5);
-}
-
-
-.backButton {
-  display: inline-flex;
-
-  align-items: center;
-
-  gap: 4px;
-
-  min-height: 38px;
-
-  margin:
-    0
-    0
-    var(--space-3);
-
-  padding:
-    0
-    10px
-    0
-    6px;
-
-  border:
-    1px solid
-    var(--color-border);
-
-  border-radius:
-    var(--radius-md);
-
-  background:
-    var(--color-surface);
-
-  color:
-    var(--color-text-primary);
-
-  font: inherit;
-  font-size: 13px;
-  font-weight: 800;
-
-  cursor: pointer;
-}
-
-
-.backButton span {
-  font-size: 22px;
-  font-weight: 500;
-  line-height: 1;
-}
-
-
-.eyebrow {
-  margin:
-    0
-    0
-    var(--space-1);
-
-  color:
-    var(--color-text-secondary);
-
-  font-size: 13px;
-  font-weight: 700;
-}
 
 
 .title {
@@ -132,47 +42,7 @@
 
 
 .summaryCard {
-  padding: 20px;
-
-  margin-bottom:
-    var(--space-5);
-
-  background:
-    var(--color-surface);
-
-  border:
-    1px solid
-    var(--color-border);
-
-  border-radius:
-    var(--radius-lg);
-
-  box-shadow:
-    var(--shadow-card);
-}
-
-
-.summaryGrid {
-  display: grid;
-
-  grid-template-columns:
-    repeat(
-      3,
-      minmax(
-        0,
-        1fr
-      )
-    );
-
-  gap:
-    var(--space-3);
-}
-
-
-.summaryItem {
-  display: grid;
-
-  gap: 4px;
+  margin-bottom: var(--space-5);
 }
 
 
@@ -875,41 +745,6 @@
 }
 
 
-.cashButton {
-  min-height: 44px;
-
-  padding:
-    0
-    16px;
-
-  border: 0;
-
-  border-radius:
-    var(--radius-md);
-
-  background:
-    var(--color-primary);
-
-  color:
-    var(--color-primary-text);
-
-  font: inherit;
-
-  font-size: 13px;
-  font-weight: 800;
-
-  cursor: pointer;
-}
-
-
-.cashButton:disabled {
-  opacity: 0.55;
-
-  cursor:
-    not-allowed;
-}
-
-
 .baselineDetails {
   margin-bottom:
     var(--space-4);
@@ -1236,13 +1071,7 @@
   }
 
 
-  .summaryGrid {
-    gap:
-      var(--space-2);
-  }
-
-
-  .summaryValue {
+.summaryValue {
     font-size: 15px;
   }
 
@@ -1317,10 +1146,6 @@
 
 .header {
   margin-bottom: 14px;
-}
-
-.eyebrow {
-  display: none;
 }
 
 .title {
@@ -1530,20 +1355,6 @@
   flex: 0 0 auto;
 }
 
-.editAccountButton,
-.reconcileButton {
-  min-height: 36px;
-  padding: 0 12px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-primary);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 800;
-  cursor: pointer;
-}
-
 .cashDetailMetrics {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1616,23 +1427,6 @@
   gap: 8px;
 }
 
-.reconcileActions button {
-  min-height: 40px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.reconcileActions button:last-child {
-  border-color: var(--color-primary);
-  background: var(--color-primary);
-  color: var(--color-primary-text);
-}
-
 .editorBackdrop {
   position: fixed;
   inset: 0;
@@ -1651,22 +1445,8 @@
   padding: 16px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl) var(--radius-xl) var(--radius-lg) var(--radius-lg);
-  background: var(--color-background);
+  background: var(--color-bg);
   box-shadow: 0 20px 60px rgba(20, 30, 34, 0.2);
-}
-
-.addAccountButton {
-  flex: 0 0 auto;
-  min-height: 38px;
-  padding: 0 12px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-primary);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 800;
-  cursor: pointer;
 }
 
 .ownerFilter {
@@ -1733,17 +1513,8 @@
 }
 
 .modalCloseButton {
-  flex: 0 0 auto;
-  width: 36px;
-  height: 36px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--color-surface-soft);
-  color: var(--color-text-primary);
-  font: inherit;
   font-size: 23px;
-  line-height: 1;
-  cursor: pointer;
+  font-weight: 500;
 }
 
 @media (min-width: 720px) {
@@ -1760,4 +1531,61 @@
 
 .editorBackdrop {
   z-index: 100;
+}
+
+.investmentWarnings {
+  display: grid;
+  gap: 0;
+  margin-bottom: var(--space-4);
+}
+
+.investmentWarningRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.investmentWarningRow:first-child {
+  padding-top: 0;
+}
+
+.investmentWarningRow:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.investmentWarningRow > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.investmentWarningRow strong {
+  font-size: 12px;
+}
+
+.investmentWarningRow span {
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sectionHeadingActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+@media (max-width: 480px) {
+  .sectionHeadingActions {
+    align-items: flex-end;
+    flex-direction: column;
+    gap: 2px;
+  }
 }

@@ -31,6 +31,9 @@ type DashboardCacheEntry = {
 type GetDashboardOptions = {
   forceRefresh?:
     boolean;
+
+  refreshQuotes?:
+    boolean;
 };
 
 
@@ -147,6 +150,10 @@ export async function getDashboard(
     options.forceRefresh ===
     true;
 
+  const refreshQuotes =
+    options.refreshQuotes ===
+    true;
+
   const key =
     getCacheKey(
       month
@@ -215,10 +222,10 @@ export async function getDashboard(
 
 
   if (
-    forceRefresh
+    refreshQuotes
   ) {
     searchParams.set(
-      "refresh",
+      "refreshQuotes",
       "1"
     );
   }

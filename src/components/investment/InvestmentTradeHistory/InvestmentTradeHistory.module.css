@@ -456,113 +456,11 @@
 }
 
 
-.editButton,
-.deleteButton,
-.restoreButton,
-.cancelButton,
-.saveButton {
-  min-height: 36px;
-
-  padding:
-    0
-    12px;
-
-  border-radius:
-    var(--radius-md);
-
-  font: inherit;
-
-  font-size: 12px;
-  font-weight: 800;
-
-  cursor: pointer;
-}
-
-
-.editButton,
-.cancelButton {
-  border:
-    1px solid
-    var(--color-border);
-
-  background:
-    var(--color-surface);
-
-  color:
-    var(--color-text-primary);
-}
-
-
-.deleteButton {
-  border:
-    1px solid
-    var(--color-border);
-
-  background:
-    var(--color-surface);
-
-  color:
-    var(--color-error);
-}
-
-
-.restoreButton {
-  border:
-    1px solid
-    var(--color-border);
-
-  background:
-    var(--color-surface);
-
-  color:
-    var(--color-primary);
-}
-
-
-.saveButton {
-  border: 0;
-
-  background:
-    var(--color-primary);
-
-  color:
-    var(--color-primary-text);
-}
-
-
-.editButton:disabled,
-.deleteButton:disabled,
-.restoreButton:disabled,
-.cancelButton:disabled,
-.saveButton:disabled {
-  opacity: 0.5;
-
-  cursor: not-allowed;
-}
-
-
 .editPanel {
   display: flex;
-
   flex-direction: column;
-
-  gap:
-    var(--space-3);
-
-  margin-top:
-    var(--space-3);
-
-  padding: 14px;
-
-  border:
-    1px solid
-    var(--color-border);
-
-  border-radius:
-    var(--radius-md);
-
-  background:
-    var(--color-surface-soft);
+  gap: var(--space-3);
+  margin-top: var(--space-3);
 }
 
 

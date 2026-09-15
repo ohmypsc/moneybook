@@ -10,6 +10,10 @@ import {
 } from "../../api/client";
 
 import {
+    getBootstrap
+} from "../../api/bootstrap";
+
+import {
     getCalendarMonthSnapshot,
     getDeletedCalendarMonthSnapshot,
     invalidateCalendarCache,
@@ -46,6 +50,11 @@ import {
     subscribeLedgerChanges
 } from "../../utils/ledgerEvents";
 
+import { Button } from "../../components/common/Button/Button";
+import { Card } from "../../components/common/Card/Card";
+import { Money, formatMoney } from "../../components/common/Money/Money";
+import type { BootstrapData, BootstrapResponse } from "../../types/bootstrap";
+
 import styles
     from "./CalendarPage.module.css";
 
@@ -72,26 +81,6 @@ interface Category {
     categoryId: string;
     type: LedgerTransactionType;
     name: string;
-}
-
-interface BootstrapData {
-    transactionTypes:
-        LedgerTransactionType[];
-    members: string[];
-    spendingTargets: string[];
-    accounts: Account[];
-    categories: Category[];
-}
-
-interface BootstrapResponse {
-    success: boolean;
-    apiVersion?: string;
-    data?: BootstrapData;
-
-    error?: {
-        code?: string;
-        message?: string;
-    };
 }
 
 interface EditForm {
@@ -297,15 +286,7 @@ function formatCurrency(
         return "-";
     }
 
-    return (
-        Math.round(
-            value
-        )
-            .toLocaleString(
-                "ko-KR"
-            ) +
-        "원"
-    );
+    return formatMoney(value);
 }
 
 function formatCalendarAmount(
@@ -1542,11 +1523,9 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
         }
 
         const response =
-            await apiRequest<
+            await getBootstrap<
                 BootstrapResponse
-            >(
-                "/api/bootstrap"
-            );
+            >();
 
         if (
             !response.success ||
@@ -2351,11 +2330,10 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
                         styles.monthNavigator
                     }
                 >
-                    <button
-                        type="button"
-                        className={
-                            styles.iconButton
-                        }
+                    <Button
+                        variant="secondary"
+                        size="sm"
+                        iconOnly
                         aria-label="이전 달"
                         onClick={
                             () =>
@@ -2368,7 +2346,7 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
                         }
                     >
                         ‹
-                    </button>
+                    </Button>
 
                     <h2
                         className={
@@ -2380,11 +2358,10 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
                         )}
                     </h2>
 
-                    <button
-                        type="button"
-                        className={
-                            styles.iconButton
-                        }
+                    <Button
+                        variant="secondary"
+                        size="sm"
+                        iconOnly
                         aria-label="다음 달"
                         onClick={
                             () =>
@@ -2397,7 +2374,7 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
                         }
                     >
                         ›
-                    </button>
+                    </Button>
                 </div>
 
                 <div
@@ -2405,23 +2382,20 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
                         styles.toolbarActions
                     }
                 >
-                    <button
-                        type="button"
-                        className={
-                            styles.todayButton
-                        }
+                    <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={
                             goToday
                         }
                     >
                         오늘
-                    </button>
+                    </Button>
 
-                    <button
-                        type="button"
-                        className={
-                            styles.refreshButton
-                        }
+                    <Button
+                        variant="secondary"
+                        size="sm"
+                        iconOnly
                         aria-label="새로고침"
                         onClick={
                             refreshMonth
@@ -2431,21 +2405,17 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
                         }
                     >
                         ↻
-                    </button>
+                    </Button>
                 </div>
             </div>
 
-            <section
-                className={
-                    styles.summaryGrid
-                }
+            <Card
+                as="section"
+                padding="none"
+                className={styles.summaryGrid}
                 aria-label="월 요약"
             >
-                <div
-                    className={
-                        styles.summaryCard
-                    }
-                >
+                <div className={styles.summaryCard}>
                     <span
                         className={
                             styles.summaryLabel
@@ -2460,15 +2430,11 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
                             styles.summaryIncome
                         ].join(" ")}
                     >
-                        {formatCalendarAmount(summary.monthIncome)}원
+                        <Money amount={summary.monthIncome} absolute tone="income" />
                     </strong>
                 </div>
 
-                <div
-                    className={
-                        styles.summaryCard
-                    }
-                >
+                <div className={styles.summaryCard}>
                     <span
                         className={
                             styles.summaryLabel
@@ -2483,15 +2449,11 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
                             styles.summaryExpense
                         ].join(" ")}
                     >
-                        {formatCalendarAmount(summary.monthExpense)}원
+                        <Money amount={summary.monthExpense} absolute tone="expense" />
                     </strong>
                 </div>
 
-                <div
-                    className={
-                        styles.summaryCard
-                    }
-                >
+                <div className={styles.summaryCard}>
                     <span
                         className={
                             styles.summaryLabel
@@ -2515,10 +2477,14 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
                             )
                             .join(" ")}
                     >
-                        {summary.monthNetCashFlow < 0 ? "-" : summary.monthNetCashFlow > 0 ? "+" : ""}{formatCalendarAmount(summary.monthNetCashFlow)}원
+                        <Money
+                            amount={summary.monthNetCashFlow}
+                            showPlus
+                            tone={summary.monthNetCashFlow < 0 ? "negative" : "positive"}
+                        />
                     </strong>
                 </div>
-            </section>
+            </Card>
 
             <div
                 className={
@@ -2590,10 +2556,10 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
                 !loading &&
                 !error && (
                     <>
-                        <section
-                            className={
-                                styles.calendarCard
-                            }
+                        <Card
+                            as="section"
+                            padding="none"
+                            className={styles.calendarCard}
                             aria-label={`${formatMonthLabel(
                                 month
                             )} 거래 달력`}
@@ -2797,7 +2763,7 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
                                     )
                                 }
                             </div>
-                        </section>
+                        </Card>
 
                         <section
                             className={
@@ -2839,13 +2805,12 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
                                     </span>
 
                                     {onAddTransaction && (
-                                        <button
-                                            type="button"
-                                            className={styles.addTransactionButton}
+                                        <Button
+                                            size="sm"
                                             onClick={() => onAddTransaction(selectedDate)}
                                         >
                                             + 추가
-                                        </button>
+                                        </Button>
                                     )}
                                 </div>
                             </div>
@@ -3116,16 +3081,12 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
                                                                     styles.transactionActions
                                                                 }
                                                             >
-                                                                <button
-                                                                    type="button"
-                                                                    className={
-                                                                        styles.editButton
-                                                                    }
-                                                                    disabled={
-                                                                        isSaving ||
-                                                                        isDeleting ||
-                                                                        isPreparingEdit
-                                                                    }
+                                                                <Button
+                                                                    variant="secondary"
+                                                                    size="sm"
+                                                                    loading={isPreparingEdit}
+                                                                    loadingLabel="준비 중..."
+                                                                    disabled={isSaving || isDeleting}
                                                                     onClick={
                                                                         () =>
                                                                             void startEdit(
@@ -3133,24 +3094,15 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
                                                                             )
                                                                     }
                                                                 >
-                                                                    {
-                                                                        isPreparingEdit
-                                                                            ? "준비 중..."
-                                                                            : isEditing
-                                                                            ? "수정 중"
-                                                                            : "수정"
-                                                                    }
-                                                                </button>
+                                                                    {isEditing ? "수정 중" : "수정"}
+                                                                </Button>
 
-                                                                <button
-                                                                    type="button"
-                                                                    className={
-                                                                        styles.deleteButton
-                                                                    }
-                                                                    disabled={
-                                                                        isSaving ||
-                                                                        isDeleting
-                                                                    }
+                                                                <Button
+                                                                    variant="dangerSoft"
+                                                                    size="sm"
+                                                                    loading={isDeleting}
+                                                                    loadingLabel="삭제 중..."
+                                                                    disabled={isSaving}
                                                                     onClick={
                                                                         () =>
                                                                             void handleDelete(
@@ -3158,22 +3110,19 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
                                                                             )
                                                                     }
                                                                 >
-                                                                    {
-                                                                        isDeleting
-                                                                            ? "삭제 중..."
-                                                                            : "삭제"
-                                                                    }
-                                                                </button>
+                                                                    삭제
+                                                                </Button>
                                                             </div>
 
                                                             {
                                                                 isEditing &&
                                                                 editForm &&
                                                                 bootstrap && (
-                                                                    <div
-                                                                        className={
-                                                                            styles.editPanel
-                                                                        }
+                                                                    <Card
+                                                                        padding="sm"
+                                                                        tone="soft"
+                                                                        shadow="none"
+                                                                        className={styles.editPanel}
                                                                     >
                                                                         <div
                                                                             className={
@@ -3200,11 +3149,10 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
                                                                                 </h3>
                                                                             </div>
 
-                                                                            <button
-                                                                                type="button"
-                                                                                className={
-                                                                                    styles.editCloseButton
-                                                                                }
+                                                                            <Button
+                                                                                variant="soft"
+                                                                                size="sm"
+                                                                                iconOnly
                                                                                 aria-label="수정 닫기"
                                                                                 disabled={
                                                                                     isSaving
@@ -3214,7 +3162,7 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
                                                                                 }
                                                                             >
                                                                                 ×
-                                                                            </button>
+                                                                            </Button>
                                                                         </div>
 
                                                                         {
@@ -3737,11 +3685,9 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
                                                                                 styles.editActions
                                                                             }
                                                                         >
-                                                                            <button
-                                                                                type="button"
-                                                                                className={
-                                                                                    styles.editCancelButton
-                                                                                }
+                                                                            <Button
+                                                                                variant="secondary"
+                                                                                size="sm"
                                                                                 disabled={
                                                                                     isSaving
                                                                                 }
@@ -3750,29 +3696,21 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
                                                                                 }
                                                                             >
                                                                                 취소
-                                                                            </button>
+                                                                            </Button>
 
-                                                                            <button
-                                                                                type="button"
-                                                                                className={
-                                                                                    styles.editSaveButton
-                                                                                }
-                                                                                disabled={
-                                                                                    isSaving
-                                                                                }
+                                                                            <Button
+                                                                                size="sm"
+                                                                                loading={isSaving}
+                                                                                loadingLabel="저장 중..."
                                                                                 onClick={
                                                                                     () =>
                                                                                         void handleSaveEdit()
                                                                                 }
                                                                             >
-                                                                                {
-                                                                                    isSaving
-                                                                                        ? "저장 중..."
-                                                                                        : "수정 저장"
-                                                                                }
-                                                                            </button>
+                                                                                수정 저장
+                                                                            </Button>
                                                                         </div>
-                                                                    </div>
+                                                                    </Card>
                                                                 )
                                                             }
                                                         </li>
@@ -3811,25 +3749,17 @@ export default function CalendarPage({ onAddTransaction }: CalendarPageProps) {
                             </span>
                         </div>
 
-                        <button
-                            type="button"
-                            className={
-                                styles.undoButton
-                            }
-                            disabled={
-                                undoBusy
-                            }
+                        <Button
+                            size="sm"
+                            loading={undoBusy}
+                            loadingLabel="복원 중..."
                             onClick={
                                 () =>
                                     void handleUndoDelete()
                             }
                         >
-                            {
-                                undoBusy
-                                    ? "복원 중..."
-                                    : "실행 취소"
-                            }
-                        </button>
+                            실행 취소
+                        </Button>
                     </div>
                 )
             }

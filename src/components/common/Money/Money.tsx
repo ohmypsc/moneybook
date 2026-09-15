@@ -1,63 +1,102 @@
-import styles
-  from "./Money.module.css";
+import type { HTMLAttributes } from "react";
 
+import styles from "./Money.module.css";
 
-type MoneyProps = {
-  amount: number;
+export type MoneyTone =
+  | "default"
+  | "muted"
+  | "income"
+  | "expense"
+  | "positive"
+  | "negative";
 
-  showPlus?:
-    boolean;
+export type MoneySize = "inherit" | "sm" | "md" | "lg";
 
-  className?:
-    string;
+export type FormatMoneyOptions = {
+  absolute?: boolean;
+  showPlus?: boolean;
+  currency?: string;
+  maximumFractionDigits?: number;
 };
 
+const formatterCache = new Map<string, Intl.NumberFormat>();
 
-const formatter =
-  new Intl.NumberFormat(
-    "ko-KR",
-    {
-      maximumFractionDigits: 0
-    }
-  );
+function getFormatter(currency: string, maximumFractionDigits: number) {
+  const key = `${currency}:${maximumFractionDigits}`;
+  const cached = formatterCache.get(key);
+  if (cached) return cached;
 
+  const formatter = currency === "KRW"
+    ? new Intl.NumberFormat("ko-KR", { maximumFractionDigits })
+    : new Intl.NumberFormat("ko-KR", {
+        style: "currency",
+        currency,
+        currencyDisplay: "narrowSymbol",
+        maximumFractionDigits
+      });
+
+  formatterCache.set(key, formatter);
+  return formatter;
+}
+
+export function formatMoney(
+  amount: number,
+  options: FormatMoneyOptions = {}
+) {
+  const {
+    absolute = false,
+    showPlus = false,
+    currency = "KRW",
+    maximumFractionDigits = currency === "KRW" ? 0 : 2
+  } = options;
+
+  const safeAmount = Number.isFinite(amount) ? amount : 0;
+  const value = absolute ? Math.abs(safeAmount) : safeAmount;
+  const formatter = getFormatter(currency, maximumFractionDigits);
+  const prefix = showPlus && value > 0 ? "+" : "";
+  const formatted = formatter.format(value);
+
+  return currency === "KRW"
+    ? `${prefix}${formatted}원`
+    : `${prefix}${formatted}`;
+}
+
+type MoneyProps = Omit<HTMLAttributes<HTMLSpanElement>, "children"> & {
+  amount: number;
+  absolute?: boolean;
+  showPlus?: boolean;
+  currency?: string;
+  maximumFractionDigits?: number;
+  tone?: MoneyTone;
+  size?: MoneySize;
+};
 
 export function Money({
   amount,
+  absolute = false,
   showPlus = false,
-  className = ""
+  currency = "KRW",
+  maximumFractionDigits,
+  tone = "default",
+  size = "inherit",
+  className = "",
+  ...props
 }: MoneyProps) {
-
-  const prefix =
-    showPlus &&
-    amount > 0
-      ? "+"
-      : "";
-
-
   const classNames = [
     styles.money,
+    styles[tone],
+    styles[`size_${size}`],
     className
-  ]
-    .filter(Boolean)
-    .join(" ");
-
+  ].filter(Boolean).join(" ");
 
   return (
-    <span
-      className={
-        classNames
-      }
-    >
-      {
-        prefix
-      }
-      {
-        formatter.format(
-          amount
-        )
-      }
-      원
+    <span className={classNames} {...props}>
+      {formatMoney(amount, {
+        absolute,
+        showPlus,
+        currency,
+        maximumFractionDigits
+      })}
     </span>
   );
 }

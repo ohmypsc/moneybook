@@ -7,6 +7,7 @@ import {
 } from "react";
 
 import { apiRequest } from "../../api/client";
+import { getBootstrap } from "../../api/bootstrap";
 import { previewBenefit } from "../../api/automation";
 import type {
   AutomationSettings,
@@ -23,10 +24,13 @@ import InvestmentTradeForm
   from "../../components/investment/InvestmentTradeForm/InvestmentTradeForm";
 import InvestmentTradeHistory
   from "../../components/investment/InvestmentTradeHistory/InvestmentTradeHistory";
+import { Button } from "../../components/common/Button/Button";
+import { Money, formatMoney } from "../../components/common/Money/Money";
 import type {
   DashboardData,
   InvestmentAccountSummary
 } from "../../types/dashboard";
+import type { BootstrapData, BootstrapResponse } from "../../types/bootstrap";
 import {
   applyAccountPreferences,
   applyCategoryPreferences,
@@ -46,6 +50,7 @@ import type {
   PendingTransactionRecord
 } from "../../utils/pendingTransactionQueue";
 import { getSeoulDateString } from "../../utils/dateTime";
+import { subscribeLedgerChanges } from "../../utils/ledgerEvents";
 import styles from "./InputPage.module.css";
 
 type TransactionType = "지출" | "수입" | "이체";
@@ -66,25 +71,6 @@ interface Category {
   categoryId: string;
   type: TransactionType;
   name: string;
-}
-
-interface BootstrapData {
-  transactionTypes: TransactionType[];
-  members: string[];
-  spendingTargets: string[];
-  accounts: Account[];
-  categories: Category[];
-  automationSettings?: AutomationSettings;
-}
-
-interface BootstrapResponse {
-  success: boolean;
-  apiVersion?: string;
-  data?: BootstrapData;
-  error?: {
-    code?: string;
-    message?: string;
-  };
 }
 
 interface ApiResult {
@@ -176,6 +162,11 @@ interface InputPageProps {
   initialFromAccountId?: string | null;
   initialToAccountId?: string | null;
   initialCategoryId?: string | null;
+  initialAmount?: number | null;
+  initialPaymentMethodId?: string | null;
+  initialSpendingTarget?: string | null;
+  initialDescription?: string | null;
+  initialMemo?: string | null;
 }
 
 interface InputHistoryState {
@@ -185,6 +176,11 @@ interface InputHistoryState {
     fromAccountId?: string | null;
     toAccountId?: string | null;
     categoryId?: string | null;
+    amount?: number | null;
+    paymentMethodId?: string | null;
+    spendingTarget?: string | null;
+    description?: string | null;
+    memo?: string | null;
   } | null;
 }
 
@@ -305,7 +301,7 @@ async function loadBootstrap(): Promise<BootstrapData> {
     bootstrapPromiseGeneration = generation;
     const requestGeneration = generation;
 
-    bootstrapPromise = apiRequest<BootstrapResponse>("/api/bootstrap")
+    bootstrapPromise = getBootstrap<BootstrapResponse>()
       .then(async response => {
         if (!response.success || !response.data) {
           throw new Error(
@@ -658,7 +654,12 @@ export default function InputPage({
   initialMode = null,
   initialFromAccountId = null,
   initialToAccountId = null,
-  initialCategoryId = null
+  initialCategoryId = null,
+  initialAmount = null,
+  initialPaymentMethodId = null,
+  initialSpendingTarget = null,
+  initialDescription = null,
+  initialMemo = null
 }: InputPageProps) {
   const today =
     getToday();
@@ -694,11 +695,41 @@ export default function InputPage({
     historyPreset?.categoryId ??
     null;
 
+  const launchAmount =
+    initialAmount ??
+    historyPreset?.amount ??
+    null;
+
+  const launchPaymentMethodId =
+    initialPaymentMethodId ??
+    historyPreset?.paymentMethodId ??
+    null;
+
+  const launchSpendingTarget =
+    initialSpendingTarget ??
+    historyPreset?.spendingTarget ??
+    null;
+
+  const launchDescription =
+    initialDescription ??
+    historyPreset?.description ??
+    null;
+
+  const launchMemo =
+    initialMemo ??
+    historyPreset?.memo ??
+    null;
+
   const hasLaunchPreset = Boolean(
     launchMode ||
     launchFromAccountId ||
     launchToAccountId ||
-    launchCategoryId
+    launchCategoryId ||
+    launchAmount !== null ||
+    launchPaymentMethodId ||
+    launchSpendingTarget ||
+    launchDescription ||
+    launchMemo
   );
 
   const initialDraft =
@@ -777,9 +808,11 @@ export default function InputPage({
     setAmount
   ] =
     useState(
-      hasLaunchPreset
-        ? ""
-        : initialDraft?.amount || ""
+      launchAmount !== null
+        ? String(launchAmount)
+        : hasLaunchPreset
+          ? ""
+          : initialDraft?.amount || ""
     );
 
   const [
@@ -796,9 +829,10 @@ export default function InputPage({
     setPaymentMethodId
   ] =
     useState(
-      hasLaunchPreset
+      launchPaymentMethodId ||
+      (hasLaunchPreset
         ? ""
-        : initialDraft?.paymentMethodId || ""
+        : initialDraft?.paymentMethodId || "")
     );
 
   const [
@@ -806,9 +840,10 @@ export default function InputPage({
     setSpendingTarget
   ] =
     useState(
-      hasLaunchPreset
+      launchSpendingTarget ||
+      (hasLaunchPreset
         ? ""
-        : initialDraft?.spendingTarget || ""
+        : initialDraft?.spendingTarget || "")
     );
 
   const [
@@ -850,13 +885,38 @@ export default function InputPage({
       if (launchCategoryId) {
         setCategoryId(launchCategoryId);
       }
+
+      if (launchAmount !== null) {
+        setAmount(String(launchAmount));
+      }
+
+      if (launchPaymentMethodId) {
+        setPaymentMethodId(launchPaymentMethodId);
+      }
+
+      if (launchSpendingTarget) {
+        setSpendingTarget(launchSpendingTarget);
+      }
+
+      if (launchDescription !== null) {
+        setDescription(launchDescription);
+      }
+
+      if (launchMemo !== null) {
+        setMemo(launchMemo);
+      }
     },
     [
       hasLaunchPreset,
       launchMode,
       launchFromAccountId,
       launchToAccountId,
-      launchCategoryId
+      launchCategoryId,
+      launchAmount,
+      launchPaymentMethodId,
+      launchSpendingTarget,
+      launchDescription,
+      launchMemo
     ]
   );
 
@@ -879,9 +939,11 @@ export default function InputPage({
     setDescription
   ] =
     useState(
-      hasLaunchPreset
-        ? ""
-        : initialDraft?.description || ""
+      launchDescription !== null
+        ? launchDescription
+        : hasLaunchPreset
+          ? ""
+          : initialDraft?.description || ""
     );
 
   const [
@@ -889,9 +951,11 @@ export default function InputPage({
     setMemo
   ] =
     useState(
-      hasLaunchPreset
-        ? ""
-        : initialDraft?.memo || ""
+      launchMemo !== null
+        ? launchMemo
+        : hasLaunchPreset
+          ? ""
+          : initialDraft?.memo || ""
     );
 
   const [
@@ -1236,6 +1300,55 @@ export default function InputPage({
       return () => {
         active =
           false;
+      };
+    },
+    []
+  );
+
+  useEffect(
+    () => {
+      let active = true;
+
+      const unsubscribe = subscribeLedgerChanges(
+        () => {
+          const generation = getBootstrapCacheGeneration();
+
+          if (bootstrapSnapshotGeneration === generation) {
+            return;
+          }
+
+          void loadBootstrap()
+            .then(data => {
+              if (!active) return null;
+
+              setBootstrap(data);
+              setBootstrapError("");
+
+              return apiRequest<AccountsResponse>(
+                `/api/accounts?includeDeleted=false&_=${Date.now()}`,
+                { cache: "no-store" }
+              );
+            })
+            .then(response => {
+              if (
+                active &&
+                response?.success &&
+                response.data
+              ) {
+                setFreshHouseholdAccounts(response.data.items || []);
+              }
+            })
+            .catch(loadError => {
+              if (active) {
+                setBootstrapError(getErrorMessage(loadError));
+              }
+            });
+        }
+      );
+
+      return () => {
+        active = false;
+        unsubscribe();
       };
     },
     []
@@ -2899,7 +3012,7 @@ export default function InputPage({
           benefitPreview &&
           rewardUsed > benefitPreview.rewardBalanceBefore
         ) {
-          return `사용 가능한 캐시백은 ${Math.round(benefitPreview.rewardBalanceBefore).toLocaleString("ko-KR")}원입니다.`;
+          return `사용 가능한 캐시백은 ${formatMoney(benefitPreview.rewardBalanceBefore)}입니다.`;
         }
       }
     }
@@ -2945,7 +3058,7 @@ export default function InputPage({
         }
 
         if (numericAmount < loanRepaymentPrincipal) {
-          return `총 상환액은 원금 ${Math.round(loanRepaymentPrincipal).toLocaleString("ko-KR")}원 이상이어야 합니다.`;
+          return `총 상환액은 원금 ${formatMoney(loanRepaymentPrincipal)} 이상이어야 합니다.`;
         }
 
         if (loanRepaymentInterest > 0 && !spendingTarget) {
@@ -3167,7 +3280,7 @@ export default function InputPage({
     if (principal > 0 && principalCategory) {
       enqueuePendingTransaction({
         owner: userName,
-        label: `대출 원금 · ${principal.toLocaleString("ko-KR")}원 · ${loanLabel}`,
+        label: `대출 원금 · ${formatMoney(principal)} · ${loanLabel}`,
         payload: {
           date,
           type: "이체",
@@ -3186,7 +3299,7 @@ export default function InputPage({
     if (interest > 0 && interestCategory) {
       enqueuePendingTransaction({
         owner: userName,
-        label: `대출 이자 · ${interest.toLocaleString("ko-KR")}원 · ${loanLabel}`,
+        label: `대출 이자 · ${formatMoney(interest)} · ${loanLabel}`,
         payload: {
           date,
           type: "지출",
@@ -3212,7 +3325,7 @@ export default function InputPage({
     setMemo("");
     setBenefitRewardUsedAmount("");
     requestMemory.current = null;
-    setSuccess(`대출 상환 ${total.toLocaleString("ko-KR")}원 저장 대기열에 추가했습니다.`);
+    setSuccess(`대출 상환 ${formatMoney(total)} 저장 대기열에 추가했습니다.`);
   }
 
   function buildPayload(
@@ -3365,7 +3478,7 @@ export default function InputPage({
     if (
       possibleDuplicate &&
       !window.confirm(
-        `같은 날짜에 ${numericAmount.toLocaleString("ko-KR")}원 ${backendType} 내역이 이미 있습니다.\n\n중복이 아니라면 그대로 저장하세요.`
+        `같은 날짜에 ${formatMoney(numericAmount)} ${backendType} 내역이 이미 있습니다.\n\n중복이 아니라면 그대로 저장하세요.`
       )
     ) {
       return;
@@ -3468,7 +3581,7 @@ export default function InputPage({
     const queueLabel =
       [
         savedLabel,
-        `${Number(amount).toLocaleString("ko-KR")}원`,
+        formatMoney(Number(amount)),
         categoryLabel
       ]
         .filter(Boolean)
@@ -3600,18 +3713,13 @@ export default function InputPage({
               styles.submitArea
             }
           >
-            <button
-              type="button"
-              className={
-                styles.submitButton
-              }
-              onClick={
-                () =>
-                  window.location.reload()
-              }
+            <Button
+              fullWidth
+              size="xl"
+              onClick={() => window.location.reload()}
             >
               다시 시도
-            </button>
+            </Button>
           </div>
         </div>
       </main>
@@ -4136,7 +4244,7 @@ export default function InputPage({
                       <>
                         <div className={styles.benefitRewardBalance}>
                           <span>보유 캐시백</span>
-                          <strong>{Math.round(benefitPreview.rewardBalanceBefore).toLocaleString("ko-KR")}원</strong>
+                          <strong><Money amount={benefitPreview.rewardBalanceBefore} /></strong>
                         </div>
 
                         <label className={styles.benefitRewardField}>
@@ -4158,9 +4266,9 @@ export default function InputPage({
                               />
                               <span>원</span>
                             </div>
-                            <button
-                              type="button"
-                              className={styles.benefitRewardAllButton}
+                            <Button
+                              variant="secondary"
+                              size="sm"
                               disabled={submitting || benefitPreview.maxRewardUsable <= 0}
                               onClick={() =>
                                 handleBenefitRewardUseChange(
@@ -4169,17 +4277,17 @@ export default function InputPage({
                               }
                             >
                               전액 사용
-                            </button>
+                            </Button>
                           </div>
                         </label>
 
                         {Number(amount) > 0 && (
                           <div className={styles.benefitSummary}>
-                            <span>결제 금액 {Math.round(benefitPreview.faceAmount).toLocaleString("ko-KR")}원</span>
-                            <span>캐시백 사용 -{Math.round(benefitPreview.rewardUsedAmount).toLocaleString("ko-KR")}원</span>
-                            <span>새 적립 대상 {Math.round(benefitPreview.eligibleAmount).toLocaleString("ko-KR")}원</span>
-                            <strong>새 캐시백 +{Math.round(benefitPreview.benefitAmount).toLocaleString("ko-KR")}원</strong>
-                            <span>거래 후 예상 캐시백 {Math.round(benefitPreview.rewardBalanceAfter).toLocaleString("ko-KR")}원</span>
+                            <span>결제 금액 <Money amount={benefitPreview.faceAmount} /></span>
+                            <span>캐시백 사용 <Money amount={-benefitPreview.rewardUsedAmount} /></span>
+                            <span>새 적립 대상 <Money amount={benefitPreview.eligibleAmount} /></span>
+                            <strong>새 캐시백 <Money amount={benefitPreview.benefitAmount} showPlus /></strong>
+                            <span>거래 후 예상 캐시백 <Money amount={benefitPreview.rewardBalanceAfter} /></span>
                           </div>
                         )}
                       </>
@@ -4192,7 +4300,7 @@ export default function InputPage({
                     <p className={styles.benefitMuted}>
                       사용한 캐시백 금액에는 새 캐시백이 붙지 않고, 나머지 결제금액에만 설정한 비율을 적용합니다. 새로 적립된 캐시백은 즉시 보유액에 더해지며 나중에 사용해도 됩니다.
                       {selectedBenefitRule.monthlyCap !== null
-                        ? ` 월 혜택 한도 ${Math.round(selectedBenefitRule.monthlyCap).toLocaleString("ko-KR")}원도 자동 반영합니다.`
+                        ? ` 월 혜택 한도 ${formatMoney(selectedBenefitRule.monthlyCap)}도 자동 반영합니다.`
                         : ""}
                     </p>
                   </div>
@@ -4329,7 +4437,7 @@ export default function InputPage({
                         handleAmountChange(event.target.value)
                       }
                     />
-                    <span className={styles.amountUnit}>원</span>
+                    <span className={styles.currency}>원</span>
                   </div>
                 </label>
 
@@ -4371,9 +4479,9 @@ export default function InputPage({
                 </div>
 
                 <div className={styles.cardBillingBox}>
-                  <span>총 상환액 {loanRepaymentTotal.toLocaleString("ko-KR")}원</span>
-                  <span>원금 {loanRepaymentPrincipal.toLocaleString("ko-KR")}원</span>
-                  <strong>이자 {loanRepaymentInterest.toLocaleString("ko-KR")}원</strong>
+                  <span>총 상환액 <Money amount={loanRepaymentTotal} /></span>
+                  <span>원금 <Money amount={loanRepaymentPrincipal} /></span>
+                  <strong>이자 <Money amount={loanRepaymentInterest} /></strong>
                   <small>원금만 대출잔액을 줄이고, 총 상환액에서 원금을 뺀 금액은 대출이자 지출로 기록됩니다.</small>
                 </div>
 
@@ -4515,9 +4623,9 @@ export default function InputPage({
 
                     {benefitEnabled && benefitPreview && (
                       <div className={styles.benefitSummary}>
-                        <span>충전 금액 {Math.round(benefitPreview.faceAmount).toLocaleString("ko-KR")}원</span>
-                        <strong>선할인 -{Math.round(benefitPreview.benefitAmount).toLocaleString("ko-KR")}원</strong>
-                        <span>실제 출금 {Math.round(benefitPreview.actualAmount).toLocaleString("ko-KR")}원</span>
+                        <span>충전 금액 <Money amount={benefitPreview.faceAmount} /></span>
+                        <strong>선할인 <Money amount={-benefitPreview.benefitAmount} /></strong>
+                        <span>실제 출금 <Money amount={benefitPreview.actualAmount} /></span>
                       </div>
                     )}
 
@@ -4532,7 +4640,7 @@ export default function InputPage({
                     <p className={styles.benefitMuted}>
                       받는 계좌에는 입력한 충전 금액 전체가 들어가고, 보내는 계좌에서는 선할인을 뺀 실제 금액만 출금되도록 자동 기록합니다.
                       {selectedBenefitRule.monthlyCap !== null
-                        ? ` 월 혜택 한도 ${Math.round(selectedBenefitRule.monthlyCap).toLocaleString("ko-KR")}원도 자동 반영합니다.`
+                        ? ` 월 혜택 한도 ${formatMoney(selectedBenefitRule.monthlyCap)}도 자동 반영합니다.`
                         : ""}
                     </p>
                   </div>
@@ -4683,9 +4791,9 @@ export default function InputPage({
 
                   {!cardBillingLoading && cardBillingInfo && (
                     <div className={styles.cardBillingBox}>
-                      <span>사용 {Math.round(cardBillingInfo.usage).toLocaleString("ko-KR")}원</span>
-                      <span>기결제 {Math.round(cardBillingInfo.payments).toLocaleString("ko-KR")}원</span>
-                      <strong>남은 결제액 {Math.round(cardBillingInfo.estimatedRemaining).toLocaleString("ko-KR")}원</strong>
+                      <span>사용 <Money amount={cardBillingInfo.usage} /></span>
+                      <span>기결제 <Money amount={cardBillingInfo.payments} /></span>
+                      <strong>남은 결제액 <Money amount={cardBillingInfo.estimatedRemaining} /></strong>
                       <small>남은 결제액을 아래 결제 금액에 자동 입력했습니다. 필요하면 직접 수정할 수 있습니다.</small>
                     </div>
                   )}
@@ -4880,11 +4988,9 @@ export default function InputPage({
 
                   {
                     failedTransactions.length > 1 && (
-                      <button
-                        type="button"
-                        className={
-                          styles.queueRetryButton
-                        }
+                      <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={
                           () =>
                             retryAllFailedPendingTransactions(
@@ -4893,7 +4999,7 @@ export default function InputPage({
                         }
                       >
                         모두 다시 시도
-                      </button>
+                      </Button>
                     )
                   }
                 </div>
@@ -4938,11 +5044,9 @@ export default function InputPage({
                           >
                             {
                               item.failureKind !== "network" && (
-                                <button
-                                  type="button"
-                                  className={
-                                    styles.queueEditButton
-                                  }
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
                                   onClick={
                                     () =>
                                       loadFailedTransactionForEdit(
@@ -4951,14 +5055,12 @@ export default function InputPage({
                                   }
                                 >
                                   수정
-                                </button>
+                                </Button>
                               )
                             }
-                            <button
-                              type="button"
-                              className={
-                                styles.queueRetryButton
-                              }
+                            <Button
+                              variant="secondary"
+                              size="sm"
                               onClick={
                                 () =>
                                   retryPendingTransaction(
@@ -4968,12 +5070,10 @@ export default function InputPage({
                               }
                             >
                               다시 시도
-                            </button>
-                            <button
-                              type="button"
-                              className={
-                                styles.queueDiscardButton
-                              }
+                            </Button>
+                            <Button
+                              variant="dangerSoft"
+                              size="sm"
                               onClick={
                                 () => {
                                   if (
@@ -4990,7 +5090,7 @@ export default function InputPage({
                               }
                             >
                               삭제
-                            </button>
+                            </Button>
                           </div>
                         </div>
                       )
@@ -5031,27 +5131,21 @@ export default function InputPage({
               styles.submitArea
             }
           >
-            <button
+            <Button
               type="submit"
-              className={
-                styles.submitButton
-              }
-              disabled={
-                submitting
-              }
+              fullWidth
+              size="xl"
+              loading={submitting}
+              loadingLabel="저장 중..."
             >
-              {
-                `${
-                  isLoanRepayment
-                    ? "대출 상환"
-                    : isCardTransfer
-                      ? cardTransferLabel
-                      : getModeLabel(
-                          mode
-                        )
-                } 저장`
-              }
-            </button>
+              {`${
+                isLoanRepayment
+                  ? "대출 상환"
+                  : isCardTransfer
+                    ? cardTransferLabel
+                    : getModeLabel(mode)
+              } 저장`}
+            </Button>
           </div>
         </section>
       </form>
@@ -5073,14 +5167,16 @@ export default function InputPage({
             <div className={styles.sheetHandle} aria-hidden="true" />
             <div className={styles.sheetHeader}>
               <h2>{getPickerTitle(activePicker)}</h2>
-              <button
-                type="button"
+              <Button
+                variant="soft"
+                size="sm"
+                iconOnly
                 className={styles.sheetClose}
                 aria-label="닫기"
                 onClick={() => setActivePicker(null)}
               >
                 ×
-              </button>
+              </Button>
             </div>
 
             <div className={styles.sheetList}>

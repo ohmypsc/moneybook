@@ -15,6 +15,10 @@ import type {
   InvestmentTrade
 } from "../../../types/investment";
 
+import { Button } from "../../common/Button/Button";
+import { Card } from "../../common/Card/Card";
+import { formatMoney } from "../../common/Money/Money";
+
 import styles
   from "./InvestmentTradeHistory.module.css";
 
@@ -48,22 +52,12 @@ function formatCurrency(
   if (
     value === null ||
     value === undefined ||
-    !Number.isFinite(
-      value
-    )
+    !Number.isFinite(value)
   ) {
     return "-";
   }
 
-  return (
-    Math.round(
-      value
-    )
-      .toLocaleString(
-        "ko-KR"
-      ) +
-    "원"
-  );
+  return formatMoney(value);
 }
 
 
@@ -76,30 +70,13 @@ function formatSignedCurrency(
   if (
     value === null ||
     value === undefined ||
-    !Number.isFinite(
-      value
-    )
+    !Number.isFinite(value)
   ) {
     return "-";
   }
 
-  const sign =
-    value > 0
-      ? "+"
-      : "";
-
-  return (
-    sign +
-    Math.round(
-      value
-    )
-      .toLocaleString(
-        "ko-KR"
-      ) +
-    "원"
-  );
+  return formatMoney(value, { showPlus: true });
 }
-
 
 function formatQuantity(
   value:
@@ -1372,11 +1349,9 @@ export default function InvestmentTradeHistory({
                               styles.rowActions
                             }
                           >
-                            <button
-                              type="button"
-                              className={
-                                styles.editButton
-                              }
+                            <Button
+                              variant="secondary"
+                              size="sm"
                               onClick={
                                 () =>
                                   beginEdit(
@@ -1388,28 +1363,23 @@ export default function InvestmentTradeHistory({
                               }
                             >
                               수정
-                            </button>
+                            </Button>
 
 
-                            <button
-                              type="button"
-                              className={
-                                styles.deleteButton
-                              }
+                            <Button
+                              variant="dangerSoft"
+                              size="sm"
+                              loading={isDeleting}
+                              loadingLabel="삭제 중..."
                               onClick={
                                 () =>
                                   void handleDelete(
                                     trade
                                   )
                               }
-                              disabled={
-                                isDeleting
-                              }
                             >
-                              {isDeleting
-                                ? "삭제 중..."
-                                : "삭제"}
-                            </button>
+                              삭제
+                            </Button>
                           </div>
                         )}
 
@@ -1420,35 +1390,31 @@ export default function InvestmentTradeHistory({
                             styles.rowActions
                           }
                         >
-                          <button
-                            type="button"
-                            className={
-                              styles.restoreButton
-                            }
+                          <Button
+                            variant="soft"
+                            size="sm"
+                            loading={isRestoring}
+                            loadingLabel="복원 중..."
                             onClick={
                               () =>
                                 void handleRestore(
                                   trade
                                 )
                             }
-                            disabled={
-                              isRestoring
-                            }
                           >
-                            {isRestoring
-                              ? "복원 중..."
-                              : "거래 복원"}
-                          </button>
+                            거래 복원
+                          </Button>
                         </div>
                       )}
 
 
                       {isEditing &&
                         !trade.isDeleted && (
-                          <div
-                            className={
-                              styles.editPanel
-                            }
+                          <Card
+                            padding="sm"
+                            tone="soft"
+                            shadow="none"
+                            className={styles.editPanel}
                           >
                             <div
                               className={
@@ -1743,11 +1709,9 @@ export default function InvestmentTradeHistory({
                                 styles.editActions
                               }
                             >
-                              <button
-                                type="button"
-                                className={
-                                  styles.cancelButton
-                                }
+                              <Button
+                                variant="secondary"
+                                size="sm"
                                 onClick={
                                   cancelEdit
                                 }
@@ -1756,30 +1720,24 @@ export default function InvestmentTradeHistory({
                                 }
                               >
                                 취소
-                              </button>
+                              </Button>
 
 
-                              <button
-                                type="button"
-                                className={
-                                  styles.saveButton
-                                }
+                              <Button
+                                size="sm"
+                                loading={isSaving}
+                                loadingLabel="저장 중..."
                                 onClick={
                                   () =>
                                     void handleSaveEdit(
                                       trade
                                     )
                                 }
-                                disabled={
-                                  isSaving
-                                }
                               >
-                                {isSaving
-                                  ? "저장 중..."
-                                  : "수정 저장"}
-                              </button>
+                                수정 저장
+                              </Button>
                             </div>
-                          </div>
+                          </Card>
                         )}
                     </li>
                   );
