@@ -11,11 +11,12 @@ export interface MoneybookBackupPayload {
   investmentTrades: unknown[];
   investmentCash: unknown;
   benefitRewardUsage?: unknown[];
+  realEstateAssets?: unknown[];
 }
 
 export interface MoneybookBackupDocument {
   format: "moneybook-backup";
-  version: 1 | 2;
+  version: 1 | 2 | 3;
   exportedAt: string;
   payload: MoneybookBackupPayload;
 }
@@ -23,7 +24,7 @@ export interface MoneybookBackupDocument {
 export function createBackupDocument(
   payload: MoneybookBackupPayload,
   exportedAt = new Date().toISOString(),
-  version: 1 | 2 = 2
+  version: 1 | 2 | 3 = 3
 ): MoneybookBackupDocument {
   return {
     format: "moneybook-backup",
@@ -49,7 +50,7 @@ export function parseMoneybookBackupText(text: string): MoneybookBackupDocument 
   if (candidate.format !== "moneybook-backup") {
     throw new Error("Moneybook 백업 파일이 아닙니다.");
   }
-  if (candidate.version !== 1 && candidate.version !== 2) {
+  if (candidate.version !== 1 && candidate.version !== 2 && candidate.version !== 3) {
     throw new Error(`지원하지 않는 백업 버전입니다: ${String(candidate.version ?? "")}`);
   }
   if (!candidate.payload || typeof candidate.payload !== "object") {

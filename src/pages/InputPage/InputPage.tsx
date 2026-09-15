@@ -25,6 +25,7 @@ import { InputPickerSheet } from "./InputPickerSheet";
 import { InputModeTabs } from "./InputModeTabs";
 import { PickerFieldButton } from "./PickerFieldButton";
 import { InvestmentInputSection } from "./InvestmentInputSection";
+import { TransactionImportSheet } from "../../features/importTransactions/TransactionImportSheet";
 import { Money, formatMoney } from "../../components/common/Money/Money";
 import type {
   DashboardData,
@@ -402,6 +403,8 @@ export default function InputPage({
       initialDraft?.mode ||
       "expense"
     );
+
+  const [showTransactionImport, setShowTransactionImport] = useState(false);
 
   const [
     date,
@@ -2906,9 +2909,25 @@ export default function InputPage({
     >
       <header className={styles.header}>
         <h1 className={styles.title}>거래 입력</h1>
+        <Button
+          variant="secondary"
+          size="sm"
+          type="button"
+          onClick={() => setShowTransactionImport(true)}
+        >
+          거래 내역 가져오기
+        </Button>
       </header>
 
       <InputModeTabs value={mode} onChange={handleModeChange} />
+
+      {showTransactionImport && (
+        <TransactionImportSheet
+          userName={userName}
+          bootstrap={bootstrap}
+          onClose={() => setShowTransactionImport(false)}
+        />
+      )}
 
       {mode === "investment" ? (
         <InvestmentInputSection

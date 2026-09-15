@@ -1,0 +1,27 @@
+.section { display: grid; gap: var(--space-4); }
+.heading { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-3); }
+.heading h2, .formHeading h3 { margin: 0; }
+.heading p { margin: 4px 0 0; color: var(--color-text-subtle); font-size: 13px; }
+.list { display: grid; gap: var(--space-3); }
+.assetCard { display: grid; gap: var(--space-3); }
+.assetTop { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-3); }
+.assetName { display: block; font-size: 17px; }
+.assetMeta, .details span, .trades span { display: block; color: var(--color-text-subtle); font-size: 13px; line-height: 1.55; }
+.value { white-space: nowrap; font-size: 18px; }
+.details, .trades { display: grid; gap: 3px; }
+.trades { padding-top: var(--space-2); border-top: 1px solid var(--color-border); }
+.actions, .formActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
+.formCard { display: grid; gap: var(--space-4); }
+.formHeading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.formGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.formGrid label { display: grid; gap: 6px; font-size: 13px; font-weight: 700; }
+.formGrid input, .formGrid select { width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); color: inherit; font: inherit; }
+.full { grid-column: 1 / -1; }
+.inline { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2); }
+.regionResults { display: grid; gap: 6px; }
+.regionResults button { display: flex; justify-content: space-between; gap: var(--space-2); padding: 10px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface-soft); color: inherit; text-align: left; cursor: pointer; }
+.regionResults small { color: var(--color-text-subtle); }
+.message { margin: 0; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--color-surface-soft); font-size: 13px; }
+.error { margin: 0; color: var(--color-danger); }
+.muted { margin: 0; color: var(--color-text-subtle); }
+@media (max-width: 640px) { .heading, .assetTop { align-items: stretch; } .assetTop { flex-direction: column; } .formGrid { grid-template-columns: 1fr; } .full { grid-column: auto; } .inline { grid-template-columns: 1fr; } }

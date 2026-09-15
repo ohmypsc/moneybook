@@ -7,7 +7,7 @@ import {
   validateBackupDocument
 } from "../worker/domain/backupRestore.js";
 
-function sample(version = 2) {
+function sample(version = 3) {
   return {
     format: "moneybook-backup",
     version,
@@ -26,24 +26,36 @@ function sample(version = 2) {
       investmentHoldings: [],
       investmentTrades: [],
       investmentCash: null,
-      benefitRewardUsage: []
+      benefitRewardUsage: [],
+      realEstateAssets: [{ propertyId: "RE1", name: "우리집", propertyType: "아파트", address: "세종", lawdCode: "36110", apartmentName: "두루마을", exclusiveAreaSqm: 84.9, valuationMode: "manual", manualValueKrw: 500000000 }]
     }
   };
 }
 
-test("valid version 2 backup returns counts", () => {
+test("valid version 3 backup returns counts", () => {
   const result = validateBackupDocument(sample());
   assert.equal(result.summary.transactions, 1);
-  assert.equal(result.summary.totalRecords, 4);
+  assert.equal(result.summary.realEstateAssets, 1);
+  assert.equal(result.summary.totalRecords, 5);
   assert.deepEqual(result.warnings, []);
 });
 
 test("version 1 backup is supported with a benefit warning", () => {
   const document = sample(1);
   delete document.payload.benefitRewardUsage;
+  delete document.payload.realEstateAssets;
   const result = validateBackupDocument(document);
   assert.equal(result.version, 1);
   assert.match(result.warnings[0], /혜택 사용 누계/);
+});
+
+
+test("version 2 backup remains supported without real estate", () => {
+  const document = sample(2);
+  delete document.payload.realEstateAssets;
+  const result = validateBackupDocument(document);
+  assert.equal(result.version, 2);
+  assert.equal(result.summary.realEstateAssets, 0);
 });
 
 test("duplicate transaction ids are rejected", () => {

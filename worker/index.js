@@ -45,6 +45,27 @@ import {
   searchInvestmentSymbols
 } from "./investmentSymbols.js";
 
+import {
+  chooseCategory as mbImportChooseCategory,
+  choosePaymentMethod as mbImportChoosePaymentMethod,
+  findDuplicateTransaction as mbImportFindDuplicate
+} from "./domain/transactionImport.js";
+
+import {
+  analyzeTransactionImport
+} from "./transactionImport.js";
+
+import {
+  deleteRealEstateAsset,
+  ensureRealEstateSchema,
+  listRealEstateAssets,
+  realEstateSummary,
+  refreshAllRealEstateAssets,
+  refreshRealEstateAsset,
+  resolveLegalRegion,
+  saveRealEstateAsset
+} from "./realEstate.js";
+
 /**
  * 우리 가계부 Cloudflare Worker
  * - 미영·승철 로그인과 400일 슬라이딩 세션
@@ -2467,7 +2488,8 @@ async function mbD1BuildDashboard(env, monthValue = "") {
   if (!mbD1MonthOnly(month)) mbD1Fail("INVALID_MONTH", "month는 YYYY-MM 형식이어야 합니다.");
   const data = await mbD1LoadFinancialData(env);
   const { accounts, transactions, holdings, trades, investment } = data;
-  let assets = 0;
+  const realEstate = realEstateSummary(await listRealEstateAssets(env, MB_D1_HOUSEHOLD_ID, false));
+  let assets = realEstate.totalValueKrw;
   let liabilities = 0;
   let investmentValue = 0;
   let cashLikeValue = 0;
@@ -2588,6 +2610,8 @@ async function mbD1BuildDashboard(env, monthValue = "") {
       netWorth: mbD1Round(assets - liabilities, 2),
       investmentValue: mbD1Round(investmentValue, 2),
       cashLikeValue: mbD1Round(cashLikeValue, 2),
+      realEstateValue: mbD1Round(realEstate.totalValueKrw, 2),
+      realEstateCount: realEstate.count,
       monthIncome: stats.income,
       monthIncomeGross: stats.incomeGross,
       monthIncomeReversals: stats.incomeReversals,
@@ -2602,6 +2626,7 @@ async function mbD1BuildDashboard(env, monthValue = "") {
     cards,
     monthlyTrend: trend,
     recentTransactions,
+    realEstate,
     investments: {
       totalAccountValue: mbD1Round(investment.accounts.reduce((sum, item) => sum + item.accountValueKrw, 0), 2),
       cashTotal: mbD1Round(investment.accounts.reduce((sum, item) => sum + (item.currentCashKrw ?? 0), 0), 2),
@@ -4929,7 +4954,8 @@ async function mbD1BuildBackupDocument(env) {
     holdingRows,
     tradeRows,
     benefitUsageRows,
-    investmentCash
+    investmentCash,
+    realEstateAssets
   ] = await Promise.all([
     mbD1BuildBootstrap(env),
     mbD1All(env, "SELECT * FROM categories WHERE household_id=? ORDER BY category_id", [MB_D1_HOUSEHOLD_ID]),
@@ -4939,7 +4965,8 @@ async function mbD1BuildBackupDocument(env) {
     mbD1All(env, `SELECT h.*, a.display_name AS account_name FROM holdings h LEFT JOIN accounts a ON a.account_id=h.account_id WHERE h.household_id=? ORDER BY h.holding_id`, [MB_D1_HOUSEHOLD_ID]),
     mbD1All(env, `SELECT t.*, a.display_name AS account_name FROM investment_trades t LEFT JOIN accounts a ON a.account_id=t.account_id WHERE t.household_id=? ORDER BY t.trade_date,t.investment_trade_id`, [MB_D1_HOUSEHOLD_ID]),
     mbD1All(env, "SELECT transaction_id,rule_id,account_id,used_amount,created_at,updated_at FROM benefit_reward_usage WHERE household_id=? ORDER BY transaction_id", [MB_D1_HOUSEHOLD_ID]),
-    mbD1GetInvestmentCashData(env, new URL("https://moneybook.internal/api/investments/cash"))
+    mbD1GetInvestmentCashData(env, new URL("https://moneybook.internal/api/investments/cash")),
+    listRealEstateAssets(env, MB_D1_HOUSEHOLD_ID, true)
   ]);
 
   const categories = categoryRows.map((row) => ({
@@ -5012,7 +5039,7 @@ async function mbD1BuildBackupDocument(env) {
 
   return {
     format: "moneybook-backup",
-    version: 2,
+    version: 3,
     exportedAt: mbD1Now(),
     payload: {
       bootstrap,
@@ -5023,12 +5050,14 @@ async function mbD1BuildBackupDocument(env) {
       investmentHoldings,
       investmentTrades,
       investmentCash,
-      benefitRewardUsage
+      benefitRewardUsage,
+      realEstateAssets
     }
   };
 }
 
 async function mbD1BackupCurrentIdSets(env) {
+  await ensureRealEstateSchema(env);
   const tableSpecs = [
     ["categories", "category_id", "categories"],
     ["accounts", "account_id", "accounts"],
@@ -5036,7 +5065,8 @@ async function mbD1BackupCurrentIdSets(env) {
     ["holdings", "holding_id", "investmentHoldings"],
     ["investment_trades", "investment_trade_id", "investmentTrades"],
     ["asset_snapshots", "month", "assetSnapshots"],
-    ["benefit_reward_usage", "transaction_id", "benefitRewardUsage"]
+    ["benefit_reward_usage", "transaction_id", "benefitRewardUsage"],
+    ["real_estate_assets", "property_id", "realEstateAssets"]
   ];
   const entries = await Promise.all(tableSpecs.map(async ([table, column, key]) => {
     const rows = await mbD1All(env, `SELECT ${column} AS id FROM ${table} WHERE household_id=?`, [MB_D1_HOUSEHOLD_ID]);
@@ -5086,6 +5116,7 @@ async function mbD1AssertBackupRequestIdCompatibility(validated, env) {
 
 async function mbD1PreviewBackupRestore(document, env) {
   await mbD1EnsureBenefitUsageSchema(env);
+  await ensureRealEstateSchema(env);
   const validated = validateBackupDocument(document);
   await mbD1AssertBackupRequestIdCompatibility(validated, env);
   const current = await mbD1BackupCurrentIdSets(env);
@@ -5097,7 +5128,8 @@ async function mbD1PreviewBackupRestore(document, env) {
     ["investmentHoldings", payload.investmentHoldings, "holdingId"],
     ["investmentTrades", payload.investmentTrades, "investmentTradeId"],
     ["assetSnapshots", payload.assetSnapshots, "month"],
-    ["benefitRewardUsage", validated.version >= 2 ? (payload.benefitRewardUsage || []) : [], "transactionId"]
+    ["benefitRewardUsage", validated.version >= 2 ? (payload.benefitRewardUsage || []) : [], "transactionId"],
+    ["realEstateAssets", validated.version >= 3 ? (payload.realEstateAssets || []) : [], "propertyId"]
   ];
   const existing = {};
   const additions = {};
@@ -5158,6 +5190,7 @@ async function mbD1RestoreBackupMerge(document, session, env) {
   const now = mbD1Now();
   const actor = session?.name || "restore";
   await mbD1EnsureBenefitUsageSchema(env);
+  await ensureRealEstateSchema(env);
   await mbD1AssertBackupRequestIdCompatibility(validated, env);
 
   let restoreStarted = false;
@@ -5328,6 +5361,33 @@ async function mbD1RestoreBackupMerge(document, session, env) {
     await mbD1RunBackupBatches(env, usageStatements);
   }
 
+  if (validated.version >= 3) {
+    const realEstateStatements = (payload.realEstateAssets || []).map((item) => env.DB.prepare(
+      `INSERT INTO real_estate_assets (
+        property_id,household_id,name,property_type,address,lawd_code,apartment_name,exclusive_area_sqm,floor,owner_label,purchase_price_krw,
+        valuation_mode,manual_value_krw,estimated_value_krw,estimate_low_krw,estimate_high_krw,estimate_trade_count,estimate_updated_at,last_trade_date,recent_trades_json,
+        created_at,updated_at,created_by,updated_by,deleted_at,deleted_by
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      ON CONFLICT(property_id) DO UPDATE SET
+        name=excluded.name,property_type=excluded.property_type,address=excluded.address,lawd_code=excluded.lawd_code,apartment_name=excluded.apartment_name,
+        exclusive_area_sqm=excluded.exclusive_area_sqm,floor=excluded.floor,owner_label=excluded.owner_label,purchase_price_krw=excluded.purchase_price_krw,
+        valuation_mode=excluded.valuation_mode,manual_value_krw=excluded.manual_value_krw,estimated_value_krw=excluded.estimated_value_krw,
+        estimate_low_krw=excluded.estimate_low_krw,estimate_high_krw=excluded.estimate_high_krw,estimate_trade_count=excluded.estimate_trade_count,
+        estimate_updated_at=excluded.estimate_updated_at,last_trade_date=excluded.last_trade_date,recent_trades_json=excluded.recent_trades_json,
+        updated_at=excluded.updated_at,updated_by=excluded.updated_by,deleted_at=excluded.deleted_at,deleted_by=excluded.deleted_by`
+    ).bind(
+      item.propertyId, MB_D1_HOUSEHOLD_ID, item.name || item.apartmentName || "아파트", item.propertyType || "아파트",
+      item.address || "", item.lawdCode || "", item.apartmentName || item.name || "", mbD1BackupNumber(item.exclusiveAreaSqm),
+      mbD1BackupNullableNumber(item.floor), item.owner || null, mbD1BackupNumber(item.purchasePriceKrw),
+      item.valuationMode === "manual" ? "manual" : "auto", mbD1BackupNullableNumber(item.manualValueKrw),
+      mbD1BackupNumber(item.estimatedValueKrw), mbD1BackupNumber(item.estimateLowKrw), mbD1BackupNumber(item.estimateHighKrw),
+      Math.max(0, Math.floor(mbD1BackupNumber(item.estimateTradeCount))), item.estimateUpdatedAt || null, item.lastTradeDate || null,
+      JSON.stringify(Array.isArray(item.recentTrades) ? item.recentTrades : []), item.createdAt || now, item.updatedAt || now,
+      item.createdBy || actor, item.updatedBy || actor, item.deletedAt || (item.isDeleted ? "1970-01-01T00:00:00.000Z" : null), item.deletedBy || null
+    ));
+    await mbD1RunBackupBatches(env, realEstateStatements);
+  }
+
   const change = await mbD1InsertChange(env, "backup_restore", `restore-${Date.now()}`, "merged", null, session, {
     version: validated.version,
     exportedAt: validated.exportedAt,
@@ -5371,6 +5431,129 @@ async function mbD1RestoreBackupMerge(document, session, env) {
 }
 
 
+
+async function mbD1AnalyzeImportedTransactions(body, session, env) {
+  const categories = (await mbD1All(
+    env,
+    "SELECT * FROM categories WHERE household_id=? AND type='지출' AND deleted_at IS NULL AND is_active=1 ORDER BY name",
+    [MB_D1_HOUSEHOLD_ID]
+  )).map(mbD1MapCategory);
+  const accounts = (await mbD1RawAccounts(env)).map(mbD1MapAccountRow);
+  const paymentMethods = accounts.filter((account) =>
+    account.active && !account.isDeleted && ["신용카드", "체크카드", "선불/지역화폐"].includes(account.subType)
+  );
+  const recentTransactions = (await mbD1AllTransactions(env, false))
+    .filter((item) => item.type === "지출")
+    .sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.createdAt || "").localeCompare(a.createdAt || ""))
+    .slice(0, 800);
+
+  let extracted;
+  try {
+    extracted = await analyzeTransactionImport(env, {
+      text: body.text,
+      images: body.images,
+      today: mbD1CurrentDateSeoul(),
+      categories,
+      paymentMethods
+    });
+  } catch (error) {
+    const rawMessage = error instanceof Error ? error.message : String(error || "");
+    const looksLikeLimit = error?.status === 429 || /(?:429|quota|rate.?limit|neuron|usage.?limit|too many requests)/i.test(rawMessage);
+    if (looksLikeLimit) {
+      mbD1Fail("AI_DAILY_LIMIT", "오늘 사용할 수 있는 AI 분석량을 모두 사용했습니다. 무료 할당량이 초기화된 뒤 다시 이용해주세요.", 429);
+    }
+    const code = error?.code || "AI_ANALYSIS_FAILED";
+    const message = rawMessage || "거래 내역을 분석하지 못했습니다.";
+    mbD1Fail(code, message, code === "AI_NOT_BOUND" ? 503 : 400);
+  }
+
+  const memberNames = (await mbD1Members(env)).map((row) => mbD1Text(row.display_name)).filter(Boolean);
+  const defaultTarget = memberNames.includes(session?.name) ? session.name : "공동";
+  return {
+    model: "@cf/google/gemma-4-26b-a4b-it",
+    items: extracted.map((candidate) => {
+      let paymentMethod = mbImportChoosePaymentMethod(candidate.cardName, paymentMethods);
+      if (!paymentMethod && paymentMethods.length === 1) paymentMethod = paymentMethods[0];
+      const categoryMatch = mbImportChooseCategory(candidate, categories, recentTransactions);
+      const duplicate = candidate.kind === "expense"
+        ? mbImportFindDuplicate(candidate, recentTransactions, paymentMethod?.accountId || null)
+        : null;
+      const reasons = [];
+      if (!candidate.date) reasons.push("날짜 확인 필요");
+      if (!candidate.amount) reasons.push("금액 확인 필요");
+      if (!paymentMethod) reasons.push("결제수단 선택 필요");
+      if (!categoryMatch.category) reasons.push("카테고리 선택 필요");
+      if (duplicate) reasons.push("중복 거래 의심");
+      if (candidate.kind === "refund") reasons.push("취소/환불은 원거래 연결 확인 필요");
+      return {
+        ...candidate,
+        categoryId: categoryMatch.category?.categoryId || null,
+        categoryName: categoryMatch.category?.name || "",
+        categorySuggestionSource: categoryMatch.source,
+        paymentMethodId: paymentMethod?.accountId || null,
+        paymentMethodName: paymentMethod?.displayName || "",
+        spendingTarget: defaultTarget,
+        duplicate: duplicate ? {
+          transactionId: duplicate.transactionId,
+          date: duplicate.date,
+          amount: duplicate.amount,
+          description: duplicate.description,
+          paymentMethod: duplicate.paymentMethod,
+          category: duplicate.category
+        } : null,
+        selected: candidate.kind === "expense" && reasons.length === 0,
+        reviewReasons: reasons
+      };
+    })
+  };
+}
+
+async function mbD1GetRealEstateData(env) {
+  const items = await listRealEstateAssets(env, MB_D1_HOUSEHOLD_ID, false);
+  return realEstateSummary(items);
+}
+
+async function mbD1SaveRealEstate(body, session, env) {
+  let result;
+  try {
+    result = await saveRealEstateAsset(env, MB_D1_HOUSEHOLD_ID, body, session.name, mbD1Now());
+  } catch (error) {
+    mbD1Fail(error?.code || "REAL_ESTATE_SAVE_FAILED", error instanceof Error ? error.message : "부동산 자산을 저장하지 못했습니다.");
+  }
+  const change = await mbD1InsertChange(env, "real_estate", result.item.propertyId, result.created ? "created" : "updated", null, session, {
+    name: result.item.name,
+    currentValueKrw: result.item.currentValueKrw
+  });
+  await env.DB.batch([change]);
+  return result;
+}
+
+async function mbD1DeleteRealEstate(body, session, env) {
+  const propertyId = mbD1Text(body.propertyId);
+  if (!propertyId) mbD1Fail("REAL_ESTATE_ID_REQUIRED", "부동산 자산 ID가 필요합니다.");
+  const result = await deleteRealEstateAsset(env, MB_D1_HOUSEHOLD_ID, propertyId, session.name, mbD1Now());
+  const change = await mbD1InsertChange(env, "real_estate", propertyId, "deleted", null, session, {});
+  await env.DB.batch([change]);
+  return result;
+}
+
+async function mbD1RefreshRealEstate(body, session, env) {
+  const propertyId = mbD1Text(body.propertyId);
+  if (!propertyId) mbD1Fail("REAL_ESTATE_ID_REQUIRED", "부동산 자산 ID가 필요합니다.");
+  let item;
+  try {
+    item = await refreshRealEstateAsset(env, MB_D1_HOUSEHOLD_ID, propertyId, session.name, mbD1Now(), mbD1CurrentDateSeoul());
+  } catch (error) {
+    mbD1Fail(error?.code || "REAL_ESTATE_REFRESH_FAILED", error instanceof Error ? error.message : "아파트 실거래 시세를 갱신하지 못했습니다.", 400);
+  }
+  const change = await mbD1InsertChange(env, "real_estate", propertyId, "refreshed", null, session, {
+    estimatedValueKrw: item.estimatedValueKrw,
+    tradeCount: item.estimateTradeCount
+  });
+  await env.DB.batch([change]);
+  return { refreshed: true, item };
+}
+
 async function mbD1ProductionRoute(request, url, session, env, ctx) {
   const path = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, "") : url.pathname;
   const getPaths = new Set([
@@ -5387,6 +5570,8 @@ async function mbD1ProductionRoute(request, url, session, env, ctx) {
     "/api/investments/holdings",
     "/api/investments/trades",
     "/api/investments/cash",
+    "/api/real-estate",
+    "/api/real-estate/regions",
     "/api/backup/export"
   ]);
   const postPaths = new Set([
@@ -5416,6 +5601,10 @@ async function mbD1ProductionRoute(request, url, session, env, ctx) {
     "/api/investments/trades/update",
     "/api/investments/trades/delete",
     "/api/investments/trades/restore",
+    "/api/import/transactions/analyze",
+    "/api/real-estate/save",
+    "/api/real-estate/delete",
+    "/api/real-estate/refresh",
     "/api/backup/preview",
     "/api/backup/restore"
   ]);
@@ -5457,6 +5646,16 @@ async function mbD1ProductionRoute(request, url, session, env, ctx) {
       }
       if (path === "/api/investments/trades") return mbD1Envelope(await mbD1GetTradesData(env, url));
       if (path === "/api/investments/cash") return mbD1Envelope(await mbD1GetInvestmentCashData(env, url));
+      if (path === "/api/real-estate") return mbD1Envelope(await mbD1GetRealEstateData(env));
+      if (path === "/api/real-estate/regions") {
+        let items;
+        try {
+          items = await resolveLegalRegion(env, mbD1Text(url.searchParams.get("q")));
+        } catch (error) {
+          mbD1Fail(error?.code || "REGION_LOOKUP_FAILED", error instanceof Error ? error.message : "주소의 지역코드를 찾지 못했습니다.", 400);
+        }
+        return mbD1Envelope({ items });
+      }
       if (path === "/api/backup/export") return mbD1Envelope(await mbD1BuildBackupDocument(env));
     }
     if (!isSameOrigin(request)) return errorResponse("INVALID_ORIGIN", "허용되지 않은 요청입니다.", 403);
@@ -5477,6 +5676,10 @@ async function mbD1ProductionRoute(request, url, session, env, ctx) {
     else if (path === "/api/investments/cash-baseline") data = await mbD1HandleCashBaseline(body, session, env);
     else if (path === "/api/investments/holdings/update") data = await mbD1HandleHoldingUpdate(body, session, env);
     else if (path.startsWith("/api/investments/trades")) data = await mbD1HandleTradeMutation(path, body, session, env, ctx);
+    else if (path === "/api/import/transactions/analyze") data = await mbD1AnalyzeImportedTransactions(body, session, env);
+    else if (path === "/api/real-estate/save") data = await mbD1SaveRealEstate(body, session, env);
+    else if (path === "/api/real-estate/delete") data = await mbD1DeleteRealEstate(body, session, env);
+    else if (path === "/api/real-estate/refresh") data = await mbD1RefreshRealEstate(body, session, env);
     else if (path === "/api/backup/preview") data = await mbD1PreviewBackupRestore(body.backup, env);
     else if (path === "/api/backup/restore") {
       if (body.confirm !== "RESTORE_MERGE") mbD1Fail("BACKUP_RESTORE_CONFIRM_REQUIRED", "복원 확인 문구가 올바르지 않습니다.", 400);
@@ -5629,6 +5832,23 @@ export default {
         console.log(
           `[moneybook cron] recurring transactions created: ${result.created.length}`
         );
+      }
+
+      const refreshedHomes = await refreshAllRealEstateAssets(
+        env,
+        MB_D1_HOUSEHOLD_ID,
+        automationSession.name,
+        mbD1Now(),
+        mbD1CurrentDateSeoul()
+      );
+      if (refreshedHomes.length > 0) {
+        if (ctx?.waitUntil) {
+          ctx.waitUntil(mbD1RealtimePoke(env, {
+            path: "/cron/real-estate/refresh",
+            changedBy: automationSession.name
+          }));
+        }
+        console.log(`[moneybook cron] real estate refreshed: ${refreshedHomes.length}`);
       }
     } catch (error) {
       console.error(

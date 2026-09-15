@@ -80,7 +80,8 @@ const COUNT_ROWS: Array<{
   { key: "investmentHoldings", label: "투자 보유종목", previewKey: "investmentHoldings" },
   { key: "investmentTrades", label: "투자 거래", previewKey: "investmentTrades" },
   { key: "assetSnapshots", label: "순자산 기록", previewKey: "assetSnapshots" },
-  { key: "benefitRewardUsage", label: "카드 혜택 사용 누계", previewKey: "benefitRewardUsage" }
+  { key: "benefitRewardUsage", label: "카드 혜택 사용 누계", previewKey: "benefitRewardUsage" },
+  { key: "realEstateAssets", label: "부동산 자산", previewKey: "realEstateAssets" }
 ];
 
 export function BackupRestorePanel() {
@@ -186,7 +187,7 @@ export function BackupRestorePanel() {
       <div className={styles.sectionHeading}>
         <h2>전체 백업 · 복원</h2>
         <p>
-          JSON 백업은 계좌·카테고리·거래·투자·설정·카드 혜택 사용 누계까지 보관합니다.
+          JSON 백업은 계좌·카테고리·거래·투자·부동산·설정·카드 혜택 사용 누계까지 보관합니다.
           복원은 현재 데이터에 안전하게 병합합니다.
         </p>
       </div>

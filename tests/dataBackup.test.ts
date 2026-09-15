@@ -28,7 +28,7 @@ test("backup document carries a stable format/version envelope", () => {
   const backup = createBackupDocument(payload, "2026-09-15T00:00:00.000Z");
 
   assert.equal(backup.format, "moneybook-backup");
-  assert.equal(backup.version, 2);
+  assert.equal(backup.version, 3);
   assert.equal(backup.exportedAt, "2026-09-15T00:00:00.000Z");
   assert.equal(backup.payload.bootstrap.backendVersion, "test");
 });

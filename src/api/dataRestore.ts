@@ -20,12 +20,13 @@ export interface BackupRestoreCounts {
   investmentHoldings: number;
   investmentTrades: number;
   benefitRewardUsage: number;
+  realEstateAssets: number;
   totalRecords: number;
 }
 
 export interface BackupRestorePreview {
   mode: "merge";
-  version: 1 | 2;
+  version: 1 | 2 | 3;
   exportedAt: string | null;
   summary: BackupRestoreCounts;
   existing: Record<string, number>;
@@ -37,7 +38,7 @@ export interface BackupRestorePreview {
 export interface BackupRestoreResult {
   restored: true;
   mode: "merge";
-  version: 1 | 2;
+  version: 1 | 2 | 3;
   exportedAt: string | null;
   summary: BackupRestoreCounts;
   warnings: string[];

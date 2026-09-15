@@ -26,6 +26,8 @@ import InvestmentTradeForm
 import InvestmentTradeHistory
   from "../../components/investment/InvestmentTradeHistory/InvestmentTradeHistory";
 
+import { RealEstatePanel } from "../../components/realEstate/RealEstatePanel";
+
 import {
   AccountSettings
 } from "../SettingsPage/AccountSettings";
@@ -64,6 +66,7 @@ import styles
 type AssetsTab =
   | "cash"
   | "investment"
+  | "realEstate"
   | "liability";
 
 
@@ -1353,7 +1356,7 @@ export default function AssetsPage({
           styles.tabs
         }
         style={{
-          gridTemplateColumns: "repeat(3, minmax(0, 1fr))"
+          gridTemplateColumns: "repeat(4, minmax(0, 1fr))"
         }}
       >
         <button
@@ -1418,6 +1421,34 @@ export default function AssetsPage({
             styles.tabButton,
 
             activeTab ===
+            "realEstate"
+              ? styles
+                  .tabButtonActive
+              : ""
+          ]
+            .filter(
+              Boolean
+            )
+            .join(
+              " "
+            )}
+          onClick={
+            () =>
+              setActiveTab(
+                "realEstate"
+              )
+          }
+        >
+          부동산
+        </button>
+
+
+        <button
+          type="button"
+          className={[
+            styles.tabButton,
+
+            activeTab ===
             "liability"
               ? styles
                   .tabButtonActive
@@ -1440,7 +1471,7 @@ export default function AssetsPage({
         </button>
       </div>
 
-      {ownerOptions.length > 1 && (
+      {activeTab !== "realEstate" && ownerOptions.length > 1 && (
         <div className={styles.ownerFilter} aria-label="명의자 필터">
           {["전체", ...ownerOptions].map(owner => (
             <button
@@ -1918,6 +1949,15 @@ export default function AssetsPage({
             )}
 
         </section>
+      )}
+
+
+      {activeTab === "realEstate" && (
+        <RealEstatePanel
+          userName={userName}
+          owners={ownerOptions}
+          onChanged={() => void loadDashboard(true)}
+        />
       )}
 
 
