@@ -9,7 +9,7 @@
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test tests/*.test.*",
-    "check:worker": "node --check worker/index.js && node --check worker/auth.js && node --check worker/investmentSymbols.js && node --check worker/domain/date.js && node --check worker/domain/automation.js && node --check worker/domain/loginRateLimit.js",
+    "check:worker": "node --check worker/index.js && node --check worker/auth.js && node --check worker/investmentSymbols.js && node --check worker/domain/date.js && node --check worker/domain/automation.js && node --check worker/domain/loginRateLimit.js && node --check worker/domain/transactionSearch.js",
     "check": "npm run typecheck && npm test && npm run check:worker && npm run check:boundaries",
     "preview": "vite preview",
     "deploy": "npm run build && wrangler deploy --config dist/moneybook/wrangler.json",

@@ -28,6 +28,11 @@ import {
 } from "./domain/loginRateLimit.js";
 
 import {
+  buildTransactionSearchWhere,
+  normalizeTransactionPagination
+} from "./domain/transactionSearch.js";
+
+import {
   lookupInvestmentSymbol,
   normalizeInvestmentLookupCode,
   normalizeInvestmentSearchQuery,
@@ -3181,60 +3186,23 @@ async function mbD1GetTransactionsData(env, url) {
     if (!Number.isFinite(amount) || amount < 0) mbD1Fail("INVALID_AMOUNT_FILTER", "amount는 0 이상의 숫자여야 합니다.");
   }
 
-  const rawLimit = Number(url.searchParams.get("limit")) || 0;
-  const rawOffset = Number(url.searchParams.get("offset")) || 0;
-  const limit = Math.max(0, Math.min(1000, Math.floor(rawLimit)));
-  const offset = Math.max(0, Math.floor(rawOffset));
+  const { limit, offset } = normalizeTransactionPagination(
+    url.searchParams.get("limit"),
+    url.searchParams.get("offset")
+  );
 
-  const where = ["t.household_id=?"];
-  const binds = [MB_D1_HOUSEHOLD_ID];
-
-  if (!includeDeleted) where.push("t.deleted_at IS NULL");
-  if (type) {
-    where.push("t.type=?");
-    binds.push(type);
-  }
-  if (categoryId) {
-    where.push("t.category_id=?");
-    binds.push(categoryId);
-  }
-  if (accountId) {
-    where.push("(t.from_account_id=? OR t.to_account_id=? OR t.payment_method_id=?)");
-    binds.push(accountId, accountId, accountId);
-  }
-  if (spendingTarget) {
-    where.push("t.spending_target=?");
-    binds.push(spendingTarget);
-  }
-  if (dateFrom) {
-    where.push("t.date>=?");
-    binds.push(dateFrom);
-  }
-  if (dateTo) {
-    where.push("t.date<=?");
-    binds.push(dateTo);
-  }
-  if (amount !== null) {
-    where.push("ABS(t.amount - ?) <= 0.000001");
-    binds.push(amount);
-  }
-  if (q) {
-    const escaped = q.replace(/[\\%_]/g, (value) => `\\${value}`);
-    const like = `%${escaped}%`;
-    where.push(`LOWER(
-      COALESCE(t.type,'') || ' ' ||
-      COALESCE(c.name,'') || ' ' ||
-      COALESCE(fa.display_name,'') || ' ' ||
-      COALESCE(ta.display_name,'') || ' ' ||
-      COALESCE(pm.display_name,'') || ' ' ||
-      COALESCE(t.spending_target,'') || ' ' ||
-      COALESCE(t.description,'') || ' ' ||
-      COALESCE(t.memo,'')
-    ) LIKE ? ESCAPE '\\'`);
-    binds.push(like);
-  }
-
-  const whereSql = `WHERE ${where.join(" AND ")}`;
+  const { whereSql, binds } = buildTransactionSearchWhere({
+    householdId: MB_D1_HOUSEHOLD_ID,
+    includeDeleted,
+    type,
+    categoryId,
+    accountId,
+    spendingTarget,
+    dateFrom,
+    dateTo,
+    amount,
+    query: q
+  });
   const countRow = await mbD1First(
     env,
     `SELECT COUNT(*) AS total ${MB_D1_TRANSACTION_FROM} ${whereSql}`,

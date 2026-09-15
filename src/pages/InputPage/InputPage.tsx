@@ -20,8 +20,9 @@ import {
 import { createTransaction } from "../../api/transactions";
 import { getDashboard, getDashboardSnapshot } from "../../api/dashboard";
 import { Button } from "../../components/common/Button/Button";
-import { BottomSheet } from "../../components/common/BottomSheet/BottomSheet";
 import { PendingTransactionPanel } from "./PendingTransactionPanel";
+import { InputPickerSheet } from "./InputPickerSheet";
+import { PickerFieldButton } from "./PickerFieldButton";
 import { InvestmentInputSection } from "./InvestmentInputSection";
 import { Money, formatMoney } from "../../components/common/Money/Money";
 import type {
@@ -55,20 +56,16 @@ import {
   LOAN_PRINCIPAL_CATEGORY_NAME,
   LOAN_REPAYMENT_PICKER_ID,
   getAccountLabel,
-  getAccountOwner,
   getBackendType,
   getCategoryLabel,
   getModeLabel,
-  isAccountPickerKind,
   isBenefitRuleActive,
   isCardSettlementCategory,
   isLoanAccount,
   isLoanSourceAccount,
-  isOtherOwnerAccount,
   isTransferAssetAccount,
   ownerMatchesUser,
   prioritizeAccountsForUser,
-  uniqueAccounts,
   type Account,
   type Category,
   type InputMode,
@@ -171,11 +168,6 @@ interface InputHistoryState {
   } | null;
 }
 
-interface PickerItem {
-  value: string;
-  label: string;
-  meta?: string;
-}
 
 let bootstrapPromise: Promise<BootstrapData> | null = null;
 let bootstrapPromiseGeneration = -1;
@@ -824,35 +816,6 @@ export default function InputPage({
       null
     );
 
-  const [
-    showOtherOwnerAccounts,
-    setShowOtherOwnerAccounts
-  ] = useState(false);
-
-  useEffect(
-    () => {
-      if (!activePicker) {
-        return;
-      }
-
-      const previousOverflow = document.body.style.overflow;
-      document.body.style.overflow = "hidden";
-
-      function handleKeyDown(event: KeyboardEvent) {
-        if (event.key === "Escape") {
-          setActivePicker(null);
-        }
-      }
-
-      window.addEventListener("keydown", handleKeyDown);
-
-      return () => {
-        document.body.style.overflow = previousOverflow;
-        window.removeEventListener("keydown", handleKeyDown);
-      };
-    },
-    [activePicker]
-  );
 
 
 
@@ -1333,64 +1296,6 @@ export default function InputPage({
       ]
     );
 
-  const activePickerSelectedAccountId =
-    activePicker === "paymentMethod"
-      ? paymentMethodId
-      : activePicker === "investmentAccount"
-        ? selectedInvestmentAccountId
-        : activePicker === "incomeAccount" ||
-            activePicker === "toAccount" ||
-            activePicker === "creditCard" ||
-            activePicker === "loanAccount"
-          ? toAccountId
-          : activePicker === "fromAccount" ||
-              activePicker === "cardSource" ||
-              activePicker === "loanSource"
-            ? fromAccountId
-            : "";
-
-  const activePickerSelectedAccount =
-    useMemo(
-      () =>
-        allAccounts.find(
-          account =>
-            account.accountId ===
-            activePickerSelectedAccountId
-        ) ?? null,
-      [
-        allAccounts,
-        activePickerSelectedAccountId
-      ]
-    );
-
-  const activePickerSelectedAccountIsOtherOwner =
-    Boolean(
-      activePickerSelectedAccount &&
-      isOtherOwnerAccount(
-        activePickerSelectedAccount,
-        userName
-      )
-    );
-
-  useEffect(
-    () => {
-      if (
-        !activePicker ||
-        !isAccountPickerKind(activePicker)
-      ) {
-        setShowOtherOwnerAccounts(false);
-        return;
-      }
-
-      setShowOtherOwnerAccounts(
-        activePickerSelectedAccountIsOtherOwner
-      );
-    },
-    [
-      activePicker,
-      activePickerSelectedAccountIsOtherOwner
-    ]
-  );
 
   const creditCards =
     useMemo(
@@ -2149,371 +2054,6 @@ export default function InputPage({
     return account
       ? getAccountLabel(account)
       : "선택하세요";
-  }
-
-  function getAccountPickerSource(
-    kind: Exclude<PickerKind, "category" | "spendingTarget">
-  ) {
-    const otherOwnerAccounts =
-      orderedAllAccounts.filter(
-        account =>
-          isOtherOwnerAccount(
-            account,
-            userName
-          )
-      );
-
-    if (kind === "investmentAccount") {
-      return uniqueAccounts(
-        orderedAllAccounts.filter(
-          account => investmentAccountIds.has(account.accountId)
-        )
-      );
-    }
-
-    if (kind === "loanSource") {
-      return uniqueAccounts(
-        orderedAllAccounts.filter(isLoanSourceAccount)
-      );
-    }
-
-    if (kind === "loanAccount") {
-      return uniqueAccounts(
-        orderedAllAccounts.filter(isLoanAccount)
-      );
-    }
-
-    if (
-      kind === "incomeAccount" ||
-      kind === "fromAccount" ||
-      kind === "toAccount"
-    ) {
-      return uniqueAccounts(
-        orderedAllAccounts.filter(isTransferAssetAccount)
-      );
-    }
-
-    if (kind === "paymentMethod") {
-      return uniqueAccounts([
-        ...accounts,
-        ...otherOwnerAccounts.filter(
-          account =>
-            visibleAccountIds.has(account.accountId) ||
-            account.subType === "신용카드" ||
-            account.subType === "체크카드"
-        )
-      ]);
-    }
-
-    if (kind === "creditCard") {
-      return uniqueAccounts([
-        ...creditCards,
-        ...otherOwnerAccounts.filter(
-          account =>
-            account.subType === "신용카드"
-        )
-      ]);
-    }
-
-    if (kind === "cardSource") {
-      return uniqueAccounts([
-        ...cardSourceAccounts,
-        ...otherOwnerAccounts.filter(
-          account =>
-            account.accountId !== toAccountId &&
-            account.accountType === "자산" &&
-            account.subType !== "주식"
-        )
-      ]);
-    }
-
-    return uniqueAccounts([
-      ...accounts,
-      ...otherOwnerAccounts
-    ]);
-  }
-
-  function getAccountPickerGroups(
-    kind: Exclude<PickerKind, "category" | "spendingTarget">
-  ) {
-    const source =
-      getAccountPickerSource(kind);
-
-    return {
-      primary: source.filter(
-        account =>
-          !isOtherOwnerAccount(
-            account,
-            userName
-          )
-      ),
-      other: source.filter(
-        account =>
-          isOtherOwnerAccount(
-            account,
-            userName
-          )
-      )
-    };
-  }
-
-  function getOtherOwnerPickerLabel(
-    kind: Exclude<PickerKind, "category" | "spendingTarget">
-  ) {
-    switch (kind) {
-      case "paymentMethod":
-        return "다른 명의 결제수단";
-      case "incomeAccount":
-        return "다른 명의 입금계좌";
-      case "fromAccount":
-        return "다른 명의 보내는 계좌";
-      case "toAccount":
-        return "다른 명의 받는 계좌";
-      case "creditCard":
-        return "다른 명의 카드";
-      case "cardSource":
-        return "다른 명의 출금계좌";
-      case "loanSource":
-        return "다른 명의 출금계좌";
-      case "loanAccount":
-        return "다른 명의 대출계좌";
-      case "investmentAccount":
-        return "다른 명의 투자계좌";
-    }
-  }
-
-  function renderAccountPickerOptions(
-    kind: Exclude<PickerKind, "category" | "spendingTarget">
-  ) {
-    const groups =
-      getAccountPickerGroups(kind);
-
-    return (
-      <>
-        {groups.other.length > 0 && (
-          <>
-            <button
-              type="button"
-              className={styles.sheetMoreOption}
-              aria-expanded={showOtherOwnerAccounts}
-              onClick={() =>
-                setShowOtherOwnerAccounts(
-                  current => !current
-                )
-              }
-            >
-              <span>
-                {getOtherOwnerPickerLabel(kind)}
-                <strong>
-                  {groups.other.length}개 · {showOtherOwnerAccounts ? "접기" : "더보기"}
-                </strong>
-              </span>
-              <span
-                className={styles.sheetMoreChevron}
-                aria-hidden="true"
-              >
-                {showOtherOwnerAccounts ? "⌃" : "⌄"}
-              </span>
-            </button>
-
-            {showOtherOwnerAccounts && (
-              <>
-                <div className={styles.sheetGroupLabel}>
-                  다른 명의
-                </div>
-                {groups.other
-                  .map(getAccountPickerItem)
-                  .map(item => renderPickerOption(kind, item))}
-                {groups.primary.length > 0 && (
-                  <div className={styles.sheetGroupLabel}>
-                    내 명의 · 공동
-                  </div>
-                )}
-              </>
-            )}
-          </>
-        )}
-
-        {groups.primary
-          .map(getAccountPickerItem)
-          .map(item => renderPickerOption(kind, item))}
-      </>
-    );
-  }
-
-  function getPickerItems(
-    kind: PickerKind
-  ): PickerItem[] {
-    if (kind === "category") {
-      const inputCategories = categories.filter(
-        category =>
-          category.name !== LOAN_PRINCIPAL_CATEGORY_NAME &&
-          category.name !== LOAN_INTEREST_CATEGORY_NAME
-      );
-
-      const visibleCategories = mode === "transfer"
-        ? [
-            ...inputCategories.filter(
-              category => category.name === CARD_PAYMENT_CATEGORY
-            ),
-            ...inputCategories.filter(
-              category => category.name === CARD_PREPAYMENT_CATEGORY
-            ),
-            ...inputCategories.filter(
-              category => !isCardSettlementCategory(category)
-            )
-          ]
-        : inputCategories;
-
-      const items = visibleCategories.map(
-        category => ({
-          value: category.categoryId,
-          label: getCategoryLabel(category),
-          meta: category.type
-        })
-      );
-
-      if (mode === "transfer") {
-        return [
-          {
-            value: LOAN_REPAYMENT_PICKER_ID,
-            label: "대출 상환",
-            meta: "이체"
-          },
-          ...items
-        ];
-      }
-
-      return items;
-    }
-
-    if (kind === "spendingTarget") {
-      return (bootstrap?.spendingTargets ?? [])
-        .slice()
-        .sort((first, second) => {
-          if (first === "공동") return -1;
-          if (second === "공동") return 1;
-          return first.localeCompare(second, "ko");
-        })
-        .map(
-          target => ({
-            value: target,
-            label: target
-          })
-        );
-    }
-
-    if (!isAccountPickerKind(kind)) {
-      return [];
-    }
-
-    return getAccountPickerSource(kind).map(
-      account => ({
-        value: account.accountId,
-        label: getAccountLabel(account),
-        meta: [account.subType, getAccountOwner(account)]
-          .filter(Boolean)
-          .join(" · ")
-      })
-    );
-  }
-
-  function renderPickerOption(
-    kind: PickerKind,
-    item: PickerItem
-  ) {
-    const selected =
-      getPickerSelectedValue(kind) ===
-      item.value;
-
-    return (
-      <button
-        type="button"
-        key={item.value}
-        className={`${styles.sheetOption} ${selected ? styles.sheetOptionSelected : ""}`}
-        onClick={() => applyPickerValue(kind, item.value)}
-      >
-        <span className={styles.sheetOptionText}>
-          <strong>{item.label}</strong>
-          {item.meta && <span>{item.meta}</span>}
-        </span>
-        {selected && (
-          <span
-            className={styles.sheetCheck}
-            aria-hidden="true"
-          >
-            ✓
-          </span>
-        )}
-      </button>
-    );
-  }
-
-  function getAccountPickerItem(
-    account: Account
-  ): PickerItem {
-    return {
-      value: account.accountId,
-      label: getAccountLabel(account),
-      meta: [account.subType, getAccountOwner(account)]
-        .filter(Boolean)
-        .join(" · ")
-    };
-  }
-
-  function getPickerTitle(
-    kind: PickerKind
-  ) {
-    switch (kind) {
-      case "category":
-        return mode === "transfer"
-          ? "이체 분류 선택"
-          : "카테고리 선택";
-      case "paymentMethod":
-        return "결제수단 선택";
-      case "spendingTarget":
-        return "지출대상 선택";
-      case "incomeAccount":
-        return "입금수단 선택";
-      case "fromAccount":
-        return "보내는 수단 선택";
-      case "toAccount":
-        return "받는 수단 선택";
-      case "creditCard":
-        return "결제할 카드 선택";
-      case "cardSource":
-        return "출금계좌 선택";
-      case "loanSource":
-        return "상환 출금계좌 선택";
-      case "loanAccount":
-        return "대출계좌 선택";
-      case "investmentAccount":
-        return "투자계좌 선택";
-    }
-  }
-
-  function getPickerSelectedValue(
-    kind: PickerKind
-  ) {
-    switch (kind) {
-      case "category":
-        return categoryId;
-      case "paymentMethod":
-        return paymentMethodId;
-      case "spendingTarget":
-        return spendingTarget;
-      case "incomeAccount":
-      case "toAccount":
-      case "creditCard":
-      case "loanAccount":
-        return toAccountId;
-      case "investmentAccount":
-        return selectedInvestmentAccountId;
-      case "fromAccount":
-      case "cardSource":
-      case "loanSource":
-        return fromAccountId;
-    }
   }
 
   function applyPickerValue(
@@ -3470,17 +3010,11 @@ export default function InputPage({
                 </span>
               </span>
 
-              <button
-                type="button"
-                className={styles.pickerButton}
-                disabled={submitting}
+              <PickerFieldButton
+                value={categoryId ? getCategoryValueLabel() : ""}
                 onClick={() => setActivePicker("category")}
-              >
-                <span className={categoryId ? styles.pickerValue : styles.pickerPlaceholder}>
-                  {getCategoryValueLabel()}
-                </span>
-                <span className={styles.pickerChevron} aria-hidden="true">⌄</span>
-              </button>
+                disabled={submitting}
+              />
 
               <p className={styles.helper}>
                 대출 상환은 원금과 이자를 자동 분리하고, 카드값 결제나 선결제는 카드 결제용 화면으로 바뀝니다.
@@ -3611,17 +3145,11 @@ export default function InputPage({
                 </span>
               </span>
 
-              <button
-                type="button"
-                className={styles.pickerButton}
-                disabled={submitting}
+              <PickerFieldButton
+                value={categoryId ? getCategoryValueLabel() : ""}
                 onClick={() => setActivePicker("category")}
-              >
-                <span className={categoryId ? styles.pickerValue : styles.pickerPlaceholder}>
-                  {getCategoryValueLabel()}
-                </span>
-                <span className={styles.pickerChevron} aria-hidden="true">⌄</span>
-              </button>
+                disabled={submitting}
+              />
             </label>
           )}
 
@@ -3722,17 +3250,11 @@ export default function InputPage({
                     </span>
                   </span>
 
-                  <button
-                    type="button"
-                    className={styles.pickerButton}
-                    disabled={submitting}
+                  <PickerFieldButton
+                    value={paymentMethodId ? getAccountValueLabel(paymentMethodId) : ""}
                     onClick={() => setActivePicker("paymentMethod")}
-                  >
-                    <span className={paymentMethodId ? styles.pickerValue : styles.pickerPlaceholder}>
-                      {getAccountValueLabel(paymentMethodId)}
-                    </span>
-                    <span className={styles.pickerChevron} aria-hidden="true">⌄</span>
-                  </button>
+                    disabled={submitting}
+                  />
 
                   <p
                     className={
@@ -3764,17 +3286,11 @@ export default function InputPage({
                     </span>
                   </span>
 
-                  <button
-                    type="button"
-                    className={styles.pickerButton}
-                    disabled={submitting}
+                  <PickerFieldButton
+                    value={spendingTarget}
                     onClick={() => setActivePicker("spendingTarget")}
-                  >
-                    <span className={spendingTarget ? styles.pickerValue : styles.pickerPlaceholder}>
-                      {spendingTarget || "선택하세요"}
-                    </span>
-                    <span className={styles.pickerChevron} aria-hidden="true">⌄</span>
-                  </button>
+                    disabled={submitting}
+                  />
                 </label>
 
                 {selectedBenefitRule && selectedBenefitRule.kind === "post_reward" && (
@@ -3909,17 +3425,11 @@ export default function InputPage({
                     </span>
                   </span>
 
-                  <button
-                    type="button"
-                    className={styles.pickerButton}
-                    disabled={submitting}
+                  <PickerFieldButton
+                    value={toAccountId ? getAccountValueLabel(toAccountId) : ""}
                     onClick={() => setActivePicker("incomeAccount")}
-                  >
-                    <span className={toAccountId ? styles.pickerValue : styles.pickerPlaceholder}>
-                      {getAccountValueLabel(toAccountId)}
-                    </span>
-                    <span className={styles.pickerChevron} aria-hidden="true">⌄</span>
-                  </button>
+                    disabled={submitting}
+                  />
                 </label>
               </div>
             )
@@ -3949,34 +3459,22 @@ export default function InputPage({
                   <span className={styles.fieldLabel}>
                     돈이 나갈 계좌 <span className={styles.required}>*</span>
                   </span>
-                  <button
-                    type="button"
-                    className={styles.pickerButton}
-                    disabled={submitting}
+                  <PickerFieldButton
+                    value={fromAccountId ? getAccountValueLabel(fromAccountId) : ""}
                     onClick={() => setActivePicker("loanSource")}
-                  >
-                    <span className={fromAccountId ? styles.pickerValue : styles.pickerPlaceholder}>
-                      {getAccountValueLabel(fromAccountId)}
-                    </span>
-                    <span className={styles.pickerChevron} aria-hidden="true">⌄</span>
-                  </button>
+                    disabled={submitting}
+                  />
                 </label>
 
                 <label className={styles.field}>
                   <span className={styles.fieldLabel}>
                     상환할 대출계좌 <span className={styles.required}>*</span>
                   </span>
-                  <button
-                    type="button"
-                    className={styles.pickerButton}
-                    disabled={submitting}
+                  <PickerFieldButton
+                    value={toAccountId ? getAccountValueLabel(toAccountId) : ""}
                     onClick={() => setActivePicker("loanAccount")}
-                  >
-                    <span className={toAccountId ? styles.pickerValue : styles.pickerPlaceholder}>
-                      {getAccountValueLabel(toAccountId)}
-                    </span>
-                    <span className={styles.pickerChevron} aria-hidden="true">⌄</span>
-                  </button>
+                    disabled={submitting}
+                  />
                 </label>
 
                 <label className={styles.amountField}>
@@ -4053,17 +3551,11 @@ export default function InputPage({
                     <span className={styles.fieldLabel}>
                       이자 지출대상 <span className={styles.required}>*</span>
                     </span>
-                    <button
-                      type="button"
-                      className={styles.pickerButton}
-                      disabled={submitting}
-                      onClick={() => setActivePicker("spendingTarget")}
-                    >
-                      <span className={spendingTarget ? styles.pickerValue : styles.pickerPlaceholder}>
-                        {spendingTarget || "선택하세요"}
-                      </span>
-                      <span className={styles.pickerChevron} aria-hidden="true">⌄</span>
-                    </button>
+                    <PickerFieldButton
+                    value={spendingTarget}
+                    onClick={() => setActivePicker("spendingTarget")}
+                    disabled={submitting}
+                  />
                   </label>
                 )}
               </div>
@@ -4114,17 +3606,11 @@ export default function InputPage({
                       </span>
                     </span>
 
-                    <button
-                      type="button"
-                      className={styles.pickerButton}
-                      disabled={submitting}
-                      onClick={() => setActivePicker("fromAccount")}
-                    >
-                      <span className={fromAccountId ? styles.pickerValue : styles.pickerPlaceholder}>
-                        {getAccountValueLabel(fromAccountId)}
-                      </span>
-                      <span className={styles.pickerChevron} aria-hidden="true">⌄</span>
-                    </button>
+                    <PickerFieldButton
+                    value={fromAccountId ? getAccountValueLabel(fromAccountId) : ""}
+                    onClick={() => setActivePicker("fromAccount")}
+                    disabled={submitting}
+                  />
                   </label>
 
                   <label
@@ -4148,17 +3634,11 @@ export default function InputPage({
                       </span>
                     </span>
 
-                    <button
-                      type="button"
-                      className={styles.pickerButton}
-                      disabled={submitting}
-                      onClick={() => setActivePicker("toAccount")}
-                    >
-                      <span className={toAccountId ? styles.pickerValue : styles.pickerPlaceholder}>
-                        {getAccountValueLabel(toAccountId)}
-                      </span>
-                      <span className={styles.pickerChevron} aria-hidden="true">⌄</span>
-                    </button>
+                    <PickerFieldButton
+                    value={toAccountId ? getAccountValueLabel(toAccountId) : ""}
+                    onClick={() => setActivePicker("toAccount")}
+                    disabled={submitting}
+                  />
                   </label>
                 </div>
 
@@ -4276,17 +3756,11 @@ export default function InputPage({
                     </span>
                   </span>
 
-                  <button
-                    type="button"
-                    className={styles.pickerButton}
-                    disabled={submitting}
+                  <PickerFieldButton
+                    value={toAccountId ? getAccountValueLabel(toAccountId) : ""}
                     onClick={() => setActivePicker("creditCard")}
-                  >
-                    <span className={toAccountId ? styles.pickerValue : styles.pickerPlaceholder}>
-                      {getAccountValueLabel(toAccountId)}
-                    </span>
-                    <span className={styles.pickerChevron} aria-hidden="true">⌄</span>
-                  </button>
+                    disabled={submitting}
+                  />
                 </label>
 
                 <label
@@ -4409,17 +3883,11 @@ export default function InputPage({
                     </span>
                   </span>
 
-                  <button
-                    type="button"
-                    className={styles.pickerButton}
-                    disabled={submitting || !toAccountId}
+                  <PickerFieldButton
+                    value={fromAccountId ? getAccountValueLabel(fromAccountId) : ""}
                     onClick={() => setActivePicker("cardSource")}
-                  >
-                    <span className={fromAccountId ? styles.pickerValue : styles.pickerPlaceholder}>
-                      {getAccountValueLabel(fromAccountId)}
-                    </span>
-                    <span className={styles.pickerChevron} aria-hidden="true">⌄</span>
-                  </button>
+                    disabled={submitting || !toAccountId}
+                  />
 
                   {
                     selectedCard
@@ -4572,15 +4040,29 @@ export default function InputPage({
       )}
 
       {activePicker && (
-        <BottomSheet
-          title={getPickerTitle(activePicker)}
+        <InputPickerSheet
+          kind={activePicker}
+          mode={mode}
+          userName={userName}
+          orderedAllAccounts={orderedAllAccounts}
+          visibleAccounts={accounts}
+          creditCards={creditCards}
+          cardSourceAccounts={cardSourceAccounts}
+          visibleAccountIds={visibleAccountIds}
+          investmentAccountIds={investmentAccountIds}
+          categories={categories}
+          spendingTargets={bootstrap?.spendingTargets ?? []}
+          selection={{
+            categoryId,
+            paymentMethodId,
+            spendingTarget,
+            fromAccountId,
+            toAccountId,
+            investmentAccountId: selectedInvestmentAccountId
+          }}
+          onSelect={applyPickerValue}
           onClose={() => setActivePicker(null)}
-        >
-          {isAccountPickerKind(activePicker)
-            ? renderAccountPickerOptions(activePicker)
-            : getPickerItems(activePicker)
-                .map(item => renderPickerOption(activePicker, item))}
-        </BottomSheet>
+        />
       )}
     </main>
   );
