@@ -1,4 +1,4 @@
-# 우리 가계부
+# 우리 가계부 
 
 React + TypeScript + Vite 프론트엔드와 Cloudflare Worker/D1로 구성된 2인용 가계부 PWA입니다.
 
