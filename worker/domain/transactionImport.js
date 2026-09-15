@@ -1,4 +1,5 @@
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_RE = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 
 export function normalizeMerchant(value) {
   return String(value || "")
@@ -23,9 +24,23 @@ function toPositiveAmount(value) {
   return Number.isFinite(numeric) && numeric > 0 ? Math.round(numeric) : 0;
 }
 
+function normalizeTransactionTime(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  if (TIME_RE.test(text)) return text;
+
+  const match = text.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (!match) return "";
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (hour > 23 || minute > 59) return "";
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
 export function normalizeImportedCandidate(raw, index = 0) {
   const source = raw && typeof raw === "object" ? raw : {};
   const date = String(source.date || "").trim();
+  const time = normalizeTransactionTime(source.time || source.transactionTime || source.approvalTime);
   const amount = toPositiveAmount(source.amount);
   const merchant = String(source.merchant || source.description || "").trim().slice(0, 160);
   const status = String(source.status || source.kind || "expense").toLowerCase();
@@ -38,6 +53,7 @@ export function normalizeImportedCandidate(raw, index = 0) {
   return {
     candidateId: `IMP_${index + 1}`,
     date: DATE_RE.test(date) ? date : "",
+    time,
     merchant,
     amount,
     cardName: String(source.cardName || source.card || "").trim().slice(0, 100),
@@ -53,9 +69,20 @@ export function extractJsonValue(value) {
   if (value && typeof value === "object") {
     if (Array.isArray(value)) return value;
     if (Array.isArray(value.transactions)) return value.transactions;
+    if (value.response && typeof value.response === "object") return extractJsonValue(value.response);
     if (typeof value.response === "string") return extractJsonValue(value.response);
     if (typeof value.result === "string") return extractJsonValue(value.result);
     if (typeof value.answer === "string") return extractJsonValue(value.answer);
+    if (typeof value.text === "string") return extractJsonValue(value.text);
+    const choiceContent = value.choices?.[0]?.message?.content;
+    if (typeof choiceContent === "string") return extractJsonValue(choiceContent);
+    if (Array.isArray(choiceContent)) {
+      const joined = choiceContent
+        .map((part) => typeof part === "string" ? part : part?.text)
+        .filter((part) => typeof part === "string")
+        .join("\n");
+      if (joined) return extractJsonValue(joined);
+    }
   }
 
   const text = String(value || "").trim();
@@ -181,12 +208,34 @@ export function findDuplicateTransaction(candidate, transactions, paymentMethodI
 }
 
 export function dedupeImportedCandidates(items) {
-  const seen = new Set();
+  const seenSource = new Set();
   const result = [];
   for (const item of items || []) {
-    const key = [item.date, item.amount, normalizeMerchant(item.merchant), item.kind].join("|");
-    if (!item.date || !item.amount || !item.merchant || seen.has(key)) continue;
-    seen.add(key);
+    const merchant = normalizeMerchant(item?.merchant);
+    const coreFieldCount = [Boolean(item?.date), Number(item?.amount || 0) > 0, Boolean(merchant)]
+      .filter(Boolean).length;
+
+    // Keep incomplete but recognizable transactions so the review UI can repair them.
+    // A single isolated field is too weak and is more likely to be a balance/summary value.
+    if (coreFieldCount < 2) continue;
+
+    const sourceText = String(item?.sourceText || "")
+      .normalize("NFKC")
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .trim();
+    const baseKey = [item?.date || "", item?.amount || 0, merchant, item?.kind || "expense"].join("|");
+    const time = String(item?.time || "").trim();
+
+    if (sourceText) {
+      // Only collapse rows when the recognized source row itself also matches. Even a
+      // matching approval time is not enough by itself: two legitimate card approvals can
+      // occur in the same minute for the same amount.
+      const sourceKey = `${baseKey}|${time}|${sourceText}`;
+      if (seenSource.has(sourceKey)) continue;
+      seenSource.add(sourceKey);
+    }
+
     result.push(item);
   }
   return result;

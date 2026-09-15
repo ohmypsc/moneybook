@@ -19,6 +19,20 @@ interface TransactionImportSheetProps {
   onClose: () => void;
 }
 
+function deriveReviewReasons(item: EditableCandidate) {
+  const reasons: string[] = [];
+  if (!item.date) reasons.push("날짜 확인 필요");
+  if (!(item.amount > 0)) reasons.push("금액 확인 필요");
+  if (!item.merchant.trim()) reasons.push("가맹점 확인 필요");
+  if (!item.paymentMethodId) reasons.push("결제수단 선택 필요");
+  if (!item.categoryId) reasons.push("카테고리 선택 필요");
+  if (!item.spendingTarget) reasons.push("지출대상 선택 필요");
+  if (item.confidence === "low") reasons.push("인식 결과 확인 필요");
+  if (item.duplicate) reasons.push("중복 거래 의심");
+  if (item.kind === "refund") reasons.push("취소/환불은 원거래 연결 확인 필요");
+  return reasons;
+}
+
 function createRequestId() {
   return globalThis.crypto?.randomUUID
     ? `IMPORT_${globalThis.crypto.randomUUID()}`
@@ -59,7 +73,17 @@ export function TransactionImportSheet({
   const reviewCount = items.filter(item => item.reviewReasons.length > 0).length;
 
   function patchItem(candidateId: string, patch: Partial<EditableCandidate>) {
-    setItems(current => current.map(item => item.candidateId === candidateId ? { ...item, ...patch } : item));
+    setItems(current => current.map(item => {
+      if (item.candidateId !== candidateId) return item;
+      const duplicateKeyChanged = ["date", "time", "amount", "merchant", "paymentMethodId"]
+        .some(key => Object.prototype.hasOwnProperty.call(patch, key));
+      const next = {
+        ...item,
+        ...patch,
+        ...(duplicateKeyChanged ? { duplicate: null } : {})
+      } as EditableCandidate;
+      return { ...next, reviewReasons: deriveReviewReasons(next) };
+    }));
   }
 
   async function handleAnalyze() {
@@ -76,7 +100,10 @@ export function TransactionImportSheet({
         images.push(await prepareImportImage(file));
       }
       const result = await analyzeTransactionImport({ text: text.trim(), images });
-      setItems(result.items.map(item => ({ ...item, selected: item.selected })));
+      setItems(result.items.map(item => {
+        const candidate = { ...item, selected: item.selected } as EditableCandidate;
+        return { ...candidate, reviewReasons: deriveReviewReasons(candidate) };
+      }));
       setStage("review");
       if (result.items.length === 0) {
         setFeedback("인식된 거래가 없습니다. 다른 캡처나 텍스트로 다시 시도해주세요.");
@@ -93,6 +120,7 @@ export function TransactionImportSheet({
       if (!item.selected || item.kind !== "expense") continue;
       if (!item.date || !/^\d{4}-\d{2}-\d{2}$/.test(item.date)) return `${item.merchant || "거래"}의 날짜를 확인해주세요.`;
       if (!(item.amount > 0)) return `${item.merchant || "거래"}의 금액을 확인해주세요.`;
+      if (!item.merchant.trim()) return "가맹점명을 확인해주세요.";
       if (!item.categoryId) return `${item.merchant || "거래"}의 카테고리를 선택해주세요.`;
       if (!item.paymentMethodId) return `${item.merchant || "거래"}의 결제수단을 선택해주세요.`;
       if (!item.spendingTarget) return `${item.merchant || "거래"}의 지출대상을 선택해주세요.`;
@@ -215,7 +243,7 @@ export function TransactionImportSheet({
                 />
                 <div className={styles.candidateTitle}>
                   <strong>{item.kind === "refund" ? "취소/환불 · " : ""}{item.merchant || "가맹점 확인 필요"}</strong>
-                  <p>{formatMoney(item.amount)} · 신뢰도 {item.confidence === "high" ? "높음" : item.confidence === "low" ? "낮음" : "보통"}</p>
+                  <p>{formatMoney(item.amount)}{item.time ? ` · ${item.time}` : ""} · 신뢰도 {item.confidence === "high" ? "높음" : item.confidence === "low" ? "낮음" : "보통"}</p>
                 </div>
               </div>
 
@@ -234,15 +262,21 @@ export function TransactionImportSheet({
                   <input className={styles.input} type="date" value={item.date} onChange={event => patchItem(item.candidateId, { date: event.target.value })} />
                 </label>
                 <label className={styles.field}>
-                  <span>금액</span>
-                  <input className={styles.input} inputMode="numeric" value={item.amount || ""} onChange={event => patchItem(item.candidateId, { amount: Number(event.target.value.replace(/[^0-9]/g, "")) || 0 })} />
+                  <span>승인 시간</span>
+                  <input className={styles.input} type="time" value={item.time} onChange={event => patchItem(item.candidateId, { time: event.target.value })} />
                 </label>
               </div>
 
-              <label className={styles.field}>
-                <span>가맹점</span>
-                <input className={styles.input} value={item.merchant} onChange={event => patchItem(item.candidateId, { merchant: event.target.value })} />
-              </label>
+              <div className={styles.grid2}>
+                <label className={styles.field}>
+                  <span>금액</span>
+                  <input className={styles.input} inputMode="numeric" value={item.amount || ""} onChange={event => patchItem(item.candidateId, { amount: Number(event.target.value.replace(/[^0-9]/g, "")) || 0 })} />
+                </label>
+                <label className={styles.field}>
+                  <span>가맹점</span>
+                  <input className={styles.input} value={item.merchant} onChange={event => patchItem(item.candidateId, { merchant: event.target.value })} />
+                </label>
+              </div>
 
               <div className={styles.grid2}>
                 <label className={styles.field}>

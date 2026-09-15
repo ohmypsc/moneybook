@@ -15,6 +15,7 @@ export interface ImportedDuplicate {
 export interface ImportedTransactionCandidate {
   candidateId: string;
   date: string;
+  time: string;
   merchant: string;
   amount: number;
   cardName: string;

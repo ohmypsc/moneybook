@@ -5481,8 +5481,10 @@ async function mbD1AnalyzeImportedTransactions(body, session, env) {
       const reasons = [];
       if (!candidate.date) reasons.push("날짜 확인 필요");
       if (!candidate.amount) reasons.push("금액 확인 필요");
+      if (!candidate.merchant) reasons.push("가맹점 확인 필요");
       if (!paymentMethod) reasons.push("결제수단 선택 필요");
       if (!categoryMatch.category) reasons.push("카테고리 선택 필요");
+      if (candidate.confidence === "low") reasons.push("인식 결과 확인 필요");
       if (duplicate) reasons.push("중복 거래 의심");
       if (candidate.kind === "refund") reasons.push("취소/환불은 원거래 연결 확인 필요");
       return {
