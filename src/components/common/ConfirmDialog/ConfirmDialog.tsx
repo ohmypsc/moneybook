@@ -36,6 +36,8 @@ export function ConfirmDialogHost() {
         return;
       }
 
+      const activeRequest = request;
+
       const previousFocus =
         document.activeElement instanceof HTMLElement
           ? document.activeElement
@@ -45,7 +47,7 @@ export function ConfirmDialogHost() {
         window.requestAnimationFrame(
           () => {
             if (
-              request.tone === "danger"
+              activeRequest.tone === "danger"
             ) {
               cancelRef.current?.focus();
             } else {
@@ -62,7 +64,7 @@ export function ConfirmDialogHost() {
         ) {
           event.preventDefault();
           resolveConfirmAction(
-            request.id,
+            activeRequest.id,
             false
           );
           return;
