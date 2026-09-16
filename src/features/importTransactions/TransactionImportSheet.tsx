@@ -6,7 +6,7 @@ import { Button } from "../../components/common/Button/Button";
 import { formatMoney } from "../../components/common/Money/Money";
 import { enqueuePendingTransaction } from "../../utils/pendingTransactionQueue";
 import type { BenefitRule } from "../../api/automation";
-import { prepareImportImage } from "./importImage";
+import { prepareImportImages } from "./importImage";
 import styles from "./TransactionImportSheet.module.css";
 
 interface EditableCandidate extends ImportedTransactionCandidate {
@@ -95,10 +95,15 @@ export function TransactionImportSheet({
     setError("");
     setFeedback("");
     try {
-      const images = [];
-      for (const file of files.slice(0, 4)) {
-        images.push(await prepareImportImage(file));
-      }
+      const sourceFiles = files.slice(0, 4);
+      const maxPreparedImages = 8;
+      const partsPerFile = sourceFiles.length > 0
+        ? Math.max(1, Math.floor(maxPreparedImages / sourceFiles.length))
+        : 1;
+      const imageGroups = await Promise.all(
+        sourceFiles.map(file => prepareImportImages(file, partsPerFile))
+      );
+      const images = imageGroups.flat().slice(0, maxPreparedImages);
       const result = await analyzeTransactionImport({ text: text.trim(), images });
       setItems(result.items.map(item => {
         const candidate = { ...item, selected: item.selected } as EditableCandidate;

@@ -2201,6 +2201,19 @@ async function mbD1AllTransactions(env, includeDeleted = false) {
   return rows.map(mbD1MapTransactionRow);
 }
 
+async function mbD1RecentExpenseTransactions(env, limit = 800) {
+  const safeLimit = Math.max(1, Math.min(2000, Math.trunc(Number(limit) || 800)));
+  const rows = await mbD1All(
+    env,
+    `${MB_D1_TRANSACTION_SELECT}
+     WHERE t.household_id=? AND t.deleted_at IS NULL AND t.type='지출'
+     ORDER BY t.date DESC, t.created_at DESC
+     LIMIT ?`,
+    [MB_D1_HOUSEHOLD_ID, safeLimit]
+  );
+  return rows.map(mbD1MapTransactionRow);
+}
+
 async function mbD1TransactionById(env, transactionId, includeDeleted = true) {
   const row = await mbD1First(
     env,
@@ -5433,29 +5446,38 @@ async function mbD1RestoreBackupMerge(document, session, env) {
 
 
 async function mbD1AnalyzeImportedTransactions(body, session, env) {
-  const categories = (await mbD1All(
+  const analysisPromise = analyzeTransactionImport(env, {
+    text: body.text,
+    images: body.images,
+    today: mbD1CurrentDateSeoul()
+  }).then(
+    (value) => ({ ok: true, value }),
+    (error) => ({ ok: false, error })
+  );
+  const categoriesPromise = mbD1All(
     env,
     "SELECT * FROM categories WHERE household_id=? AND type='지출' AND deleted_at IS NULL AND is_active=1 ORDER BY name",
     [MB_D1_HOUSEHOLD_ID]
-  )).map(mbD1MapCategory);
-  const accounts = (await mbD1RawAccounts(env)).map(mbD1MapAccountRow);
+  ).then((rows) => rows.map(mbD1MapCategory));
+  const accountsPromise = mbD1RawAccounts(env).then((rows) => rows.map(mbD1MapAccountRow));
+  const recentTransactionsPromise = mbD1RecentExpenseTransactions(env, 800);
+  const membersPromise = mbD1Members(env);
+
+  const [analysisResult, categories, accounts, recentTransactions, memberRows] = await Promise.all([
+    analysisPromise,
+    categoriesPromise,
+    accountsPromise,
+    recentTransactionsPromise,
+    membersPromise
+  ]);
   const paymentMethods = accounts.filter((account) =>
     account.active && !account.isDeleted && ["신용카드", "체크카드", "선불/지역화폐"].includes(account.subType)
   );
-  const recentTransactions = (await mbD1AllTransactions(env, false))
-    .filter((item) => item.type === "지출")
-    .sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.createdAt || "").localeCompare(a.createdAt || ""))
-    .slice(0, 800);
 
   let extracted;
   try {
-    extracted = await analyzeTransactionImport(env, {
-      text: body.text,
-      images: body.images,
-      today: mbD1CurrentDateSeoul(),
-      categories,
-      paymentMethods
-    });
+    if (!analysisResult.ok) throw analysisResult.error;
+    extracted = analysisResult.value;
   } catch (error) {
     const rawMessage = error instanceof Error ? error.message : String(error || "");
     const looksLikeLimit = error?.status === 429 || /(?:429|quota|rate.?limit|neuron|usage.?limit|too many requests)/i.test(rawMessage);
@@ -5467,10 +5489,10 @@ async function mbD1AnalyzeImportedTransactions(body, session, env) {
     mbD1Fail(code, message, code === "AI_NOT_BOUND" ? 503 : 400);
   }
 
-  const memberNames = (await mbD1Members(env)).map((row) => mbD1Text(row.display_name)).filter(Boolean);
+  const memberNames = memberRows.map((row) => mbD1Text(row.display_name)).filter(Boolean);
   const defaultTarget = memberNames.includes(session?.name) ? session.name : "공동";
   return {
-    model: "@cf/google/gemma-4-26b-a4b-it",
+    model: "@cf/moondream/moondream3.1-9B-A2B",
     items: extracted.map((candidate) => {
       let paymentMethod = mbImportChoosePaymentMethod(candidate.cardName, paymentMethods);
       if (!paymentMethod && paymentMethods.length === 1) paymentMethod = paymentMethods[0];

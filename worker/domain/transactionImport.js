@@ -39,11 +39,11 @@ function normalizeTransactionTime(value) {
 
 export function normalizeImportedCandidate(raw, index = 0) {
   const source = raw && typeof raw === "object" ? raw : {};
-  const date = String(source.date || "").trim();
-  const time = normalizeTransactionTime(source.time || source.transactionTime || source.approvalTime);
-  const amount = toPositiveAmount(source.amount);
-  const merchant = String(source.merchant || source.description || "").trim().slice(0, 160);
-  const status = String(source.status || source.kind || "expense").toLowerCase();
+  const date = String(source.date ?? source.d ?? "").trim();
+  const time = normalizeTransactionTime(source.time ?? source.t ?? source.transactionTime ?? source.approvalTime);
+  const amount = toPositiveAmount(source.amount ?? source.a);
+  const merchant = String(source.merchant ?? source.m ?? source.description ?? "").trim().slice(0, 160);
+  const status = String(source.status ?? source.s ?? source.kind ?? "expense").toLowerCase();
   const kind = /refund|cancel|취소|환불/.test(status) ? "refund" : "expense";
   const confidenceRaw = String(source.confidence || "medium").toLowerCase();
   const confidence = ["high", "medium", "low"].includes(confidenceRaw)
@@ -56,12 +56,12 @@ export function normalizeImportedCandidate(raw, index = 0) {
     time,
     merchant,
     amount,
-    cardName: String(source.cardName || source.card || "").trim().slice(0, 100),
-    suggestedCategoryName: String(source.category || source.suggestedCategoryName || "").trim().slice(0, 80),
+    cardName: String(source.cardName ?? source.c ?? source.card ?? "").trim().slice(0, 100),
+    suggestedCategoryName: String(source.category ?? source.g ?? source.suggestedCategoryName ?? "").trim().slice(0, 80),
     kind,
     confidence,
     memo: String(source.memo || "").trim().slice(0, 240),
-    sourceText: String(source.sourceText || source.rawText || "").trim().slice(0, 300)
+    sourceText: String(source.sourceText ?? source.r ?? source.rawText ?? "").trim().slice(0, 300)
   };
 }
 

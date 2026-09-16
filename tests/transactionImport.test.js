@@ -33,6 +33,24 @@ test("refund/cancel is classified as refund", () => {
   assert.equal(item.kind, "refund");
 });
 
+test("compact vision keys normalize without extra AI output", () => {
+  const item = normalizeImportedCandidate({
+    d: "2026-09-15",
+    t: "7:03",
+    m: "Cafe",
+    a: 4900,
+    s: "expense",
+    c: "Card A",
+    r: "09/15 07:03 Cafe 4,900"
+  });
+  assert.equal(item.date, "2026-09-15");
+  assert.equal(item.time, "07:03");
+  assert.equal(item.merchant, "Cafe");
+  assert.equal(item.amount, 4900);
+  assert.equal(item.cardName, "Card A");
+  assert.match(item.sourceText, /4,900/);
+});
+
 test("AI fenced JSON response is extracted", () => {
   const values = extractJsonValue('```json\n{"transactions":[{"amount":5500}]}\n```');
   assert.equal(values.length, 1);
@@ -174,18 +192,16 @@ test("transaction import accepts real Cloudflare choices response and keeps mult
   assert.deepEqual(requestPayload.chat_template_kwargs, { enable_thinking: false });
 });
 
-test("image import sends the capture to Workers AI and parses multiple transactions", async () => {
+test("image import uses Moondream fast query and parses compact transactions", async () => {
+  let requestModel = null;
   let requestPayload = null;
   const env = {
     AI: {
-      async run(_model, payload) {
+      async run(model, payload) {
+        requestModel = model;
         requestPayload = payload;
         return {
-          choices: [{
-            message: {
-              content: '{"transactions":[{"date":"2026-09-15","merchant":"편의점","amount":4100,"sourceText":"09/15 편의점 4,100원"},{"date":"2026-09-15","merchant":"약국","amount":8300,"sourceText":"09/15 약국 8,300원"}]}'
-            }
-          }]
+          answer: '{"transactions":[{"d":"2026-09-15","m":"Store A","a":4100,"r":"09/15 Store A 4,100"},{"d":"2026-09-15","m":"Store B","a":8300,"r":"09/15 Store B 8,300"}]}'
         };
       }
     }
@@ -194,15 +210,69 @@ test("image import sends the capture to Workers AI and parses multiple transacti
   const image = "data:image/png;base64,AA==";
   const values = await analyzeTransactionImport(env, {
     images: [image],
-    today: "2026-09-16",
-    categories: [],
-    paymentMethods: []
+    today: "2026-09-16"
   });
 
+  assert.equal(requestModel, "@cf/moondream/moondream3.1-9B-A2B");
+  assert.equal(requestPayload.task, "query");
   assert.equal(requestPayload.image, image);
+  assert.equal(requestPayload.reasoning, false);
   assert.equal(values.length, 2);
-  assert.equal(values[0].merchant, "편의점");
-  assert.equal(values[1].merchant, "약국");
+  assert.equal(values[0].merchant, "Store A");
+  assert.equal(values[1].merchant, "Store B");
+});
+
+test("image import falls back to Gemma only when fast vision output is unusable", async () => {
+  const models = [];
+  const env = {
+    AI: {
+      async run(model) {
+        models.push(model);
+        if (models.length === 1) return { answer: "not json" };
+        return {
+          choices: [{ message: { content: '{"transactions":[{"date":"2026-09-15","merchant":"Fallback Store","amount":9200}]}' } }]
+        };
+      }
+    }
+  };
+  const values = await analyzeTransactionImport(env, {
+    images: ["data:image/jpeg;base64,AA=="],
+    today: "2026-09-16"
+  });
+  assert.deepEqual(models, [
+    "@cf/moondream/moondream3.1-9B-A2B",
+    "@cf/google/gemma-4-26b-a4b-it"
+  ]);
+  assert.equal(values[0].merchant, "Fallback Store");
+});
+
+test("multiple images are analyzed concurrently", async () => {
+  let active = 0;
+  let maxActive = 0;
+  const env = {
+    AI: {
+      async run(_model, payload) {
+        active += 1;
+        maxActive = Math.max(maxActive, active);
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        active -= 1;
+        return {
+          answer: JSON.stringify({
+            transactions: [{ d: "2026-09-15", m: payload.image, a: 1000 }]
+          })
+        };
+      }
+    }
+  };
+  const values = await analyzeTransactionImport(env, {
+    images: [
+      "data:image/png;base64,AA==",
+      "data:image/png;base64,BB=="
+    ],
+    today: "2026-09-16"
+  });
+  assert.equal(maxActive, 2);
+  assert.equal(values.length, 2);
 });
 
 test("merchant normalization ignores punctuation and parenthetical text", () => {
