@@ -158,10 +158,64 @@ function getDataServiceKey(env) {
   return cleanText(env.DATA_GO_KR_SERVICE_KEY || env.MOLIT_API_KEY, 1000);
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function encodeServiceKeyOnce(value) {
+  const key = cleanText(value, 1000);
+  if (!key) return "";
+  // Encoding 키를 저장한 경우에는 %를 다시 인코딩하지 않고 그대로 사용한다.
+  // Decoding 키를 저장한 경우에는 여기서 정확히 한 번 URL encode 한다.
+  return /%[0-9a-f]{2}/i.test(key) ? key : encodeURIComponent(key);
+}
+
+function xmlValue(text, name) {
+  const match = new RegExp(`<${name}>\\s*([^<]*?)\\s*</${name}>`, "i").exec(String(text || ""));
+  return cleanText(match?.[1], 300);
+}
+
+function compactResponseText(text) {
+  return String(text || "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 220);
+}
+
+function dataGoErrorDetails(text, httpStatus) {
+  const authMessage = xmlValue(text, "returnAuthMsg");
+  const reasonCode = xmlValue(text, "returnReasonCode");
+  const resultMessage = xmlValue(text, "resultMsg");
+  const resultCode = xmlValue(text, "resultCode");
+  const errMessage = xmlValue(text, "errMsg");
+  const message = authMessage || resultMessage || errMessage || compactResponseText(text);
+  const code = reasonCode || resultCode || "";
+  const looksLikeError = Boolean(
+    httpStatus >= 400 ||
+    authMessage ||
+    errMessage ||
+    (resultCode && !["0", "00", "000"].includes(resultCode)) ||
+    /SERVICE[_ ]?KEY|PERMISSION[_ ]?DENIED|ACCESS[_ ]?DENIED|LIMITED[_ ]?NUMBER|BLACKLIST[_ ]?IP|UNREGISTERED[_ ]?IP|DEADLINE[_ ]?HAS[_ ]?EXPIRED|APPLICATION[_ ]?ERROR/i.test(String(text || ""))
+  );
+  return { looksLikeError, code, message };
+}
+
+function describeDataGoError(details, status, ymd) {
+  const code = details.code ? ` / 코드 ${details.code}` : "";
+  const message = details.message ? `: ${details.message}` : "";
+  return `국토부 실거래가 API 오류 [${ymd}] (HTTP ${status}${code})${message}`;
+}
+
 async function fetchJson(url) {
   const response = await fetch(url, { headers: { Accept: "application/json" } });
-  if (!response.ok) throw new Error(`공공데이터 API 응답 오류 (${response.status})`);
-  return response.json();
+  const text = await response.text();
+  if (!response.ok) {
+    const details = dataGoErrorDetails(text, response.status);
+    throw new Error(`공공데이터 API 응답 오류 (HTTP ${response.status})${details.message ? `: ${details.message}` : ""}`);
+  }
+  return JSON.parse(text);
 }
 
 export async function resolveLegalRegion(env, query) {
@@ -172,13 +226,14 @@ export async function resolveLegalRegion(env, query) {
   const tokens = clean.split(/\s+/).filter(Boolean);
   const searches = [clean, tokens.slice(0, 3).join(" "), tokens.slice(0, 2).join(" ")].filter((value, index, array) => value && array.indexOf(value) === index);
   for (const search of searches) {
-    const url = new URL(REGION_API);
-    url.searchParams.set("serviceKey", key);
-    url.searchParams.set("type", "json");
-    url.searchParams.set("pageNo", "1");
-    url.searchParams.set("numOfRows", "20");
-    url.searchParams.set("flag", "Y");
-    url.searchParams.set("locatadd_nm", search);
+    const params = new URLSearchParams({
+      type: "json",
+      pageNo: "1",
+      numOfRows: "20",
+      flag: "Y",
+      locatadd_nm: search
+    });
+    const url = `${REGION_API}?serviceKey=${encodeServiceKeyOnce(key)}&${params.toString()}`;
     const payload = await fetchJson(url);
     const rows = payload?.StanReginCd?.[1]?.row || [];
     const mapped = rows
@@ -214,20 +269,33 @@ function monthKeys(today, count = 12) {
   return items;
 }
 
-async function fetchTradesForMonth(key, lawdCode, ymd) {
-  const url = new URL(TRADE_API);
-  url.searchParams.set("serviceKey", key);
-  url.searchParams.set("LAWD_CD", lawdCode);
-  url.searchParams.set("DEAL_YMD", ymd);
-  url.searchParams.set("pageNo", "1");
-  url.searchParams.set("numOfRows", "999");
-  const response = await fetch(url.toString());
-  if (!response.ok) throw new Error(`국토부 실거래가 API 응답 오류 (${response.status})`);
+async function fetchTradesForMonth(key, lawdCode, ymd, attempt = 0) {
+  const params = new URLSearchParams({
+    LAWD_CD: lawdCode,
+    DEAL_YMD: ymd,
+    pageNo: "1",
+    numOfRows: "999"
+  });
+  const url = `${TRADE_API}?serviceKey=${encodeServiceKeyOnce(key)}&${params.toString()}`;
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      Accept: "application/xml,text/xml;q=0.9,*/*;q=0.8"
+    }
+  });
+  // HTTP 오류일 때도 본문을 먼저 읽어 공공데이터포털의 실제 오류코드를 보존한다.
   const text = await response.text();
-  const resultCode = /<resultCode>\s*([^<]+)\s*<\/resultCode>/i.exec(text)?.[1]?.trim() || "";
-  const resultMessage = /<resultMsg>\s*([^<]+)\s*<\/resultMsg>/i.exec(text)?.[1]?.trim() || "";
-  if ((resultCode && !["0", "00", "000"].includes(resultCode)) || /SERVICE[_ ]?KEY|PERMISSION[_ ]?DENIED|LIMITED[_ ]?NUMBER|APPLICATION[_ ]?ERROR|ACCESS[_ ]?DENIED/i.test(text)) {
-    throw new Error(resultMessage ? `국토부 실거래가 API 오류: ${resultMessage}` : "국토부 실거래가 API 인증 또는 호출 한도를 확인해주세요.");
+  const details = dataGoErrorDetails(text, response.status);
+  if (details.looksLikeError) {
+    // 오류코드 23: 초당 호출량 제한. 짧게 기다렸다가 최대 두 번 자동 재시도한다.
+    const perSecondLimited = details.code === "23" || /PER_SECOND/i.test(details.message);
+    if (perSecondLimited && attempt < 2) {
+      await sleep(800 * (attempt + 1));
+      return fetchTradesForMonth(key, lawdCode, ymd, attempt + 1);
+    }
+    const error = new Error(describeDataGoError(details, response.status, ymd));
+    error.code = details.code === "23" ? "DATA_GO_KR_RATE_LIMIT" : "DATA_GO_KR_REQUEST_FAILED";
+    throw error;
   }
   return parseApartmentTradeXml(text);
 }
@@ -242,10 +310,16 @@ export async function refreshRealEstateAsset(env, householdId, propertyId, actor
   if (!key) throw Object.assign(new Error("공공데이터포털 서비스키가 설정되어 있지 않습니다."), { code: "DATA_GO_KR_KEY_MISSING" });
 
   const allTrades = [];
-  for (const ymd of monthKeys(today, 12)) {
-    allTrades.push(...await fetchTradesForMonth(key, asset.lawdCode, ymd));
+  const months = monthKeys(today, 12);
+  let estimate = estimateApartmentValue(allTrades, asset);
+  for (let index = 0; index < months.length; index += 1) {
+    // 개발계정의 초당 호출 제한을 피하기 위해 연속 호출 사이에 짧은 간격을 둔다.
+    if (index > 0) await sleep(350);
+    allTrades.push(...await fetchTradesForMonth(key, asset.lawdCode, months[index]));
+    estimate = estimateApartmentValue(allTrades, asset);
+    // 최근 거래가 충분하면 불필요하게 12개월 전체를 조회하지 않는다.
+    if (estimate.tradeCount >= 5 && index >= 2) break;
   }
-  const estimate = estimateApartmentValue(allTrades, asset);
   await env.DB.prepare(`UPDATE real_estate_assets SET estimated_value_krw=?,estimate_low_krw=?,estimate_high_krw=?,estimate_trade_count=?,estimate_updated_at=?,last_trade_date=?,recent_trades_json=?,updated_at=?,updated_by=? WHERE household_id=? AND property_id=?`)
     .bind(
       estimate.estimatedValueKrw,
