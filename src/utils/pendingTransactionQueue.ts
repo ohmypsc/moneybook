@@ -45,6 +45,7 @@ let records: PendingTransactionRecord[] = [];
 let loaded = false;
 let loadPromise: Promise<void> | null = null;
 let dbPromise: Promise<IDBDatabase | null> | null = null;
+let indexedDbPrimary = false;
 let processing = false;
 let processingOwner = "";
 let lastCompletion: PendingTransactionCompletion | null = null;
@@ -188,15 +189,27 @@ function persistLegacySnapshot(
   nextRecords: PendingTransactionRecord[]
 ) {
   if (typeof window === "undefined") {
-    throw new Error(
-      "브라우저 임시저장 공간을 사용할 수 없습니다."
-    );
+    return false;
   }
 
-  window.localStorage.setItem(
-    LEGACY_STORAGE_KEY,
-    JSON.stringify(nextRecords)
-  );
+  try {
+    window.localStorage.setItem(
+      LEGACY_STORAGE_KEY,
+      JSON.stringify(nextRecords)
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function clearLegacySnapshot() {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.removeItem(LEGACY_STORAGE_KEY);
+  } catch {
+  }
 }
 
 
@@ -351,28 +364,74 @@ async function deleteDbRecord(
   }
 }
 
+async function replaceDbRecords(
+  nextRecords: PendingTransactionRecord[]
+) {
+  const db = await openQueueDb();
+  if (!db) return false;
+
+  try {
+    const transaction = db.transaction(
+      STORE_NAME,
+      "readwrite"
+    );
+    const done = idbTransactionDone(transaction);
+    const store = transaction.objectStore(STORE_NAME);
+    store.clear();
+    for (const record of nextRecords) {
+      store.put(record);
+    }
+    await done;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function persistRecordBestEffort(
   record: PendingTransactionRecord,
   nextRecords: PendingTransactionRecord[]
 ) {
-  try {
-    persistLegacySnapshot(nextRecords);
-  } catch {
+  if (indexedDbPrimary && await putDbRecord(record)) {
+    clearLegacySnapshot();
+    return;
   }
 
-  await putDbRecord(record);
+  indexedDbPrimary = false;
+
+  // IndexedDB가 다시 열릴 수 있으면 localStorage보다 먼저 복구합니다.
+  // 브라우저가 localStorage만 차단한 환경에서도 오프라인 입력이 실패하지 않게 합니다.
+  if (await replaceDbRecords(nextRecords)) {
+    indexedDbPrimary = true;
+    clearLegacySnapshot();
+    return;
+  }
+
+  if (!persistLegacySnapshot(nextRecords)) {
+    throw new Error("브라우저 임시저장 공간에 거래를 보관하지 못했습니다.");
+  }
 }
 
 async function removePersistentRecord(
   id: string,
   nextRecords: PendingTransactionRecord[]
 ) {
-  try {
-    persistLegacySnapshot(nextRecords);
-  } catch {
+  if (indexedDbPrimary && await deleteDbRecord(id)) {
+    clearLegacySnapshot();
+    return;
   }
 
-  await deleteDbRecord(id);
+  indexedDbPrimary = false;
+
+  if (await replaceDbRecords(nextRecords)) {
+    indexedDbPrimary = true;
+    clearLegacySnapshot();
+    return;
+  }
+
+  if (!persistLegacySnapshot(nextRecords)) {
+    throw new Error("브라우저 임시저장 공간에서 거래를 정리하지 못했습니다.");
+  }
 }
 
 function mergeRecords(
@@ -410,21 +469,14 @@ async function ensureLoadedAsync() {
     );
 
     if (dbRecords !== null) {
-      let migrated = true;
-
-      for (const record of records) {
-        if (!(await putDbRecord(record))) {
-          migrated = false;
-          break;
-        }
+      indexedDbPrimary = await replaceDbRecords(records);
+      if (indexedDbPrimary) {
+        clearLegacySnapshot();
+      } else {
+        persistLegacySnapshot(records);
       }
-
-      if (migrated) {
-        try {
-          persistLegacySnapshot(records);
-        } catch {
-        }
-      }
+    } else {
+      indexedDbPrimary = false;
     }
 
     loaded = true;
@@ -684,7 +736,7 @@ export function stopPendingTransactionQueue(
   }
 }
 
-export function enqueuePendingTransaction(
+export async function enqueuePendingTransaction(
   input: {
     owner: string;
     label: string;
@@ -701,11 +753,9 @@ export function enqueuePendingTransaction(
     throw new Error("로그인 사용자를 확인할 수 없습니다.");
   }
 
-  const baseRecords = loaded
-    ? records
-    : mergeRecords(records, readLegacyRecords());
+  await ensureLoadedAsync();
 
-  const existing = baseRecords.find(
+  const existing = records.find(
     record => record.id === requestId
   );
 
@@ -724,23 +774,18 @@ export function enqueuePendingTransaction(
     };
 
     const nextRecords = [
-      ...baseRecords,
+      ...records,
       record
     ];
 
-    persistLegacySnapshot(nextRecords);
+    await persistRecordBestEffort(record, nextRecords);
 
     records = nextRecords;
     emit();
     broadcastQueueChanged();
-
-    void putDbRecord(record);
-  } else {
-    records = baseRecords;
   }
 
-  void ensureLoadedAsync()
-    .then(() => processQueue(input.owner));
+  void processQueue(input.owner);
 }
 
 export function retryPendingTransaction(

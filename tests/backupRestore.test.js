@@ -89,3 +89,46 @@ test("request id conflict helper detects another item using the same request id"
   assert.deepEqual(conflicts, [{ requestId: "REQ1", id: "T1" }]);
 });
 
+
+test("invalid transaction calendar date is rejected", () => {
+  const document = sample();
+  document.payload.transactions[0].date = "2026-02-30";
+  assert.throws(
+    () => validateBackupDocument(document),
+    error => error instanceof BackupValidationError && error.code === "BACKUP_TRANSACTION_DATE_INVALID"
+  );
+});
+
+test("invalid billing month is rejected", () => {
+  const document = sample();
+  document.payload.transactions[0].billingMonth = "2026-13";
+  assert.throws(
+    () => validateBackupDocument(document),
+    error => error instanceof BackupValidationError && error.code === "BACKUP_TRANSACTION_BILLING_MONTH_INVALID"
+  );
+});
+
+test("invalid snapshot month is rejected", () => {
+  const document = sample();
+  document.payload.assetSnapshots[0].month = "2026-99";
+  assert.throws(
+    () => validateBackupDocument(document),
+    error => error instanceof BackupValidationError && error.code === "BACKUP_SNAPSHOT_MONTH_INVALID"
+  );
+});
+
+test("invalid investment trade date is rejected", () => {
+  const document = sample();
+  document.payload.investmentHoldings.push({ holdingId: "H1", accountId: "A1", stockCode: "005930" });
+  document.payload.investmentTrades.push({
+    investmentTradeId: "IT1",
+    tradeDate: "2026-02-31",
+    tradeType: "매수",
+    accountId: "A1",
+    holdingId: "H1"
+  });
+  assert.throws(
+    () => validateBackupDocument(document),
+    error => error instanceof BackupValidationError && error.code === "BACKUP_TRADE_DATE_INVALID"
+  );
+});

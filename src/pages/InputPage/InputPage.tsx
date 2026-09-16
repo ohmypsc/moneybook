@@ -2451,7 +2451,7 @@ export default function InputPage({
     const baseMemo = memo.trim();
 
     if (principal > 0 && principalCategory) {
-      enqueuePendingTransaction({
+      await enqueuePendingTransaction({
         owner: userName,
         label: `대출 원금 · ${formatMoney(principal)} · ${loanLabel}`,
         payload: {
@@ -2470,7 +2470,7 @@ export default function InputPage({
     }
 
     if (interest > 0 && interestCategory) {
-      enqueuePendingTransaction({
+      await enqueuePendingTransaction({
         owner: userName,
         label: `대출 이자 · ${formatMoney(interest)} · ${loanLabel}`,
         payload: {
@@ -2775,7 +2775,7 @@ export default function InputPage({
        * 이 함수가 성공한 순간부터 앱을 닫아도 같은 requestId로
        * 다시 저장할 수 있습니다.
        */
-      enqueuePendingTransaction({
+      await enqueuePendingTransaction({
         owner:
           userName,
 

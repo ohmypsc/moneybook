@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 
 import { getSession, logout } from "../../api/auth";
+import { clearBootstrapMemoryCache } from "../../api/bootstrapCache";
+import { clearDashboardPersistentSnapshot, invalidateDashboardCache } from "../../api/dashboard";
+import { clearInvestmentPrefetchCache } from "../../api/investments";
+import { clearManagedSettingsCache } from "../../api/settingsManagement";
 import { confirmAction } from "../../utils/confirmAction";
 import PwaInstallPrompt from "../../components/pwa/PwaInstallPrompt/PwaInstallPrompt";
 import { Button } from "../../components/common/Button/Button";
@@ -92,12 +96,25 @@ export function ProfileSettings() {
 
         try {
             await logout();
-
-            window.location.reload();
         } finally {
+            invalidateDashboardCache();
+            clearDashboardPersistentSnapshot();
+            clearBootstrapMemoryCache();
+            clearInvestmentPrefetchCache();
+            clearManagedSettingsCache();
+
+            try {
+                window.localStorage.removeItem(
+                    "moneybook:last-authenticated-user:v1"
+                );
+            } catch {
+                /* 저장소 사용 불가 환경에서는 서버 세션만 종료합니다. */
+            }
+
             setLoggingOut(
                 false
             );
+            window.location.reload();
         }
     }
 

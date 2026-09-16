@@ -1,3 +1,4 @@
+import { pbkdf2Sync } from "node:crypto";
 import test from "node:test";
 import assert from "node:assert/strict";
 
@@ -6,7 +7,8 @@ import {
   createSessionToken,
   getSession,
   safeEqual,
-  verifySessionToken
+  verifySessionToken,
+  verifyStoredPassword
 } from "../worker/auth.js";
 
 const env = {
@@ -52,4 +54,19 @@ test("session cookie keeps strict secure host-only attributes", () => {
   assert.match(cookie, /HttpOnly/);
   assert.match(cookie, /Secure/);
   assert.match(cookie, /SameSite=Strict/);
+});
+
+function toBase64Url(buffer) {
+  return Buffer.from(buffer).toString("base64url");
+}
+
+test("verifyStoredPassword supports PBKDF2 hashes and legacy plaintext", async () => {
+  const salt = Buffer.from("0123456789abcdef", "utf8");
+  const iterations = 120000;
+  const hash = pbkdf2Sync("secret-password", salt, iterations, 32, "sha256");
+  const stored = `pbkdf2-sha256$${iterations}$${toBase64Url(salt)}$${toBase64Url(hash)}`;
+
+  assert.equal(await verifyStoredPassword("secret-password", stored), true);
+  assert.equal(await verifyStoredPassword("wrong", stored), false);
+  assert.equal(await verifyStoredPassword("pw1", "pw1"), true);
 });

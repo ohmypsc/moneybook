@@ -161,7 +161,7 @@ export function TransactionImportSheet({
     return null;
   }
 
-  function handleSave() {
+  async function handleSave() {
     const validationError = validateSelected();
     if (validationError) {
       setError(validationError);
@@ -180,7 +180,7 @@ export function TransactionImportSheet({
         const benefitRule = bootstrap.automationSettings?.benefitRules.find(
           rule => rule.accountId === item.paymentMethodId && benefitRuleActive(rule, item.date)
         );
-        enqueuePendingTransaction({
+        await enqueuePendingTransaction({
           owner: userName,
           label: `${item.merchant} · ${formatMoney(item.amount)}`,
           payload: {

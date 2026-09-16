@@ -1,3 +1,5 @@
+import { dateOnly, monthOnly } from "./date.js";
+
 export class BackupValidationError extends Error {
   constructor(code, message) {
     super(message);
@@ -112,6 +114,12 @@ export function validateBackupDocument(input) {
   for (const transaction of transactions) {
     const type = text(transaction?.type);
     if (!TRANSACTION_TYPES.has(type)) fail("BACKUP_TRANSACTION_TYPE_INVALID", `거래 유형이 올바르지 않습니다: ${type}`);
+    const transactionDate = text(transaction?.date);
+    if (!dateOnly(transactionDate)) fail("BACKUP_TRANSACTION_DATE_INVALID", `거래 날짜가 올바르지 않습니다: ${transaction?.transactionId ?? ""}`);
+    for (const [field, value] of [["청구월", transaction?.billingMonth], ["청구월 수정값", transaction?.billingOverride]]) {
+      const month = text(value);
+      if (month && !monthOnly(month)) fail("BACKUP_TRANSACTION_BILLING_MONTH_INVALID", `${field}이 올바르지 않습니다: ${transaction?.transactionId ?? ""}`);
+    }
     const amount = Number(transaction?.amount);
     if (!Number.isFinite(amount) || amount <= 0) fail("BACKUP_TRANSACTION_AMOUNT_INVALID", `거래 금액이 올바르지 않습니다: ${transaction?.transactionId ?? ""}`);
     requireReference(transaction?.categoryId, categoryIds, "거래의 카테고리");
@@ -124,7 +132,7 @@ export function validateBackupDocument(input) {
   const snapshotMonths = new Set();
   for (const snapshot of assetSnapshots) {
     const month = text(snapshot?.month);
-    if (!/^\d{4}-\d{2}$/.test(month)) fail("BACKUP_SNAPSHOT_MONTH_INVALID", `자산 스냅샷 월이 올바르지 않습니다: ${month}`);
+    if (!monthOnly(month)) fail("BACKUP_SNAPSHOT_MONTH_INVALID", `자산 스냅샷 월이 올바르지 않습니다: ${month}`);
     if (snapshotMonths.has(month)) fail("BACKUP_DUPLICATE_SNAPSHOT", `중복된 자산 스냅샷 월이 있습니다: ${month}`);
     snapshotMonths.add(month);
   }
@@ -136,6 +144,8 @@ export function validateBackupDocument(input) {
 
   for (const trade of investmentTrades) {
     if (!TRADE_TYPES.has(text(trade?.tradeType))) fail("BACKUP_TRADE_TYPE_INVALID", `투자 거래 유형이 올바르지 않습니다: ${trade?.tradeType ?? ""}`);
+    const tradeDate = text(trade?.tradeDate ?? trade?.date);
+    if (!dateOnly(tradeDate)) fail("BACKUP_TRADE_DATE_INVALID", `투자 거래 날짜가 올바르지 않습니다: ${trade?.investmentTradeId ?? ""}`);
     requireReference(trade?.accountId, accountIds, "투자 거래의 계좌");
     requireReference(trade?.holdingId, holdingIds, "투자 거래의 보유종목");
   }

@@ -4,6 +4,33 @@ const SESSION_MAX_AGE = 60 * 60 * 24 * 400;
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
+const PASSWORD_HASH_PREFIX = "pbkdf2-sha256";
+const PASSWORD_HASH_MIN_ITERATIONS = 100000;
+
+async function pbkdf2Sha256(password, salt, iterations) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(String(password)),
+    "PBKDF2",
+    false,
+    ["deriveBits"]
+  );
+
+  const bits = await crypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      hash: "SHA-256",
+      salt,
+      iterations
+    },
+    key,
+    256
+  );
+
+  return new Uint8Array(bits);
+}
+
+
 function isObject(value) {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -48,6 +75,41 @@ export async function safeEqual(valueA, valueB) {
   }
 
   return difference === 0;
+}
+
+export async function verifyStoredPassword(password, storedValue) {
+  const stored = String(storedValue ?? "");
+  if (!stored) return false;
+
+  if (!stored.startsWith(`${PASSWORD_HASH_PREFIX}$`)) {
+    // 기존 LOGIN_USERS 평문 형식을 당장 깨뜨리지 않기 위한 호환 경로입니다.
+    return safeEqual(password, stored);
+  }
+
+  const parts = stored.split("$");
+  if (parts.length !== 4) return false;
+
+  const iterations = Number(parts[1]);
+  if (!Number.isInteger(iterations) || iterations < PASSWORD_HASH_MIN_ITERATIONS) {
+    return false;
+  }
+
+  try {
+    const salt = base64UrlToBytes(parts[2]);
+    const expected = base64UrlToBytes(parts[3]);
+    if (salt.length < 16 || expected.length !== 32) return false;
+
+    const actual = await pbkdf2Sha256(password, salt, iterations);
+    if (actual.length !== expected.length) return false;
+
+    let difference = 0;
+    for (let index = 0; index < actual.length; index += 1) {
+      difference |= actual[index] ^ expected[index];
+    }
+    return difference === 0;
+  } catch {
+    return false;
+  }
 }
 
 function bytesToBase64Url(bytes) {

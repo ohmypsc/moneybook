@@ -7,7 +7,7 @@ import {
   getLoginUsers,
   getSession,
   isSameOrigin,
-  safeEqual
+  verifyStoredPassword
 } from "./auth.js";
 
 import {
@@ -1435,7 +1435,7 @@ async function handleLogin(
   if (
     !stored ||
     !(
-      await safeEqual(
+      await verifyStoredPassword(
         password,
         stored
       )
@@ -3816,6 +3816,13 @@ async function mbD1LinkedBenefitUpdateStatements(env, current, model, actor, ses
   return statements;
 }
 
+function mbD1LooksLikeRequestIdUniqueConflict(error, tableName) {
+  const message = error instanceof Error ? error.message : String(error || "");
+  return message.includes("UNIQUE constraint failed") &&
+    message.includes(`${tableName}.household_id`) &&
+    message.includes(`${tableName}.request_id`);
+}
+
 async function mbD1HandleTransactionMutation(path, body, session, env) {
   const actor = session.name;
   if (path === "/api/transactions") {
@@ -3942,7 +3949,30 @@ async function mbD1HandleTransactionMutation(path, body, session, env) {
       );
     }
 
-    await env.DB.batch(statements);
+    try {
+      await env.DB.batch(statements);
+    } catch (error) {
+      if (mbD1LooksLikeRequestIdUniqueConflict(error, "transactions")) {
+        const duplicate = await mbD1First(
+          env,
+          "SELECT transaction_id FROM transactions WHERE household_id=? AND request_id=? LIMIT 1",
+          [MB_D1_HOUSEHOLD_ID, requestId]
+        );
+        if (duplicate?.transaction_id) {
+          const transaction = await mbD1TransactionById(env, duplicate.transaction_id, true);
+          return {
+            created: false,
+            duplicate: true,
+            transactionId: duplicate.transaction_id,
+            requestId,
+            row: transaction?.row || 0,
+            transaction,
+            serverElapsedMs: Date.now() - started
+          };
+        }
+      }
+      throw error;
+    }
     const transaction = await mbD1TransactionById(env, transactionId, true);
     return {
       created: true,
@@ -4768,7 +4798,30 @@ async function mbD1HandleTradeMutation(path, body, session, env, ctx) {
       "UPDATE holdings SET quantity=?,avg_buy_price=?,book_cost_krw=?,value_krw=?,return_rate=?,managed_by_trades=1,version=version+1,updated_at=?,updated_by=? WHERE household_id=? AND holding_id=?"
     ).bind(state.quantity, state.avgBuyPrice, state.bookCostKrw, valueKrw, returnRate, now, actor, MB_D1_HOUSEHOLD_ID, holding.holdingId));
     statements.push(await mbD1InsertChange(env, "investment_trade", tradeId, "created", 1, session, { accountId, holdingId: holding.holdingId, tradeType: model.tradeType }));
-    await env.DB.batch(statements);
+    try {
+      await env.DB.batch(statements);
+    } catch (error) {
+      if (mbD1LooksLikeRequestIdUniqueConflict(error, "investment_trades")) {
+        const duplicate = await mbD1First(
+          env,
+          "SELECT investment_trade_id FROM investment_trades WHERE household_id=? AND request_id=? LIMIT 1",
+          [MB_D1_HOUSEHOLD_ID, requestId]
+        );
+        if (duplicate?.investment_trade_id) {
+          const trade = (await mbD1Trades(env, true)).find(
+            (item) => item.investmentTradeId === duplicate.investment_trade_id
+          ) || null;
+          return {
+            created: false,
+            duplicate: true,
+            investmentTradeId: duplicate.investment_trade_id,
+            requestId,
+            trade
+          };
+        }
+      }
+      throw error;
+    }
     if (ctx?.waitUntil) ctx.waitUntil(mbD1RefreshQuotes(env, true));
     const trade = (await mbD1Trades(env, true)).find((item) => item.investmentTradeId === tradeId) || null;
     return {
