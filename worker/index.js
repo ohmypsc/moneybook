@@ -5570,11 +5570,23 @@ async function mbD1RefreshRealEstate(body, session, env) {
   } catch (error) {
     mbD1Fail(error?.code || "REAL_ESTATE_REFRESH_FAILED", error instanceof Error ? error.message : "아파트 실거래 시세를 갱신하지 못했습니다.", 400);
   }
-  const change = await mbD1InsertChange(env, "real_estate", propertyId, "refreshed", null, session, {
-    estimatedValueKrw: item.estimatedValueKrw,
-    tradeCount: item.estimateTradeCount
-  });
-  await env.DB.batch([change]);
+  try {
+    const change = await mbD1InsertChange(env, "real_estate", propertyId, "updated", null, session, {
+      refresh: true,
+      estimatedValueKrw: item.estimatedValueKrw,
+      tradeCount: item.estimateTradeCount
+    });
+    await env.DB.batch([change]);
+  } catch (error) {
+    console.error("real estate refresh change-log failed", propertyId, error);
+    mbD1Fail(
+      "REAL_ESTATE_CHANGE_LOG_FAILED",
+      error instanceof Error
+        ? `시세는 갱신됐지만 변경 이력 저장에 실패했습니다: ${error.message}`
+        : "시세는 갱신됐지만 변경 이력 저장에 실패했습니다.",
+      500
+    );
+  }
   return { refreshed: true, item };
 }
 
