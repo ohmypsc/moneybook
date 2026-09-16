@@ -43,6 +43,10 @@ import {
   isPreDiscountBenefitTransaction
 } from "../../utils/transactionBenefits";
 
+import {
+  isSettlementTransaction
+} from "../../utils/settlement";
+
 import { Button } from "../../components/common/Button/Button";
 import { Card } from "../../components/common/Card/Card";
 import { Money, formatMoney } from "../../components/common/Money/Money";
@@ -425,7 +429,11 @@ export default function HomePage({
       const items = response.data.items || [];
       setDetailItems(
         type === "수입"
-          ? items.filter(item => !isPreDiscountBenefitTransaction(item))
+          ? items.filter(
+              item =>
+                !isPreDiscountBenefitTransaction(item) &&
+                !isSettlementTransaction(item)
+            )
           : items
       );
     } catch (error) {

@@ -33,6 +33,9 @@ import type {
 } from "../../utils/inputPreferences";
 
 import { confirmAction } from "../../utils/confirmAction";
+import {
+  isSystemSettlementCategory
+} from "../../utils/settlement";
 import { Button } from "../../components/common/Button/Button";
 import { Card } from "../../components/common/Card/Card";
 import {
@@ -266,7 +269,8 @@ export function CategorySettings() {
                     category =>
                         category.type ===
                             selectedType &&
-                        !category.isDeleted
+                        !category.isDeleted &&
+                        !isSystemSettlementCategory(category)
                 ),
             [
                 categories,
@@ -282,7 +286,8 @@ export function CategorySettings() {
                     category =>
                         category.type ===
                             selectedType &&
-                        category.isDeleted
+                        category.isDeleted &&
+                        !isSystemSettlementCategory(category)
                 ),
             [
                 categories,
@@ -300,7 +305,8 @@ export function CategorySettings() {
                     .filter(
                         category =>
                             !category.isDeleted &&
-                            category.active
+                            category.active &&
+                            !isSystemSettlementCategory(category)
                     )
                     .map(
                         category => ({

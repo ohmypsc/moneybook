@@ -86,3 +86,19 @@ test("picker selection maps account roles to the right state value", () => {
   assert.equal(getPickerSelectedValue("loanAccount", selection), "TO");
   assert.equal(getPickerSelectedValue("investmentAccount", selection), "INV");
 });
+
+test("manual income picker hides internal settlement category", () => {
+  const categories: Category[] = [
+    { categoryId: "salary", type: "수입", name: "급여" },
+    { categoryId: "settlement", type: "수입", name: "정산받음" }
+  ];
+
+  const items = getPickerItems("category", {
+    ...accountContext,
+    mode: "income",
+    categories,
+    spendingTargets: []
+  });
+
+  assert.deepEqual(items.map(item => item.label), ["급여"]);
+});

@@ -1,4 +1,8 @@
 import {
+  isSystemSettlementCategory
+} from "../../utils/settlement.ts";
+
+import {
   CARD_PAYMENT_CATEGORY,
   CARD_PREPAYMENT_CATEGORY,
   LOAN_INTEREST_CATEGORY_NAME,
@@ -236,7 +240,8 @@ export function getPickerItems(
     const inputCategories = context.categories.filter(
       category =>
         category.name !== LOAN_PRINCIPAL_CATEGORY_NAME &&
-        category.name !== LOAN_INTEREST_CATEGORY_NAME
+        category.name !== LOAN_INTEREST_CATEGORY_NAME &&
+        !isSystemSettlementCategory(category)
     );
 
     const visibleCategories = context.mode === "transfer"

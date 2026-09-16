@@ -30,6 +30,8 @@ export interface CalendarTransaction {
 
   category: string;
 
+  settlementEligible?: boolean;
+
   amount: number;
 
   fromAccountId:

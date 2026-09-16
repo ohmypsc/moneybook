@@ -43,6 +43,8 @@ import {
   isPreDiscountBenefitTransaction
 } from "../../utils/transactionBenefits";
 
+import { isSettlementTransaction } from "../../utils/settlement";
+
 import { Button } from "../../components/common/Button/Button";
 import { Card } from "../../components/common/Card/Card";
 import { Money, formatMoney } from "../../components/common/Money/Money";
@@ -73,12 +75,19 @@ function moveMonth(month: string, offset: number) {
 
 function getTransactionTitle(transaction: Transaction) {
   if (isPreDiscountBenefitTransaction(transaction)) return "선할인 혜택";
+  if (isSettlementTransaction(transaction)) return transaction.description || "정산받음";
   return transaction.description || transaction.category || transaction.type;
 }
 
 function getTransactionMeta(transaction: Transaction) {
   if (isPreDiscountBenefitTransaction(transaction)) {
     return "충전 선할인 혜택 · 수입 합계 제외";
+  }
+
+  if (isSettlementTransaction(transaction)) {
+    return [transaction.toAccount, "회식비 정산 · 수입 합계 제외", transaction.createdBy]
+      .filter(Boolean)
+      .join(" · ");
   }
 
   if (transaction.type === "수입") {
@@ -531,6 +540,7 @@ export default function HistoryPage({
             ) : (
               searchItems.map(transaction => {
                 const isPreDiscountBenefit = isPreDiscountBenefitTransaction(transaction);
+                const isSettlement = isSettlementTransaction(transaction);
 
                 return (
                   <article key={transaction.transactionId} className={styles.transactionRow}>
@@ -541,7 +551,7 @@ export default function HistoryPage({
                     </div>
                     <div className={styles.transactionActions}>
                       <strong className={
-                        isPreDiscountBenefit
+                        isPreDiscountBenefit || isSettlement
                           ? styles.transfer
                           : transaction.type === "수입"
                             ? styles.income
@@ -553,7 +563,7 @@ export default function HistoryPage({
                           amount={transaction.type === "지출" ? -transaction.amount : transaction.amount}
                           showPlus={transaction.type === "수입"}
                           tone={
-                            isPreDiscountBenefit
+                            isPreDiscountBenefit || isSettlement
                               ? "muted"
                               : transaction.type === "수입"
                                 ? "income"
@@ -639,7 +649,7 @@ export default function HistoryPage({
                   <strong><Money amount={report.summary.monthExpenseGross} absolute /></strong>
                 </div>
                 <div>
-                  <span>환불</span>
+                  <span>환불·정산</span>
                   <strong><Money amount={report.summary.monthRefunds} absolute tone="positive" /></strong>
                 </div>
                 <div>

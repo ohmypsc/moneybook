@@ -28,6 +28,8 @@ import { markLedgerChanged } from "../../utils/ledgerEvents";
 import { clearBootstrapMemoryCache } from "../../api/bootstrapCache";
 import { getSeoulDateString } from "../../utils/dateTime";
 import { confirmAction } from "../../utils/confirmAction";
+import { isSystemSettlementCategory } from "../../utils/settlement";
+
 import { Button } from "../../components/common/Button/Button";
 import { Card } from "../../components/common/Card/Card";
 import { formatMoney } from "../../components/common/Money/Money";
@@ -148,7 +150,13 @@ export default function AutomationSettingsPanel() {
   }, [activeAccounts]);
 
   const recurringCategories = useMemo(
-    () => categories.filter(category => !category.isDeleted && category.active && category.type === recurringForm.type),
+    () => categories.filter(
+      category =>
+        !category.isDeleted &&
+        category.active &&
+        category.type === recurringForm.type &&
+        !isSystemSettlementCategory(category)
+    ),
     [categories, recurringForm.type]
   );
 

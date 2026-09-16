@@ -45,6 +45,7 @@ const LEDGER_MUTATION_PATHS =
     ...MASTER_MUTATION_PATHS,
 
     "/api/transactions",
+    "/api/transactions/settle",
     "/api/transactions/update",
     "/api/transactions/delete",
     "/api/transactions/restore",

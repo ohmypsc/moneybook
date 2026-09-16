@@ -27,6 +27,15 @@ import {
 } from "./domain/benefit.js";
 
 import {
+  SETTLEMENT_EXPENSE_CATEGORY_NAME,
+  SETTLEMENT_INCOME_CATEGORY_NAME,
+  SETTLEMENT_REQUEST_PREFIX,
+  isSettlementEligibleCategory as mbD1IsSettlementEligibleCategory,
+  isSettlementRequestId as mbD1IsSettlementRequestId,
+  settlementRemaining as mbD1SettlementRemaining
+} from "./domain/settlement.js";
+
+import {
   getLoginRateLimitStatus,
   recordLoginFailureState
 } from "./domain/loginRateLimit.js";
@@ -2096,10 +2105,13 @@ async function mbD1ValidateLedgerDate(env, dateValue) {
 }
 
 function mbD1MapCategory(row) {
+  const type = mbD1Text(row.type);
+  const name = mbD1Text(row.name);
   return {
     categoryId: mbD1Text(row.category_id),
-    type: mbD1Text(row.type),
-    name: mbD1Text(row.name),
+    type,
+    name,
+    settlementEligible: mbD1IsSettlementEligibleCategory(type, name),
     active: mbD1Bool(row.is_active),
     isDeleted: Boolean(row.deleted_at),
     row: mbD1Number(row.source_row, 0)
@@ -2155,6 +2167,7 @@ function mbD1MapTransactionRow(row) {
     type: mbD1Text(row.type),
     categoryId: row.category_id || null,
     category: mbD1Text(row.category_name),
+    settlementEligible: mbD1IsSettlementEligibleCategory(row.type, row.category_name),
     amount: mbD1Number(row.amount),
     fromAccountId: row.from_account_id || null,
     fromAccount: mbD1Text(row.from_account_name) || null,
@@ -2818,6 +2831,86 @@ function mbD1BenefitRuleIsActive(rule, date) {
   return true;
 }
 
+async function mbD1EnsureSystemCategory(env, { categoryId, type, name }) {
+  let row = await mbD1First(
+    env,
+    "SELECT category_id,name,is_active,deleted_at,type FROM categories WHERE household_id=? AND type=? AND name=? ORDER BY CASE WHEN deleted_at IS NULL AND is_active=1 THEN 0 ELSE 1 END LIMIT 1",
+    [MB_D1_HOUSEHOLD_ID, type, name]
+  );
+  if (row?.category_id && !row.deleted_at && mbD1Bool(row.is_active)) return row;
+
+  const now = mbD1Now();
+  if (row?.category_id) {
+    await env.DB.prepare(
+      "UPDATE categories SET is_active=1,deleted_at=NULL,deleted_by=NULL,updated_at=?,updated_by=? WHERE household_id=? AND category_id=?"
+    ).bind(now, "system", MB_D1_HOUSEHOLD_ID, row.category_id).run();
+    return { ...row, is_active: 1, deleted_at: null };
+  }
+
+  await env.DB.prepare(
+    "INSERT OR IGNORE INTO categories (category_id,household_id,type,name,is_active,created_at,updated_at,created_by,updated_by,deleted_at,deleted_by,source_row) VALUES (?,?,?,?,?,?,?,?,?,?,?,NULL)"
+  ).bind(
+    categoryId,
+    MB_D1_HOUSEHOLD_ID,
+    type,
+    name,
+    1,
+    now,
+    now,
+    "system",
+    "system",
+    null,
+    null
+  ).run();
+
+  row = await mbD1First(
+    env,
+    "SELECT category_id,name,is_active,deleted_at,type FROM categories WHERE household_id=? AND type=? AND name=? AND deleted_at IS NULL AND is_active=1 ORDER BY updated_at DESC LIMIT 1",
+    [MB_D1_HOUSEHOLD_ID, type, name]
+  );
+  if (!row?.category_id) mbD1Fail("SYSTEM_CATEGORY_CREATE_FAILED", `${name} 카테고리를 준비하지 못했습니다.`, 500);
+  return row;
+}
+
+async function mbD1SettlementExpenseCategory(env) {
+  const existing = await mbD1First(
+    env,
+    "SELECT category_id,name,is_active,deleted_at,type FROM categories WHERE household_id=? AND type='지출' AND name=? ORDER BY updated_at DESC LIMIT 1",
+    [MB_D1_HOUSEHOLD_ID, SETTLEMENT_EXPENSE_CATEGORY_NAME]
+  );
+  if (existing?.category_id) return existing;
+
+  const now = mbD1Now();
+  await env.DB.prepare(
+    "INSERT OR IGNORE INTO categories (category_id,household_id,type,name,is_active,created_at,updated_at,created_by,updated_by,deleted_at,deleted_by,source_row) VALUES (?,?,?,?,?,?,?,?,?,?,?,NULL)"
+  ).bind(
+    "CAT_SYSTEM_GROUP_MEAL",
+    MB_D1_HOUSEHOLD_ID,
+    "지출",
+    SETTLEMENT_EXPENSE_CATEGORY_NAME,
+    1,
+    now,
+    now,
+    "system",
+    "system",
+    null,
+    null
+  ).run();
+  return mbD1First(
+    env,
+    "SELECT category_id,name,is_active,deleted_at,type FROM categories WHERE household_id=? AND type='지출' AND name=? ORDER BY updated_at DESC LIMIT 1",
+    [MB_D1_HOUSEHOLD_ID, SETTLEMENT_EXPENSE_CATEGORY_NAME]
+  );
+}
+
+async function mbD1SettlementIncomeCategory(env) {
+  return mbD1EnsureSystemCategory(env, {
+    categoryId: "CAT_SYSTEM_SETTLEMENT_RECEIVED",
+    type: "수입",
+    name: SETTLEMENT_INCOME_CATEGORY_NAME
+  });
+}
+
 async function mbD1BenefitCategory(env) {
   let row = await mbD1First(
     env,
@@ -3152,6 +3245,7 @@ async function mbD1InputPreferencesData(env) {
 }
 
 async function mbD1BuildBootstrap(env) {
+  await mbD1SettlementExpenseCategory(env);
   const [members, rawAccounts, categoryRows, ledgerConfig, inputPreferences, automationSettings] = await Promise.all([
     mbD1Members(env),
     mbD1RawAccounts(env),
@@ -3194,6 +3288,7 @@ async function mbD1BuildBootstrap(env) {
 }
 
 async function mbD1GetCategoriesData(env, url) {
+  await mbD1SettlementExpenseCategory(env);
   const includeDeleted = ["1", "true"].includes((url.searchParams.get("includeDeleted") || "").toLowerCase());
   const type = mbD1Text(url.searchParams.get("type"));
   let rows = await mbD1All(
@@ -3283,6 +3378,46 @@ async function mbD1GetTransactionsData(env, url) {
   return {
     total,
     items: rows.map(mbD1MapTransactionRow)
+  };
+}
+
+async function mbD1SettlementSummaryData(env, transactionId) {
+  const original = await mbD1TransactionById(env, transactionId, true);
+  if (!original || original.isDeleted) {
+    mbD1Fail("TRANSACTION_NOT_FOUND", "정산할 거래를 찾을 수 없습니다.", 404);
+  }
+  if (!mbD1IsSettlementEligibleCategory(original.type, original.category)) {
+    mbD1Fail("SETTLEMENT_NOT_ELIGIBLE", "정산받기는 정산 가능한 지출에서만 사용할 수 있습니다.");
+  }
+
+  const rows = await mbD1All(
+    env,
+    `SELECT t.transaction_id,t.request_id,t.date,t.amount,t.to_account_id,a.display_name AS to_account_name
+     FROM transactions t
+     LEFT JOIN accounts a ON a.account_id=t.to_account_id
+     WHERE t.household_id=? AND t.reversal_of=? AND t.deleted_at IS NULL
+     ORDER BY t.date ASC,t.created_at ASC`,
+    [MB_D1_HOUSEHOLD_ID, transactionId]
+  );
+  const linkedAmounts = rows.map((row) => mbD1Number(row.amount));
+  const settlements = rows
+    .filter((row) => mbD1IsSettlementRequestId(row.request_id))
+    .map((row) => ({
+      transactionId: mbD1Text(row.transaction_id),
+      date: mbD1Text(row.date),
+      amount: mbD1Number(row.amount),
+      toAccountId: row.to_account_id || null,
+      toAccount: mbD1Text(row.to_account_name) || null
+    }));
+  const settledAmount = settlements.reduce((sum, item) => sum + item.amount, 0);
+  const offsetAmount = linkedAmounts.reduce((sum, value) => sum + value, 0);
+  return {
+    transactionId,
+    originalAmount: mbD1Number(original.amount),
+    settledAmount: mbD1Round(settledAmount, 2),
+    otherOffsetAmount: mbD1Round(Math.max(0, offsetAmount - settledAmount), 2),
+    remainingAmount: mbD1Round(mbD1SettlementRemaining(original.amount, linkedAmounts), 2),
+    settlements
   };
 }
 
@@ -4015,6 +4150,117 @@ async function mbD1HandleTransactionMutation(path, body, session, env) {
   const current = await mbD1TransactionById(env, transactionId, true);
   if (!current) mbD1Fail("TRANSACTION_NOT_FOUND", "거래를 찾을 수 없습니다.", 404);
 
+  if (path === "/api/transactions/settle") {
+    if (current.isDeleted) mbD1Fail("TRANSACTION_NOT_FOUND", "정산할 거래를 찾을 수 없습니다.", 404);
+    if (!mbD1IsSettlementEligibleCategory(current.type, current.category)) {
+      mbD1Fail("SETTLEMENT_NOT_ELIGIBLE", "정산받기는 정산 가능한 지출에서만 사용할 수 있습니다.");
+    }
+
+    const amount = Number(body.amount);
+    if (!Number.isFinite(amount) || amount <= 0) mbD1Fail("INVALID_SETTLEMENT_AMOUNT", "정산받은 금액을 입력해주세요.");
+    const receiveAccountId = mbD1Text(body.toAccountId);
+    if (!receiveAccountId) mbD1Fail("SETTLEMENT_ACCOUNT_REQUIRED", "정산금을 받은 현금 또는 계좌를 선택해주세요.");
+    const receiveAccount = await mbD1AccountById(env, receiveAccountId, false);
+    if (!receiveAccount || !receiveAccount.active || receiveAccount.isDeleted) {
+      mbD1Fail("SETTLEMENT_ACCOUNT_NOT_FOUND", "정산금을 받은 계좌를 찾을 수 없습니다.");
+    }
+    if (receiveAccount.accountType !== "자산" || ["신용카드", "체크카드"].includes(receiveAccount.subType)) {
+      mbD1Fail("SETTLEMENT_ACCOUNT_INVALID", "정산금은 현금이나 입금 가능한 자산 계좌로 받아주세요.");
+    }
+
+    const before = await mbD1SettlementSummaryData(env, transactionId);
+    if (amount > before.remainingAmount + 0.0001) {
+      mbD1Fail(
+        "SETTLEMENT_AMOUNT_EXCEEDS_REMAINING",
+        `남은 정산 가능 금액 ${Math.round(before.remainingAmount).toLocaleString("ko-KR")}원을 초과할 수 없습니다.`
+      );
+    }
+
+    const rawRequestId = mbD1Text(body.requestId);
+    const requestId = rawRequestId
+      ? (rawRequestId.startsWith(SETTLEMENT_REQUEST_PREFIX) ? rawRequestId : `${SETTLEMENT_REQUEST_PREFIX}${rawRequestId}`)
+      : `${SETTLEMENT_REQUEST_PREFIX}${transactionId}_${mbD1Id("REQ")}`;
+    const duplicateRow = await mbD1First(
+      env,
+      "SELECT transaction_id FROM transactions WHERE household_id=? AND request_id=? LIMIT 1",
+      [MB_D1_HOUSEHOLD_ID, requestId]
+    );
+    if (duplicateRow?.transaction_id) {
+      return {
+        created: false,
+        duplicate: true,
+        transaction: await mbD1TransactionById(env, duplicateRow.transaction_id, true),
+        summary: await mbD1SettlementSummaryData(env, transactionId)
+      };
+    }
+
+    const category = await mbD1SettlementIncomeCategory(env);
+    const date = await mbD1ValidateLedgerDate(env, body.date || mbD1CurrentDateSeoul());
+    const model = await mbD1BuildTransactionModel(
+      env,
+      {
+        date,
+        type: "수입",
+        categoryId: category.category_id,
+        amount,
+        toAccountId: receiveAccountId,
+        description: `${current.description || current.category || SETTLEMENT_EXPENSE_CATEGORY_NAME} 정산받음`,
+        memo: mbD1Text(body.memo),
+        reversalOf: transactionId
+      },
+      null,
+      true
+    );
+    const settlementTransactionId = mbD1Id("TX");
+    const now = mbD1Now();
+    const enteredBy = await mbD1MemberIdByName(env, actor);
+    const insert = env.DB.prepare(
+      `INSERT INTO transactions (
+        transaction_id,household_id,request_id,date,type,category_id,amount,
+        from_account_id,to_account_id,payment_method_id,spending_target,spender_member_id,
+        entered_by_member_id,description,memo,billing_month_override,billing_month,group_id,reversal_of,
+        version,created_at,updated_at,created_by,updated_by,deleted_at,deleted_by,source_row
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+    ).bind(
+      settlementTransactionId, MB_D1_HOUSEHOLD_ID, requestId, model.date, model.type, model.categoryId, model.amount,
+      model.fromAccountId, model.toAccountId, model.paymentMethodId, model.spendingTarget, model.spenderMemberId,
+      enteredBy, model.description || null, model.memo || null, model.billingOverride, model.billingMonth,
+      model.groupId, model.reversalOf, 1, now, now, actor, actor, null, null, null
+    );
+    const change = await mbD1InsertChange(env, "transaction", settlementTransactionId, "created", 1, session, {
+      date: model.date,
+      type: model.type,
+      amount: model.amount,
+      settlementOf: transactionId
+    });
+    try {
+      await env.DB.batch([insert, change]);
+    } catch (error) {
+      if (mbD1LooksLikeRequestIdUniqueConflict(error, "transactions")) {
+        const duplicate = await mbD1First(
+          env,
+          "SELECT transaction_id FROM transactions WHERE household_id=? AND request_id=? LIMIT 1",
+          [MB_D1_HOUSEHOLD_ID, requestId]
+        );
+        if (duplicate?.transaction_id) {
+          return {
+            created: false,
+            duplicate: true,
+            transaction: await mbD1TransactionById(env, duplicate.transaction_id, true),
+            summary: await mbD1SettlementSummaryData(env, transactionId)
+          };
+        }
+      }
+      throw error;
+    }
+    return {
+      created: true,
+      duplicate: false,
+      transaction: await mbD1TransactionById(env, settlementTransactionId, true),
+      summary: await mbD1SettlementSummaryData(env, transactionId)
+    };
+  }
+
   if (path === "/api/transactions/update") {
     if (current.isDeleted) mbD1Fail("TRANSACTION_NOT_FOUND", "수정할 거래를 찾을 수 없습니다.", 404);
     if (!mbD1Has(body, "expectedUpdatedAtMs")) mbD1Fail("UPDATE_VERSION_REQUIRED", "거래의 최신 버전 정보가 필요합니다. 화면을 새로고침한 뒤 다시 시도하세요.", 409);
@@ -4025,14 +4271,14 @@ async function mbD1HandleTransactionMutation(path, body, session, env) {
     if (current.updatedAtMs !== expected) mbD1Fail("CONCURRENT_MODIFICATION", "거래가 다른 기기에서 먼저 수정되었습니다. 최신 내용을 다시 불러온 뒤 수정하세요.", 409);
     const financialKeys = ["date","type","categoryId","amount","fromAccountId","toAccountId","paymentMethodId","spendingTarget","billingMonth","groupId","reversalOf"];
     const financialChange = financialKeys.some((key) => mbD1Has(body, key));
-    if (financialChange && current.reversalOf) mbD1Fail("REVERSAL_FINANCIAL_EDIT_NOT_ALLOWED", "환불/취소 역거래의 금액·계좌·유형은 직접 수정할 수 없습니다.");
+    if (financialChange && current.reversalOf) mbD1Fail("REVERSAL_FINANCIAL_EDIT_NOT_ALLOWED", "환불/정산 거래의 금액·계좌·유형은 직접 수정할 수 없습니다.");
     if (financialChange && !current.reversalOf) {
       const reversal = await mbD1First(
         env,
         "SELECT transaction_id FROM transactions WHERE household_id=? AND reversal_of=? AND deleted_at IS NULL LIMIT 1",
         [MB_D1_HOUSEHOLD_ID, transactionId]
       );
-      if (reversal) mbD1Fail("ORIGINAL_WITH_REVERSAL_EDIT_NOT_ALLOWED", "이미 환불/취소가 연결된 원거래의 금액·계좌·유형은 직접 수정할 수 없습니다.");
+      if (reversal) mbD1Fail("ORIGINAL_WITH_REVERSAL_EDIT_NOT_ALLOWED", "이미 환불/정산이 연결된 원거래의 금액·계좌·유형은 직접 수정할 수 없습니다.");
     }
     const model = await mbD1BuildTransactionModel(env, body, current, false);
     const now = mbD1Now();
@@ -4066,7 +4312,7 @@ async function mbD1HandleTransactionMutation(path, body, session, env) {
         "SELECT transaction_id FROM transactions WHERE household_id=? AND reversal_of=? AND deleted_at IS NULL LIMIT 1",
         [MB_D1_HOUSEHOLD_ID, transactionId]
       );
-      if (reversal) mbD1Fail("ORIGINAL_WITH_REVERSAL_DELETE_NOT_ALLOWED", "활성 환불/취소가 연결된 원거래는 삭제할 수 없습니다. 연결된 역거래를 먼저 삭제하세요.");
+      if (reversal) mbD1Fail("ORIGINAL_WITH_REVERSAL_DELETE_NOT_ALLOWED", "활성 환불/정산이 연결된 원거래는 삭제할 수 없습니다. 연결된 거래를 먼저 삭제하세요.");
     }
     const now = mbD1Now();
     const versionRow = await mbD1First(env, "SELECT version FROM transactions WHERE transaction_id=?", [transactionId]);
@@ -4108,7 +4354,16 @@ async function mbD1HandleTransactionMutation(path, body, session, env) {
     }
     if (current.reversalOf) {
       const original = await mbD1TransactionById(env, current.reversalOf, true);
-      if (!original || original.isDeleted) mbD1Fail("REVERSAL_ORIGINAL_NOT_ACTIVE", "원거래가 활성 상태가 아니어서 환불/취소 역거래를 복원할 수 없습니다.");
+      if (!original || original.isDeleted) mbD1Fail("REVERSAL_ORIGINAL_NOT_ACTIVE", "원거래가 활성 상태가 아니어서 환불/정산 거래를 복원할 수 없습니다.");
+      if (mbD1IsSettlementRequestId(current.requestId)) {
+        const summary = await mbD1SettlementSummaryData(env, current.reversalOf);
+        if (mbD1Number(current.amount) > summary.remainingAmount + 0.0001) {
+          mbD1Fail(
+            "SETTLEMENT_RESTORE_EXCEEDS_REMAINING",
+            `현재 남은 정산 가능 금액 ${Math.round(summary.remainingAmount).toLocaleString("ko-KR")}원을 초과해 이 정산 내역을 복원할 수 없습니다.`
+          );
+        }
+      }
     }
     await mbD1BuildTransactionModel(env, {}, current, false);
     const now = mbD1Now();
@@ -5737,6 +5992,11 @@ async function mbD1ProductionRoute(request, url, session, env, ctx) {
       if (path === "/api/settings/ledger-config") return mbD1Envelope(await mbD1GetLedgerConfigData(env));
       if (path === "/api/settings/automation") return mbD1Envelope(await mbD1AutomationSettingsData(env));
       if (path === "/api/benefits/reward-balances") return mbD1Envelope(await mbD1BenefitRewardBalancesData(env));
+      if (path === "/api/transactions/settlement-summary") {
+        const transactionId = mbD1Text(url.searchParams.get("transactionId"));
+        if (!transactionId) mbD1Fail("TRANSACTION_ID_REQUIRED", "transactionId가 필요합니다.");
+        return mbD1Envelope(await mbD1SettlementSummaryData(env, transactionId));
+      }
       if (path === "/api/transactions") return mbD1Envelope(await mbD1GetTransactionsData(env, url));
       if (path === "/api/asset-snapshots") return mbD1Envelope(await mbD1GetAssetSnapshotsData(env, url));
       if (path === "/api/investments/accounts") return mbD1Envelope(await mbD1GetInvestmentAccountsData(env));
