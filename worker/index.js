@@ -1907,6 +1907,11 @@ async function handleBackendTest(
 
 const MB_D1_HOUSEHOLD_ID = "HH_MAIN";
 const MB_D1_API_VERSION = "D1-2.0";
+
+function mbD1AdminToolsEnabled(env) {
+  const value = String(env?.ENABLE_D1_ADMIN_TOOLS ?? "").trim().toLowerCase();
+  return value === "1" || value === "true" || value === "yes" || value === "on";
+}
 const MB_D1_QUOTE_REFRESH_MS = 5 * 60 * 1000;
 let mbD1LastQuoteRefreshAt = 0;
 let mbD1QuoteRefreshPromise = null;
@@ -5900,6 +5905,7 @@ export default {
     const automationSession = {
       name: "자동화"
     };
+    const cronErrors = [];
 
     try {
       const result = await mbD1ProcessRecurring(
@@ -5922,7 +5928,15 @@ export default {
           `[moneybook cron] recurring transactions created: ${result.created.length}`
         );
       }
+    } catch (error) {
+      cronErrors.push(error);
+      console.error(
+        "[moneybook cron] recurring transaction processing failed",
+        error
+      );
+    }
 
+    try {
       const refreshedHomes = await refreshAllRealEstateAssets(
         env,
         MB_D1_HOUSEHOLD_ID,
@@ -5940,11 +5954,15 @@ export default {
         console.log(`[moneybook cron] real estate refreshed: ${refreshedHomes.length}`);
       }
     } catch (error) {
+      cronErrors.push(error);
       console.error(
-        "[moneybook cron] recurring transaction processing failed",
+        "[moneybook cron] real estate refresh failed",
         error
       );
-      throw error;
+    }
+
+    if (cronErrors.length > 0) {
+      throw new AggregateError(cronErrors, "One or more Moneybook cron jobs failed.");
     }
   },
 
@@ -6052,6 +6070,18 @@ export default {
             "Set-Cookie":
               clearCookie()
           }
+        );
+      }
+
+      if (
+        (normalizedPath === "/api/admin/migrate-d1" ||
+          normalizedPath === "/api/admin/verify-d1") &&
+        !mbD1AdminToolsEnabled(env)
+      ) {
+        return errorResponse(
+          "NOT_FOUND",
+          "페이지를 찾을 수 없습니다.",
+          404
         );
       }
 
