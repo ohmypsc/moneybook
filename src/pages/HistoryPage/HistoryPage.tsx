@@ -39,6 +39,10 @@ import {
   subscribeLedgerChanges
 } from "../../utils/ledgerEvents";
 
+import {
+  isPreDiscountBenefitTransaction
+} from "../../utils/transactionBenefits";
+
 import { Button } from "../../components/common/Button/Button";
 import { Card } from "../../components/common/Card/Card";
 import { Money, formatMoney } from "../../components/common/Money/Money";
@@ -68,10 +72,15 @@ function moveMonth(month: string, offset: number) {
 }
 
 function getTransactionTitle(transaction: Transaction) {
+  if (isPreDiscountBenefitTransaction(transaction)) return "선할인 혜택";
   return transaction.description || transaction.category || transaction.type;
 }
 
 function getTransactionMeta(transaction: Transaction) {
+  if (isPreDiscountBenefitTransaction(transaction)) {
+    return "충전 선할인 혜택 · 수입 합계 제외";
+  }
+
   if (transaction.type === "수입") {
     return [transaction.description ? transaction.category : "", transaction.toAccount, transaction.createdBy]
       .filter(Boolean)
@@ -521,6 +530,8 @@ export default function HistoryPage({
               <p className={styles.empty}>조건에 맞는 거래가 없습니다.</p>
             ) : (
               searchItems.map(transaction => {
+                const isPreDiscountBenefit = isPreDiscountBenefitTransaction(transaction);
+
                 return (
                   <article key={transaction.transactionId} className={styles.transactionRow}>
                     <div className={styles.transactionMain}>
@@ -530,21 +541,25 @@ export default function HistoryPage({
                     </div>
                     <div className={styles.transactionActions}>
                       <strong className={
-                        transaction.type === "수입"
-                          ? styles.income
-                          : transaction.type === "지출"
-                            ? styles.expense
-                            : styles.transfer
+                        isPreDiscountBenefit
+                          ? styles.transfer
+                          : transaction.type === "수입"
+                            ? styles.income
+                            : transaction.type === "지출"
+                              ? styles.expense
+                              : styles.transfer
                       }>
                         <Money
                           amount={transaction.type === "지출" ? -transaction.amount : transaction.amount}
                           showPlus={transaction.type === "수입"}
                           tone={
-                            transaction.type === "수입"
-                              ? "income"
-                              : transaction.type === "지출"
-                                ? "expense"
-                                : "muted"
+                            isPreDiscountBenefit
+                              ? "muted"
+                              : transaction.type === "수입"
+                                ? "income"
+                                : transaction.type === "지출"
+                                  ? "expense"
+                                  : "muted"
                           }
                         />
                       </strong>

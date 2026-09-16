@@ -52,6 +52,10 @@ import {
 } from "../../utils/ledgerEvents";
 
 import {
+    isPreDiscountBenefitTransaction
+} from "../../utils/transactionBenefits";
+
+import {
     confirmAction
 } from "../../utils/confirmAction";
 
@@ -383,6 +387,11 @@ function sumTransactions(
                 type === "수입"
             ) {
                 if (
+                    isPreDiscountBenefitTransaction(item)
+                ) {
+                    return sum;
+                }
+                if (
                     item.reversalOf &&
                     item.type ===
                         "지출"
@@ -477,6 +486,12 @@ function getTransactionMethod(
     transaction:
         CalendarTransaction
 ) {
+    if (
+        isPreDiscountBenefitTransaction(transaction)
+    ) {
+        return "충전 선할인 혜택 · 수입 합계 제외";
+    }
+
     const recordedBy =
         transaction.createdBy
             ? `기록 ${transaction.createdBy}`
@@ -540,6 +555,12 @@ function getTransactionMethod(
 function getTransactionTitle(
     transaction: CalendarTransaction
 ) {
+    if (
+        isPreDiscountBenefitTransaction(transaction)
+    ) {
+        return "선할인 혜택";
+    }
+
     return (
         transaction.description ||
         transaction.category ||
@@ -3077,8 +3098,10 @@ export default function CalendarPage({
                                                                             className={[
                                                                                 styles.transactionType,
 
-                                                                                transaction.type ===
-                                                                                "지출"
+                                                                                isPreDiscountBenefitTransaction(transaction)
+                                                                                    ? styles.transactionTypeTransfer
+                                                                                    : transaction.type ===
+                                                                                      "지출"
                                                                                     ? styles.transactionTypeExpense
                                                                                     : transaction.type ===
                                                                                       "수입"
@@ -3088,7 +3111,7 @@ export default function CalendarPage({
                                                                                 " "
                                                                             )}
                                                                         >
-                                                                            {transaction.type}
+                                                                            {isPreDiscountBenefitTransaction(transaction) ? "혜택" : transaction.type}
                                                                         </span>
 
                                                                         <span
@@ -3129,8 +3152,10 @@ export default function CalendarPage({
                                                                     className={[
                                                                         styles.transactionAmount,
 
-                                                                        transaction.type ===
-                                                                        "지출"
+                                                                        isPreDiscountBenefitTransaction(transaction)
+                                                                            ? styles.amountTransfer
+                                                                            : transaction.type ===
+                                                                              "지출"
                                                                             ? styles.amountExpense
                                                                             : transaction.type ===
                                                                               "수입"

@@ -39,6 +39,10 @@ import {
   getSeoulTimestampLabel
 } from "../../utils/dateTime";
 
+import {
+  isPreDiscountBenefitTransaction
+} from "../../utils/transactionBenefits";
+
 import { Button } from "../../components/common/Button/Button";
 import { Card } from "../../components/common/Card/Card";
 import { Money, formatMoney } from "../../components/common/Money/Money";
@@ -57,6 +61,7 @@ interface DashboardCardView {
   estimatedRemaining: number;
   name: string;
   paymentDay: number | null;
+  billingCutoffDay: number | null;
   owner: string;
   paymentAccountId: string | null;
   paymentAccountName: string | null;
@@ -113,6 +118,41 @@ function addMonths(month: string, delta: number) {
   if (!match) return month;
   const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1 + delta, 1));
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function getBillingPeriodLabel(
+  billingMonth: string,
+  cutoffDay: number | null,
+  paymentDay: number | null
+) {
+  if (!cutoffDay || !paymentDay) return null;
+
+  const endMonth = addMonths(
+    billingMonth,
+    paymentDay <= cutoffDay ? -1 : 0
+  );
+  const endMatch = /^(\d{4})-(\d{2})$/.exec(endMonth);
+  if (!endMatch) return null;
+
+  const endYear = Number(endMatch[1]);
+  const endMonthNumber = Number(endMatch[2]);
+  const endDay = Math.min(cutoffDay, daysInMonth(endYear, endMonthNumber));
+
+  const previousMonth = addMonths(endMonth, -1);
+  const previousMatch = /^(\d{4})-(\d{2})$/.exec(previousMonth);
+  if (!previousMatch) return null;
+
+  const previousYear = Number(previousMatch[1]);
+  const previousMonthNumber = Number(previousMatch[2]);
+  const previousCutoff = Math.min(
+    cutoffDay,
+    daysInMonth(previousYear, previousMonthNumber)
+  );
+  const start = new Date(
+    Date.UTC(previousYear, previousMonthNumber - 1, previousCutoff + 1)
+  );
+
+  return `${start.getUTCMonth() + 1}/${start.getUTCDate()}~${endMonthNumber}/${endDay} 사용분`;
 }
 
 function dateDistance(from: string, to: string) {
@@ -382,7 +422,12 @@ export default function HomePage({
         type,
         limit: 500
       });
-      setDetailItems(response.data.items || []);
+      const items = response.data.items || [];
+      setDetailItems(
+        type === "수입"
+          ? items.filter(item => !isPreDiscountBenefitTransaction(item))
+          : items
+      );
     } catch (error) {
       setDetailError(
         error instanceof Error
@@ -405,7 +450,6 @@ export default function HomePage({
     );
 
     const baseCards = (Array.isArray(dashboard.cards) ? dashboard.cards : [])
-      .filter(card => Number(card.estimatedRemaining) > 0)
       .map(card => {
         const account = accountMap.get(card.accountId);
 
@@ -413,6 +457,7 @@ export default function HomePage({
           ...card,
           name: card.accountName || account?.displayName || "신용카드",
           paymentDay: account?.paymentDay ?? null,
+          billingCutoffDay: account?.billingCutoffDay ?? null,
           owner: account?.owner || "",
           paymentAccountId: account?.paymentAccountId ?? null
         };
@@ -472,6 +517,7 @@ export default function HomePage({
     const items: UpcomingOutflowItem[] = [];
 
     for (const card of cardSummary.cards) {
+      if (Number(card.estimatedRemaining) <= 0) continue;
       const dueDate = dateForMonthDay(card.billingMonth, card.paymentDay);
       if (!dueDate) continue;
       const distance = dateDistance(today, dueDate);
@@ -674,7 +720,7 @@ export default function HomePage({
         <div className={styles.sectionHeader}>
           <div>
             <h2>카드 결제 예정</h2>
-            <span className={styles.sectionHint}>결제계좌 잔액과 부족 예상액까지 확인</span>
+            <span className={styles.sectionHint}>입력 내역 기준 · 결제계좌 잔액과 부족액 확인</span>
           </div>
           <strong className={styles.sectionTotal}><Money amount={cardSummary.total} absolute /></strong>
         </div>
@@ -689,7 +735,8 @@ export default function HomePage({
                     <strong>{card.name}</strong>
                     <span>
                       {[
-                        card.paymentDay ? `${card.paymentDay}일 결제` : "결제일 미설정",
+                        card.paymentDay ? `${Number(card.billingMonth.slice(5))}월 ${card.paymentDay}일 결제` : "결제일 미설정",
+                        getBillingPeriodLabel(card.billingMonth, card.billingCutoffDay, card.paymentDay),
                         card.owner
                       ].filter(Boolean).join(" · ")}
                     </span>
@@ -701,19 +748,27 @@ export default function HomePage({
                   </div>
                 </div>
                 <div className={styles.cardAmountBlock}>
-                  <strong className={styles.cardAmount}>
-                    <Money amount={card.estimatedRemaining} absolute />
-                  </strong>
-                  {card.paymentAccountShortage > 0 && (
-                    <span className={styles.shortageBadge}>
-                      부족 <Money amount={card.paymentAccountShortage} absolute />
-                    </span>
+                  {Number(card.usage) <= 0 ? (
+                    <span className={styles.cardEmptyStatus}>대상 사용 내역 없음</span>
+                  ) : Number(card.estimatedRemaining) <= 0 ? (
+                    <span className={styles.cardPaidStatus}>결제 반영 완료</span>
+                  ) : (
+                    <>
+                      <strong className={styles.cardAmount}>
+                        <Money amount={card.estimatedRemaining} absolute />
+                      </strong>
+                      {card.paymentAccountShortage > 0 && (
+                        <span className={styles.shortageBadge}>
+                          부족 <Money amount={card.paymentAccountShortage} absolute />
+                        </span>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
             ))
           ) : (
-            <p className={styles.emptyText}>이번 달 결제 예정액이 없습니다.</p>
+            <p className={styles.emptyText}>등록된 신용카드가 없습니다.</p>
           )}
         </Card>
       </section>

@@ -23,6 +23,10 @@ import {
 } from "./domain/automation.js";
 
 import {
+  isPreDiscountBenefitTransaction as mbD1IsPreDiscountBenefitTransaction
+} from "./domain/benefit.js";
+
+import {
   getLoginRateLimitStatus,
   recordLoginFailureState
 } from "./domain/loginRateLimit.js";
@@ -2456,6 +2460,8 @@ function mbD1NetMonthStats(transactions, month) {
   const categoryNet = new Map();
   const targetNet = new Map();
   for (const tx of monthTx) {
+    if (mbD1IsPreDiscountBenefitTransaction(tx)) continue;
+
     if (tx.reversalOf) {
       const original = byId.get(tx.reversalOf);
       if (original && original.type === "지출" && tx.type === "수입") {
