@@ -23,6 +23,7 @@ export interface BottomSheetProps {
   onClose: () => void;
   ariaLabel?: string;
   contentClassName?: string;
+  size?: "default" | "large";
 }
 
 export function BottomSheet({
@@ -30,7 +31,8 @@ export function BottomSheet({
   children,
   onClose,
   ariaLabel,
-  contentClassName = ""
+  contentClassName = "",
+  size = "default"
 }: BottomSheetProps) {
   const sheetRef = useRef<HTMLElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -102,7 +104,7 @@ export function BottomSheet({
     >
       <section
         ref={sheetRef}
-        className={styles.sheet}
+        className={[styles.sheet, size === "large" ? styles.large : ""].filter(Boolean).join(" ")}
         role="dialog"
         aria-modal="true"
         aria-label={ariaLabel || title}

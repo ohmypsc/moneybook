@@ -25,6 +25,11 @@
   animation: bottomSheetIn 170ms ease-out;
 }
 
+.large {
+  height: min(92dvh, 860px);
+  max-height: 92dvh;
+}
+
 @keyframes bottomSheetIn {
   from {
     transform: translateY(14px);
