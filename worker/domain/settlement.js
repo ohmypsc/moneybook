@@ -1,12 +1,17 @@
 export const SETTLEMENT_EXPENSE_CATEGORY_NAME = "회식비";
 export const SETTLEMENT_INCOME_CATEGORY_NAME = "정산받음";
 export const BENEFIT_INCOME_CATEGORY_NAME = "캐시백/할인혜택";
+export const CASHBACK_INCOME_CATEGORY_NAME = "캐시백";
 export const SETTLEMENT_REQUEST_PREFIX = "SETTLEMENT_";
 
 export const SYSTEM_CATEGORY_IDS = {
   settlementExpense: "CAT_SYSTEM_GROUP_MEAL",
   settlementIncome: "CAT_SYSTEM_SETTLEMENT_RECEIVED",
   benefitIncome: "CAT_SYSTEM_CASHBACK_BENEFIT"
+};
+
+export const DEFAULT_CATEGORY_IDS = {
+  cashbackIncome: "CAT_DEFAULT_CASHBACK_INCOME"
 };
 
 export function systemCategoryRole(type, name, categoryId = "") {

@@ -31,8 +31,10 @@ import {
   SETTLEMENT_EXPENSE_CATEGORY_NAME,
   SETTLEMENT_INCOME_CATEGORY_NAME,
   BENEFIT_INCOME_CATEGORY_NAME,
+  CASHBACK_INCOME_CATEGORY_NAME,
   SETTLEMENT_REQUEST_PREFIX,
   SYSTEM_CATEGORY_IDS,
+  DEFAULT_CATEGORY_IDS,
   isSettlementEligibleCategory as mbD1IsSettlementEligibleCategory,
   isSettlementRequestId as mbD1IsSettlementRequestId,
   settlementRemaining as mbD1SettlementRemaining,
@@ -2867,6 +2869,49 @@ async function mbD1EnsureSystemCategory(env, { categoryId, type, name }) {
   return row;
 }
 
+async function mbD1EnsureDefaultCashbackIncomeCategory(env) {
+  const categoryId = DEFAULT_CATEGORY_IDS.cashbackIncome;
+
+  // 고정 ID가 한 번이라도 만들어졌다면 이후 이름 변경/삭제는 사용자의 선택으로 존중한다.
+  const byId = await mbD1First(
+    env,
+    "SELECT category_id,name,is_active,deleted_at,type FROM categories WHERE household_id=? AND category_id=? LIMIT 1",
+    [MB_D1_HOUSEHOLD_ID, categoryId]
+  );
+  if (byId?.category_id) return byId;
+
+  // 기존에 사용자가 만든 '캐시백' 카테고리가 있거나 삭제 이력이 있으면 중복 생성하지 않는다.
+  const existing = await mbD1First(
+    env,
+    "SELECT category_id,name,is_active,deleted_at,type FROM categories WHERE household_id=? AND type='수입' AND name=? ORDER BY updated_at DESC LIMIT 1",
+    [MB_D1_HOUSEHOLD_ID, CASHBACK_INCOME_CATEGORY_NAME]
+  );
+  if (existing?.category_id) return existing;
+
+  const now = mbD1Now();
+  await env.DB.prepare(
+    "INSERT OR IGNORE INTO categories (category_id,household_id,type,name,is_active,created_at,updated_at,created_by,updated_by,deleted_at,deleted_by,source_row) VALUES (?,?,?,?,?,?,?,?,?,?,?,NULL)"
+  ).bind(
+    categoryId,
+    MB_D1_HOUSEHOLD_ID,
+    "수입",
+    CASHBACK_INCOME_CATEGORY_NAME,
+    1,
+    now,
+    now,
+    "system-default",
+    "system-default",
+    null,
+    null
+  ).run();
+
+  return mbD1First(
+    env,
+    "SELECT category_id,name,is_active,deleted_at,type FROM categories WHERE household_id=? AND category_id=? LIMIT 1",
+    [MB_D1_HOUSEHOLD_ID, categoryId]
+  );
+}
+
 async function mbD1SettlementExpenseCategory(env) {
   return mbD1EnsureSystemCategory(env, {
     categoryId: SYSTEM_CATEGORY_IDS.settlementExpense,
@@ -3182,6 +3227,7 @@ async function mbD1InputPreferencesData(env) {
 
 async function mbD1BuildBootstrap(env) {
   await mbD1SettlementExpenseCategory(env);
+  await mbD1EnsureDefaultCashbackIncomeCategory(env);
   const [members, rawAccounts, categoryRows, ledgerConfig, inputPreferences, automationSettings] = await Promise.all([
     mbD1Members(env),
     mbD1RawAccounts(env),
@@ -3225,6 +3271,7 @@ async function mbD1BuildBootstrap(env) {
 
 async function mbD1GetCategoriesData(env, url) {
   await mbD1SettlementExpenseCategory(env);
+  await mbD1EnsureDefaultCashbackIncomeCategory(env);
   const includeDeleted = ["1", "true"].includes((url.searchParams.get("includeDeleted") || "").toLowerCase());
   const type = mbD1Text(url.searchParams.get("type"));
   let rows = await mbD1All(

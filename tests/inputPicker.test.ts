@@ -87,10 +87,12 @@ test("picker selection maps account roles to the right state value", () => {
   assert.equal(getPickerSelectedValue("investmentAccount", selection), "INV");
 });
 
-test("manual income picker hides internal settlement category", () => {
+test("manual income picker hides internal settlement/benefit categories but keeps cash cashback", () => {
   const categories: Category[] = [
     { categoryId: "salary", type: "수입", name: "급여" },
-    { categoryId: "settlement", type: "수입", name: "정산받음" }
+    { categoryId: "cashback", type: "수입", name: "캐시백" },
+    { categoryId: "settlement", type: "수입", name: "정산받음" },
+    { categoryId: "benefit", type: "수입", name: "캐시백/할인혜택" }
   ];
 
   const items = getPickerItems("category", {
@@ -100,5 +102,5 @@ test("manual income picker hides internal settlement category", () => {
     spendingTargets: []
   });
 
-  assert.deepEqual(items.map(item => item.label), ["급여"]);
+  assert.deepEqual(items.map(item => item.label), ["급여", "캐시백"]);
 });

@@ -30,4 +30,5 @@ test("시스템 카테고리는 이름 또는 고정 ID로 역할을 유지한�
   assert.equal(systemCategoryRole("지출", "이름이 바뀜", "CAT_SYSTEM_GROUP_MEAL"), "settlement_expense");
   assert.equal(systemCategoryRole("수입", "정산받음", "CAT_X"), "settlement_income");
   assert.equal(systemCategoryRole("수입", "캐시백/할인혜택", "CAT_X"), "benefit_income");
+  assert.equal(systemCategoryRole("수입", "캐시백", "CAT_DEFAULT_CASHBACK_INCOME"), "");
 });
