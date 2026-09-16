@@ -1,27 +1,354 @@
-.section { display: grid; gap: var(--space-4); }
-.heading { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-3); }
-.heading h2, .formHeading h3 { margin: 0; }
-.heading p { margin: 4px 0 0; color: var(--color-text-subtle); font-size: 13px; }
-.list { display: grid; gap: var(--space-3); }
-.assetCard { display: grid; gap: var(--space-3); }
-.assetTop { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-3); }
-.assetName { display: block; font-size: 17px; }
-.assetMeta, .details span, .trades span { display: block; color: var(--color-text-subtle); font-size: 13px; line-height: 1.55; }
-.value { white-space: nowrap; font-size: 18px; }
-.details, .trades { display: grid; gap: 3px; }
-.trades { padding-top: var(--space-2); border-top: 1px solid var(--color-border); }
-.actions, .formActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
-.formCard { display: grid; gap: var(--space-4); }
-.formHeading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
-.formGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
-.formGrid label { display: grid; gap: 6px; font-size: 13px; font-weight: 700; }
-.formGrid input, .formGrid select { width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); color: inherit; font: inherit; }
-.full { grid-column: 1 / -1; }
-.inline { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2); }
-.regionResults { display: grid; gap: 6px; }
-.regionResults button { display: flex; justify-content: space-between; gap: var(--space-2); padding: 10px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface-soft); color: inherit; text-align: left; cursor: pointer; }
-.regionResults small { color: var(--color-text-subtle); }
-.message { margin: 0; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--color-surface-soft); font-size: 13px; }
-.error { margin: 0; color: var(--color-danger); }
-.muted { margin: 0; color: var(--color-text-subtle); }
-@media (max-width: 640px) { .heading, .assetTop { align-items: stretch; } .assetTop { flex-direction: column; } .formGrid { grid-template-columns: 1fr; } .full { grid-column: auto; } .inline { grid-template-columns: 1fr; } }
+.section {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.heading h2,
+.formHeading h3 {
+  margin: 0;
+}
+
+.heading p,
+.formHeading p {
+  margin: 4px 0 0;
+  color: var(--color-text-subtle);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.emptyCard {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-4);
+  padding-block: 34px;
+  text-align: center;
+}
+
+.homeIcon {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 18px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  font-size: 30px;
+  line-height: 1;
+}
+
+.emptyCopy {
+  display: grid;
+  gap: 7px;
+  max-width: 420px;
+}
+
+.emptyCopy strong {
+  font-size: 18px;
+}
+
+.emptyCopy p {
+  margin: 0;
+  color: var(--color-text-subtle);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.assetCard {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.assetHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-5);
+}
+
+.assetIdentity {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.homeBadge {
+  justify-self: start;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--color-surface-soft);
+  color: var(--color-text-subtle);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.assetName {
+  font-size: 19px;
+  line-height: 1.35;
+}
+
+.assetMeta {
+  color: var(--color-text-subtle);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.priceBlock {
+  display: grid;
+  justify-items: end;
+  gap: 3px;
+  flex: 0 0 auto;
+}
+
+.priceBlock > span {
+  color: var(--color-text-subtle);
+  font-size: 12px;
+}
+
+.value {
+  white-space: nowrap;
+  font-size: 22px;
+}
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.summaryGrid > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+}
+
+.summaryGrid strong {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.summaryLabel {
+  color: var(--color-text-subtle);
+  font-size: 11px;
+}
+
+.positive {
+  color: var(--color-positive, var(--color-text));
+}
+
+.negative {
+  color: var(--color-danger);
+}
+
+.trades {
+  display: grid;
+  gap: 8px;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.tradeTitle {
+  color: var(--color-text-subtle);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.tradeRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 44px;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: 13px;
+}
+
+.tradeRow span:last-child {
+  color: var(--color-text-subtle);
+  text-align: right;
+}
+
+.actions,
+.formActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.formCard {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.formHeading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.coreFields {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.coreFields label,
+.formGrid label {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.coreFields input,
+.formGrid input,
+.formGrid select {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 13px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: inherit;
+  font: inherit;
+}
+
+.coreFields input:focus,
+.formGrid input:focus,
+.formGrid select:focus {
+  outline: 2px solid color-mix(in srgb, var(--color-primary) 24%, transparent);
+  outline-offset: 1px;
+  border-color: var(--color-primary);
+}
+
+.coreFields small {
+  color: var(--color-text-subtle);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.55;
+}
+
+.splitFields {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(130px, 0.6fr);
+  gap: var(--space-3);
+}
+
+.optionalDetails {
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  padding: 2px 0;
+}
+
+.optionalDetails summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 2px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+  list-style: none;
+}
+
+.optionalDetails summary::-webkit-details-marker {
+  display: none;
+}
+
+.optionalDetails summary::after {
+  content: "⌄";
+  margin-left: auto;
+  color: var(--color-text-subtle);
+  transition: transform 160ms ease;
+}
+
+.optionalDetails[open] summary::after {
+  transform: rotate(180deg);
+}
+
+.optionalDetails summary span {
+  color: var(--color-text-subtle);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  padding: 2px 0 var(--space-4);
+}
+
+.full {
+  grid-column: 1 / -1;
+}
+
+.actionSpacer {
+  flex: 1 1 auto;
+}
+
+.message {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-soft);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.error {
+  margin: 0;
+  color: var(--color-danger);
+}
+
+.muted {
+  margin: 0;
+  color: var(--color-text-subtle);
+}
+
+@media (max-width: 640px) {
+  .assetHeader {
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .priceBlock {
+    justify-items: start;
+  }
+
+  .summaryGrid,
+  .splitFields,
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .full {
+    grid-column: auto;
+  }
+
+  .tradeRow {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .tradeRow span:last-child {
+    grid-column: 1 / -1;
+    text-align: left;
+    font-size: 12px;
+  }
+}

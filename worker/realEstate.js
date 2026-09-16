@@ -123,8 +123,8 @@ export async function saveRealEstateAsset(env, householdId, input, actor, now) {
   const valuationMode = input?.valuationMode === "manual" ? "manual" : "auto";
   const manualValueKrw = valuationMode === "manual" ? Math.round(positiveNumber(input?.manualValueKrw)) : nullableNumber(input?.manualValueKrw);
   if (!name || !apartmentName) throw Object.assign(new Error("아파트 이름을 입력해주세요."), { code: "REAL_ESTATE_NAME_REQUIRED" });
-  if (!address) throw Object.assign(new Error("주소를 입력해주세요."), { code: "REAL_ESTATE_ADDRESS_REQUIRED" });
-  if (valuationMode === "auto" && !/^\d{5}$/.test(lawdCode)) throw Object.assign(new Error("자동 시세를 사용하려면 지역코드를 확인해주세요. 주소 검색으로 자동 설정할 수 있습니다."), { code: "REAL_ESTATE_LAWD_REQUIRED" });
+  if (!address) throw Object.assign(new Error("지역을 입력해주세요."), { code: "REAL_ESTATE_ADDRESS_REQUIRED" });
+  if (valuationMode === "auto" && !/^\d{5}$/.test(lawdCode)) throw Object.assign(new Error("자동 시세를 사용하려면 국토부 지역코드 5자리를 입력해주세요."), { code: "REAL_ESTATE_LAWD_REQUIRED" });
   if (!exclusiveAreaSqm) throw Object.assign(new Error("전용면적을 입력해주세요."), { code: "REAL_ESTATE_AREA_REQUIRED" });
   if (valuationMode === "manual" && !manualValueKrw) throw Object.assign(new Error("수동 평가액을 입력해주세요."), { code: "REAL_ESTATE_MANUAL_VALUE_REQUIRED" });
 

@@ -1439,7 +1439,7 @@ export default function AssetsPage({
               )
           }
         >
-          부동산
+          우리집
         </button>
 
 
