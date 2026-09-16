@@ -3392,7 +3392,7 @@ async function mbD1SettlementSummaryData(env, transactionId) {
 
   const rows = await mbD1All(
     env,
-    `SELECT t.transaction_id,t.request_id,t.date,t.amount,t.to_account_id,a.display_name AS to_account_name
+    `SELECT t.transaction_id,t.request_id,t.date,t.amount,t.to_account_id,t.memo,a.display_name AS to_account_name
      FROM transactions t
      LEFT JOIN accounts a ON a.account_id=t.to_account_id
      WHERE t.household_id=? AND t.reversal_of=? AND t.deleted_at IS NULL
@@ -3407,7 +3407,8 @@ async function mbD1SettlementSummaryData(env, transactionId) {
       date: mbD1Text(row.date),
       amount: mbD1Number(row.amount),
       toAccountId: row.to_account_id || null,
-      toAccount: mbD1Text(row.to_account_name) || null
+      toAccount: mbD1Text(row.to_account_name) || null,
+      memo: mbD1Text(row.memo) || null
     }));
   const settledAmount = settlements.reduce((sum, item) => sum + item.amount, 0);
   const offsetAmount = linkedAmounts.reduce((sum, value) => sum + value, 0);

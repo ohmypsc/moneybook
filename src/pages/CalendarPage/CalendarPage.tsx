@@ -57,6 +57,7 @@ import {
 } from "../../utils/dateTime";
 
 import {
+    markLedgerChanged,
     subscribeLedgerChanges
 } from "../../utils/ledgerEvents";
 
@@ -1856,6 +1857,7 @@ export default function CalendarPage({
             setSettlementMemo("");
             setActionFeedback(`${formatMoney(amount)} 정산을 반영했습니다.`);
             invalidateCalendarCache(month);
+            markLedgerChanged();
         } catch (settlementError) {
             setActionError(getErrorMessage(settlementError));
         } finally {
@@ -3431,12 +3433,33 @@ export default function CalendarPage({
 
                                                             {showCompactSettlementSummary && compactSettlementSummary && (
                                                                 <div className={styles.settlementOverview}>
-                                                                    <span>총 결제 <strong>{formatMoney(compactSettlementSummary.originalAmount)}</strong></span>
-                                                                    <span>정산 <strong>{formatMoney(compactSettlementSummary.settledAmount)}</strong></span>
-                                                                    {compactSettlementSummary.otherOffsetAmount > 0 && (
-                                                                        <span>환불·기타 <strong>{formatMoney(compactSettlementSummary.otherOffsetAmount)}</strong></span>
-                                                                    )}
-                                                                    <span className={styles.settlementOverviewNet}>내 부담 <strong>{formatMoney(compactSettlementSummary.remainingAmount)}</strong></span>
+                                                                    <div className={styles.settlementOverviewHeader}>
+                                                                        <div>
+                                                                            <span className={styles.settlementOverviewBadge}>정산 현황</span>
+                                                                            <p className={styles.settlementOverviewCaption}>정산받은 금액을 뺀 실제 내 부담이에요</p>
+                                                                        </div>
+                                                                        <div className={styles.settlementOverviewHero}>
+                                                                            <span>내 부담</span>
+                                                                            <strong>{formatMoney(compactSettlementSummary.remainingAmount)}</strong>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div className={styles.settlementOverviewGrid}>
+                                                                        <div>
+                                                                            <span>총 결제</span>
+                                                                            <strong>{formatMoney(compactSettlementSummary.originalAmount)}</strong>
+                                                                        </div>
+                                                                        <div>
+                                                                            <span>정산받음</span>
+                                                                            <strong>{formatMoney(compactSettlementSummary.settledAmount)}</strong>
+                                                                        </div>
+                                                                        {compactSettlementSummary.otherOffsetAmount > 0 && (
+                                                                            <div>
+                                                                                <span>환불·기타</span>
+                                                                                <strong>{formatMoney(compactSettlementSummary.otherOffsetAmount)}</strong>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
                                                                 </div>
                                                             )}
 
@@ -3513,9 +3536,17 @@ export default function CalendarPage({
                                                                     <div className={styles.settlementHeader}>
                                                                         <div>
                                                                             <p className={styles.editEyebrow}>회식비 정산</p>
-                                                                            <h3 className={styles.editTitle}>받은 돈만 반영</h3>
+                                                                            <h3 className={styles.editTitle}>정산 현황과 받은 내역</h3>
                                                                         </div>
-                                                                        <span className={styles.settlementHint}>수입 합계에는 포함되지 않아요</span>
+                                                                        <span className={styles.settlementHint}>정산금은 수입이 아니라 원래 지출에서 차감돼요</span>
+                                                                    </div>
+
+                                                                    <div className={styles.settlementHero}>
+                                                                        <div>
+                                                                            <span>현재 내 부담</span>
+                                                                            <strong>{formatMoney(settlementSummary.remainingAmount)}</strong>
+                                                                        </div>
+                                                                        <p>총 {formatMoney(settlementSummary.originalAmount)} 결제 중 {formatMoney(settlementSummary.settledAmount + settlementSummary.otherOffsetAmount)}이 정산·환불로 차감되었습니다.</p>
                                                                     </div>
 
                                                                     <div className={styles.settlementStats}>
@@ -3533,10 +3564,6 @@ export default function CalendarPage({
                                                                                 <strong>{formatMoney(settlementSummary.otherOffsetAmount)}</strong>
                                                                             </div>
                                                                         )}
-                                                                        <div>
-                                                                            <span>현재 내 실지출</span>
-                                                                            <strong>{formatMoney(settlementSummary.remainingAmount)}</strong>
-                                                                        </div>
                                                                     </div>
 
                                                                     {settlementSummary.remainingAmount > 0 ? (
@@ -3603,13 +3630,28 @@ export default function CalendarPage({
                                                                     )}
 
                                                                     {settlementSummary.settlements.length > 0 && (
-                                                                        <div className={styles.settlementHistory}>
-                                                                            {settlementSummary.settlements.map(item => (
-                                                                                <span key={item.transactionId}>
-                                                                                    {item.date} · {item.toAccount || "입금수단"} · {formatMoney(item.amount)}
-                                                                                </span>
-                                                                            ))}
-                                                                        </div>
+                                                                        <section className={styles.settlementHistory}>
+                                                                            <div className={styles.settlementHistoryHeader}>
+                                                                                <div>
+                                                                                    <span className={styles.settlementHistoryEyebrow}>정산 내역</span>
+                                                                                    <strong>{settlementSummary.settlements.length}건</strong>
+                                                                                </div>
+                                                                                <span>합계 {formatMoney(settlementSummary.settledAmount)}</span>
+                                                                            </div>
+                                                                            <div className={styles.settlementHistoryList}>
+                                                                                {settlementSummary.settlements.map(item => (
+                                                                                    <div className={styles.settlementHistoryItem} key={item.transactionId}>
+                                                                                        <div className={styles.settlementHistoryIcon}>↙</div>
+                                                                                        <div className={styles.settlementHistoryMain}>
+                                                                                            <strong>{item.toAccount || "입금수단"}</strong>
+                                                                                            <span>{item.date}</span>
+                                                                                            {item.memo && <p>{item.memo}</p>}
+                                                                                        </div>
+                                                                                        <strong className={styles.settlementHistoryAmount}>+{formatMoney(item.amount)}</strong>
+                                                                                    </div>
+                                                                                ))}
+                                                                            </div>
+                                                                        </section>
                                                                     )}
                                                                 </Card>
                                                             )}

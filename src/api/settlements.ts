@@ -9,6 +9,7 @@ export interface SettlementRecord {
   amount: number;
   toAccountId: string | null;
   toAccount: string | null;
+  memo?: string | null;
 }
 
 export interface SettlementSummary {

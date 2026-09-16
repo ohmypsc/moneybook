@@ -743,6 +743,8 @@
 
 .settlementPanel {
   margin-top: 12px;
+  border-color: var(--color-primary);
+  background: var(--color-surface-soft);
 }
 
 .settlementHeader {
@@ -754,23 +756,61 @@
 }
 
 .settlementHint {
+  max-width: 220px;
   color: var(--color-text-secondary);
-  font-size: 10px;
-  line-height: 1.4;
+  font-size: 11px;
+  line-height: 1.45;
   text-align: right;
+}
+
+.settlementHero {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.8fr) minmax(0, 1.6fr);
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 12px;
+  padding: 14px;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-blue);
+}
+
+.settlementHero > div {
+  display: grid;
+  gap: 3px;
+}
+
+.settlementHero span {
+  color: var(--color-primary);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.settlementHero strong {
+  color: var(--color-text-primary);
+  font-size: clamp(19px, 5vw, 25px);
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+
+.settlementHero p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.55;
 }
 
 .settlementStats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-  gap: 7px;
-  margin-bottom: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
 }
 
 .settlementStats > div {
   display: grid;
-  gap: 4px;
-  padding: 9px 8px;
+  gap: 5px;
+  padding: 11px 10px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-surface);
@@ -778,41 +818,139 @@
 
 .settlementStats span {
   color: var(--color-text-secondary);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .settlementStats strong {
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.3;
+  font-variant-numeric: tabular-nums;
 }
 
 .settlementForm {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+  padding-top: 2px;
 }
 
 .settlementComplete {
   margin: 0;
-  padding: 10px 11px;
-  border: 1px solid var(--color-border);
+  padding: 11px 12px;
+  border: 1px solid var(--color-primary);
   border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
+  background: var(--color-surface-blue);
+  color: var(--color-primary);
   font-size: 12px;
+  font-weight: 700;
 }
 
 .settlementHistory {
   display: grid;
-  gap: 4px;
-  margin-top: 10px;
+  gap: 9px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border);
+}
+
+.settlementHistoryHeader {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.settlementHistoryHeader > div {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.settlementHistoryEyebrow {
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.settlementHistoryHeader strong {
+  color: var(--color-primary);
+  font-size: 12px;
+}
+
+.settlementHistoryHeader > span {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
+
+.settlementHistoryList {
+  display: grid;
+  gap: 7px;
+}
+
+.settlementHistoryItem {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 11px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.settlementHistoryIcon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--color-surface-blue);
+  color: var(--color-primary);
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.settlementHistoryMain {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.settlementHistoryMain strong {
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settlementHistoryMain span {
   color: var(--color-text-secondary);
   font-size: 10px;
 }
 
+.settlementHistoryMain p {
+  margin: 2px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.settlementHistoryAmount {
+  color: var(--color-income);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 @media (max-width: 520px) {
-  .settlementStats {
+  .settlementHero {
     grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .settlementStats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .settlementForm {
@@ -824,6 +962,7 @@
   }
 
   .settlementHint {
+    max-width: none;
     text-align: left;
   }
 }
@@ -1046,41 +1185,100 @@
 
 /* 회식비 거래에서 정산 상태를 바로 확인하는 요약 */
 .settlementOverview {
+  display: grid;
+  gap: 11px;
+  margin: 10px 0 3px;
+  padding: 12px;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-blue);
+}
+
+.settlementOverviewHeader {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 6px 12px;
-  margin: 8px 0 2px;
-  padding: 8px 10px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settlementOverviewBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.settlementOverviewCaption {
+  margin: 5px 0 0;
   color: var(--color-text-secondary);
   font-size: 11px;
-  line-height: 1.4;
+  line-height: 1.35;
 }
 
-.settlementOverview strong {
-  margin-left: 3px;
+.settlementOverviewHero {
+  flex: 0 0 auto;
+  display: grid;
+  gap: 2px;
+  text-align: right;
+}
+
+.settlementOverviewHero span {
+  color: var(--color-primary);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.settlementOverviewHero strong {
   color: var(--color-text-primary);
-  font-size: 11px;
+  font-size: 17px;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
 }
 
-.settlementOverviewNet {
-  margin-left: auto;
+.settlementOverviewGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
 }
 
-.settlementOverviewNet strong {
+.settlementOverviewGrid > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 8px 9px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.settlementOverviewGrid span {
+  color: var(--color-text-secondary);
+  font-size: 10px;
+}
+
+.settlementOverviewGrid strong {
+  overflow: hidden;
+  color: var(--color-text-primary);
   font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 @media (max-width: 520px) {
-  .settlementOverview {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .settlementOverviewHeader {
+    align-items: flex-start;
   }
 
-  .settlementOverviewNet {
-    margin-left: 0;
+  .settlementOverviewCaption {
+    max-width: 180px;
+  }
+
+  .settlementOverviewGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
