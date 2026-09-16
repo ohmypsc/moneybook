@@ -10,6 +10,9 @@ import {
   getDashboardSnapshotInfo
 } from "../../api/dashboard";
 
+import { getBootstrap } from "../../api/bootstrap";
+import type { RecurringTransactionRule } from "../../api/automation";
+
 import {
   getTransactions,
   type Transaction
@@ -38,7 +41,7 @@ import {
 
 import { Button } from "../../components/common/Button/Button";
 import { Card } from "../../components/common/Card/Card";
-import { Money } from "../../components/common/Money/Money";
+import { Money, formatMoney } from "../../components/common/Money/Money";
 import { DataFreshnessNotice } from "../../components/common/DataFreshnessNotice/DataFreshnessNotice";
 import PwaInstallPrompt from "../../components/pwa/PwaInstallPrompt/PwaInstallPrompt";
 
@@ -55,6 +58,21 @@ interface DashboardCardView {
   name: string;
   paymentDay: number | null;
   owner: string;
+  paymentAccountId: string | null;
+  paymentAccountName: string | null;
+  paymentAccountBalance: number | null;
+  paymentAccountScheduledTotal: number;
+  paymentAccountShortage: number;
+}
+
+interface UpcomingOutflowItem {
+  id: string;
+  date: string;
+  label: string;
+  meta: string;
+  amount: number;
+  kind: "card" | "recurring";
+  shortage?: number;
 }
 
 function formatMonth(month: string) {
@@ -75,6 +93,59 @@ function getMonthRange(month: string) {
     dateFrom: `${month}-01`,
     dateTo: `${month}-${String(lastDay).padStart(2, "0")}`
   };
+}
+
+function daysInMonth(year: number, month: number) {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+function dateForMonthDay(month: string, day: number | null) {
+  const match = /^(\d{4})-(\d{2})$/.exec(month);
+  if (!match || !day) return null;
+  const year = Number(match[1]);
+  const monthNumber = Number(match[2]);
+  const safeDay = Math.min(Math.max(1, day), daysInMonth(year, monthNumber));
+  return `${match[1]}-${match[2]}-${String(safeDay).padStart(2, "0")}`;
+}
+
+function addMonths(month: string, delta: number) {
+  const match = /^(\d{4})-(\d{2})$/.exec(month);
+  if (!match) return month;
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1 + delta, 1));
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function dateDistance(from: string, to: string) {
+  const fromMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(from);
+  const toMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(to);
+  if (!fromMatch || !toMatch) return Number.POSITIVE_INFINITY;
+  const fromUtc = Date.UTC(Number(fromMatch[1]), Number(fromMatch[2]) - 1, Number(fromMatch[3]));
+  const toUtc = Date.UTC(Number(toMatch[1]), Number(toMatch[2]) - 1, Number(toMatch[3]));
+  return Math.round((toUtc - fromUtc) / 86_400_000);
+}
+
+function formatUpcomingDate(date: string) {
+  const today = getSeoulDateString();
+  const distance = dateDistance(today, date);
+  const [, month = "", day = ""] = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date) || [];
+  const dateLabel = month && day ? `${Number(month)}/${Number(day)}` : date;
+  if (distance === 0) return `오늘 · ${dateLabel}`;
+  if (distance === 1) return `내일 · ${dateLabel}`;
+  if (distance > 1 && distance <= 7) return `D-${distance} · ${dateLabel}`;
+  return dateLabel;
+}
+
+function nextRecurringDate(rule: RecurringTransactionRule, today: string) {
+  if (!rule.enabled || !(rule.amount > 0)) return null;
+  const todayMonth = today.slice(0, 7);
+  for (const month of [todayMonth, addMonths(todayMonth, 1)]) {
+    if (rule.startMonth && month < rule.startMonth) continue;
+    if (rule.endMonth && month > rule.endMonth) continue;
+    const date = dateForMonthDay(month, rule.dayOfMonth);
+    if (!date || date < today) continue;
+    return date;
+  }
+  return null;
 }
 
 function getTransactionTitle(transaction: Transaction) {
@@ -137,6 +208,7 @@ export default function HomePage({
   const [detailItems, setDetailItems] = useState<Transaction[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
+  const [recurringRules, setRecurringRules] = useState<RecurringTransactionRule[]>([]);
 
   useEffect(() => {
     if (!detailType) return;
@@ -279,6 +351,21 @@ export default function HomePage({
     };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    void getBootstrap()
+      .then(response => {
+        if (!active) return;
+        setRecurringRules(response.data?.automationSettings?.recurringRules || []);
+      })
+      .catch(() => {
+        // 예정 지출 보조 정보가 없어도 홈의 핵심 데이터는 그대로 표시합니다.
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   async function openMonthlyDetail(type: "수입" | "지출") {
     if (!dashboard) return;
 
@@ -317,7 +404,7 @@ export default function HomePage({
         .map(account => [account.accountId, account] as const)
     );
 
-    const cards = (Array.isArray(dashboard.cards) ? dashboard.cards : [])
+    const baseCards = (Array.isArray(dashboard.cards) ? dashboard.cards : [])
       .filter(card => Number(card.estimatedRemaining) > 0)
       .map(card => {
         const account = accountMap.get(card.accountId);
@@ -326,7 +413,41 @@ export default function HomePage({
           ...card,
           name: card.accountName || account?.displayName || "신용카드",
           paymentDay: account?.paymentDay ?? null,
-          owner: account?.owner || ""
+          owner: account?.owner || "",
+          paymentAccountId: account?.paymentAccountId ?? null
+        };
+      });
+
+    const scheduledByPaymentAccount = new Map<string, number>();
+    for (const card of baseCards) {
+      if (!card.paymentAccountId) continue;
+      scheduledByPaymentAccount.set(
+        card.paymentAccountId,
+        (scheduledByPaymentAccount.get(card.paymentAccountId) || 0) + Math.max(0, Number(card.estimatedRemaining) || 0)
+      );
+    }
+
+    const cards = baseCards
+      .map(card => {
+        const paymentAccount = card.paymentAccountId
+          ? accountMap.get(card.paymentAccountId)
+          : undefined;
+        const paymentAccountBalance = paymentAccount
+          ? Number(paymentAccount.currentBalance || 0)
+          : null;
+        const paymentAccountScheduledTotal = card.paymentAccountId
+          ? scheduledByPaymentAccount.get(card.paymentAccountId) || 0
+          : 0;
+        const paymentAccountShortage = paymentAccountBalance === null
+          ? 0
+          : Math.max(0, paymentAccountScheduledTotal - Math.max(0, paymentAccountBalance));
+
+        return {
+          ...card,
+          paymentAccountName: paymentAccount?.displayName || paymentAccount?.accountName || null,
+          paymentAccountBalance,
+          paymentAccountScheduledTotal,
+          paymentAccountShortage
         };
       })
       .sort((first, second) =>
@@ -341,6 +462,71 @@ export default function HomePage({
       cards
     };
   }, [dashboard]);
+
+  const upcomingOutflows = useMemo(() => {
+    if (!dashboard) return { total: 0, items: [] as UpcomingOutflowItem[] };
+    const today = getSeoulDateString();
+    const accountMap = new Map(
+      (dashboard.accounts || []).map(account => [account.accountId, account] as const)
+    );
+    const items: UpcomingOutflowItem[] = [];
+
+    for (const card of cardSummary.cards) {
+      const dueDate = dateForMonthDay(card.billingMonth, card.paymentDay);
+      if (!dueDate) continue;
+      const distance = dateDistance(today, dueDate);
+      if (distance < 0 || distance > 7) continue;
+      items.push({
+        id: `card:${card.accountId}:${card.billingMonth}`,
+        date: dueDate,
+        label: `${card.name} 결제`,
+        meta: [
+          card.paymentAccountName || "결제계좌 미설정",
+          formatUpcomingDate(dueDate)
+        ].join(" · "),
+        amount: Math.max(0, Number(card.estimatedRemaining) || 0),
+        kind: "card",
+        shortage: card.paymentAccountShortage
+      });
+    }
+
+    for (const rule of recurringRules) {
+      if (!rule.enabled || rule.type === "수입") continue;
+      const paymentAccount = rule.paymentMethodId
+        ? accountMap.get(rule.paymentMethodId)
+        : undefined;
+      if (rule.type === "지출" && paymentAccount?.subType === "신용카드") {
+        continue;
+      }
+      const date = nextRecurringDate(rule, today);
+      if (!date) continue;
+      const distance = dateDistance(today, date);
+      // 오늘 날짜의 자동 정기거래는 Cron에서 이미 장부에 반영됐을 수 있으므로
+      // 잔액과 예정액을 동시에 차감해 보이는 일을 피하고 내일부터 표시합니다.
+      if (distance <= 0 || distance > 7) continue;
+      const sourceAccount = rule.type === "이체" && rule.fromAccountId
+        ? accountMap.get(rule.fromAccountId)
+        : paymentAccount;
+      items.push({
+        id: `recurring:${rule.id}:${date}`,
+        date,
+        label: rule.name || rule.description || (rule.type === "이체" ? "정기 이체" : "정기 지출"),
+        meta: [
+          rule.type === "이체" ? "정기 이체" : "정기 지출",
+          sourceAccount?.displayName || sourceAccount?.accountName || "",
+          formatUpcomingDate(date)
+        ].filter(Boolean).join(" · "),
+        amount: Math.max(0, Number(rule.amount) || 0),
+        kind: "recurring"
+      });
+    }
+
+    items.sort((a, b) => a.date.localeCompare(b.date) || b.amount - a.amount);
+    return {
+      total: items.reduce((sum, item) => sum + item.amount, 0),
+      items
+    };
+  }, [dashboard, cardSummary.cards, recurringRules]);
 
   const topCategories = useMemo(() => {
     return (dashboard?.categoryExpense || [])
@@ -488,7 +674,7 @@ export default function HomePage({
         <div className={styles.sectionHeader}>
           <div>
             <h2>카드 결제 예정</h2>
-            <span className={styles.sectionHint}>이번 달 남은 결제액</span>
+            <span className={styles.sectionHint}>결제계좌 잔액과 부족 예상액까지 확인</span>
           </div>
           <strong className={styles.sectionTotal}><Money amount={cardSummary.total} absolute /></strong>
         </div>
@@ -507,15 +693,65 @@ export default function HomePage({
                         card.owner
                       ].filter(Boolean).join(" · ")}
                     </span>
+                    <small className={styles.cardAccountMeta}>
+                      {card.paymentAccountName
+                        ? `${card.paymentAccountName} 잔액 ${formatMoney(card.paymentAccountBalance || 0)}`
+                        : "결제계좌 미설정"}
+                    </small>
                   </div>
                 </div>
-                <strong className={styles.cardAmount}>
-                  <Money amount={card.estimatedRemaining} absolute />
-                </strong>
+                <div className={styles.cardAmountBlock}>
+                  <strong className={styles.cardAmount}>
+                    <Money amount={card.estimatedRemaining} absolute />
+                  </strong>
+                  {card.paymentAccountShortage > 0 && (
+                    <span className={styles.shortageBadge}>
+                      부족 <Money amount={card.paymentAccountShortage} absolute />
+                    </span>
+                  )}
+                </div>
               </div>
             ))
           ) : (
             <p className={styles.emptyText}>이번 달 결제 예정액이 없습니다.</p>
+          )}
+        </Card>
+      </section>
+
+      <section className={styles.section}>
+        <div className={styles.sectionHeader}>
+          <div>
+            <h2>앞으로 나갈 돈</h2>
+            <span className={styles.sectionHint}>7일 안에 예정된 카드대금·정기 지출</span>
+          </div>
+          <strong className={styles.sectionTotal}><Money amount={upcomingOutflows.total} absolute /></strong>
+        </div>
+
+        <Card padding="none" className={styles.upcomingList}>
+          {upcomingOutflows.items.length > 0 ? (
+            upcomingOutflows.items.map(item => (
+              <div key={item.id} className={styles.upcomingRow}>
+                <span
+                  className={[
+                    styles.upcomingIcon,
+                    item.kind === "card" ? styles.upcomingIconCard : styles.upcomingIconRecurring
+                  ].join(" ")}
+                  aria-hidden="true"
+                >
+                  {item.kind === "card" ? "C" : "↻"}
+                </span>
+                <div className={styles.upcomingCopy}>
+                  <strong>{item.label}</strong>
+                  <span>{item.meta}</span>
+                  {item.shortage && item.shortage > 0 ? (
+                    <small>결제계좌 부족 예상 <Money amount={item.shortage} absolute /></small>
+                  ) : null}
+                </div>
+                <strong className={styles.upcomingAmount}><Money amount={item.amount} absolute /></strong>
+              </div>
+            ))
+          ) : (
+            <p className={styles.emptyText}>7일 안에 예정된 출금이 없습니다.</p>
           )}
         </Card>
       </section>

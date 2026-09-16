@@ -150,7 +150,99 @@
 .cardName div { min-width: 0; display: grid; gap: 3px; }
 .cardName strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
 .cardName span { color: var(--color-text-secondary); font-size: 11px; }
+.cardAccountMeta {
+  color: var(--color-text-secondary);
+  font-size: 10.5px;
+  font-weight: 650;
+}
+.cardAmountBlock {
+  min-width: 112px;
+  display: grid;
+  justify-items: end;
+  gap: 5px;
+}
 .cardAmount { flex: 0 0 auto; font-size: 14px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.shortageBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: var(--color-error-soft);
+  color: var(--color-error);
+  font-size: 10.5px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.upcomingList {
+  overflow: hidden;
+}
+
+.upcomingRow {
+  min-height: 66px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  padding: 13px 15px;
+  border-bottom: 1px solid rgba(220, 229, 229, 0.72);
+}
+
+.upcomingRow:last-child {
+  border-bottom: 0;
+}
+
+.upcomingIcon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.upcomingIconCard {
+  background: var(--color-surface-blue);
+  color: var(--color-primary);
+}
+
+.upcomingIconRecurring {
+  background: var(--color-surface-soft);
+  color: var(--color-text-secondary);
+}
+
+.upcomingCopy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.upcomingCopy strong {
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.upcomingCopy span {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
+
+.upcomingCopy small {
+  color: var(--color-error);
+  font-size: 10.5px;
+  font-weight: 750;
+}
+
+.upcomingAmount {
+  font-size: 13px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
 
 
 .rankRow { min-height: 58px; }
@@ -213,6 +305,9 @@
   .rankRow { padding-right: 13px; padding-left: 13px; }
   .cardAmount,
   .rankAmount { font-size: 12.5px; }
+  .cardAmountBlock { min-width: 96px; }
+  .upcomingRow { padding-right: 13px; padding-left: 13px; }
+  .upcomingAmount { font-size: 12.5px; }
 }
 
 .summaryRowButton {

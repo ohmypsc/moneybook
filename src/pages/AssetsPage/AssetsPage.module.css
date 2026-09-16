@@ -1589,3 +1589,28 @@
     gap: 2px;
   }
 }
+
+.liabilityPrimaryAction {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-soft);
+}
+
+.liabilityPrimaryAction > div {
+  display: grid;
+  gap: 4px;
+}
+
+.liabilityPrimaryAction strong {
+  font-size: 14px;
+}
+
+.liabilityPrimaryAction span {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+}

@@ -63,6 +63,7 @@ export function TransactionImportSheet({
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState("");
   const [stage, setStage] = useState<"source" | "review">("source");
+  const [expandedCandidateId, setExpandedCandidateId] = useState<string | null>(null);
 
   const expenseCategories = useMemo(
     () => bootstrap.categories.filter(item => item.type === "지출" && item.active && !item.isDeleted),
@@ -79,6 +80,20 @@ export function TransactionImportSheet({
   function patchItem(candidateId: string, patch: Partial<EditableCandidate>) {
     setItems(current => current.map(item => {
       if (item.candidateId !== candidateId) return item;
+      const duplicateKeyChanged = ["date", "time", "amount", "merchant", "paymentMethodId"]
+        .some(key => Object.prototype.hasOwnProperty.call(patch, key));
+      const next = {
+        ...item,
+        ...patch,
+        ...(duplicateKeyChanged ? { duplicate: null } : {})
+      } as EditableCandidate;
+      return { ...next, reviewReasons: deriveReviewReasons(next) };
+    }));
+  }
+
+  function patchSelected(patch: Partial<EditableCandidate>) {
+    setItems(current => current.map(item => {
+      if (!item.selected || item.kind !== "expense") return item;
       const duplicateKeyChanged = ["date", "time", "amount", "merchant", "paymentMethodId"]
         .some(key => Object.prototype.hasOwnProperty.call(patch, key));
       const next = {
@@ -133,10 +148,14 @@ export function TransactionImportSheet({
         text: source === "text" ? text.trim() : "",
         images
       });
-      setItems(result.items.map(item => {
+      const mappedItems = result.items.map(item => {
         const candidate = { ...item, selected: item.selected } as EditableCandidate;
         return { ...candidate, reviewReasons: deriveReviewReasons(candidate) };
-      }));
+      });
+      setItems(mappedItems);
+      setExpandedCandidateId(
+        mappedItems.find(item => item.reviewReasons.length > 0)?.candidateId || null
+      );
       setStage("review");
       if (result.items.length === 0) {
         setFeedback("인식된 거래가 없습니다. 다른 캡처나 텍스트로 다시 시도해주세요.");
@@ -349,6 +368,49 @@ export function TransactionImportSheet({
             {reviewCount > 0 && <span className={styles.pill}>확인 필요 {reviewCount}건</span>}
           </div>
 
+          {items.length > 1 && (
+            <div className={styles.bulkEdit}>
+              <div>
+                <strong>선택 항목 일괄 수정</strong>
+                <span>{selectedCount > 0 ? `${selectedCount}건에 바로 적용됩니다.` : "먼저 저장할 거래를 선택해주세요."}</span>
+              </div>
+              <div className={styles.bulkControls}>
+                <select
+                  className={styles.bulkSelect}
+                  value=""
+                  disabled={selectedCount === 0}
+                  onChange={event => {
+                    const category = expenseCategories.find(item => item.categoryId === event.target.value);
+                    if (!category) return;
+                    patchSelected({ categoryId: category.categoryId, categoryName: category.name });
+                  }}
+                  aria-label="선택 항목 카테고리 일괄 변경"
+                >
+                  <option value="">카테고리 일괄 변경</option>
+                  {expenseCategories.map(category => (
+                    <option key={category.categoryId} value={category.categoryId}>{category.name}</option>
+                  ))}
+                </select>
+                <select
+                  className={styles.bulkSelect}
+                  value=""
+                  disabled={selectedCount === 0}
+                  onChange={event => {
+                    const account = paymentMethods.find(item => item.accountId === event.target.value);
+                    if (!account) return;
+                    patchSelected({ paymentMethodId: account.accountId, paymentMethodName: account.displayName });
+                  }}
+                  aria-label="선택 항목 결제수단 일괄 변경"
+                >
+                  <option value="">결제수단 일괄 변경</option>
+                  {paymentMethods.map(account => (
+                    <option key={account.accountId} value={account.accountId}>{account.displayName}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
           {items.map(item => (
             <article
               key={item.candidateId}
@@ -358,7 +420,7 @@ export function TransactionImportSheet({
                 item.reviewReasons.length > 0 && !item.duplicate ? styles.candidateWarning : ""
               ].filter(Boolean).join(" ")}
             >
-              <div className={styles.candidateHeader}>
+              <div className={styles.candidateCompactHeader}>
                 <input
                   type="checkbox"
                   checked={item.selected}
@@ -366,81 +428,103 @@ export function TransactionImportSheet({
                   aria-label={`${item.merchant || "거래"} 저장 선택`}
                   onChange={event => patchItem(item.candidateId, { selected: event.target.checked })}
                 />
-                <div className={styles.candidateTitle}>
-                  <strong>{item.kind === "refund" ? "취소/환불 · " : ""}{item.merchant || "가맹점 확인 필요"}</strong>
-                  <p>{formatMoney(item.amount)}{item.time ? ` · ${item.time}` : ""} · 신뢰도 {item.confidence === "high" ? "높음" : item.confidence === "low" ? "낮음" : "보통"}</p>
+                <button
+                  type="button"
+                  className={styles.candidateToggle}
+                  aria-expanded={expandedCandidateId === item.candidateId}
+                  onClick={() => setExpandedCandidateId(current => current === item.candidateId ? null : item.candidateId)}
+                >
+                  <div className={styles.candidateTitle}>
+                    <strong>{item.kind === "refund" ? "취소/환불 · " : ""}{item.merchant || "가맹점 확인 필요"}</strong>
+                    <p>
+                      {[item.date || "날짜 확인", item.time, item.categoryName || "카테고리 확인", item.paymentMethodName]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                    {item.reviewReasons.length > 0 && (
+                      <span className={styles.compactWarning}>{item.reviewReasons[0]}{item.reviewReasons.length > 1 ? ` 외 ${item.reviewReasons.length - 1}` : ""}</span>
+                    )}
+                  </div>
+                  <div className={styles.candidateSummaryAmount}>
+                    <strong>{formatMoney(item.amount)}</strong>
+                    <span aria-hidden="true">{expandedCandidateId === item.candidateId ? "⌃" : "⌄"}</span>
+                  </div>
+                </button>
+              </div>
+
+              {expandedCandidateId === item.candidateId && (
+                <div className={styles.candidateDetails}>
+                  {item.reviewReasons.length > 0 && (
+                    <ul className={styles.reasonList}>
+                      {item.reviewReasons.map(reason => <li key={reason}>{reason}</li>)}
+                    </ul>
+                  )}
+                  {item.duplicate && (
+                    <p className={styles.notice}>기존 거래: {item.duplicate.date} · {item.duplicate.description || item.duplicate.category} · {formatMoney(item.duplicate.amount)}</p>
+                  )}
+
+                  <div className={styles.grid2}>
+                    <label className={styles.field}>
+                      <span>날짜</span>
+                      <input className={styles.input} type="date" value={item.date} onChange={event => patchItem(item.candidateId, { date: event.target.value })} />
+                    </label>
+                    <label className={styles.field}>
+                      <span>승인 시간</span>
+                      <input className={styles.input} type="time" value={item.time} onChange={event => patchItem(item.candidateId, { time: event.target.value })} />
+                    </label>
+                  </div>
+
+                  <div className={styles.grid2}>
+                    <label className={styles.field}>
+                      <span>금액</span>
+                      <input className={styles.input} inputMode="numeric" value={item.amount || ""} onChange={event => patchItem(item.candidateId, { amount: Number(event.target.value.replace(/[^0-9]/g, "")) || 0 })} />
+                    </label>
+                    <label className={styles.field}>
+                      <span>가맹점</span>
+                      <input className={styles.input} value={item.merchant} onChange={event => patchItem(item.candidateId, { merchant: event.target.value })} />
+                    </label>
+                  </div>
+
+                  <div className={styles.grid2}>
+                    <label className={styles.field}>
+                      <span>카테고리</span>
+                      <select
+                        className={styles.select}
+                        value={item.categoryId || ""}
+                        onChange={event => {
+                          const category = expenseCategories.find(categoryItem => categoryItem.categoryId === event.target.value);
+                          patchItem(item.candidateId, { categoryId: event.target.value || null, categoryName: category?.name || "" });
+                        }}
+                      >
+                        <option value="">선택</option>
+                        {expenseCategories.map(category => <option key={category.categoryId} value={category.categoryId}>{category.name}</option>)}
+                      </select>
+                    </label>
+                    <label className={styles.field}>
+                      <span>결제수단</span>
+                      <select
+                        className={styles.select}
+                        value={item.paymentMethodId || ""}
+                        onChange={event => {
+                          const account = paymentMethods.find(accountItem => accountItem.accountId === event.target.value);
+                          patchItem(item.candidateId, { paymentMethodId: event.target.value || null, paymentMethodName: account?.displayName || "" });
+                        }}
+                      >
+                        <option value="">선택</option>
+                        {paymentMethods.map(account => <option key={account.accountId} value={account.accountId}>{account.displayName}</option>)}
+                      </select>
+                    </label>
+                  </div>
+
+                  <label className={styles.field}>
+                    <span>지출대상</span>
+                    <select className={styles.select} value={item.spendingTarget} onChange={event => patchItem(item.candidateId, { spendingTarget: event.target.value })}>
+                      <option value="">선택</option>
+                      {bootstrap.spendingTargets.map(target => <option key={target} value={target}>{target}</option>)}
+                    </select>
+                  </label>
                 </div>
-              </div>
-
-              {item.reviewReasons.length > 0 && (
-                <ul className={styles.reasonList}>
-                  {item.reviewReasons.map(reason => <li key={reason}>{reason}</li>)}
-                </ul>
               )}
-              {item.duplicate && (
-                <p className={styles.notice}>기존 거래: {item.duplicate.date} · {item.duplicate.description || item.duplicate.category} · {formatMoney(item.duplicate.amount)}</p>
-              )}
-
-              <div className={styles.grid2}>
-                <label className={styles.field}>
-                  <span>날짜</span>
-                  <input className={styles.input} type="date" value={item.date} onChange={event => patchItem(item.candidateId, { date: event.target.value })} />
-                </label>
-                <label className={styles.field}>
-                  <span>승인 시간</span>
-                  <input className={styles.input} type="time" value={item.time} onChange={event => patchItem(item.candidateId, { time: event.target.value })} />
-                </label>
-              </div>
-
-              <div className={styles.grid2}>
-                <label className={styles.field}>
-                  <span>금액</span>
-                  <input className={styles.input} inputMode="numeric" value={item.amount || ""} onChange={event => patchItem(item.candidateId, { amount: Number(event.target.value.replace(/[^0-9]/g, "")) || 0 })} />
-                </label>
-                <label className={styles.field}>
-                  <span>가맹점</span>
-                  <input className={styles.input} value={item.merchant} onChange={event => patchItem(item.candidateId, { merchant: event.target.value })} />
-                </label>
-              </div>
-
-              <div className={styles.grid2}>
-                <label className={styles.field}>
-                  <span>카테고리</span>
-                  <select
-                    className={styles.select}
-                    value={item.categoryId || ""}
-                    onChange={event => {
-                      const category = expenseCategories.find(categoryItem => categoryItem.categoryId === event.target.value);
-                      patchItem(item.candidateId, { categoryId: event.target.value || null, categoryName: category?.name || "" });
-                    }}
-                  >
-                    <option value="">선택</option>
-                    {expenseCategories.map(category => <option key={category.categoryId} value={category.categoryId}>{category.name}</option>)}
-                  </select>
-                </label>
-                <label className={styles.field}>
-                  <span>결제수단</span>
-                  <select
-                    className={styles.select}
-                    value={item.paymentMethodId || ""}
-                    onChange={event => {
-                      const account = paymentMethods.find(accountItem => accountItem.accountId === event.target.value);
-                      patchItem(item.candidateId, { paymentMethodId: event.target.value || null, paymentMethodName: account?.displayName || "" });
-                    }}
-                  >
-                    <option value="">선택</option>
-                    {paymentMethods.map(account => <option key={account.accountId} value={account.accountId}>{account.displayName}</option>)}
-                  </select>
-                </label>
-              </div>
-
-              <label className={styles.field}>
-                <span>지출대상</span>
-                <select className={styles.select} value={item.spendingTarget} onChange={event => patchItem(item.candidateId, { spendingTarget: event.target.value })}>
-                  <option value="">선택</option>
-                  {bootstrap.spendingTargets.map(target => <option key={target} value={target}>{target}</option>)}
-                </select>
-              </label>
             </article>
           ))}
 

@@ -324,6 +324,15 @@ export default function AssetsPage({
     >(null);
 
   const [
+    selectedLiabilityAccountId,
+    setSelectedLiabilityAccountId
+  ] =
+    useState<
+      string |
+      null
+    >(null);
+
+  const [
     editingAccountId,
     setEditingAccountId
   ] =
@@ -366,7 +375,13 @@ export default function AssetsPage({
     useState("");
 
   useEffect(() => {
-    if (!selectedCashAccountId && !selectedAccountId) {
+    if (activeTab !== "liability" && selectedLiabilityAccountId) {
+      setSelectedLiabilityAccountId(null);
+    }
+  }, [activeTab, selectedLiabilityAccountId]);
+
+  useEffect(() => {
+    if (!selectedCashAccountId && !selectedAccountId && !selectedLiabilityAccountId) {
       return;
     }
 
@@ -377,6 +392,7 @@ export default function AssetsPage({
       if (event.key === "Escape") {
         setSelectedCashAccountId(null);
         setSelectedAccountId(null);
+        setSelectedLiabilityAccountId(null);
         setReconcileAccountId(null);
       }
     };
@@ -387,7 +403,7 @@ export default function AssetsPage({
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [selectedCashAccountId, selectedAccountId]);
+  }, [selectedCashAccountId, selectedAccountId, selectedLiabilityAccountId]);
 
   useEffect(
     () => {
@@ -858,6 +874,14 @@ export default function AssetsPage({
       account =>
         account.accountId ===
         selectedCashAccountId
+    ) ||
+    null;
+
+  const selectedLiabilityAccount =
+    liabilityAccounts.find(
+      account =>
+        account.accountId ===
+        selectedLiabilityAccountId
     ) ||
     null;
 
@@ -2069,7 +2093,7 @@ export default function AssetsPage({
                             styles.cashAccountRow
                           }
                           onClick={() =>
-                            setEditingAccountId(
+                            setSelectedLiabilityAccountId(
                               account.accountId
                             )
                           }
@@ -2095,7 +2119,7 @@ export default function AssetsPage({
                               {[
                                 account.subType,
                                 account.owner,
-                                "눌러서 편집"
+                                "눌러서 상세"
                               ]
                                 .filter(Boolean)
                                 .join(" · ")}
@@ -2112,34 +2136,115 @@ export default function AssetsPage({
                             )}
                           </strong>
                         </button>
-
-                        {
-                          account.subType === "대출" && (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              style={{
-                                width: "100%",
-                                marginTop: 8
-                              }}
-                              onClick={() =>
-                                openInput({
-                                  mode: "transfer",
-                                  toAccountId: account.accountId,
-                                  categoryId: "__moneybook_loan_repayment__"
-                                })
-                              }
-                            >
-                              대출 상환 입력
-                            </Button>
-                          )
-                        }
                       </li>
                     );
                   }
                 )}
               </ul>
             )}
+
+          {selectedLiabilityAccount && (
+            <div
+              className={styles.investmentDetailBackdrop}
+              role="presentation"
+              onClick={() => setSelectedLiabilityAccountId(null)}
+            >
+              <div
+                className={styles.detailCard}
+                role="dialog"
+                aria-modal="true"
+                aria-label={`${selectedLiabilityAccount.displayName} 상세`}
+                onClick={event => event.stopPropagation()}
+              >
+                <div className={styles.detailHeader}>
+                  <div>
+                    <span className={styles.detailEyebrow}>
+                      {[selectedLiabilityAccount.subType || "부채", selectedLiabilityAccount.owner]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </span>
+                    <h3 className={styles.detailTitle}>
+                      {selectedLiabilityAccount.displayName}
+                    </h3>
+                  </div>
+
+                  <div className={styles.detailHeaderActions}>
+                    <strong className={styles.detailTotal}>
+                      {formatCurrency(Math.abs(Number(selectedLiabilityAccount.currentBalance || 0)))}
+                    </strong>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        const accountId = selectedLiabilityAccount.accountId;
+                        setSelectedLiabilityAccountId(null);
+                        setEditingAccountId(accountId);
+                      }}
+                    >
+                      편집
+                    </Button>
+                    <Button
+                      className={styles.modalCloseButton}
+                      variant="soft"
+                      size="sm"
+                      iconOnly
+                      aria-label="상세 닫기"
+                      onClick={() => setSelectedLiabilityAccountId(null)}
+                    >
+                      ×
+                    </Button>
+                  </div>
+                </div>
+
+                <div className={styles.cashDetailMetrics}>
+                  <div>
+                    <span>현재 남은 부채</span>
+                    <strong>
+                      {formatCurrency(Math.abs(Number(selectedLiabilityAccount.currentBalance || 0)))}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>시작 금액</span>
+                    <strong>
+                      {formatCurrency(Math.abs(Number(selectedLiabilityAccount.openingBalance || 0)))}
+                    </strong>
+                  </div>
+                  {selectedLiabilityAccount.startYear && (
+                    <div>
+                      <span>기간</span>
+                      <strong>
+                        {selectedLiabilityAccount.startYear}
+                        {selectedLiabilityAccount.endYear ? ` ~ ${selectedLiabilityAccount.endYear}` : " ~"}
+                      </strong>
+                    </div>
+                  )}
+                </div>
+
+                {selectedLiabilityAccount.subType === "대출" && (
+                  <div className={styles.liabilityPrimaryAction}>
+                    <div>
+                      <strong>이번 상환을 기록할까요?</strong>
+                      <span>원금과 이자를 나눠 기록하고 대출잔액을 자동으로 줄입니다.</span>
+                    </div>
+                    <Button
+                      size="lg"
+                      onClick={() => {
+                        const accountId = selectedLiabilityAccount.accountId;
+                        setSelectedLiabilityAccountId(null);
+                        openInput({
+                          mode: "transfer",
+                          toAccountId: accountId,
+                          categoryId: "__moneybook_loan_repayment__"
+                        });
+                      }}
+                    >
+                      대출 상환 입력
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </section>
       )}
 
