@@ -25,6 +25,12 @@ export interface ManagedCategory {
 
   name: string;
 
+  settlementEligible?: boolean;
+
+  systemLocked?: boolean;
+
+  systemRole?: string | null;
+
   active: boolean;
 
   isDeleted: boolean;

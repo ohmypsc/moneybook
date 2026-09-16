@@ -9,7 +9,7 @@
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test tests/*.test.*",
-    "check:worker": "node --check worker/index.js && node --check worker/auth.js && node --check worker/investmentSymbols.js && node --check worker/domain/date.js && node --check worker/domain/automation.js && node --check worker/domain/benefit.js && node --check worker/domain/settlement.js && node --check worker/domain/loginRateLimit.js && node --check worker/domain/transactionSearch.js && node --check worker/domain/backupRestore.js && node --check worker/domain/transactionImport.js && node --check worker/domain/realEstate.js && node --check worker/transactionImport.js && node --check worker/realEstate.js",
+    "check:worker": "node --check worker/index.js && node --check worker/auth.js && node --check worker/investmentSymbols.js && node --check worker/domain/date.js && node --check worker/domain/automation.js && node --check worker/domain/benefit.js && node --check worker/domain/monthStats.js && node --check worker/domain/settlement.js && node --check worker/domain/loginRateLimit.js && node --check worker/domain/transactionSearch.js && node --check worker/domain/backupRestore.js && node --check worker/domain/transactionImport.js && node --check worker/domain/realEstate.js && node --check worker/transactionImport.js && node --check worker/realEstate.js",
     "check": "npm run typecheck && npm test && npm run check:worker && npm run check:boundaries",
     "preview": "vite preview",
     "deploy": "npm run build && wrangler deploy --config dist/moneybook/wrangler.json",

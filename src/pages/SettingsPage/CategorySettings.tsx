@@ -1342,11 +1342,11 @@ export function CategorySettings() {
                                                                                 </strong>
 
                                                                                 <span>
-                                                                                    {
-                                                                                        category.active
+                                                                                    {category.systemRole === "settlement_expense"
+                                                                                        ? "정산 기능용 · 사용 중"
+                                                                                        : category.active
                                                                                             ? "사용 중"
-                                                                                            : "사용 중지"
-                                                                                    }
+                                                                                            : "사용 중지"}
                                                                                 </span>
                                                                             </span>
 
@@ -1355,28 +1355,32 @@ export function CategorySettings() {
                                                                                     styles.rowActions
                                                                                 }
                                                                             >
-                                                                                <button
-                                                                                    type="button"
-                                                                                    className={
-                                                                                        styles.iconMenuButton
-                                                                                    }
-                                                                                    aria-label={`${category.name} 메뉴`}
-                                                                                    aria-expanded={
-                                                                                        menuOpen
-                                                                                    }
-                                                                                    onClick={
-                                                                                        () =>
-                                                                                            setMenuCategoryId(
-                                                                                                current =>
-                                                                                                    current ===
-                                                                                                    category.categoryId
-                                                                                                        ? null
-                                                                                                        : category.categoryId
-                                                                                            )
-                                                                                    }
-                                                                                >
-                                                                                    ⋮
-                                                                                </button>
+                                                                                {category.systemLocked ? (
+                                                                                    <span title="자동 기능에 사용되는 카테고리">🔒</span>
+                                                                                ) : (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        className={
+                                                                                            styles.iconMenuButton
+                                                                                        }
+                                                                                        aria-label={`${category.name} 메뉴`}
+                                                                                        aria-expanded={
+                                                                                            menuOpen
+                                                                                        }
+                                                                                        onClick={
+                                                                                            () =>
+                                                                                                setMenuCategoryId(
+                                                                                                    current =>
+                                                                                                        current ===
+                                                                                                        category.categoryId
+                                                                                                            ? null
+                                                                                                            : category.categoryId
+                                                                                                )
+                                                                                        }
+                                                                                    >
+                                                                                        ⋮
+                                                                                    </button>
+                                                                                )}
                                                                             </div>
                                                                         </>
                                                                     )
@@ -1392,6 +1396,7 @@ export function CategorySettings() {
 
                 {
                     activeMenuCategory &&
+                    !activeMenuCategory.systemLocked &&
                     !reordering && (
                         <div
                             className={

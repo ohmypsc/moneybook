@@ -57,3 +57,39 @@ export function estimateBillingMonth(dateText, cutoff, paymentDay) {
   const target = new Date(Date.UTC(year, month - 1 + offset, 1));
   return `${target.getUTCFullYear()}-${String(target.getUTCMonth() + 1).padStart(2, "0")}`;
 }
+
+export function resolveBillingState({
+  type,
+  isCreditCard,
+  date,
+  cutoffDay,
+  paymentDay,
+  hasBillingMonthInput = false,
+  requestedBillingMonth = "",
+  sourceBillingOverride = "",
+  sourceBillingMonth = "",
+  forCreate = false
+}) {
+  let billingOverride = null;
+  let billingMonth = null;
+
+  if (type === "지출" && isCreditCard) {
+    if (hasBillingMonthInput) {
+      billingOverride = cleanText(requestedBillingMonth) || null;
+      billingMonth = billingOverride || estimateBillingMonth(date, cutoffDay, paymentDay);
+    } else if (!forCreate && cleanText(sourceBillingOverride)) {
+      billingOverride = cleanText(sourceBillingOverride);
+      billingMonth = billingOverride;
+    } else {
+      billingMonth = estimateBillingMonth(date, cutoffDay, paymentDay);
+    }
+  } else if (type === "이체") {
+    const carried = hasBillingMonthInput
+      ? cleanText(requestedBillingMonth)
+      : cleanText(sourceBillingOverride || sourceBillingMonth);
+    billingOverride = carried || null;
+    billingMonth = carried || null;
+  }
+
+  return { billingOverride, billingMonth };
+}

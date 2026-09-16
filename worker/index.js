@@ -13,7 +13,8 @@ import {
 import {
   dateOnly as mbD1DateOnly,
   estimateBillingMonth as mbD1EstimateBilling,
-  monthOnly as mbD1MonthOnly
+  monthOnly as mbD1MonthOnly,
+  resolveBillingState as mbD1ResolveBillingState
 } from "./domain/date.js";
 
 import {
@@ -23,16 +24,19 @@ import {
 } from "./domain/automation.js";
 
 import {
-  isBenefitTransaction as mbD1IsBenefitTransaction
-} from "./domain/benefit.js";
+  netMonthStats as mbD1NetMonthStats
+} from "./domain/monthStats.js";
 
 import {
   SETTLEMENT_EXPENSE_CATEGORY_NAME,
   SETTLEMENT_INCOME_CATEGORY_NAME,
+  BENEFIT_INCOME_CATEGORY_NAME,
   SETTLEMENT_REQUEST_PREFIX,
+  SYSTEM_CATEGORY_IDS,
   isSettlementEligibleCategory as mbD1IsSettlementEligibleCategory,
   isSettlementRequestId as mbD1IsSettlementRequestId,
-  settlementRemaining as mbD1SettlementRemaining
+  settlementRemaining as mbD1SettlementRemaining,
+  systemCategoryRole as mbD1SystemCategoryRole
 } from "./domain/settlement.js";
 
 import {
@@ -2107,11 +2111,15 @@ async function mbD1ValidateLedgerDate(env, dateValue) {
 function mbD1MapCategory(row) {
   const type = mbD1Text(row.type);
   const name = mbD1Text(row.name);
+  const categoryId = mbD1Text(row.category_id);
+  const systemRole = mbD1SystemCategoryRole(type, name, categoryId);
   return {
-    categoryId: mbD1Text(row.category_id),
+    categoryId,
     type,
     name,
-    settlementEligible: mbD1IsSettlementEligibleCategory(type, name),
+    settlementEligible: systemRole === "settlement_expense",
+    systemLocked: Boolean(systemRole),
+    systemRole: systemRole || null,
     active: mbD1Bool(row.is_active),
     isDeleted: Boolean(row.deleted_at),
     row: mbD1Number(row.source_row, 0)
@@ -2167,7 +2175,7 @@ function mbD1MapTransactionRow(row) {
     type: mbD1Text(row.type),
     categoryId: row.category_id || null,
     category: mbD1Text(row.category_name),
-    settlementEligible: mbD1IsSettlementEligibleCategory(row.type, row.category_name),
+    settlementEligible: mbD1IsSettlementEligibleCategory(row.type, row.category_name, row.category_id),
     amount: mbD1Number(row.amount),
     fromAccountId: row.from_account_id || null,
     fromAccount: mbD1Text(row.from_account_name) || null,
@@ -2183,6 +2191,10 @@ function mbD1MapTransactionRow(row) {
     groupId: row.group_id || null,
     requestId: row.request_id || null,
     reversalOf: row.reversal_of || null,
+    reversalAmount: mbD1Number(row.reversal_total),
+    settlementAmount: mbD1Number(row.settlement_total),
+    refundAmount: Math.max(0, mbD1Number(row.reversal_total) - mbD1Number(row.settlement_total)),
+    netAmount: Math.max(0, mbD1Number(row.amount) - mbD1Number(row.reversal_total)),
     createdAt: row.created_at || null,
     updatedAt: row.updated_at || null,
     updatedAtMs: mbD1TimestampMs(row.updated_at),
@@ -2208,7 +2220,22 @@ const MB_D1_TRANSACTION_SELECT = `
          c.name AS category_name,
          fa.display_name AS from_account_name,
          ta.display_name AS to_account_name,
-         pm.display_name AS payment_method_name
+         pm.display_name AS payment_method_name,
+         COALESCE((
+           SELECT SUM(r.amount)
+           FROM transactions r
+           WHERE r.household_id=t.household_id
+             AND r.reversal_of=t.transaction_id
+             AND r.deleted_at IS NULL
+         ),0) AS reversal_total,
+         COALESCE((
+           SELECT SUM(r.amount)
+           FROM transactions r
+           WHERE r.household_id=t.household_id
+             AND r.reversal_of=t.transaction_id
+             AND r.deleted_at IS NULL
+             AND r.request_id LIKE '${SETTLEMENT_REQUEST_PREFIX}%'
+         ),0) AS settlement_total
   ${MB_D1_TRANSACTION_FROM}
 `;
 
@@ -2461,63 +2488,6 @@ async function mbD1LoadFinancialData(env) {
     }
   }
   return { accounts, transactions, holdings, trades, investment, balances };
-}
-
-function mbD1NetMonthStats(transactions, month) {
-  const byId = new Map((transactions || []).map((tx) => [tx.transactionId, tx]));
-  const monthTx = (transactions || []).filter((tx) => tx.date && tx.date.startsWith(month));
-  let incomeGross = 0;
-  let expenseGross = 0;
-  let expenseRefunds = 0;
-  let incomeReversals = 0;
-  const categoryNet = new Map();
-  const targetNet = new Map();
-  for (const tx of monthTx) {
-    if (mbD1IsBenefitTransaction(tx)) continue;
-
-    if (tx.reversalOf) {
-      const original = byId.get(tx.reversalOf);
-      if (original && original.type === "지출" && tx.type === "수입") {
-        expenseRefunds += tx.amount;
-        const category = original.category || "미분류";
-        const target = original.spendingTarget || "미분류";
-        categoryNet.set(category, (categoryNet.get(category) || 0) - tx.amount);
-        targetNet.set(target, (targetNet.get(target) || 0) - tx.amount);
-      } else if (original && original.type === "수입" && tx.type === "지출") {
-        incomeReversals += tx.amount;
-      }
-      continue;
-    }
-    if (tx.type === "수입") incomeGross += tx.amount;
-    if (tx.type === "지출") {
-      expenseGross += tx.amount;
-      const category = tx.category || "미분류";
-      const target = tx.spendingTarget || "미분류";
-      categoryNet.set(category, (categoryNet.get(category) || 0) + tx.amount);
-      targetNet.set(target, (targetNet.get(target) || 0) + tx.amount);
-    }
-  }
-  const categoryExpense = Array.from(categoryNet.entries())
-    .map(([name, amount]) => ({ name, amount: mbD1Round(amount, 2) }))
-    .filter((item) => Math.abs(item.amount) > 0.0001)
-    .sort((a, b) => b.amount - a.amount);
-  const targetExpense = Array.from(targetNet.entries())
-    .map(([name, amount]) => ({ name, amount: mbD1Round(amount, 2) }))
-    .filter((item) => Math.abs(item.amount) > 0.0001)
-    .sort((a, b) => b.amount - a.amount);
-  const income = incomeGross - incomeReversals;
-  const expense = expenseGross - expenseRefunds;
-  return {
-    incomeGross: mbD1Round(incomeGross, 2),
-    expenseGross: mbD1Round(expenseGross, 2),
-    expenseRefunds: mbD1Round(expenseRefunds, 2),
-    incomeReversals: mbD1Round(incomeReversals, 2),
-    income: mbD1Round(income, 2),
-    expense: mbD1Round(expense, 2),
-    net: mbD1Round(income - expense, 2),
-    categoryExpense,
-    targetExpense
-  };
 }
 
 async function mbD1BuildDashboard(env, monthValue = "") {
@@ -2834,17 +2804,42 @@ function mbD1BenefitRuleIsActive(rule, date) {
 async function mbD1EnsureSystemCategory(env, { categoryId, type, name }) {
   let row = await mbD1First(
     env,
-    "SELECT category_id,name,is_active,deleted_at,type FROM categories WHERE household_id=? AND type=? AND name=? ORDER BY CASE WHEN deleted_at IS NULL AND is_active=1 THEN 0 ELSE 1 END LIMIT 1",
-    [MB_D1_HOUSEHOLD_ID, type, name]
+    `SELECT category_id,name,is_active,deleted_at,type
+     FROM categories
+     WHERE household_id=?
+       AND (category_id=? OR (type=? AND name=?))
+     ORDER BY
+       CASE WHEN type=? AND name=? AND deleted_at IS NULL AND is_active=1 THEN 0
+            WHEN type=? AND name=? THEN 1
+            WHEN category_id=? THEN 2
+            ELSE 3 END,
+       updated_at DESC
+     LIMIT 1`,
+    [
+      MB_D1_HOUSEHOLD_ID,
+      categoryId,
+      type,
+      name,
+      type,
+      name,
+      type,
+      name,
+      categoryId
+    ]
   );
-  if (row?.category_id && !row.deleted_at && mbD1Bool(row.is_active)) return row;
 
   const now = mbD1Now();
   if (row?.category_id) {
-    await env.DB.prepare(
-      "UPDATE categories SET is_active=1,deleted_at=NULL,deleted_by=NULL,updated_at=?,updated_by=? WHERE household_id=? AND category_id=?"
-    ).bind(now, "system", MB_D1_HOUSEHOLD_ID, row.category_id).run();
-    return { ...row, is_active: 1, deleted_at: null };
+    const needsRepair = row.type !== type || row.name !== name || row.deleted_at || !mbD1Bool(row.is_active);
+    if (needsRepair) {
+      await env.DB.prepare(
+        `UPDATE categories
+         SET type=?,name=?,is_active=1,deleted_at=NULL,deleted_by=NULL,updated_at=?,updated_by=?
+         WHERE household_id=? AND category_id=?`
+      ).bind(type, name, now, "system", MB_D1_HOUSEHOLD_ID, row.category_id).run();
+      return { ...row, type, name, is_active: 1, deleted_at: null };
+    }
+    return row;
   }
 
   await env.DB.prepare(
@@ -2865,94 +2860,35 @@ async function mbD1EnsureSystemCategory(env, { categoryId, type, name }) {
 
   row = await mbD1First(
     env,
-    "SELECT category_id,name,is_active,deleted_at,type FROM categories WHERE household_id=? AND type=? AND name=? AND deleted_at IS NULL AND is_active=1 ORDER BY updated_at DESC LIMIT 1",
-    [MB_D1_HOUSEHOLD_ID, type, name]
+    "SELECT category_id,name,is_active,deleted_at,type FROM categories WHERE household_id=? AND category_id=? LIMIT 1",
+    [MB_D1_HOUSEHOLD_ID, categoryId]
   );
   if (!row?.category_id) mbD1Fail("SYSTEM_CATEGORY_CREATE_FAILED", `${name} 카테고리를 준비하지 못했습니다.`, 500);
   return row;
 }
 
 async function mbD1SettlementExpenseCategory(env) {
-  const existing = await mbD1First(
-    env,
-    "SELECT category_id,name,is_active,deleted_at,type FROM categories WHERE household_id=? AND type='지출' AND name=? ORDER BY updated_at DESC LIMIT 1",
-    [MB_D1_HOUSEHOLD_ID, SETTLEMENT_EXPENSE_CATEGORY_NAME]
-  );
-  if (existing?.category_id) return existing;
-
-  const now = mbD1Now();
-  await env.DB.prepare(
-    "INSERT OR IGNORE INTO categories (category_id,household_id,type,name,is_active,created_at,updated_at,created_by,updated_by,deleted_at,deleted_by,source_row) VALUES (?,?,?,?,?,?,?,?,?,?,?,NULL)"
-  ).bind(
-    "CAT_SYSTEM_GROUP_MEAL",
-    MB_D1_HOUSEHOLD_ID,
-    "지출",
-    SETTLEMENT_EXPENSE_CATEGORY_NAME,
-    1,
-    now,
-    now,
-    "system",
-    "system",
-    null,
-    null
-  ).run();
-  return mbD1First(
-    env,
-    "SELECT category_id,name,is_active,deleted_at,type FROM categories WHERE household_id=? AND type='지출' AND name=? ORDER BY updated_at DESC LIMIT 1",
-    [MB_D1_HOUSEHOLD_ID, SETTLEMENT_EXPENSE_CATEGORY_NAME]
-  );
+  return mbD1EnsureSystemCategory(env, {
+    categoryId: SYSTEM_CATEGORY_IDS.settlementExpense,
+    type: "지출",
+    name: SETTLEMENT_EXPENSE_CATEGORY_NAME
+  });
 }
 
 async function mbD1SettlementIncomeCategory(env) {
   return mbD1EnsureSystemCategory(env, {
-    categoryId: "CAT_SYSTEM_SETTLEMENT_RECEIVED",
+    categoryId: SYSTEM_CATEGORY_IDS.settlementIncome,
     type: "수입",
     name: SETTLEMENT_INCOME_CATEGORY_NAME
   });
 }
 
 async function mbD1BenefitCategory(env) {
-  let row = await mbD1First(
-    env,
-    "SELECT category_id,name,is_active,deleted_at FROM categories WHERE household_id=? AND type='수입' AND name='캐시백/할인혜택' ORDER BY CASE WHEN deleted_at IS NULL AND is_active=1 THEN 0 ELSE 1 END LIMIT 1",
-    [MB_D1_HOUSEHOLD_ID]
-  );
-  if (row?.category_id && !row.deleted_at && mbD1Bool(row.is_active)) {
-    return { category_id: row.category_id, name: row.name };
-  }
-
-  const now = mbD1Now();
-  if (row?.category_id) {
-    await env.DB.prepare(
-      "UPDATE categories SET is_active=1,deleted_at=NULL,deleted_by=NULL,updated_at=?,updated_by=? WHERE household_id=? AND category_id=?"
-    ).bind(now, "system", MB_D1_HOUSEHOLD_ID, row.category_id).run();
-    return { category_id: row.category_id, name: row.name };
-  }
-
-  const categoryId = "CAT_SYSTEM_CASHBACK_BENEFIT";
-  await env.DB.prepare(
-    "INSERT OR IGNORE INTO categories (category_id,household_id,type,name,is_active,created_at,updated_at,created_by,updated_by,deleted_at,deleted_by,source_row) VALUES (?,?,?,?,?,?,?,?,?,?,?,NULL)"
-  ).bind(
-    categoryId,
-    MB_D1_HOUSEHOLD_ID,
-    "수입",
-    "캐시백/할인혜택",
-    1,
-    now,
-    now,
-    "system",
-    "system",
-    null,
-    null
-  ).run();
-
-  row = await mbD1First(
-    env,
-    "SELECT category_id,name FROM categories WHERE household_id=? AND type='수입' AND name='캐시백/할인혜택' AND deleted_at IS NULL AND is_active=1 ORDER BY updated_at DESC LIMIT 1",
-    [MB_D1_HOUSEHOLD_ID]
-  );
-  if (!row?.category_id) mbD1Fail("BENEFIT_CATEGORY_CREATE_FAILED", "혜택 기록용 수입 카테고리를 준비하지 못했습니다.", 500);
-  return row;
+  return mbD1EnsureSystemCategory(env, {
+    categoryId: SYSTEM_CATEGORY_IDS.benefitIncome,
+    type: "수입",
+    name: BENEFIT_INCOME_CATEGORY_NAME
+  });
 }
 
 let mbD1BenefitUsageSchemaReady = false;
@@ -3386,7 +3322,7 @@ async function mbD1SettlementSummaryData(env, transactionId) {
   if (!original || original.isDeleted) {
     mbD1Fail("TRANSACTION_NOT_FOUND", "정산할 거래를 찾을 수 없습니다.", 404);
   }
-  if (!mbD1IsSettlementEligibleCategory(original.type, original.category)) {
+  if (!mbD1IsSettlementEligibleCategory(original.type, original.category, original.categoryId)) {
     mbD1Fail("SETTLEMENT_NOT_ELIGIBLE", "정산받기는 정산 가능한 지출에서만 사용할 수 있습니다.");
   }
 
@@ -3628,13 +3564,29 @@ async function mbD1BuildTransactionModel(env, payload, current = null, forCreate
     );
     if (mbD1Has(payload, "paymentMethodId") && mbD1Text(payload.paymentMethodId)) mbD1Fail("TRANSFER_PAYMENT_NOT_ALLOWED", "이체에는 결제수단을 사용할 수 없습니다.");
   }
-  const billingInput = mbD1Has(payload, "billingMonth")
+  const hasBillingMonthInput = mbD1Has(payload, "billingMonth");
+  const requestedBillingMonth = hasBillingMonthInput
     ? mbD1Text(payload.billingMonth)
-    : mbD1Text(source.billingOverride || source.billingMonth);
-  if (billingInput && !mbD1MonthOnly(billingInput)) mbD1Fail("INVALID_BILLING_MONTH", "청구월은 YYYY-MM 형식이어야 합니다.");
-  let billingMonth = billingInput || null;
-  if (!billingMonth && type === "지출" && paymentMethod?.subType === "신용카드") {
-    billingMonth = mbD1EstimateBilling(date, paymentMethod.billingCutoffDay, paymentMethod.paymentDay);
+    : "";
+  if (requestedBillingMonth && !mbD1MonthOnly(requestedBillingMonth)) {
+    mbD1Fail("INVALID_BILLING_MONTH", "청구월은 YYYY-MM 형식이어야 합니다.");
+  }
+
+  const { billingOverride, billingMonth } = mbD1ResolveBillingState({
+    type,
+    isCreditCard: paymentMethod?.subType === "신용카드",
+    date,
+    cutoffDay: paymentMethod?.billingCutoffDay,
+    paymentDay: paymentMethod?.paymentDay,
+    hasBillingMonthInput,
+    requestedBillingMonth,
+    sourceBillingOverride: mbD1Text(source.billingOverride),
+    sourceBillingMonth: mbD1Text(source.billingMonth),
+    forCreate
+  });
+
+  if (billingOverride && !mbD1MonthOnly(billingOverride)) {
+    mbD1Fail("INVALID_BILLING_MONTH", "청구월은 YYYY-MM 형식이어야 합니다.");
   }
   return {
     date,
@@ -3648,7 +3600,7 @@ async function mbD1BuildTransactionModel(env, payload, current = null, forCreate
     spenderMemberId: type === "지출" ? await mbD1MemberIdByName(env, spendingTarget) : null,
     description: mbD1Has(payload, "description") ? mbD1Text(payload.description) : mbD1Text(source.description),
     memo: mbD1Has(payload, "memo") ? mbD1Text(payload.memo) : mbD1Text(source.memo),
-    billingOverride: billingInput || null,
+    billingOverride,
     billingMonth,
     groupId: mbD1Has(payload, "groupId") ? mbD1Text(payload.groupId) || null : source.groupId || null,
     reversalOf: mbD1Has(payload, "reversalOf") ? mbD1Text(payload.reversalOf) || null : source.reversalOf || null
@@ -3763,73 +3715,38 @@ async function mbD1LinkedBenefit(env, current) {
   return ruleId ? { ...row, ruleId } : null;
 }
 
-async function mbD1LinkedBenefitUpdateStatements(env, current, model, actor, session, now) {
+async function mbD1MatchingBenefitRule(env, model) {
+  const settings = await mbD1AutomationSettingsData(env);
+  const activeRules = settings.benefitRules.filter((rule) => mbD1BenefitRuleIsActive(rule, model.date));
+
+  if (model.type === "지출" && model.paymentMethodId) {
+    return activeRules.find(
+      (rule) => rule.kind === "post_reward" && rule.accountId === model.paymentMethodId
+    ) || null;
+  }
+
+  if (model.type === "이체" && model.toAccountId) {
+    const category = await mbD1CategoryById(env, model.categoryId, false);
+    if (category?.name !== "지역화폐충전") return null;
+    return activeRules.find(
+      (rule) => rule.kind === "pre_discount" && rule.accountId === model.toAccountId
+    ) || null;
+  }
+
+  return null;
+}
+
+async function mbD1LinkedBenefitUpdateStatements(env, current, model, actor, session, now, matchingRule = undefined) {
   const [linked, usage] = await Promise.all([
     mbD1LinkedBenefit(env, current),
     mbD1BenefitRewardUsageRecord(env, current.transactionId)
   ]);
-  const ruleId = linked?.ruleId || mbD1Text(usage?.rule_id);
-  if (!ruleId) return [];
-
-  const settings = await mbD1AutomationSettingsData(env);
-  const rule = settings.benefitRules.find((item) => item.id === ruleId);
-  if (!rule) return [];
-
+  const rule = matchingRule === undefined
+    ? await mbD1MatchingBenefitRule(env, model)
+    : matchingRule;
   const statements = [];
-  let eligible = Boolean(mbD1BenefitRuleIsActive(rule, model.date));
-  let creditAccountId = null;
-  let benefitBaseAmount = model.amount;
 
-  if (eligible && rule.kind === "post_reward") {
-    eligible = model.type === "지출" && model.paymentMethodId === rule.accountId;
-    creditAccountId = rule.accountId;
-
-    if (eligible) {
-      const rewardBalanceBefore = await mbD1BenefitRewardBalance(
-        env,
-        rule,
-        current.transactionId,
-        linked?.request_id || ""
-      );
-      const oldRewardUsed = Math.max(0, Math.floor(mbD1Number(usage?.used_amount, 0)));
-      const rewardUsedAmount = Math.min(oldRewardUsed, Math.max(0, model.amount), rewardBalanceBefore);
-      benefitBaseAmount = Math.max(0, model.amount - rewardUsedAmount);
-
-      if (rewardUsedAmount > 0) {
-        statements.push(
-          env.DB.prepare(
-            `INSERT INTO benefit_reward_usage (transaction_id,household_id,rule_id,account_id,used_amount,created_at,updated_at)
-             VALUES (?,?,?,?,?,?,?)
-             ON CONFLICT(transaction_id) DO UPDATE SET
-               rule_id=excluded.rule_id,account_id=excluded.account_id,used_amount=excluded.used_amount,updated_at=excluded.updated_at`
-          ).bind(
-            current.transactionId,
-            MB_D1_HOUSEHOLD_ID,
-            rule.id,
-            rule.accountId,
-            rewardUsedAmount,
-            now,
-            now
-          )
-        );
-      } else if (usage) {
-        statements.push(
-          env.DB.prepare(
-            "DELETE FROM benefit_reward_usage WHERE household_id=? AND transaction_id=?"
-          ).bind(MB_D1_HOUSEHOLD_ID, current.transactionId)
-        );
-      }
-    } else if (usage) {
-      statements.push(
-        env.DB.prepare(
-          "DELETE FROM benefit_reward_usage WHERE household_id=? AND transaction_id=?"
-        ).bind(MB_D1_HOUSEHOLD_ID, current.transactionId)
-      );
-    }
-  } else if (eligible && rule.kind === "pre_discount") {
-    const category = await mbD1CategoryById(env, model.categoryId, false);
-    eligible = model.type === "이체" && model.toAccountId === rule.accountId && category?.name === "지역화폐충전";
-    creditAccountId = model.fromAccountId;
+  if (!rule) {
     if (usage) {
       statements.push(
         env.DB.prepare(
@@ -3837,18 +3754,6 @@ async function mbD1LinkedBenefitUpdateStatements(env, current, model, actor, ses
         ).bind(MB_D1_HOUSEHOLD_ID, current.transactionId)
       );
     }
-  } else {
-    eligible = false;
-    if (usage) {
-      statements.push(
-        env.DB.prepare(
-          "DELETE FROM benefit_reward_usage WHERE household_id=? AND transaction_id=?"
-        ).bind(MB_D1_HOUSEHOLD_ID, current.transactionId)
-      );
-    }
-  }
-
-  if (!eligible || !creditAccountId) {
     if (linked && !linked.deleted_at) {
       const nextVersion = mbD1Number(linked.version, 1) + 1;
       statements.push(
@@ -3861,12 +3766,73 @@ async function mbD1LinkedBenefitUpdateStatements(env, current, model, actor, ses
     return statements;
   }
 
+  let creditAccountId = null;
+  let benefitBaseAmount = model.amount;
+
+  if (rule.kind === "post_reward") {
+    creditAccountId = rule.accountId;
+    const sameRuleUsage = usage && mbD1Text(usage.rule_id) === rule.id;
+    const excludeRequestId = linked?.ruleId === rule.id ? linked.request_id : "";
+    const rewardBalanceBefore = await mbD1BenefitRewardBalance(
+      env,
+      rule,
+      current.transactionId,
+      excludeRequestId
+    );
+    const oldRewardUsed = sameRuleUsage
+      ? Math.max(0, Math.floor(mbD1Number(usage.used_amount, 0)))
+      : 0;
+    const rewardUsedAmount = Math.min(
+      oldRewardUsed,
+      Math.max(0, model.amount),
+      rewardBalanceBefore
+    );
+    benefitBaseAmount = Math.max(0, model.amount - rewardUsedAmount);
+
+    if (rewardUsedAmount > 0) {
+      statements.push(
+        env.DB.prepare(
+          `INSERT INTO benefit_reward_usage (transaction_id,household_id,rule_id,account_id,used_amount,created_at,updated_at)
+           VALUES (?,?,?,?,?,?,?)
+           ON CONFLICT(transaction_id) DO UPDATE SET
+             rule_id=excluded.rule_id,account_id=excluded.account_id,used_amount=excluded.used_amount,updated_at=excluded.updated_at`
+        ).bind(
+          current.transactionId,
+          MB_D1_HOUSEHOLD_ID,
+          rule.id,
+          rule.accountId,
+          rewardUsedAmount,
+          now,
+          now
+        )
+      );
+    } else if (usage) {
+      statements.push(
+        env.DB.prepare(
+          "DELETE FROM benefit_reward_usage WHERE household_id=? AND transaction_id=?"
+        ).bind(MB_D1_HOUSEHOLD_ID, current.transactionId)
+      );
+    }
+  } else if (rule.kind === "pre_discount") {
+    creditAccountId = model.fromAccountId;
+    if (usage) {
+      statements.push(
+        env.DB.prepare(
+          "DELETE FROM benefit_reward_usage WHERE household_id=? AND transaction_id=?"
+        ).bind(MB_D1_HOUSEHOLD_ID, current.transactionId)
+      );
+    }
+  }
+
+  if (!creditAccountId) return statements;
+
+  const linkedRequestIdForCap = linked?.ruleId === rule.id ? linked.request_id : "";
   const benefitAmount = await mbD1CalculateBenefit(
     env,
     rule,
     benefitBaseAmount,
     model.date,
-    linked?.request_id || ""
+    linkedRequestIdForCap
   );
 
   if (benefitAmount <= 0) {
@@ -3883,29 +3849,33 @@ async function mbD1LinkedBenefitUpdateStatements(env, current, model, actor, ses
   }
 
   const benefitCategory = await mbD1BenefitCategory(env);
-  if (!benefitCategory?.category_id) mbD1Fail("BENEFIT_CATEGORY_MISSING", "수입 카테고리 '캐시백/할인혜택'이 필요합니다.");
+  if (!benefitCategory?.category_id) {
+    mbD1Fail("BENEFIT_CATEGORY_MISSING", "수입 카테고리 '캐시백/할인혜택'이 필요합니다.");
+  }
   const account = await mbD1AccountById(env, creditAccountId, false);
   if (!account) mbD1Fail("BENEFIT_ACCOUNT_NOT_FOUND", "혜택 반영 계좌를 찾을 수 없습니다.");
   const description = rule.kind === "pre_discount"
     ? `${account.displayName} 선할인`
     : `${account.displayName} 혜택 적립`;
+  const benefitRequestId = `BENEFIT_${rule.id}_${current.requestId}`;
 
   if (linked) {
     const nextVersion = mbD1Number(linked.version, 1) + 1;
     statements.push(
       env.DB.prepare(
         `UPDATE transactions
-         SET date=?,category_id=?,amount=?,from_account_id=NULL,to_account_id=?,payment_method_id=NULL,
+         SET request_id=?,date=?,category_id=?,amount=?,from_account_id=NULL,to_account_id=?,payment_method_id=NULL,
              spending_target=NULL,spender_member_id=NULL,description=?,memo=NULL,billing_month_override=NULL,billing_month=NULL,
              group_id=?,version=?,updated_at=?,updated_by=?,deleted_at=NULL,deleted_by=NULL
          WHERE household_id=? AND transaction_id=?`
       ).bind(
+        benefitRequestId,
         model.date,
         benefitCategory.category_id,
         benefitAmount,
         creditAccountId,
         description,
-        current.groupId,
+        model.groupId,
         nextVersion,
         now,
         actor,
@@ -3914,15 +3884,15 @@ async function mbD1LinkedBenefitUpdateStatements(env, current, model, actor, ses
       ),
       await mbD1InsertChange(env, "transaction", linked.transaction_id, "updated", nextVersion, session, {
         automaticBenefit: true,
+        benefitRuleId: rule.id,
         amount: benefitAmount
       })
     );
     return statements;
   }
 
-  if (!current.groupId || !current.requestId) return statements;
+  if (!model.groupId || !current.requestId) return statements;
   const enteredBy = await mbD1MemberIdByName(env, actor);
-  const benefitRequestId = `BENEFIT_${rule.id}_${current.requestId}`;
   const benefitModel = await mbD1BuildTransactionModel(
     env,
     {
@@ -3933,7 +3903,7 @@ async function mbD1LinkedBenefitUpdateStatements(env, current, model, actor, ses
       toAccountId: creditAccountId,
       description,
       memo: "",
-      groupId: current.groupId
+      groupId: model.groupId
     },
     null,
     true
@@ -3957,7 +3927,8 @@ async function mbD1LinkedBenefitUpdateStatements(env, current, model, actor, ses
       date: benefitModel.date,
       type: benefitModel.type,
       amount: benefitModel.amount,
-      automaticBenefit: true
+      automaticBenefit: true,
+      benefitRuleId: rule.id
     })
   );
   return statements;
@@ -4153,7 +4124,7 @@ async function mbD1HandleTransactionMutation(path, body, session, env) {
 
   if (path === "/api/transactions/settle") {
     if (current.isDeleted) mbD1Fail("TRANSACTION_NOT_FOUND", "정산할 거래를 찾을 수 없습니다.", 404);
-    if (!mbD1IsSettlementEligibleCategory(current.type, current.category)) {
+    if (!mbD1IsSettlementEligibleCategory(current.type, current.category, current.categoryId)) {
       mbD1Fail("SETTLEMENT_NOT_ELIGIBLE", "정산받기는 정산 가능한 지출에서만 사용할 수 있습니다.");
     }
 
@@ -4281,7 +4252,16 @@ async function mbD1HandleTransactionMutation(path, body, session, env) {
       );
       if (reversal) mbD1Fail("ORIGINAL_WITH_REVERSAL_EDIT_NOT_ALLOWED", "이미 환불/정산이 연결된 원거래의 금액·계좌·유형은 직접 수정할 수 없습니다.");
     }
-    const model = await mbD1BuildTransactionModel(env, body, current, false);
+    let model = await mbD1BuildTransactionModel(env, body, current, false);
+    const matchingBenefitRule = financialChange
+      ? await mbD1MatchingBenefitRule(env, model)
+      : null;
+    if (financialChange && matchingBenefitRule && !model.groupId) {
+      model = {
+        ...model,
+        groupId: `BENEFIT_GROUP_${current.requestId || transactionId}`
+      };
+    }
     const now = mbD1Now();
     const nextVersion = mbD1Number((await mbD1First(env, "SELECT version FROM transactions WHERE transaction_id=?", [transactionId]))?.version, 1) + 1;
     const update = env.DB.prepare(
@@ -4299,7 +4279,15 @@ async function mbD1HandleTransactionMutation(path, body, session, env) {
       amount: model.amount
     });
     const linkedBenefitStatements = financialChange
-      ? await mbD1LinkedBenefitUpdateStatements(env, current, model, actor, session, now)
+      ? await mbD1LinkedBenefitUpdateStatements(
+          env,
+          current,
+          model,
+          actor,
+          session,
+          now,
+          matchingBenefitRule
+        )
       : [];
     await env.DB.batch([update, change, ...linkedBenefitStatements]);
     return { updated: true, transaction: await mbD1TransactionById(env, transactionId, true) };
@@ -4426,6 +4414,16 @@ async function mbD1HandleCategoryMutation(path, body, session, env) {
   if (!id) mbD1Fail("CATEGORY_ID_REQUIRED", "categoryId가 필요합니다.");
   const current = await mbD1CategoryById(env, id, true);
   if (!current) mbD1Fail("CATEGORY_NOT_FOUND", "카테고리를 찾을 수 없습니다.", 404);
+
+  if (current.systemLocked && (path === "/api/categories/update" || path === "/api/categories/delete")) {
+    mbD1Fail(
+      "SYSTEM_CATEGORY_LOCKED",
+      current.systemRole === "settlement_expense"
+        ? "회식비는 정산 기능에 사용되는 기본 카테고리라 이름 변경·사용 중지·삭제할 수 없습니다."
+        : "이 카테고리는 자동 기록에 사용되는 시스템 카테고리라 수정하거나 삭제할 수 없습니다.",
+      409
+    );
+  }
 
   if (path === "/api/categories/update") {
     if (current.isDeleted) mbD1Fail("CATEGORY_NOT_FOUND", "수정할 카테고리를 찾을 수 없습니다.", 404);
@@ -6836,29 +6834,15 @@ export default {
         const activeSourceTx = sourceTransactions.filter((tx) => !auditSourceDeleted(tx));
         const activeTargetTx = targetTransactions.filter((tx) => !auditDeleted(tx)).map(toSourceLikeTargetTx);
         const buildNetMonth = (items) => {
-          const byId = new Map(items.map((tx) => [auditText(tx.transactionId),tx]));
-          const out = new Map();
-          for (const tx of items) {
-            const month = auditMonth(tx.date);
-            if (!month) continue;
-            if (!out.has(month)) out.set(month,{incomeGross:0,expenseGross:0,expenseRefunds:0,incomeReversals:0});
-            const x = out.get(month);
-            if (tx.reversalOf) {
-              const original = byId.get(auditText(tx.reversalOf));
-              if (original && original.type === "지출" && tx.type === "수입") x.expenseRefunds += auditNumber(tx.amount);
-              else if (original && original.type === "수입" && tx.type === "지출") x.incomeReversals += auditNumber(tx.amount);
-              continue;
-            }
-            if (tx.type === "수입") x.incomeGross += auditNumber(tx.amount);
-            if (tx.type === "지출") x.expenseGross += auditNumber(tx.amount);
-          }
-          for (const x of out.values()) {
-            x.income = auditRound(x.incomeGross-x.incomeReversals);
-            x.expense = auditRound(x.expenseGross-x.expenseRefunds);
-            x.net = auditRound(x.income-x.expense);
-            x.incomeGross=auditRound(x.incomeGross);x.expenseGross=auditRound(x.expenseGross);x.expenseRefunds=auditRound(x.expenseRefunds);x.incomeReversals=auditRound(x.incomeReversals);
-          }
-          return out;
+          const months = new Set(
+            items
+              .filter((tx) => !tx.reversalOf)
+              .map((tx) => auditMonth(tx.date))
+              .filter(Boolean)
+          );
+          return new Map(
+            Array.from(months).map((month) => [month, mbD1NetMonthStats(items, month)])
+          );
         };
         const sourceMonthMap = buildNetMonth(activeSourceTx);
         const targetMonthMap = buildNetMonth(activeTargetTx);

@@ -72,6 +72,14 @@ export interface TransactionItem {
   reversalOf:
     string | null;
 
+  reversalAmount?: number;
+
+  settlementAmount?: number;
+
+  refundAmount?: number;
+
+  netAmount?: number;
+
   createdAt:
     string | null;
 

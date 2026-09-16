@@ -4,7 +4,8 @@ import assert from "node:assert/strict";
 import {
   dateOnly,
   estimateBillingMonth,
-  monthOnly
+  monthOnly,
+  resolveBillingState
 } from "../worker/domain/date.js";
 
 import {
@@ -113,4 +114,37 @@ test("recurringPayload emits account fields appropriate to each transaction type
   );
   assert.equal(transfer.fromAccountId, "BANK_1");
   assert.equal(transfer.toAccountId, "BANK_2");
+});
+
+
+test("automatic credit-card billing month recalculates after date changes", () => {
+  assert.deepEqual(
+    resolveBillingState({
+      type: "지출",
+      isCreditCard: true,
+      date: "2026-09-15",
+      cutoffDay: 14,
+      paymentDay: 25,
+      sourceBillingMonth: "2026-09",
+      sourceBillingOverride: "",
+      forCreate: false
+    }),
+    { billingOverride: null, billingMonth: "2026-10" }
+  );
+});
+
+test("manual billing override survives edits while automatic billing does not", () => {
+  assert.deepEqual(
+    resolveBillingState({
+      type: "지출",
+      isCreditCard: true,
+      date: "2026-09-15",
+      cutoffDay: 14,
+      paymentDay: 25,
+      sourceBillingMonth: "2026-09",
+      sourceBillingOverride: "2026-11",
+      forCreate: false
+    }),
+    { billingOverride: "2026-11", billingMonth: "2026-11" }
+  );
 });

@@ -4,6 +4,8 @@ export interface DashboardSummary {
   netWorth: number;
   investmentValue: number;
   cashLikeValue: number;
+  realEstateValue?: number;
+  realEstateCount?: number;
   monthIncome: number;
   monthIncomeGross: number;
   monthIncomeReversals: number;

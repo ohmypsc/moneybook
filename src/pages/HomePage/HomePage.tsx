@@ -449,7 +449,7 @@ export default function HomePage({
 
   const cardSummary = useMemo(() => {
     if (!dashboard) {
-      return { total: 0, cards: [] as DashboardCardView[] };
+      return { total: 0, cards: [] as DashboardCardView[], registeredCount: 0 };
     }
 
     const accountMap = new Map<string, DashboardAccount>(
@@ -507,12 +507,17 @@ export default function HomePage({
         (first.paymentDay ?? 99) - (second.paymentDay ?? 99)
       );
 
+    const dueCards = cards.filter(
+      card => Math.max(0, Number(card.estimatedRemaining) || 0) > 0.0001
+    );
+
     return {
-      total: cards.reduce(
+      total: dueCards.reduce(
         (sum, card) => sum + Math.max(0, Number(card.estimatedRemaining) || 0),
         0
       ),
-      cards
+      cards: dueCards,
+      registeredCount: cards.length
     };
   }, [dashboard]);
 
@@ -633,6 +638,9 @@ export default function HomePage({
     monthExpense,
     monthNetCashFlow
   } = dashboard.summary;
+  const realEstateValue = Number(dashboard.summary.realEstateValue || 0);
+  const financialAssets = Number(dashboard.summary.assets || 0) - realEstateValue;
+  const liabilities = Number(dashboard.summary.liabilities || 0);
 
   const togetherDays = getTogetherDays();
 
@@ -671,10 +679,26 @@ export default function HomePage({
 
         <div className={styles.summaryRows}>
           <div className={styles.summaryRow}>
-            <span className={styles.summaryLabel}>우리 순자산</span>
+            <span className={styles.summaryLabel}>우리 순자산 <small>부동산 포함</small></span>
             <strong className={netWorth < 0 ? styles.negativeAmount : styles.netAmount}>
               <Money amount={netWorth} />
             </strong>
+          </div>
+          <div className={styles.assetComposition} aria-label="순자산 구성">
+            <div>
+              <span>금융자산</span>
+              <strong><Money amount={financialAssets} /></strong>
+            </div>
+            <div>
+              <span>부동산</span>
+              <strong><Money amount={realEstateValue} /></strong>
+            </div>
+            <div>
+              <span>부채</span>
+              <strong className={liabilities > 0 ? styles.negativeAmount : undefined}>
+                <Money amount={-liabilities} />
+              </strong>
+            </div>
           </div>
           <button
             type="button"
@@ -776,7 +800,11 @@ export default function HomePage({
               </div>
             ))
           ) : (
-            <p className={styles.emptyText}>등록된 신용카드가 없습니다.</p>
+            <p className={styles.emptyText}>
+              {cardSummary.registeredCount > 0
+                ? "이번 결제 예정이 없습니다."
+                : "등록된 신용카드가 없습니다."}
+            </p>
           )}
         </Card>
       </section>
@@ -850,34 +878,52 @@ export default function HomePage({
 
             {!detailLoading && !detailError && detailItems.length > 0 && (
               <div className={styles.detailList}>
-                {detailItems.map(transaction => (
-                  <article key={transaction.transactionId} className={styles.detailRow}>
-                    <div>
-                      <span>{transaction.date}</span>
-                      <strong>{getTransactionTitle(transaction)}</strong>
-                      <small>{getTransactionMeta(transaction)}</small>
-                      {transaction.memo && <em>{transaction.memo}</em>}
-                    </div>
-                    <div className={styles.detailRowActions}>
-                      <b className={detailType === "수입" ? styles.incomeAmount : styles.expenseAmount}>
-                        <Money
-                          amount={detailType === "수입" ? transaction.amount : -transaction.amount}
-                          showPlus={detailType === "수입"}
-                          tone={detailType === "수입" ? "income" : "expense"}
-                        />
-                      </b>
-                      {onCopyTransaction && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onCopyTransaction(transaction)}
-                        >
-                          복사 입력
-                        </Button>
-                      )}
-                    </div>
-                  </article>
-                ))}
+                {detailItems.map(transaction => {
+                  const settlementAmount = Math.max(0, Number(transaction.settlementAmount) || 0);
+                  const refundAmount = Math.max(0, Number(transaction.refundAmount) || 0);
+                  const reversalAmount = Math.max(0, Number(transaction.reversalAmount) || 0);
+                  const expenseNetAmount = Math.max(
+                    0,
+                    Number(transaction.netAmount ?? (transaction.amount - reversalAmount)) || 0
+                  );
+
+                  return (
+                    <article key={transaction.transactionId} className={styles.detailRow}>
+                      <div>
+                        <span>{transaction.date}</span>
+                        <strong>{getTransactionTitle(transaction)}</strong>
+                        <small>{getTransactionMeta(transaction)}</small>
+                        {detailType === "지출" && reversalAmount > 0 && (
+                          <em className={styles.detailOffset}>
+                            총 결제 {formatMoney(transaction.amount)}
+                            {settlementAmount > 0 ? ` · 정산 ${formatMoney(settlementAmount)}` : ""}
+                            {refundAmount > 0 ? ` · 환불 ${formatMoney(refundAmount)}` : ""}
+                            {` · 실지출 ${formatMoney(expenseNetAmount)}`}
+                          </em>
+                        )}
+                        {transaction.memo && <em>{transaction.memo}</em>}
+                      </div>
+                      <div className={styles.detailRowActions}>
+                        <b className={detailType === "수입" ? styles.incomeAmount : styles.expenseAmount}>
+                          <Money
+                            amount={detailType === "수입" ? transaction.amount : -expenseNetAmount}
+                            showPlus={detailType === "수입"}
+                            tone={detailType === "수입" ? "income" : "expense"}
+                          />
+                        </b>
+                        {onCopyTransaction && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onCopyTransaction(transaction)}
+                          >
+                            복사 입력
+                          </Button>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
             )}
           </section>
