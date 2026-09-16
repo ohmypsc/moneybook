@@ -40,7 +40,9 @@ import {
 } from "../../utils/ledgerEvents";
 
 import {
-  isPreDiscountBenefitTransaction
+  getBenefitTransactionMeta,
+  getBenefitTransactionTitle,
+  isBenefitTransaction
 } from "../../utils/transactionBenefits";
 
 import { isSettlementTransaction } from "../../utils/settlement";
@@ -74,14 +76,14 @@ function moveMonth(month: string, offset: number) {
 }
 
 function getTransactionTitle(transaction: Transaction) {
-  if (isPreDiscountBenefitTransaction(transaction)) return "선할인 혜택";
+  if (isBenefitTransaction(transaction)) return getBenefitTransactionTitle(transaction);
   if (isSettlementTransaction(transaction)) return transaction.description || "정산받음";
   return transaction.description || transaction.category || transaction.type;
 }
 
 function getTransactionMeta(transaction: Transaction) {
-  if (isPreDiscountBenefitTransaction(transaction)) {
-    return "충전 선할인 혜택 · 수입 합계 제외";
+  if (isBenefitTransaction(transaction)) {
+    return getBenefitTransactionMeta(transaction);
   }
 
   if (isSettlementTransaction(transaction)) {
@@ -539,7 +541,7 @@ export default function HistoryPage({
               <p className={styles.empty}>조건에 맞는 거래가 없습니다.</p>
             ) : (
               searchItems.map(transaction => {
-                const isPreDiscountBenefit = isPreDiscountBenefitTransaction(transaction);
+                const isBenefit = isBenefitTransaction(transaction);
                 const isSettlement = isSettlementTransaction(transaction);
 
                 return (
@@ -551,7 +553,7 @@ export default function HistoryPage({
                     </div>
                     <div className={styles.transactionActions}>
                       <strong className={
-                        isPreDiscountBenefit || isSettlement
+                        isBenefit || isSettlement
                           ? styles.transfer
                           : transaction.type === "수입"
                             ? styles.income
@@ -563,7 +565,7 @@ export default function HistoryPage({
                           amount={transaction.type === "지출" ? -transaction.amount : transaction.amount}
                           showPlus={transaction.type === "수입"}
                           tone={
-                            isPreDiscountBenefit || isSettlement
+                            isBenefit || isSettlement
                               ? "muted"
                               : transaction.type === "수입"
                                 ? "income"

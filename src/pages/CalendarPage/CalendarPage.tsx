@@ -61,7 +61,9 @@ import {
 } from "../../utils/ledgerEvents";
 
 import {
-    isPreDiscountBenefitTransaction
+    getBenefitTransactionMeta,
+    getBenefitTransactionTitle,
+    isBenefitTransaction
 } from "../../utils/transactionBenefits";
 
 import {
@@ -400,7 +402,7 @@ function sumTransactions(
                 type === "수입"
             ) {
                 if (
-                    isPreDiscountBenefitTransaction(item)
+                    isBenefitTransaction(item)
                 ) {
                     return sum;
                 }
@@ -500,9 +502,9 @@ function getTransactionMethod(
         CalendarTransaction
 ) {
     if (
-        isPreDiscountBenefitTransaction(transaction)
+        isBenefitTransaction(transaction)
     ) {
-        return "충전 선할인 혜택 · 수입 합계 제외";
+        return getBenefitTransactionMeta(transaction);
     }
 
     if (isSettlementTransaction(transaction)) {
@@ -576,9 +578,9 @@ function getTransactionTitle(
     transaction: CalendarTransaction
 ) {
     if (
-        isPreDiscountBenefitTransaction(transaction)
+        isBenefitTransaction(transaction)
     ) {
-        return "선할인 혜택";
+        return getBenefitTransactionTitle(transaction);
     }
 
     if (isSettlementTransaction(transaction)) {
@@ -864,6 +866,11 @@ export default function CalendarPage({
         settlementSummary,
         setSettlementSummary
     ] = useState<SettlementSummary | null>(null);
+
+    const [
+        settlementSummaries,
+        setSettlementSummaries
+    ] = useState<Record<string, SettlementSummary>>({});
 
     const [
         settlementAmount,
@@ -1464,6 +1471,45 @@ export default function CalendarPage({
             ]
         );
 
+    useEffect(() => {
+        const eligible = selectedTransactions.filter(
+            transaction =>
+                transaction.type === "지출" &&
+                Boolean(transaction.settlementEligible) &&
+                !transaction.reversalOf
+        );
+
+        if (eligible.length === 0) {
+            setSettlementSummaries({});
+            return;
+        }
+
+        let cancelled = false;
+
+        void Promise.all(
+            eligible.map(async transaction => {
+                try {
+                    const summary = await getSettlementSummary(transaction.transactionId);
+                    return [transaction.transactionId, summary] as const;
+                } catch {
+                    return null;
+                }
+            })
+        ).then(results => {
+            if (cancelled) return;
+
+            const next: Record<string, SettlementSummary> = {};
+            results.forEach(result => {
+                if (result) next[result[0]] = result[1];
+            });
+            setSettlementSummaries(next);
+        });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [selectedTransactions]);
+
     const selectedIncome =
         sumTransactions(
             selectedTransactions,
@@ -1733,9 +1779,12 @@ export default function CalendarPage({
         setActionFeedback("");
 
         try {
+            const cachedSummary = settlementSummaries[transaction.transactionId];
             const [bootstrapData, summary] = await Promise.all([
                 ensureBootstrap(),
-                getSettlementSummary(transaction.transactionId)
+                cachedSummary
+                    ? Promise.resolve(cachedSummary)
+                    : getSettlementSummary(transaction.transactionId)
             ]);
             const accounts = bootstrapData.accounts
                 .filter(
@@ -1799,6 +1848,10 @@ export default function CalendarPage({
                 requestId: requestToken
             });
             setSettlementSummary(result.summary);
+            setSettlementSummaries(current => ({
+                ...current,
+                [transaction.transactionId]: result.summary
+            }));
             setSettlementAmount("");
             setSettlementMemo("");
             setActionFeedback(`${formatMoney(amount)} 정산을 반영했습니다.`);
@@ -3261,6 +3314,16 @@ export default function CalendarPage({
                                                         Boolean(transaction.settlementEligible) &&
                                                         !transaction.reversalOf;
 
+                                                    const compactSettlementSummary =
+                                                        settlementSummaries[transaction.transactionId];
+
+                                                    const showCompactSettlementSummary =
+                                                        Boolean(compactSettlementSummary) &&
+                                                        (
+                                                            (compactSettlementSummary?.settledAmount || 0) > 0 ||
+                                                            (compactSettlementSummary?.otherOffsetAmount || 0) > 0
+                                                        );
+
                                                     return (
                                                         <li
                                                             key={
@@ -3289,7 +3352,7 @@ export default function CalendarPage({
                                                                             className={[
                                                                                 styles.transactionType,
 
-                                                                                isPreDiscountBenefitTransaction(transaction)
+                                                                                isBenefitTransaction(transaction)
                                                                                     ? styles.transactionTypeTransfer
                                                                                     : transaction.type ===
                                                                                       "지출"
@@ -3302,7 +3365,7 @@ export default function CalendarPage({
                                                                                 " "
                                                                             )}
                                                                         >
-                                                                            {isPreDiscountBenefitTransaction(transaction)
+                                                                            {isBenefitTransaction(transaction)
                                                                                 ? "혜택"
                                                                                 : isSettlementTransaction(transaction)
                                                                                 ? "정산"
@@ -3347,7 +3410,7 @@ export default function CalendarPage({
                                                                     className={[
                                                                         styles.transactionAmount,
 
-                                                                        isPreDiscountBenefitTransaction(transaction)
+                                                                        isBenefitTransaction(transaction)
                                                                             ? styles.amountTransfer
                                                                             : transaction.type ===
                                                                               "지출"
@@ -3365,6 +3428,17 @@ export default function CalendarPage({
                                                                     )}
                                                                 </strong>
                                                             </div>
+
+                                                            {showCompactSettlementSummary && compactSettlementSummary && (
+                                                                <div className={styles.settlementOverview}>
+                                                                    <span>총 결제 <strong>{formatMoney(compactSettlementSummary.originalAmount)}</strong></span>
+                                                                    <span>정산 <strong>{formatMoney(compactSettlementSummary.settledAmount)}</strong></span>
+                                                                    {compactSettlementSummary.otherOffsetAmount > 0 && (
+                                                                        <span>환불·기타 <strong>{formatMoney(compactSettlementSummary.otherOffsetAmount)}</strong></span>
+                                                                    )}
+                                                                    <span className={styles.settlementOverviewNet}>내 부담 <strong>{formatMoney(compactSettlementSummary.remainingAmount)}</strong></span>
+                                                                </div>
+                                                            )}
 
                                                             {
                                                                 transaction.memo && (

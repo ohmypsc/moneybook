@@ -23,7 +23,7 @@ import {
 } from "./domain/automation.js";
 
 import {
-  isPreDiscountBenefitTransaction as mbD1IsPreDiscountBenefitTransaction
+  isBenefitTransaction as mbD1IsBenefitTransaction
 } from "./domain/benefit.js";
 
 import {
@@ -2473,7 +2473,7 @@ function mbD1NetMonthStats(transactions, month) {
   const categoryNet = new Map();
   const targetNet = new Map();
   for (const tx of monthTx) {
-    if (mbD1IsPreDiscountBenefitTransaction(tx)) continue;
+    if (mbD1IsBenefitTransaction(tx)) continue;
 
     if (tx.reversalOf) {
       const original = byId.get(tx.reversalOf);

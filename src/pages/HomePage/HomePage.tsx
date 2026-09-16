@@ -40,7 +40,7 @@ import {
 } from "../../utils/dateTime";
 
 import {
-  isPreDiscountBenefitTransaction
+  isBenefitTransaction
 } from "../../utils/transactionBenefits";
 
 import {
@@ -431,7 +431,7 @@ export default function HomePage({
         type === "수입"
           ? items.filter(
               item =>
-                !isPreDiscountBenefitTransaction(item) &&
+                !isBenefitTransaction(item) &&
                 !isSettlementTransaction(item)
             )
           : items
