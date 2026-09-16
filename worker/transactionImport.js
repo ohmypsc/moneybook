@@ -33,10 +33,10 @@ function getOutputText(response) {
 }
 
 function buildPrompt({ today, sourceLabel }) {
-  return `Extract every real Korean card/payment transaction from the ${sourceLabel}.
-Today is ${today}. Return JSON only, with no markdown or explanation.
-Use exactly: {"transactions":[{"d":"YYYY-MM-DD or empty","t":"HH:MM or empty","m":"merchant or empty","a":12500,"s":"expense or refund","c":"card name or empty","r":"short source row"}]}
-Rules: include every visible transaction row; ignore totals, balances, limits, points, and bill summaries; amounts are positive integer KRW; canceled/refunded rows use refund; preserve repeated real purchases even when merchant and amount match; only collapse a row when the same source row is visibly duplicated; if one field is unclear keep the transaction and leave only that field empty or 0; infer a missing year naturally from today; if time is visible use 24-hour HH:MM; if there are no transactions return {"transactions":[]}.`;
+  return `Read the Korean card/payment ${sourceLabel} carefully and extract ALL visible purchase, approval, charge, cancellation, or refund rows.
+Today is ${today}. If a row has a merchant and an amount, KEEP IT even when the date, time, or card name is unclear. Do not return an empty list when real transaction rows are visible.
+Return JSON only: {"transactions":[{"d":"YYYY-MM-DD or empty","t":"HH:MM or empty","m":"merchant","a":12500,"s":"expense or refund","c":"card name or empty","r":"short text copied from that row"}]}
+Ignore totals, balances, limits, points, section headings, and bill summaries. Amounts are positive integer KRW. Keep repeated purchases as separate rows. For unclear fields use an empty string or 0 instead of dropping the transaction. Infer a missing year from today when reasonable.`;
 }
 
 function isUsefulTransactionList(values) {
@@ -83,10 +83,15 @@ async function runImageFallback(env, prompt, image) {
   const response = await env.AI.run(FALLBACK_MODEL, {
     messages: [
       { role: "system", content: prompt },
-      { role: "user", content: "Extract all transaction rows from this screenshot and return only the requested JSON." }
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "Inspect this screenshot closely. Extract every visible transaction row and return only the requested JSON." },
+          { type: "image_url", image_url: { url: image } }
+        ]
+      }
     ],
-    image,
-    max_tokens: 2048,
+    max_completion_tokens: 2048,
     temperature: 0,
     chat_template_kwargs: { enable_thinking: false }
   });

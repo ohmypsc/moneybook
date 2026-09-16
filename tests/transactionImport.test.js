@@ -222,12 +222,14 @@ test("image import uses Moondream fast query and parses compact transactions", a
   assert.equal(values[1].merchant, "Store B");
 });
 
-test("image import falls back to Gemma only when fast vision output is unusable", async () => {
+test("image import falls back to Gemma with the screenshot embedded in multimodal message content", async () => {
   const models = [];
+  const payloads = [];
   const env = {
     AI: {
-      async run(model) {
+      async run(model, payload) {
         models.push(model);
+        payloads.push(payload);
         if (models.length === 1) return { answer: "not json" };
         return {
           choices: [{ message: { content: '{"transactions":[{"date":"2026-09-15","merchant":"Fallback Store","amount":9200}]}' } }]
@@ -235,14 +237,20 @@ test("image import falls back to Gemma only when fast vision output is unusable"
       }
     }
   };
+  const image = "data:image/jpeg;base64,AA==";
   const values = await analyzeTransactionImport(env, {
-    images: ["data:image/jpeg;base64,AA=="],
+    images: [image],
     today: "2026-09-16"
   });
   assert.deepEqual(models, [
     "@cf/moondream/moondream3.1-9B-A2B",
     "@cf/google/gemma-4-26b-a4b-it"
   ]);
+  const fallbackUser = payloads[1].messages.find((message) => message.role === "user");
+  assert.ok(Array.isArray(fallbackUser.content));
+  assert.equal(fallbackUser.content[1].type, "image_url");
+  assert.equal(fallbackUser.content[1].image_url.url, image);
+  assert.equal(payloads[1].image, undefined);
   assert.equal(values[0].merchant, "Fallback Store");
 });
 
