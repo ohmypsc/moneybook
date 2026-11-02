@@ -13,7 +13,7 @@ npm run build
 
 `npm run check`는 TypeScript 검사, Node 기본 테스트, Worker 문법 검사, 소스 경계 검사를 순서대로 실행합니다. 기능 변경 후에는 최소한 `npm run check`를 통과시키고 배포 전에는 `npm run build`까지 확인합니다.
 
-현재 저장소에는 `package-lock.json`이 없으므로 정상적인 npm 네트워크 환경에서 `npm install` 후 생성된 lockfile을 함께 커밋하는 것을 권장합니다.
+의존성 버전은 `package-lock.json`으로 고정되어 있습니다. 새로 설치할 때는 `npm ci`를 사용하세요.
 
 ## 주요 구조
 
@@ -48,8 +48,7 @@ tests/                  Node 기본 테스트 러너 기반 테스트
 
 - `LOGIN_USERS`: 로그인 사용자 JSON
 - `SESSION_SECRET`: 세션 HMAC 서명 키
-- `LEDGER_API_SECRET`: 기존 ledger 연동 비밀값
-- `APPS_SCRIPT_URL`: 기존 Apps Script 연동/관리 기능용 URL
+- `LEDGER_API_SECRET`, `APPS_SCRIPT_URL`: (선택) 예전 Google Sheets → D1 이전 관리 도구에서만 사용합니다. 일반 운영에는 필요하지 않습니다.
 - `DATA_GO_KR_SERVICE_KEY`: 아파트 주소 검색·국토부 실거래가 자동 시세용 공공데이터포털 서비스키(부동산 자동평가를 쓸 때만 필요)
 
 비밀값은 저장소에 직접 커밋하지 않습니다.

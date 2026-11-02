@@ -53,8 +53,6 @@
 
   "secrets": {
     "required": [
-      "APPS_SCRIPT_URL",
-      "LEDGER_API_SECRET",
       "LOGIN_USERS",
       "SESSION_SECRET"
     ]
