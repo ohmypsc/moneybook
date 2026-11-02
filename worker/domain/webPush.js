@@ -255,7 +255,7 @@ export function buildTransactionNotification(transaction, actorName) {
 
 // ── 여러 건 묶어 보내기 ────────────────────────────────────────
 // 마지막 입력 후 이만큼 조용하면 보냅니다(연속 입력·캡처 일괄 등록을 한 알림으로).
-export const PUSH_BATCH_QUIET_MS = 8_000;
+export const PUSH_BATCH_QUIET_MS = 2_000;
 // 계속 입력하더라도 첫 입력 후 이 시간이 지나면 그때까지 모인 것을 보냅니다.
 export const PUSH_BATCH_MAX_WAIT_MS = 30_000;
 export const PUSH_BATCH_MAX_ITEMS = 200;

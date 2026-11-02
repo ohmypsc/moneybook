@@ -203,9 +203,9 @@ test("batched pushes wait for a quiet gap but never longer than the max wait", (
   let state = scheduleBatchedPush([], { actor: "승철", transaction: { transactionId: "1" } }, t0);
   assert.equal(state.sendAt, t0 + PUSH_BATCH_QUIET_MS);
 
-  // 5초 뒤 한 건 더 → 그때부터 다시 조용한 시간을 기다림
-  state = scheduleBatchedPush(state.pending, { actor: "승철", transaction: { transactionId: "2" } }, t0 + 5_000);
-  assert.equal(state.sendAt, t0 + 5_000 + PUSH_BATCH_QUIET_MS);
+  // 1.5초 뒤 한 건 더(아직 안 보낸 상태) → 그때부터 다시 조용한 시간을 기다림
+  state = scheduleBatchedPush(state.pending, { actor: "승철", transaction: { transactionId: "2" } }, t0 + 1_500);
+  assert.equal(state.sendAt, t0 + 1_500 + PUSH_BATCH_QUIET_MS);
   assert.equal(state.pending.length, 2);
 
   // 계속 들어와도 첫 입력 후 최대 대기시간에는 보냄
