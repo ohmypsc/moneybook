@@ -2,7 +2,7 @@
 // 암호화·서명 같은 순수 로직은 domain/webPush.js에 있습니다.
 
 import {
-  buildTransactionNotification,
+  buildBatchNotification,
   generateVapidKeys,
   normalizePushSubscription,
   sendWebPush
@@ -171,16 +171,21 @@ async function deliver(env, rows, payload, origin) {
 
 /**
  * 거래를 입력한 사람이 아닌, 다른 구성원의 기기에만 알림을 보냅니다.
- * (알림은 각자 설정에서 켠 기기로만 갑니다.)
+ * 여러 건이면 알림 하나로 묶습니다. (알림은 각자 설정에서 켠 기기로만 갑니다.)
  */
-export async function notifyPartnersOfTransaction(env, householdId, actorName, transaction, origin) {
-  if (!transaction || !actorName) return { sent: 0, failed: 0, removed: 0 };
+export async function notifyPartnersOfTransactions(env, householdId, actorName, transactions, origin) {
+  const list = (Array.isArray(transactions) ? transactions : []).filter(Boolean);
+  if (!list.length || !actorName) return { sent: 0, failed: 0, removed: 0 };
   await ensurePushSchema(env);
   const result = await env.DB.prepare(
     "SELECT endpoint,p256dh,auth FROM push_subscriptions WHERE household_id=? AND member_name<>?"
   ).bind(householdId, actorName).all();
   const rows = result.results || [];
-  return deliver(env, rows, buildTransactionNotification(transaction, actorName), origin);
+  return deliver(env, rows, buildBatchNotification(list, actorName), origin);
+}
+
+export async function notifyPartnersOfTransaction(env, householdId, actorName, transaction, origin) {
+  return notifyPartnersOfTransactions(env, householdId, actorName, transaction ? [transaction] : [], origin);
 }
 
 export async function sendTestPush(env, householdId, session, origin) {

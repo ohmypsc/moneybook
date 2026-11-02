@@ -252,3 +252,84 @@ export function buildTransactionNotification(transaction, actorName) {
     tag: `moneybook-tx-${String(transaction?.transactionId || Date.now())}`
   };
 }
+
+// ── 여러 건 묶어 보내기 ────────────────────────────────────────
+// 마지막 입력 후 이만큼 조용하면 보냅니다(연속 입력·캡처 일괄 등록을 한 알림으로).
+export const PUSH_BATCH_QUIET_MS = 2_000;
+// 계속 입력하더라도 첫 입력 후 이 시간이 지나면 그때까지 모인 것을 보냅니다.
+export const PUSH_BATCH_MAX_WAIT_MS = 30_000;
+export const PUSH_BATCH_MAX_ITEMS = 200;
+
+/**
+ * 대기 중인 알림 목록에 새 거래를 더하고, 언제 보낼지(알람 시각)를 정합니다.
+ */
+export function scheduleBatchedPush(pending, item, now = Date.now()) {
+  const list = Array.isArray(pending) ? pending.slice() : [];
+  if (list.length < PUSH_BATCH_MAX_ITEMS) {
+    list.push({ ...item, at: now });
+  }
+  const firstAt = Math.min(...list.map(entry => Number(entry.at) || now));
+  const sendAt = Math.min(firstAt + PUSH_BATCH_MAX_WAIT_MS, now + PUSH_BATCH_QUIET_MS);
+  return { pending: list, sendAt };
+}
+
+/**
+ * 모인 알림을 입력한 사람별로 나눕니다(승철 입력은 미영에게, 미영 입력은 승철에게).
+ */
+export function groupBatchedPush(pending) {
+  const groups = new Map();
+  for (const entry of Array.isArray(pending) ? pending : []) {
+    const actor = String(entry?.actor || "");
+    if (!actor || !entry?.transaction) continue;
+    const key = `${actor}\u0000${entry.origin || ""}`;
+    if (!groups.has(key)) groups.set(key, { actor, origin: entry.origin || "", transactions: [] });
+    groups.get(key).transactions.push(entry.transaction);
+  }
+  return Array.from(groups.values());
+}
+
+/**
+ * 알림에 필요한 거래 정보만 남깁니다(대기열 저장 용량을 줄이기 위해).
+ */
+export function summarizeTransactionForPush(transaction) {
+  return {
+    transactionId: String(transaction?.transactionId || ""),
+    type: String(transaction?.type || ""),
+    amount: Number(transaction?.amount) || 0,
+    description: String(transaction?.description || "").slice(0, 60),
+    category: String(transaction?.category || "").slice(0, 40),
+    paymentMethod: String(transaction?.paymentMethod || "").slice(0, 40),
+    fromAccount: String(transaction?.fromAccount || "").slice(0, 40),
+    toAccount: String(transaction?.toAccount || "").slice(0, 40)
+  };
+}
+
+/**
+ * 한 사람이 입력한 여러 거래를 알림 하나로 만듭니다. 한 건이면 기존 한 건 알림과 같습니다.
+ */
+export function buildBatchNotification(transactions, actorName) {
+  const list = Array.isArray(transactions) ? transactions : [];
+  if (list.length <= 1) return buildTransactionNotification(list[0], actorName);
+
+  const shown = list.slice(0, 3).map(item =>
+    `${String(item?.description || item?.category || item?.type || "거래").trim()} ${formatKrw(item?.amount)}`
+  );
+  const rest = list.length - shown.length;
+
+  const totals = [];
+  for (const type of ["지출", "수입", "이체"]) {
+    const items = list.filter(item => item?.type === type);
+    if (items.length) {
+      totals.push(`${type} ${formatKrw(items.reduce((sum, item) => sum + (Number(item?.amount) || 0), 0))}`);
+    }
+  }
+
+  const body = `${shown.join(", ")}${rest > 0 ? ` 외 ${rest}건` : ""} · ${totals.join(" · ")}`;
+
+  return {
+    title: `${actorName}님이 거래 ${list.length}건을 입력했어요`,
+    body: body.slice(0, 240),
+    url: "/?shortcut=history",
+    tag: `moneybook-batch-${String(list[list.length - 1]?.transactionId || Date.now())}`
+  };
+}
