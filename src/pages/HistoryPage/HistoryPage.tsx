@@ -52,8 +52,9 @@ import { Card } from "../../components/common/Card/Card";
 import { Money, formatMoney } from "../../components/common/Money/Money";
 
 import styles from "./HistoryPage.module.css";
+import { YearEndTaxView } from "./YearEndTaxView";
 
-type HistoryView = "calendar" | "search" | "report";
+type HistoryView = "calendar" | "search" | "report" | "tax";
 type TransactionFilter = "전체" | "지출" | "수입" | "이체";
 
 interface HistoryPageProps {
@@ -98,7 +99,7 @@ const HISTORY_VIEW_STORAGE_KEY = "moneybook:history-view:v1";
 function readStoredHistoryView(): HistoryView {
   try {
     const stored = window.localStorage.getItem(HISTORY_VIEW_STORAGE_KEY);
-    if (stored === "calendar" || stored === "search" || stored === "report") {
+    if (stored === "calendar" || stored === "search" || stored === "report" || stored === "tax") {
       return stored;
     }
   } catch {
@@ -496,8 +497,17 @@ export default function HistoryPage({
           >
             리포트
           </button>
+          <button
+            type="button"
+            className={view === "tax" ? styles.active : ""}
+            onClick={() => setView("tax")}
+          >
+            연말정산
+          </button>
         </div>
       </div>
+
+      {view === "tax" && <YearEndTaxView />}
 
       {view === "calendar" && (
         <CalendarPage

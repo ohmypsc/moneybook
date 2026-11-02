@@ -30,3 +30,10 @@ test("change_log actions written by the Worker are allowed by the DB CHECK const
   assert.ok(actions.length > 10, "should find the change log writes");
   assert.deepEqual(actions.filter(action => !allowed.has(action)), []);
 });
+
+test("year-end tax APIs stay registered in the Worker router", () => {
+  assert.match(routeBlock("getPaths"), /"\/api\/tax\/summary"/);
+  assert.match(routeBlock("postPaths"), /"\/api\/tax\/profile"/);
+  assert.match(routeBlock("postPaths"), /"\/api\/tax\/category"/);
+  assert.match(routeBlock("postPaths"), /"\/api\/tax\/preset"/);
+});
