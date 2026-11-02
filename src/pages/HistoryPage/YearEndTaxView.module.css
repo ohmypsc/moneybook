@@ -1,0 +1,244 @@
+.notice {
+  margin: 0 0 12px;
+  padding: 11px 13px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.tipsCard,
+.memberCard {
+  margin-bottom: 12px;
+}
+
+.tipsCard h2,
+.sectionTitle {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.tipsCard ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.memberHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.memberHeader h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.stageBadge {
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: var(--color-surface-soft);
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.stageBadge[data-stage="deducting"] {
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+}
+
+.profileRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.profileRow label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.profileRow label span {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
+
+.profileRow input,
+.profileRow select,
+.categoryList select {
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 16px; /* iOS는 16px 미만 입력칸에 포커스하면 화면을 확대합니다 */
+}
+
+.hint {
+  margin: 6px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.meter {
+  margin-top: 14px;
+}
+
+.meterLabel {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.meterLabel span:last-child {
+  color: var(--color-text-secondary);
+}
+
+.meterTrack {
+  height: 8px;
+  margin-top: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--color-surface-soft);
+}
+
+.meterFill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-text-secondary);
+}
+
+.meterFillDeduction {
+  background: var(--color-primary);
+}
+
+.meterNote {
+  margin: 5px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
+
+.usageList {
+  display: grid;
+  gap: 0;
+  margin: 14px 0 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.usageList div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(220, 229, 229, 0.72);
+  font-size: 12px;
+}
+
+.usageList dt {
+  color: var(--color-text-secondary);
+}
+
+.usageList dt small {
+  margin-left: 6px;
+  font-size: 10px;
+}
+
+.usageList dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.itemTable {
+  width: 100%;
+  margin-top: 10px;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.itemTable th,
+.itemTable td {
+  padding: 8px 4px;
+  border-bottom: 1px solid rgba(220, 229, 229, 0.72);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.itemTable th:first-child {
+  text-align: left;
+}
+
+.itemTable thead th {
+  color: var(--color-text-secondary);
+  font-weight: 600;
+}
+
+.collapseToggle {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.collapseToggle span:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.collapseToggle small {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
+
+.categoryList {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.categoryList li {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.4fr);
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.footnote {
+  margin: 14px 2px 0;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+@media (max-width: 390px) {
+  .profileRow {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .profileRow button {
+    grid-column: 1 / -1;
+  }
+}
