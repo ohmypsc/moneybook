@@ -7,7 +7,10 @@ import { formatMoney } from "../../components/common/Money/Money";
 import { enqueuePendingTransaction } from "../../utils/pendingTransactionQueue";
 import type { BenefitRule } from "../../api/automation";
 import { prepareImportImages } from "./importImage";
+import { prioritizeAccountsForUser } from "../../pages/InputPage/inputDomain";
 import styles from "./TransactionImportSheet.module.css";
+
+const IMPORT_CARD_SUBTYPES = ["신용카드", "체크카드", "선불/지역화폐"];
 
 interface EditableCandidate extends ImportedTransactionCandidate {
   selected: boolean;
@@ -69,9 +72,40 @@ export function TransactionImportSheet({
     () => bootstrap.categories.filter(item => item.type === "지출" && item.active && !item.isDeleted),
     [bootstrap]
   );
+  // 카드뿐 아니라 현금·통장(계좌이체 결제)도 고를 수 있게 합니다. 내 명의 → 공동 → 배우자 순서입니다.
+  const paymentMethodGroups = useMemo(() => {
+    const active = prioritizeAccountsForUser(
+      bootstrap.accounts.filter(item => item.active && !item.isDeleted),
+      userName
+    );
+    return {
+      cards: active.filter(item => IMPORT_CARD_SUBTYPES.includes(item.subType)),
+      cashAndBank: active.filter(
+        item => item.accountType === "자산" && item.subType !== "주식" && !IMPORT_CARD_SUBTYPES.includes(item.subType)
+      )
+    };
+  }, [bootstrap, userName]);
   const paymentMethods = useMemo(
-    () => bootstrap.accounts.filter(item => item.active && !item.isDeleted && ["신용카드", "체크카드", "선불/지역화폐"].includes(item.subType)),
-    [bootstrap]
+    () => [...paymentMethodGroups.cards, ...paymentMethodGroups.cashAndBank],
+    [paymentMethodGroups]
+  );
+  const paymentMethodOptions = (
+    <>
+      {paymentMethodGroups.cards.length > 0 && (
+        <optgroup label="카드">
+          {paymentMethodGroups.cards.map(account => (
+            <option key={account.accountId} value={account.accountId}>{account.displayName}</option>
+          ))}
+        </optgroup>
+      )}
+      {paymentMethodGroups.cashAndBank.length > 0 && (
+        <optgroup label="현금·계좌">
+          {paymentMethodGroups.cashAndBank.map(account => (
+            <option key={account.accountId} value={account.accountId}>{account.displayName}</option>
+          ))}
+        </optgroup>
+      )}
+    </>
   );
   const selectedCount = items.filter(item => item.selected && item.kind === "expense").length;
   const duplicateCount = items.filter(item => item.duplicate).length;
@@ -403,9 +437,7 @@ export function TransactionImportSheet({
                   aria-label="선택 항목 결제수단 일괄 변경"
                 >
                   <option value="">결제수단 일괄 변경</option>
-                  {paymentMethods.map(account => (
-                    <option key={account.accountId} value={account.accountId}>{account.displayName}</option>
-                  ))}
+                  {paymentMethodOptions}
                 </select>
               </div>
             </div>
@@ -511,7 +543,7 @@ export function TransactionImportSheet({
                         }}
                       >
                         <option value="">선택</option>
-                        {paymentMethods.map(account => <option key={account.accountId} value={account.accountId}>{account.displayName}</option>)}
+                        {paymentMethodOptions}
                       </select>
                     </label>
                   </div>

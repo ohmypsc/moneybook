@@ -75,6 +75,46 @@ function moveMonth(month: string, offset: number) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
+function getMonthDateRange(month: string) {
+  const [year, monthNumber] = month.split("-").map(Number);
+  const lastDay = new Date(year, monthNumber, 0).getDate();
+  return {
+    dateFrom: `${month}-01`,
+    dateTo: `${month}-${String(lastDay).padStart(2, "0")}`
+  };
+}
+
+const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
+
+function formatDayHeader(date: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  if (!match) return date;
+  const weekday = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])).getDay();
+  return `${Number(match[2])}월 ${Number(match[3])}일 (${WEEKDAY_LABELS[weekday]})`;
+}
+
+const HISTORY_VIEW_STORAGE_KEY = "moneybook:history-view:v1";
+
+function readStoredHistoryView(): HistoryView {
+  try {
+    const stored = window.localStorage.getItem(HISTORY_VIEW_STORAGE_KEY);
+    if (stored === "calendar" || stored === "search" || stored === "report") {
+      return stored;
+    }
+  } catch {
+    /* 저장소를 쓸 수 없으면 기본 화면을 사용합니다. */
+  }
+  return "calendar";
+}
+
+function storeHistoryView(view: HistoryView) {
+  try {
+    window.localStorage.setItem(HISTORY_VIEW_STORAGE_KEY, view);
+  } catch {
+    /* 마지막 화면 기억은 편의 기능이라 실패해도 무시합니다. */
+  }
+}
+
 function getTransactionTitle(transaction: Transaction) {
   if (isBenefitTransaction(transaction)) return getBenefitTransactionTitle(transaction);
   if (isSettlementTransaction(transaction)) return transaction.description || "정산받음";
@@ -118,7 +158,16 @@ export default function HistoryPage({
   onAddTransaction,
   onCopyTransaction
 }: HistoryPageProps) {
-  const [view, setView] = useState<HistoryView>("calendar");
+  // 마지막으로 본 화면(캘린더/목록/리포트)을 기억해 다음에 그대로 엽니다.
+  const [view, setViewState] = useState<HistoryView>(readStoredHistoryView);
+  const setView = (next: HistoryView) => {
+    setViewState(next);
+    storeHistoryView(next);
+  };
+  const [listMonth, setListMonth] = useState(getSeoulMonthString());
+  const [appliedQuery, setAppliedQuery] = useState("");
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [searchNonce, setSearchNonce] = useState(0);
   const [calendarEditTarget, setCalendarEditTarget] = useState<{
     transactionId: string;
     date: string;
@@ -175,9 +224,14 @@ export default function HistoryPage({
         ? Number(normalizedNumber)
         : undefined;
 
+      // 검색어도 기간도 없으면 선택한 달의 내역을 날짜순으로 보여줍니다.
+      const browseMonth = !trimmed && !searchDateFrom && !searchDateTo;
+      const monthRange = browseMonth ? getMonthDateRange(listMonth) : null;
+      if (!append) setAppliedQuery(trimmed);
+
       const response = await getTransactions({
-        dateFrom: searchDateFrom || undefined,
-        dateTo: searchDateTo || undefined,
+        dateFrom: monthRange?.dateFrom || searchDateFrom || undefined,
+        dateTo: monthRange?.dateTo || searchDateTo || undefined,
         type: filter === "전체" ? undefined : filter,
         categoryId: searchCategoryId || undefined,
         accountId: searchAccountId || undefined,
@@ -214,7 +268,8 @@ export default function HistoryPage({
       transactionId: transaction.transactionId,
       date: transaction.date
     });
-    setView("calendar");
+    // 수정을 위해 잠깐 캘린더로 이동할 뿐이라 '마지막으로 본 화면'으로는 기억하지 않습니다.
+    setViewState("calendar");
   }
 
   function resetSearchFilters() {
@@ -225,6 +280,12 @@ export default function HistoryPage({
     setSearchCategoryId("");
     setSearchAccountId("");
     setSearchSpendingTarget("");
+    setSearchNonce(value => value + 1);
+  }
+
+  function clearQuery() {
+    setQuery("");
+    setSearchNonce(value => value + 1);
   }
 
   async function loadReport(month: string, forceRefresh = false) {
@@ -302,7 +363,7 @@ export default function HistoryPage({
     if (view === "search") {
       void runSearch();
     }
-  }, [view, ledgerVersion]);
+  }, [view, ledgerVersion, listMonth, searchNonce]);
 
   useEffect(() => {
     if (view !== "search" || searchBootstrap) return;
@@ -362,6 +423,28 @@ export default function HistoryPage({
     [searchBootstrap]
   );
 
+  const browsingMonth = !appliedQuery && !searchDateFrom && !searchDateTo;
+  const activeAdvancedFilterCount = [
+    searchDateFrom,
+    searchDateTo,
+    searchCategoryId,
+    searchAccountId,
+    searchSpendingTarget
+  ].filter(Boolean).length;
+
+  const groupedSearchItems = useMemo(() => {
+    const groups: { date: string; items: Transaction[] }[] = [];
+    for (const transaction of searchItems) {
+      const last = groups[groups.length - 1];
+      if (last && last.date === transaction.date) {
+        last.items.push(transaction);
+      } else {
+        groups.push({ date: transaction.date, items: [transaction] });
+      }
+    }
+    return groups;
+  }, [searchItems]);
+
   const selectedSnapshot = useMemo(
     () => assetSnapshots.find(item => item.month === reportMonth) || null,
     [assetSnapshots, reportMonth]
@@ -403,7 +486,7 @@ export default function HistoryPage({
             className={view === "search" ? styles.active : ""}
             onClick={() => setView("search")}
           >
-            검색
+            목록
           </button>
           <button
             type="button"
@@ -424,17 +507,47 @@ export default function HistoryPage({
 
       {view === "search" && (
         <main className={styles.page}>
-          <header className={styles.header}>
-            <h1>전체 내역 검색</h1>
-            <p>내용·메모·카테고리·계좌·지출대상 또는 정확한 금액으로 찾을 수 있습니다.</p>
-          </header>
+          {browsingMonth ? (
+            <div className={styles.monthControl}>
+              <Button variant="ghost" size="sm" iconOnly aria-label="이전 달" onClick={() => setListMonth(current => moveMonth(current, -1))}>‹</Button>
+              <strong>{formatMonthLabel(listMonth)}</strong>
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
+                aria-label="다음 달"
+                disabled={listMonth >= getSeoulMonthString()}
+                onClick={() => setListMonth(current => moveMonth(current, 1))}
+              >›</Button>
+            </div>
+          ) : (
+            <div className={styles.searchModeBar}>
+              <span>
+                {appliedQuery ? `'${appliedQuery}' 전체 기간 검색 결과` : "기간 지정 결과"}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  if (appliedQuery) {
+                    clearQuery();
+                  } else {
+                    resetSearchFilters();
+                  }
+                }}
+              >
+                월별 목록으로
+              </Button>
+            </div>
+          )}
 
           <Card as="form" padding="sm" onSubmit={runSearch}>
             <div className={styles.searchRow}>
               <input
+                type="search"
                 value={query}
                 onChange={event => setQuery(event.target.value)}
-                placeholder="예: 쿠팡, 식비, 125000"
+                placeholder="전체 기간 검색: 쿠팡, 식비, 125000"
                 aria-label="내역 검색어"
               />
               <Button type="submit" loading={searchLoading} loadingLabel="검색 중">
@@ -456,6 +569,7 @@ export default function HistoryPage({
                     if (selected && item !== "전체" && selected.type !== item) {
                       setSearchCategoryId("");
                     }
+                    setSearchNonce(value => value + 1);
                   }}
                 >
                   {item}
@@ -463,6 +577,18 @@ export default function HistoryPage({
               ))}
             </div>
 
+            <button
+              type="button"
+              className={styles.advancedToggle}
+              aria-expanded={showAdvancedFilters}
+              onClick={() => setShowAdvancedFilters(current => !current)}
+            >
+              상세 조건{activeAdvancedFilterCount > 0 ? ` ${activeAdvancedFilterCount}개 적용` : ""}
+              <span aria-hidden="true">{showAdvancedFilters ? "⌃" : "⌄"}</span>
+            </button>
+
+            {showAdvancedFilters && (
+            <>
             <div className={styles.advancedFilters}>
               <label>
                 <span>시작일</span>
@@ -526,31 +652,53 @@ export default function HistoryPage({
               <Button type="button" variant="ghost" size="sm" onClick={resetSearchFilters}>
                 조건 초기화
               </Button>
+              <Button type="submit" size="sm" loading={searchLoading} loadingLabel="적용 중">
+                조건 적용
+              </Button>
             </div>
+            </>
+            )}
           </Card>
 
           <div className={styles.resultHeader}>
             <strong>{searchTotal.toLocaleString("ko-KR")}건</strong>
-            <span>{searchItems.length.toLocaleString("ko-KR")}건 표시 중</span>
+            {searchItems.length < searchTotal && (
+              <span>{searchItems.length.toLocaleString("ko-KR")}건 표시 중</span>
+            )}
           </div>
 
           {searchError && <p className={styles.error}>{searchError}</p>}
 
-          <Card as="section" padding="none" className={styles.listCard}>
-            {!searchLoading && searchItems.length === 0 ? (
-              <p className={styles.empty}>조건에 맞는 거래가 없습니다.</p>
-            ) : (
-              searchItems.map(transaction => {
+          {searchLoading && searchItems.length === 0 && (
+            <p className={styles.state}>내역을 불러오는 중입니다.</p>
+          )}
+
+          {!searchLoading && searchItems.length === 0 ? (
+            <Card as="section" padding="none" className={styles.listCard}>
+              <p className={styles.empty}>
+                {browsingMonth ? "이 달에 기록된 거래가 없습니다." : "조건에 맞는 거래가 없습니다."}
+              </p>
+            </Card>
+          ) : (
+            groupedSearchItems.map(group => (
+            <section key={group.date} className={styles.dayGroup}>
+            <h2 className={styles.dayHeader}>{formatDayHeader(group.date)}</h2>
+            <Card padding="none" className={styles.listCard}>
+            {group.items.map(transaction => {
                 const isBenefit = isBenefitTransaction(transaction);
                 const isSettlement = isSettlementTransaction(transaction);
 
                 return (
                   <article key={transaction.transactionId} className={styles.transactionRow}>
-                    <div className={styles.transactionMain}>
-                      <span className={styles.transactionDate}>{transaction.date}</span>
+                    <button
+                      type="button"
+                      className={styles.transactionMain}
+                      onClick={() => openSearchResultForEdit(transaction)}
+                      aria-label={`${getTransactionTitle(transaction)} 수정`}
+                    >
                       <strong>{getTransactionTitle(transaction)}</strong>
                       <span>{getTransactionMeta(transaction)}</span>
-                    </div>
+                    </button>
                     <div className={styles.transactionActions}>
                       <strong className={
                         isBenefit || isSettlement
@@ -575,28 +723,24 @@ export default function HistoryPage({
                           }
                         />
                       </strong>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => openSearchResultForEdit(transaction)}
-                      >
-                        수정
-                      </Button>
                       {onCopyTransaction && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
+                        <button
+                          type="button"
+                          className={styles.copyButton}
                           onClick={() => onCopyTransaction(transaction)}
+                          aria-label={`${getTransactionTitle(transaction)} 복사해서 새로 입력`}
                         >
-                          복사 입력
-                        </Button>
+                          복사
+                        </button>
                       )}
                     </div>
                   </article>
                 );
-              })
-            )}
-          </Card>
+              })}
+            </Card>
+            </section>
+            ))
+          )}
 
           {searchItems.length < searchTotal && (
             <div className={styles.loadMore}>
