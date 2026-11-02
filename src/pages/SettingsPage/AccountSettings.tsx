@@ -1575,8 +1575,8 @@ export function AccountSettings({
 
                     successMessage:
                         wasHidden
-                            ? "입력 화면에 표시합니다."
-                            : "입력 화면에서 숨겼습니다."
+                            ? "지출 결제수단 목록에 다시 표시합니다."
+                            : "지출 결제수단 목록에서 숨겼습니다. 이체·수입 입력과 내역에는 그대로 보입니다."
                 }
             );
     }
@@ -2032,7 +2032,7 @@ export function AccountSettings({
                                                                     }
                                                                     {
                                                                         hidden
-                                                                            ? " · 입력 숨김"
+                                                                            ? " · 결제수단 숨김"
                                                                             : ""
                                                                     }
                                                                 </span>
@@ -2126,8 +2126,8 @@ export function AccountSettings({
                                                                                                                                     !account.active
                                                                                                                                         ? " · 사용 종료"
                                                                                                                                         : hidden
-                                                                                                                                            ? " · 입력 숨김"
-                                                                                                                                            : " · 입력 표시"
+                                                                                                                                            ? " · 결제수단 숨김"
+                                                                                                                                            : " · 결제수단 표시"
                                                                                                                                 }
                                                                                                                             </span>
                                                                                                                         </span>
@@ -2262,8 +2262,8 @@ export function AccountSettings({
                                                 hiddenAccountSet.has(
                                                     activeMenuAccount.accountId
                                                 )
-                                                    ? "입력 표시"
-                                                    : "입력 숨김"
+                                                    ? "결제수단에 표시"
+                                                    : "결제수단에서 숨기기"
                                             }
                                         </button>
                                     )
