@@ -52,6 +52,12 @@ CREATE TABLE IF NOT EXISTS tax_rule_sets ( tax_year INTEGER PRIMARY KEY, rules_j
 
 CREATE TABLE IF NOT EXISTS tax_year_profiles ( household_id TEXT NOT NULL, member_id TEXT NOT NULL, tax_year INTEGER NOT NULL, gross_salary_krw INTEGER, salary_income_krw INTEGER, profile_json TEXT, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (household_id, member_id, tax_year), FOREIGN KEY (household_id) REFERENCES households(household_id), FOREIGN KEY (member_id) REFERENCES members(member_id) );
 
+-- ── 알림 ──────────────────────────────────────────────
+-- 배우자 입력 알림을 켠 기기 목록. Worker(worker/push.js)가 처음 쓸 때 스스로 만듭니다.
+-- VAPID 키는 schema_meta의 'web_push_vapid_v1' 값으로 보관됩니다.
+
+CREATE TABLE IF NOT EXISTS push_subscriptions ( endpoint TEXT PRIMARY KEY, household_id TEXT NOT NULL, member_name TEXT NOT NULL, p256dh TEXT NOT NULL, auth TEXT NOT NULL, user_agent TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, last_success_at TEXT, last_failure_at TEXT, failure_count INTEGER NOT NULL DEFAULT 0 );
+
 -- ── 인덱스 ────────────────────────────────────────────
 
 CREATE INDEX IF NOT EXISTS idx_accounts_household ON accounts(household_id);
@@ -67,6 +73,7 @@ CREATE INDEX IF NOT EXISTS idx_investment_trades_holding_date ON investment_trad
 CREATE UNIQUE INDEX IF NOT EXISTS idx_investment_trades_request ON investment_trades(household_id, request_id) WHERE request_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_members_household ON members(household_id);
 CREATE INDEX IF NOT EXISTS idx_preferences_household_member ON user_preferences(household_id, member_id);
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_household_member ON push_subscriptions(household_id, member_name);
 CREATE INDEX IF NOT EXISTS idx_real_estate_household ON real_estate_assets(household_id, deleted_at);
 CREATE INDEX IF NOT EXISTS idx_tax_profiles_year ON tax_year_profiles(household_id, tax_year, member_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_category_date ON transactions(household_id, category_id, date DESC);

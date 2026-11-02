@@ -190,6 +190,9 @@ export interface TransactionsResponse {
 
 
 export interface GetTransactionsParams {
+  /** 기본 요청 제한시간(30초) 대신 쓸 값. 저장 전 빠른 확인용. */
+  timeoutMs?: number;
+
   dateFrom?: string;
 
   dateTo?: string;
@@ -357,7 +360,8 @@ export async function getTransactions(
       : "/api/transactions";
 
 
-  return apiRequest<TransactionsResponse>(
-    url
+return apiRequest<TransactionsResponse>(
+    url,
+    params.timeoutMs ? { timeoutMs: params.timeoutMs } : {}
   );
 }

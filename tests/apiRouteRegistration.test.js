@@ -16,3 +16,10 @@ test("settlement GET and POST APIs stay registered in the Worker router", () => 
   assert.match(routeBlock("getPaths"), /"\/api\/transactions\/settlement-summary"/);
   assert.match(routeBlock("postPaths"), /"\/api\/transactions\/settle"/);
 });
+
+test("push notification APIs stay registered in the Worker router", () => {
+  assert.match(routeBlock("getPaths"), /"\/api\/push\/config"/);
+  assert.match(routeBlock("postPaths"), /"\/api\/push\/subscribe"/);
+  assert.match(routeBlock("postPaths"), /"\/api\/push\/unsubscribe"/);
+  assert.match(routeBlock("postPaths"), /"\/api\/push\/test"/);
+});
