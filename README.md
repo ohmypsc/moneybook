@@ -93,4 +93,4 @@ npm run deploy
 
 배포 스크립트는 먼저 TypeScript/Vite 빌드를 수행한 뒤 Wrangler로 배포합니다. Durable Object migration과 Cron 설정은 `wrangler.jsonc`에 포함되어 있습니다.
 
-> D1의 전체 `CREATE TABLE` 스키마 migration은 현재 저장소에 완전한 형태로 보존되어 있지 않습니다. 새 D1 데이터베이스를 임의로 재생성하지 말고, 운영 스키마를 먼저 정확히 추출한 뒤 별도의 schema migration으로 버전 관리하는 것이 안전합니다.
+> D1 테이블 구조(스키마)는 `migrations/0000_schema.sql`에 보관되어 있습니다(2026-11-02 운영 DB에서 추출). 데이터베이스를 새로 만들어야 할 때 이 파일로 테이블을 만든 뒤, 앱의 JSON 백업으로 데이터를 복원합니다. 운영 DB의 테이블 구조를 바꾸면 이 파일도 함께 갱신하세요.

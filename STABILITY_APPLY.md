@@ -22,6 +22,8 @@ npx wrangler d1 execute moneybook-prod --remote --file=./database/check-request-
 
 ## 3. UNIQUE 인덱스 적용
 
+> ✅ 2026-11-02 확인: 운영 DB(moneybook-prod)에는 같은 역할의 UNIQUE 인덱스(`idx_transactions_request`, `idx_investment_trades_request`)가 이미 있습니다. 운영 DB에는 이 단계를 실행할 필요가 없습니다. 실행하면 같은 역할의 인덱스가 하나씩 더 생겨 저장이 아주 조금 느려질 뿐 기능상 이득은 없습니다.
+
 ```bash
 npx wrangler d1 execute moneybook-prod --remote --file=./migrations/0001_request_id_unique_indexes.sql
 ```
