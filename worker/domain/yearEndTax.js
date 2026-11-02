@@ -334,3 +334,107 @@ export function buildRecommendations(people, rules) {
 
   return tips;
 }
+
+// ── 급여 수입으로 총급여 추정 ────────────────────────────────────
+// 가계부에는 세금·4대보험을 뗀 '실수령액'이 기록되므로, 연봉 구간별 대략적인
+// 실수령 비율로 총급여를 거꾸로 추정합니다(부양가족·비과세 수당에 따라 5~10% 차이 날 수 있음).
+
+/** [연 총급여, 실수령 비율] — 2026년 4대보험·간이세액표 기준 대략치 */
+export const NET_PAY_RATIOS = [
+  [20 * MILLION, 0.91],
+  [30 * MILLION, 0.89],
+  [40 * MILLION, 0.87],
+  [50 * MILLION, 0.85],
+  [60 * MILLION, 0.835],
+  [70 * MILLION, 0.82],
+  [80 * MILLION, 0.80],
+  [100 * MILLION, 0.77],
+  [150 * MILLION, 0.72],
+  [200 * MILLION, 0.68]
+];
+
+export function netPayRatio(gross) {
+  const table = NET_PAY_RATIOS;
+  if (gross <= table[0][0]) return table[0][1];
+  for (let index = 1; index < table.length; index += 1) {
+    const [upper, upperRatio] = table[index];
+    const [lower, lowerRatio] = table[index - 1];
+    if (gross <= upper) {
+      return lowerRatio + ((gross - lower) / (upper - lower)) * (upperRatio - lowerRatio);
+    }
+  }
+  return table[table.length - 1][1];
+}
+
+/** 연 실수령액 → 연 총급여 추정(만 원 단위 반올림) */
+export function estimateGrossFromNet(annualNet) {
+  const net = Math.max(0, Number(annualNet) || 0);
+  if (net <= 0) return 0;
+  let low = net;
+  let high = net * 2;
+  for (let step = 0; step < 60; step += 1) {
+    const mid = (low + high) / 2;
+    if (mid * netPayRatio(mid) < net) low = mid;
+    else high = mid;
+  }
+  return Math.round(high / 10_000) * 10_000;
+}
+
+const SALARY_NAME_PATTERN = /급여|월급|상여|보너스|성과급|인센티브|연봉/;
+
+/**
+ * 수입 카테고리가 급여인지 판단합니다.
+ * 코드: "salary"(급여로 계산), "not-salary"(급여 아님), ""(이름으로 자동 판단)
+ */
+export function isSalaryCategory(name, code) {
+  if (code === "salary") return true;
+  if (code === "not-salary") return false;
+  return SALARY_NAME_PATTERN.test(String(name || ""));
+}
+
+export const INCOME_TAX_CODES = {
+  "": "자동",
+  salary: "급여로 계산",
+  "not-salary": "급여 아님"
+};
+
+/**
+ * 사람별(받은 통장 명의자) 한 해 급여 실수령액과 총급여 추정치.
+ * currentMonth(YYYY-MM)가 같은 해면 받은 달 수로 1년치를 환산합니다.
+ */
+export function summarizeSalaryIncome({ transactions, accounts, salaryCategoryIds, members, year, currentMonth }) {
+  const accountMap = new Map((accounts || []).map(account => [account.accountId, account]));
+  const memberSet = new Set(members || []);
+  const result = new Map();
+  for (const name of memberSet) result.set(name, { netTotal: 0, months: new Set() });
+
+  for (const tx of transactions || []) {
+    if (tx?.type !== "수입" || tx?.reversalOf) continue;
+    if (!String(tx?.date || "").startsWith(`${year}-`)) continue;
+    if (!salaryCategoryIds.has(tx.categoryId)) continue;
+    const requestId = String(tx.requestId || "");
+    if (requestId.startsWith("BENEFIT_") || requestId.startsWith("SETTLEMENT_")) continue;
+    const owner = String(accountMap.get(tx.toAccountId)?.owner || "").trim();
+    if (!memberSet.has(owner)) continue;
+    const entry = result.get(owner);
+    entry.netTotal += Math.max(0, (Number(tx.amount) || 0) - (Number(tx.refundAmount) || 0));
+    entry.months.add(String(tx.date).slice(0, 7));
+  }
+
+  const inProgress = String(currentMonth || "").startsWith(`${year}-`);
+  const summaries = new Map();
+  for (const [name, entry] of result) {
+    const monthCount = entry.months.size;
+    const annualizedNet = inProgress && monthCount > 0 && monthCount < 12
+      ? (entry.netTotal / monthCount) * 12
+      : entry.netTotal;
+    summaries.set(name, {
+      netTotal: Math.round(entry.netTotal),
+      months: monthCount,
+      annualized: inProgress && monthCount > 0 && monthCount < 12,
+      annualizedNet: Math.round(annualizedNet),
+      estimatedGross: estimateGrossFromNet(annualizedNet)
+    });
+  }
+  return summaries;
+}

@@ -137,3 +137,73 @@ test("recommendations tell the couple whose card to use", () => {
   assert.match(texts, /공동 지출은 이미 문턱을 넘은 승철님 카드로/);
   assert.match(texts, /의료비 200만 원은 미영님 카드로/);
 });
+
+import {
+  estimateGrossFromNet,
+  isSalaryCategory,
+  netPayRatio,
+  summarizeSalaryIncome
+} from "../worker/domain/yearEndTax.js";
+
+test("gross salary is estimated back from take-home pay", () => {
+  // 총급여 5천만 원의 실수령은 약 85% → 4,250만 원
+  assert.equal(estimateGrossFromNet(50 * M * netPayRatio(50 * M)), 50 * M);
+  assert.equal(estimateGrossFromNet(36 * M), Math.round(36 * M / netPayRatio(estimateGrossFromNet(36 * M)) / 10_000) * 10_000);
+  assert.equal(estimateGrossFromNet(0), 0);
+  // 실수령이 많을수록 총급여도 큼
+  assert.ok(estimateGrossFromNet(60 * M) > estimateGrossFromNet(50 * M));
+});
+
+test("salary categories are found by name unless the couple says otherwise", () => {
+  assert.equal(isSalaryCategory("급여", ""), true);
+  assert.equal(isSalaryCategory("상여금", ""), true);
+  assert.equal(isSalaryCategory("이자", ""), false);
+  assert.equal(isSalaryCategory("부업", "salary"), true);
+  assert.equal(isSalaryCategory("급여(알바 정산)", "not-salary"), false);
+});
+
+test("take-home salary is summed per receiving account owner and annualized mid-year", () => {
+  const accounts = [
+    { accountId: "SC_BANK", owner: "승철" },
+    { accountId: "MY_BANK", owner: "미영" },
+    { accountId: "JOINT", owner: "공동" }
+  ];
+  const pay = (id, date, amount, toAccountId, extra = {}) => ({ transactionId: id, type: "수입", categoryId: "PAY", date, amount, toAccountId, ...extra });
+  const summaries = summarizeSalaryIncome({
+    year: 2026,
+    currentMonth: "2026-04",
+    members: ["승철", "미영"],
+    accounts,
+    salaryCategoryIds: new Set(["PAY"]),
+    transactions: [
+      pay("1", "2026-01-25", 3_500_000, "SC_BANK"),
+      pay("2", "2026-02-25", 3_500_000, "SC_BANK"),
+      pay("3", "2026-03-25", 3_500_000, "SC_BANK"),
+      pay("4", "2026-03-31", 1_000_000, "SC_BANK"),
+      pay("5", "2026-02-25", 2_800_000, "MY_BANK"),
+      pay("6", "2026-02-25", 9_999_999, "JOINT"),
+      pay("7", "2025-12-25", 9_999_999, "SC_BANK"),
+      { transactionId: "8", type: "수입", categoryId: "OTHER", date: "2026-02-01", amount: 9_999_999, toAccountId: "MY_BANK" },
+      pay("9", "2026-02-26", 50_000, "MY_BANK", { requestId: "BENEFIT_x" })
+    ]
+  });
+
+  const sc = summaries.get("승철");
+  assert.equal(sc.netTotal, 11_500_000);
+  assert.equal(sc.months, 3);
+  assert.equal(sc.annualized, true);
+  assert.equal(sc.annualizedNet, 46_000_000);
+  assert.ok(sc.estimatedGross > 46_000_000);
+
+  const my = summaries.get("미영");
+  assert.equal(my.netTotal, 2_800_000);
+  assert.equal(my.annualizedNet, 33_600_000);
+
+  // 지난해는 환산하지 않음
+  const past = summarizeSalaryIncome({
+    year: 2026, currentMonth: "2027-02", members: ["승철"], accounts, salaryCategoryIds: new Set(["PAY"]),
+    transactions: [pay("1", "2026-01-25", 3_000_000, "SC_BANK")]
+  });
+  assert.equal(past.get("승철").annualized, false);
+  assert.equal(past.get("승철").annualizedNet, 3_000_000);
+});

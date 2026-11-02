@@ -35,10 +35,22 @@ export interface TaxItemTotal {
   byTarget: Record<string, number>;
 }
 
+export interface SalaryIncomeSummary {
+  netTotal: number;
+  months: number;
+  annualized: boolean;
+  annualizedNet: number;
+  estimatedGross: number;
+}
+
 export interface TaxMemberSummary {
   name: string;
   grossSalary: number;
   children: number;
+  /** profile: 직접 입력 / estimate: 급여 수입으로 추정 / none: 없음 */
+  salarySource: "profile" | "estimate" | "none";
+  salaryUsed: number;
+  salaryIncome: SalaryIncomeSummary | null;
   card: TaxCardResult;
   medicalThreshold: number;
   items: Partial<Record<TaxItemKey, TaxItemTotal>>;
@@ -58,7 +70,9 @@ export interface TaxSummary {
     items: Partial<Record<TaxItemKey, TaxItemTotal>>;
   } | null;
   categories: { categoryId: string; name: string; taxCode: string }[];
+  incomeCategories: { categoryId: string; name: string; taxCode: string; countedAsSalary: boolean }[];
   taxCodes: { code: string; label: string }[];
+  incomeTaxCodes: { code: string; label: string }[];
   recommendations: { kind: string; member?: string; text: string }[];
 }
 

@@ -93,6 +93,7 @@ function MemberCard({
   }
 
   const card = member.card;
+  const salaryBasis = member.salaryUsed;
   const progress = card.threshold > 0 ? Math.min(100, (card.usage.total / card.threshold) * 100) : 0;
   const limitProgress = card.basicLimit > 0 ? Math.min(100, (card.basicDeduction / card.basicLimit) * 100) : 0;
 
@@ -135,10 +136,36 @@ function MemberCard({
           저장
         </Button>
       </div>
-      <p className={styles.hint}>총급여는 비과세 소득을 뺀 연봉이에요. 원천징수영수증의 '총급여' 칸 기준이에요.</p>
+      {member.salaryIncome && member.salaryIncome.netTotal > 0 ? (
+        <div className={styles.estimateBox}>
+          <p>
+            가계부 급여 수입: {member.salaryIncome.months}개월 실수령 {won(member.salaryIncome.netTotal)}
+            {member.salaryIncome.annualized ? ` → 1년 환산 ${won(member.salaryIncome.annualizedNet)}` : ""}
+            <br />
+            <strong>총급여 약 {Math.round(member.salaryIncome.estimatedGross / 10_000).toLocaleString("ko-KR")}만 원</strong>으로 추정돼요.
+          </p>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => setSalaryManwon(String(Math.round(member.salaryIncome!.estimatedGross / 10_000)))}
+          >
+            추정값 넣기
+          </Button>
+        </div>
+      ) : (
+        <p className={styles.hint}>
+          수입에 '급여'·'월급' 카테고리로 기록하면 총급여를 추정해 드려요.
+        </p>
+      )}
+      {member.salarySource === "estimate" && (
+        <p className={styles.estimateNotice}>
+          총급여를 입력하지 않아 추정값으로 계산했어요. 실수령액으로 거꾸로 추정한 값이라 실제와 5~10% 다를 수 있어요.
+        </p>
+      )}
+      <p className={styles.hint}>총급여는 비과세 수당을 뺀 세전 연봉이에요. 급여명세서나 원천징수영수증의 '총급여' 칸을 넣으면 가장 정확해요.</p>
       {error && <p className={historyStyles.error}>{error}</p>}
 
-      {card.salary > 0 && (
+      {salaryBasis > 0 && (
         <>
           <div className={styles.meter}>
             <div className={styles.meterLabel}>
@@ -330,12 +357,12 @@ export function YearEndTaxView() {
                 </tbody>
               </table>
             )}
-            {summary.members.some(member => member.grossSalary > 0) && itemRows.some(row => row.key === "medical") && (
+            {summary.members.some(member => member.salaryUsed > 0) && itemRows.some(row => row.key === "medical") && (
               <p className={styles.hint}>
                 의료비 공제 문턱(총급여 3%):{" "}
                 {summary.members
-                  .filter(member => member.grossSalary > 0)
-                  .map(member => `${member.name} ${won(member.medicalThreshold)}`)
+                  .filter(member => member.salaryUsed > 0)
+                  .map(member => `${member.name} ${won(member.medicalThreshold)}${member.salarySource === "estimate" ? "(추정)" : ""}`)
                   .join(" · ")}
               </p>
             )}
@@ -354,6 +381,32 @@ export function YearEndTaxView() {
               </span>
               <span aria-hidden="true">{showCategories ? "⌃" : "⌄"}</span>
             </button>
+            {showCategories && summary.incomeCategories.length > 0 && (
+              <>
+                <h3 className={styles.categoryGroupTitle}>수입 · 급여로 볼 카테고리</h3>
+                <p className={styles.hint}>'자동'은 이름에 급여·월급·상여·보너스·성과급이 들어가면 급여로 봐요.</p>
+                <ul className={styles.categoryList}>
+                  {summary.incomeCategories.map(category => (
+                    <li key={category.categoryId}>
+                      <span>
+                        {category.name}
+                        {category.countedAsSalary && <small className={styles.salaryTag}>급여</small>}
+                      </span>
+                      <select
+                        value={category.taxCode}
+                        disabled={savingCategoryId === category.categoryId}
+                        onChange={event => void handleCategoryChange(category.categoryId, event.target.value)}
+                      >
+                        {summary.incomeTaxCodes.map(option => (
+                          <option key={option.code} value={option.code}>{option.label}</option>
+                        ))}
+                      </select>
+                    </li>
+                  ))}
+                </ul>
+                <h3 className={styles.categoryGroupTitle}>지출 · 공제 분류</h3>
+              </>
+            )}
             {showCategories && (
               <ul className={styles.categoryList}>
                 {summary.categories.map(category => (

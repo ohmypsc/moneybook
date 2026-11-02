@@ -21,8 +21,11 @@ import {
 } from "./push.js";
 
 import {
+  INCOME_TAX_CODES,
   TAX_CODES,
   aggregateYearSpending,
+  isSalaryCategory,
+  summarizeSalaryIncome,
   buildRecommendations,
   computeCardDeduction,
   getTaxRules,
@@ -6066,7 +6069,7 @@ async function mbD1TaxSummaryData(env, url) {
     mbD1RawAccounts(env),
     mbD1All(
       env,
-      "SELECT category_id,name,type,default_tax_category_code FROM categories WHERE household_id=? AND deleted_at IS NULL AND type='지출' ORDER BY name",
+      "SELECT category_id,name,type,default_tax_category_code FROM categories WHERE household_id=? AND deleted_at IS NULL AND type IN ('지출','수입') ORDER BY name",
       [MB_D1_HOUSEHOLD_ID]
     ),
     mbD1All(
@@ -6077,7 +6080,7 @@ async function mbD1TaxSummaryData(env, url) {
     mbD1All(
       env,
       `${MB_D1_TRANSACTION_SELECT}
-       WHERE t.household_id=? AND t.deleted_at IS NULL AND t.type='지출' AND t.date BETWEEN ? AND ?`,
+       WHERE t.household_id=? AND t.deleted_at IS NULL AND t.type IN ('지출','수입') AND t.date BETWEEN ? AND ?`,
       [MB_D1_HOUSEHOLD_ID, `${year}-01-01`, `${year}-12-31`]
     )
   ]);
@@ -6091,26 +6094,53 @@ async function mbD1TaxSummaryData(env, url) {
     return [mbD1Text(row.member_id), { grossSalary: mbD1Number(row.gross_salary_krw, 0), children: mbD1Number(extra.children, 0) }];
   }));
 
+  const expenseCategoryRows = categoryRows.filter((row) => row.type === "지출");
+  const incomeCategoryRows = categoryRows.filter((row) => row.type === "수입");
   const categoryTaxCodes = new Map(
-    categoryRows.map((row) => [mbD1Text(row.category_id), isValidTaxCode(row.default_tax_category_code) ? mbD1Text(row.default_tax_category_code) : ""])
+    expenseCategoryRows.map((row) => [mbD1Text(row.category_id), isValidTaxCode(row.default_tax_category_code) ? mbD1Text(row.default_tax_category_code) : ""])
   );
-  const people = aggregateYearSpending({
+  const incomeCodeOf = (row) => {
+    const code = mbD1Text(row.default_tax_category_code);
+    return Object.prototype.hasOwnProperty.call(INCOME_TAX_CODES, code) ? code : "";
+  };
+  const salaryCategoryIds = new Set(
+    incomeCategoryRows
+      .filter((row) => isSalaryCategory(row.name, incomeCodeOf(row)))
+      .map((row) => mbD1Text(row.category_id))
+  );
+  const accounts = rawAccounts.map(mbD1MapAccountRow);
+  const transactions = transactionRows.map(mbD1MapTransactionRow);
+  const memberNames = members.map((member) => member.name);
+  const people = aggregateYearSpending({ year, members: memberNames, accounts, categoryTaxCodes, transactions });
+  const salaries = summarizeSalaryIncome({
     year,
-    members: members.map((member) => member.name),
-    accounts: rawAccounts.map(mbD1MapAccountRow),
-    categoryTaxCodes,
-    transactions: transactionRows.map(mbD1MapTransactionRow)
+    members: memberNames,
+    accounts,
+    salaryCategoryIds,
+    transactions,
+    currentMonth: mbD1CurrentMonthSeoul()
   });
 
   const memberResults = members.map((member) => {
     const profile = profiles.get(member.memberId) || { grossSalary: 0, children: 0 };
     const aggregated = people.get(member.name);
+    const salaryIncome = salaries.get(member.name) || null;
+    // 직접 입력한 총급여가 우선이고, 없으면 가계부 급여 수입으로 추정한 값으로 계산합니다.
+    const salarySource = profile.grossSalary > 0
+      ? "profile"
+      : salaryIncome?.estimatedGross > 0 ? "estimate" : "none";
+    const salary = salarySource === "profile"
+      ? profile.grossSalary
+      : salarySource === "estimate" ? salaryIncome.estimatedGross : 0;
     return {
       name: member.name,
       grossSalary: profile.grossSalary,
       children: profile.children,
-      card: computeCardDeduction({ salary: profile.grossSalary, children: profile.children, usage: aggregated.usage }, rules),
-      medicalThreshold: Math.round(profile.grossSalary * rules.medicalThresholdRate),
+      salarySource,
+      salaryUsed: salary,
+      salaryIncome,
+      card: computeCardDeduction({ salary, children: profile.children, usage: aggregated.usage }, rules),
+      medicalThreshold: Math.round(salary * rules.medicalThresholdRate),
       items: aggregated.items
     };
   });
@@ -6128,12 +6158,19 @@ async function mbD1TaxSummaryData(env, url) {
     },
     members: memberResults,
     unassigned: unassigned ? { usage: unassigned.usage, items: unassigned.items } : null,
-    categories: categoryRows.map((row) => ({
+    categories: expenseCategoryRows.map((row) => ({
       categoryId: mbD1Text(row.category_id),
       name: mbD1Text(row.name),
       taxCode: categoryTaxCodes.get(mbD1Text(row.category_id)) || ""
     })),
+    incomeCategories: incomeCategoryRows.map((row) => ({
+      categoryId: mbD1Text(row.category_id),
+      name: mbD1Text(row.name),
+      taxCode: incomeCodeOf(row),
+      countedAsSalary: salaryCategoryIds.has(mbD1Text(row.category_id))
+    })),
     taxCodes: Object.entries(TAX_CODES).map(([code, meta]) => ({ code, label: meta.label })),
+    incomeTaxCodes: Object.entries(INCOME_TAX_CODES).map(([code, label]) => ({ code, label })),
     recommendations: buildRecommendations(memberResults, rules)
   };
 }
@@ -6167,13 +6204,16 @@ async function mbD1HandleTaxProfile(body, session, env) {
 async function mbD1HandleTaxCategory(body, session, env) {
   const categoryId = mbD1Text(body.categoryId);
   const taxCode = mbD1Text(body.taxCode);
-  if (!isValidTaxCode(taxCode)) mbD1Fail("INVALID_TAX_CODE", "연말정산 분류가 올바르지 않습니다.");
   const category = await mbD1First(
     env,
-    "SELECT category_id FROM categories WHERE household_id=? AND category_id=? AND type='지출' AND deleted_at IS NULL",
+    "SELECT category_id,type FROM categories WHERE household_id=? AND category_id=? AND type IN ('지출','수입') AND deleted_at IS NULL",
     [MB_D1_HOUSEHOLD_ID, categoryId]
   );
-  if (!category) mbD1Fail("CATEGORY_NOT_FOUND", "지출 카테고리를 찾을 수 없습니다.", 404);
+  if (!category) mbD1Fail("CATEGORY_NOT_FOUND", "카테고리를 찾을 수 없습니다.", 404);
+  const validCode = category.type === "수입"
+    ? Object.prototype.hasOwnProperty.call(INCOME_TAX_CODES, taxCode)
+    : isValidTaxCode(taxCode);
+  if (!validCode) mbD1Fail("INVALID_TAX_CODE", "연말정산 분류가 올바르지 않습니다.");
   const now = mbD1Now();
   const update = env.DB.prepare(
     "UPDATE categories SET default_tax_category_code=?,updated_at=?,updated_by=? WHERE household_id=? AND category_id=?"
