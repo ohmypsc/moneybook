@@ -81,7 +81,8 @@ export function TransactionImportSheet({
     return {
       cards: active.filter(item => IMPORT_CARD_SUBTYPES.includes(item.subType)),
       cashAndBank: active.filter(
-        item => item.accountType === "자산" && item.subType !== "주식" && !IMPORT_CARD_SUBTYPES.includes(item.subType)
+        // 일반 입력 화면처럼 투자계좌(CMA 등)도 결제수단으로 고를 수 있게 합니다.
+        item => item.accountType === "자산" && !IMPORT_CARD_SUBTYPES.includes(item.subType)
       )
     };
   }, [bootstrap, userName]);
@@ -99,7 +100,7 @@ export function TransactionImportSheet({
         </optgroup>
       )}
       {paymentMethodGroups.cashAndBank.length > 0 && (
-        <optgroup label="현금·계좌">
+        <optgroup label="현금·계좌·CMA">
           {paymentMethodGroups.cashAndBank.map(account => (
             <option key={account.accountId} value={account.accountId}>{account.displayName}</option>
           ))}
