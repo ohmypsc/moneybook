@@ -441,68 +441,163 @@ export function summarizeSalaryIncome({ transactions, accounts, salaryCategoryId
 
 
 // ── 추천 카테고리 정리 ─────────────────────────────────────────
-// 이 가계부의 지출 카테고리에 맞춘 연말정산용 정리안입니다.
-// 기존 거래는 건드리지 않고, (1) 분류가 비어 있는 기존 카테고리에 분류를 연결하고
-// (2) 없는 카테고리를 새로 만듭니다.
+// 이 가계부(승철·미영)의 실제 카테고리 목록과 대화로 정한 새 구성입니다.
+// 기존 거래는 건드리지 않습니다. 이름 바꾸기 · 새로 만들기 · 사용 중지(입력 목록에서만 숨김) ·
+// 연말정산 분류 연결을 한 번에 합니다. 이미 직접 정한 분류는 덮어쓰지 않습니다.
 export const CATEGORY_PRESET = {
+  rename: [
+    { type: "지출", from: "의료", to: "병원·약국", taxCode: "medical", note: "부모님 병원비도 여기로 (의료비 공제)" },
+    { type: "지출", from: "공과금", to: "관리비·공과금", taxCode: "excluded", note: "관리비·전기·가스·수도" },
+    { type: "지출", from: "교육비", to: "대학원 등록금", taxCode: "tuition", note: "카드공제 제외 · 본인 교육비 세액공제" },
+    { type: "지출", from: "여가", to: "취미·여가", taxCode: "", note: "" },
+    { type: "지출", from: "옥천", to: "부모님께 갚는 돈", taxCode: "", note: "" }
+  ],
   link: [
-    { name: "대중교통", taxCode: "transit", note: "버스·지하철·기차·고속버스 (택시 제외)" },
-    { name: "공과금", taxCode: "excluded", note: "전기·가스·수도·통신비·관리비" },
-    { name: "교육비", taxCode: "tuition", note: "대학원 등록금 — 본인 교육비 세액공제" },
-    { name: "의료", taxCode: "medical", note: "병원·약국·안경" },
-    { name: "보험", taxCode: "insurance", note: "실손·암보험 등 보장성" }
+    { type: "지출", name: "대중교통", taxCode: "transit", note: "버스·지하철·기차·고속버스 (택시 제외)" },
+    { type: "지출", name: "보험", taxCode: "insurance", note: "보장성 보험료 (자동차보험 포함)" },
+    { type: "수입", name: "부수입", taxCode: "salary", note: "연봉에 더해지는 수당 → 총급여 추정에 포함" }
+  ],
+  deactivate: [
+    { type: "지출", name: "식비", note: "장보기·외식·배달·카페·간식으로 나눔" },
+    { type: "지출", name: "생활비", note: "생활용품·미용 등으로 나눔" },
+    { type: "이체", name: "대출상환", note: "대출원금상환과 겹침" }
   ],
   create: [
-    { name: "기부금", taxCode: "donation", note: "경조사(축의·조의)와 구분" },
-    { name: "저축성 보험", taxCode: "excluded", note: "연금·저축보험 (보험료 공제 아님)" },
-    { name: "도서·공연·운동", taxCode: "culture", note: "책·공연·영화·헬스장·수영장" },
-    { name: "건강식품·영양제", taxCode: "", note: "의료비 공제가 안 되는 건강 관련 지출" },
-    { name: "전통시장", taxCode: "market", note: "전통시장 결제 (40%)" }
+    { type: "지출", name: "장보기", taxCode: "", note: "" },
+    { type: "지출", name: "외식", taxCode: "", note: "" },
+    { type: "지출", name: "배달", taxCode: "", note: "" },
+    { type: "지출", name: "카페·간식", taxCode: "", note: "" },
+    { type: "지출", name: "생활용품", taxCode: "", note: "" },
+    { type: "지출", name: "미용", taxCode: "", note: "" },
+    { type: "지출", name: "통신비", taxCode: "excluded", note: "휴대폰·인터넷 (카드공제 제외)" },
+    { type: "지출", name: "택시", taxCode: "", note: "대중교통 공제 아님" },
+    { type: "지출", name: "주차·통행료", taxCode: "", note: "" },
+    { type: "지출", name: "자동차 관리", taxCode: "", note: "정비·세차 (자동차보험은 '보험')" },
+    { type: "지출", name: "건강식품·영양제", taxCode: "", note: "의료비 공제 안 됨" },
+    { type: "지출", name: "도서", taxCode: "culture", note: "책 (문화 30%)" },
+    { type: "지출", name: "강의·자격증", taxCode: "", note: "온라인 강의·시험 응시료" },
+    { type: "지출", name: "공연·영화·운동", taxCode: "culture", note: "공연·영화·박물관·헬스장·수영장 (30%)" },
+    { type: "지출", name: "여행·숙박", taxCode: "", note: "" },
+    { type: "지출", name: "기부금", taxCode: "donation", note: "경조사(축의·조의)와 구분" },
+    { type: "지출", name: "수수료·세금", taxCode: "excluded", note: "은행 수수료·자동차세 등 (카드공제 제외)" },
+    { type: "지출", name: "전통시장", taxCode: "market", note: "전통시장 결제 (40%)" },
+    { type: "수입", name: "이자·배당", taxCode: "not-salary", note: "부수입과 구분" }
   ]
 };
 
+/** 앱 기능이 이름으로 찾는 카테고리 — 이름 바꾸기·사용 중지 대상에서 항상 뺍니다. */
+export const PROTECTED_CATEGORY_NAMES = new Set([
+  "회식비", "정산받음", "캐시백", "캐시백/할인혜택", "카드정기결제", "카드선결제",
+  "대출원금상환", "대출이자", "지역화폐충전"
+]);
+
+function validCodeFor(type, code) {
+  if (!code) return true;
+  return type === "수입"
+    ? Object.prototype.hasOwnProperty.call(INCOME_TAX_CODES, code)
+    : isValidTaxCode(code);
+}
+
 /**
  * 추천 정리안을 지금 카테고리에 맞춰 실제로 바꿀 목록으로 만듭니다.
- * categories: [{ categoryId, name, type, taxCode, deleted }]
- * 이미 다른 분류로 연결된 카테고리는 덮어쓰지 않습니다.
+ * categories: [{ categoryId, name, type, taxCode, deleted, active }]
+ * referencedCategoryIds: 고정 거래 자동 등록 등에서 쓰는 카테고리 ID (사용 중지하면 안 됨)
  */
-export function planCategoryPreset(categories, preset = CATEGORY_PRESET) {
-  const expense = (categories || []).filter(category => category.type === "지출");
-  const active = expense.filter(category => !category.deleted);
-  const byName = new Map(active.map(category => [category.name, category]));
-  const deletedNames = new Set(expense.filter(category => category.deleted).map(category => category.name));
+export function planCategoryPreset(categories, { referencedCategoryIds = new Set() } = {}, preset = CATEGORY_PRESET) {
+  const all = categories || [];
+  const live = all.filter(category => !category.deleted);
+  const find = (type, name) => live.find(category => category.type === type && category.name === name) || null;
+  const deletedExists = (type, name) => all.some(category => category.deleted && category.type === type && category.name === name);
 
+  const renames = [];
   const links = [];
+  const deactivations = [];
   const creates = [];
   const skipped = [];
+  const pushLink = (category, taxCode, note) => {
+    if (!taxCode || !validCodeFor(category.type, taxCode)) return;
+    if (category.taxCode === taxCode) return;
+    if (category.taxCode) {
+      skipped.push({ name: category.name, reason: "다른 분류로 직접 연결해 둬서 분류는 그대로 둬요" });
+      return;
+    }
+    links.push({ categoryId: category.categoryId, type: category.type, name: category.name, taxCode, note });
+  };
 
-  for (const rule of preset.link) {
-    const category = byName.get(rule.name);
-    if (!category) {
-      skipped.push({ name: rule.name, reason: "카테고리가 없어요" });
-    } else if (category.taxCode === rule.taxCode) {
-      skipped.push({ name: rule.name, reason: "이미 연결돼 있어요" });
-    } else if (category.taxCode) {
-      skipped.push({ name: rule.name, reason: "다른 분류로 직접 연결해 둬서 그대로 둬요" });
+  for (const rule of preset.rename || []) {
+    const source = find(rule.type, rule.from);
+    const target = find(rule.type, rule.to);
+    if (PROTECTED_CATEGORY_NAMES.has(rule.from)) {
+      skipped.push({ name: rule.from, reason: "앱 기능에 쓰이는 카테고리라 그대로 둬요" });
+    } else if (source && target) {
+      skipped.push({ name: rule.from, reason: `'${rule.to}'이(가) 이미 있어 이름은 그대로 둬요` });
+    } else if (source) {
+      renames.push({
+        categoryId: source.categoryId,
+        type: rule.type,
+        from: rule.from,
+        to: rule.to,
+        taxCode: !source.taxCode && rule.taxCode ? rule.taxCode : null,
+        note: rule.note
+      });
+      if (source.taxCode && rule.taxCode && source.taxCode !== rule.taxCode) {
+        skipped.push({ name: rule.from, reason: "다른 분류로 직접 연결해 둬서 분류는 그대로 둬요" });
+      }
+    } else if (target) {
+      pushLink(target, rule.taxCode, rule.note);
     } else {
-      links.push({ categoryId: category.categoryId, name: rule.name, taxCode: rule.taxCode, note: rule.note });
+      skipped.push({ name: rule.from, reason: "카테고리가 없어요" });
     }
   }
 
-  for (const rule of preset.create) {
-    const existing = byName.get(rule.name);
+  for (const rule of preset.link || []) {
+    const category = find(rule.type, rule.name);
+    if (!category) skipped.push({ name: rule.name, reason: "카테고리가 없어요" });
+    else pushLink(category, rule.taxCode, rule.note);
+  }
+
+  for (const rule of preset.deactivate || []) {
+    const category = find(rule.type, rule.name);
+    if (!category) {
+      skipped.push({ name: rule.name, reason: "카테고리가 없어요" });
+    } else if (PROTECTED_CATEGORY_NAMES.has(rule.name)) {
+      skipped.push({ name: rule.name, reason: "앱 기능에 쓰이는 카테고리라 그대로 둬요" });
+    } else if (category.active === false) {
+      skipped.push({ name: rule.name, reason: "이미 사용 중지돼 있어요" });
+    } else if (referencedCategoryIds.has(category.categoryId)) {
+      skipped.push({ name: rule.name, reason: "고정 거래 자동 등록에서 쓰고 있어 그대로 둬요" });
+    } else {
+      deactivations.push({ categoryId: category.categoryId, type: rule.type, name: rule.name, note: rule.note });
+    }
+  }
+
+  for (const rule of preset.create || []) {
+    const existing = find(rule.type, rule.name);
     if (existing) {
-      if (!existing.taxCode && rule.taxCode) {
-        links.push({ categoryId: existing.categoryId, name: rule.name, taxCode: rule.taxCode, note: rule.note });
+      if (rule.taxCode && !existing.taxCode && validCodeFor(rule.type, rule.taxCode)) {
+        pushLink(existing, rule.taxCode, rule.note);
       } else {
         skipped.push({ name: rule.name, reason: "이미 있어요" });
       }
-    } else if (deletedNames.has(rule.name)) {
+    } else if (deletedExists(rule.type, rule.name)) {
       skipped.push({ name: rule.name, reason: "삭제된 같은 이름 카테고리가 있어요 (설정에서 복원하세요)" });
     } else {
-      creates.push({ name: rule.name, taxCode: rule.taxCode, note: rule.note });
+      creates.push({ type: rule.type, name: rule.name, taxCode: rule.taxCode || "", note: rule.note });
     }
   }
 
-  return { links, creates, skipped };
+  return { renames, links, deactivations, creates, skipped };
+}
+
+/** 자동화 설정 안의 모든 categoryId를 모읍니다. */
+export function collectReferencedCategoryIds(value, out = new Set()) {
+  if (Array.isArray(value)) {
+    for (const item of value) collectReferencedCategoryIds(item, out);
+  } else if (value && typeof value === "object") {
+    for (const [key, item] of Object.entries(value)) {
+      if (key === "categoryId" && item) out.add(String(item));
+      else collectReferencedCategoryIds(item, out);
+    }
+  }
+  return out;
 }

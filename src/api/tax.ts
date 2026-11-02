@@ -112,8 +112,10 @@ export async function saveCategoryTaxCode(categoryId: string, taxCode: string) {
 
 export interface TaxPresetPlan {
   applied: boolean;
-  links: { categoryId: string; name: string; taxCode: string; note: string }[];
-  creates: { name: string; taxCode: string; note: string }[];
+  renames: { categoryId: string; type: string; from: string; to: string; taxCode: string | null; note: string }[];
+  links: { categoryId: string; type: string; name: string; taxCode: string; note: string }[];
+  deactivations: { categoryId: string; type: string; name: string; note: string }[];
+  creates: { type: string; name: string; taxCode: string; note: string }[];
   skipped: { name: string; reason: string }[];
 }
 

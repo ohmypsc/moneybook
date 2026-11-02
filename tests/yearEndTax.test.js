@@ -208,28 +208,56 @@ test("take-home salary is summed per receiving account owner and annualized mid-
   assert.equal(past.get("승철").annualizedNet, 3_000_000);
 });
 
-import { planCategoryPreset } from "../worker/domain/yearEndTax.js";
+import { collectReferencedCategoryIds, planCategoryPreset } from "../worker/domain/yearEndTax.js";
 
-test("category preset links empty categories, creates missing ones and never overrides choices", () => {
-  const plan = planCategoryPreset([
-    { categoryId: "C1", name: "대중교통", type: "지출", taxCode: "" },
-    { categoryId: "C2", name: "의료", type: "지출", taxCode: "education" },
-    { categoryId: "C3", name: "교육비", type: "지출", taxCode: "tuition" },
-    { categoryId: "C4", name: "공과금", type: "지출", taxCode: "" },
-    { categoryId: "C5", name: "기부금", type: "지출", taxCode: "" },
-    { categoryId: "C6", name: "전통시장", type: "지출", taxCode: "", deleted: true },
-    { categoryId: "C7", name: "보험", type: "수입", taxCode: "" }
-  ]);
+const CURRENT = [
+  ...["식비","생활비","의료","회비","부모님","경조사","보험","쇼핑","유류비","공과금","여가","대중교통","회식비","대출이자","교육비","옥천","이자","회식비(정산)","수입취소/반환"]
+    .map((name, index) => ({ categoryId: `E${index}`, type: "지출", name, taxCode: "", active: true })),
+  ...["캐시백/할인혜택","부수입","급여","환불/취소","캐시백","정산받음"]
+    .map((name, index) => ({ categoryId: `I${index}`, type: "수입", name, taxCode: "", active: true })),
+  ...["일반 이체","지역화폐충전","저축/투자","대출원금상환","카드정기결제","대출상환","현금인출","카드선결제"]
+    .map((name, index) => ({ categoryId: `T${index}`, type: "이체", name, taxCode: "", active: true }))
+];
 
-  assert.deepEqual(plan.links.map(item => [item.name, item.taxCode]), [
-    ["대중교통", "transit"],
-    ["공과금", "excluded"],
-    ["기부금", "donation"]
+test("restructure plan for this ledger renames, splits, links and adds without touching app categories", () => {
+  const plan = planCategoryPreset(CURRENT);
+  assert.deepEqual(plan.renames.map(item => `${item.from}→${item.to}`), [
+    "의료→병원·약국", "공과금→관리비·공과금", "교육비→대학원 등록금", "여가→취미·여가", "옥천→부모님께 갚는 돈"
   ]);
-  assert.deepEqual(plan.creates.map(item => item.name), ["저축성 보험", "도서·공연·운동", "건강식품·영양제"]);
-  const reasons = Object.fromEntries(plan.skipped.map(item => [item.name, item.reason]));
-  assert.match(reasons["의료"], /직접 연결/);
-  assert.match(reasons["교육비"], /이미 연결/);
-  assert.match(reasons["보험"], /없어요/, "수입 카테고리는 대상이 아님");
-  assert.match(reasons["전통시장"], /삭제된/);
+  assert.equal(plan.renames.find(item => item.from === "의료").taxCode, "medical");
+  assert.equal(plan.renames.find(item => item.from === "여가").taxCode, null);
+  assert.deepEqual(plan.links.map(item => `${item.name}:${item.taxCode}`), ["대중교통:transit", "보험:insurance", "부수입:salary"]);
+  assert.deepEqual(plan.deactivations.map(item => item.name), ["식비", "생활비", "대출상환"]);
+  assert.equal(plan.creates.length, 19);
+  assert.ok(plan.creates.some(item => item.name === "도서" && item.taxCode === "culture"));
+  assert.ok(plan.creates.some(item => item.name === "강의·자격증" && item.taxCode === ""));
+  assert.ok(!plan.creates.some(item => item.name === "저축성 보험"));
+  const touched = [...plan.renames.map(i => i.from), ...plan.deactivations.map(i => i.name)];
+  for (const name of ["회식비", "캐시백", "캐시백/할인혜택", "정산받음", "대출이자", "대출원금상환"]) {
+    assert.ok(!touched.includes(name), `${name} must stay`);
+  }
+  assert.deepEqual(plan.skipped, []);
+});
+
+test("restructure plan is safe to run twice and respects automation and manual choices", () => {
+  const after = CURRENT.map(category => {
+    const rename = { 의료: "병원·약국", 공과금: "관리비·공과금", 교육비: "대학원 등록금", 여가: "취미·여가", 옥천: "부모님께 갚는 돈" }[category.name];
+    return {
+      ...category,
+      name: category.type === "지출" && rename ? rename : category.name,
+      active: !["식비", "생활비", "대출상환"].includes(category.name),
+      taxCode: { 의료: "medical", 공과금: "excluded", 교육비: "tuition", 대중교통: "transit", 보험: "insurance", 부수입: "salary" }[category.name] || ""
+    };
+  });
+  const created = planCategoryPreset(CURRENT).creates.map((item, index) => ({ categoryId: `N${index}`, type: item.type, name: item.name, taxCode: item.taxCode, active: true }));
+  const second = planCategoryPreset([...after, ...created]);
+  assert.equal(second.renames.length + second.links.length + second.deactivations.length + second.creates.length, 0);
+
+  const guarded = planCategoryPreset(
+    CURRENT.map(category => (category.name === "보험" ? { ...category, taxCode: "excluded" } : category)),
+    { referencedCategoryIds: collectReferencedCategoryIds({ recurring: [{ categoryId: "E0", amount: 1 }] }) }
+  );
+  assert.ok(!guarded.deactivations.some(item => item.name === "식비"));
+  assert.match(guarded.skipped.find(item => item.name === "식비").reason, /고정 거래/);
+  assert.ok(!guarded.links.some(item => item.name === "보험"));
 });

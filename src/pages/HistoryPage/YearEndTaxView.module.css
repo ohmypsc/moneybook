@@ -327,3 +327,10 @@
   gap: 6px;
   margin-top: 10px;
 }
+
+.presetBox h4 small {
+  margin-left: 4px;
+  color: var(--color-text-secondary);
+  font-size: 10px;
+  font-weight: 400;
+}

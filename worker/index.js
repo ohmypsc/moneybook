@@ -25,6 +25,7 @@ import {
   TAX_CODES,
   aggregateYearSpending,
   isSalaryCategory,
+  collectReferencedCategoryIds,
   planCategoryPreset,
   summarizeSalaryIncome,
   buildRecommendations,
@@ -6226,24 +6227,42 @@ async function mbD1HandleTaxCategory(body, session, env) {
 
 // 추천 카테고리 정리: apply=false면 바뀔 내용만 돌려주고, true면 적용합니다.
 async function mbD1HandleTaxPreset(body, session, env) {
-  const rows = await mbD1All(
-    env,
-    "SELECT category_id,name,type,default_tax_category_code,deleted_at FROM categories WHERE household_id=? AND type='지출'",
-    [MB_D1_HOUSEHOLD_ID]
+  const [rows, automation] = await Promise.all([
+    mbD1All(
+      env,
+      "SELECT category_id,name,type,is_active,default_tax_category_code,deleted_at FROM categories WHERE household_id=?",
+      [MB_D1_HOUSEHOLD_ID]
+    ),
+    mbD1AutomationSettingsData(env)
+  ]);
+  const plan = planCategoryPreset(
+    rows.map((row) => ({
+      categoryId: mbD1Text(row.category_id),
+      name: mbD1Text(row.name),
+      type: mbD1Text(row.type),
+      taxCode: mbD1Text(row.default_tax_category_code),
+      deleted: Boolean(row.deleted_at),
+      active: mbD1Bool(row.is_active)
+    })),
+    { referencedCategoryIds: collectReferencedCategoryIds(automation) }
   );
-  const plan = planCategoryPreset(rows.map((row) => ({
-    categoryId: mbD1Text(row.category_id),
-    name: mbD1Text(row.name),
-    type: mbD1Text(row.type),
-    taxCode: isValidTaxCode(row.default_tax_category_code) ? mbD1Text(row.default_tax_category_code) : "",
-    deleted: Boolean(row.deleted_at)
-  })));
 
   if (body.apply !== true) return { applied: false, ...plan };
 
   const actor = session.name;
   const now = mbD1Now();
   const statements = [];
+  for (const item of plan.renames) {
+    statements.push(
+      env.DB.prepare(
+        `UPDATE categories SET name=?,
+           default_tax_category_code=CASE WHEN ? IS NOT NULL AND (default_tax_category_code IS NULL OR default_tax_category_code='') THEN ? ELSE default_tax_category_code END,
+           updated_at=?,updated_by=?
+         WHERE household_id=? AND category_id=? AND name=? AND deleted_at IS NULL`
+      ).bind(item.to, item.taxCode, item.taxCode, now, actor, MB_D1_HOUSEHOLD_ID, item.categoryId, item.from),
+      await mbD1InsertChange(env, "category", item.categoryId, "updated", null, session, { from: item.from, name: item.to })
+    );
+  }
   for (const item of plan.links) {
     statements.push(
       env.DB.prepare(
@@ -6252,13 +6271,21 @@ async function mbD1HandleTaxPreset(body, session, env) {
       await mbD1InsertChange(env, "category", item.categoryId, "updated", null, session, { taxCode: item.taxCode })
     );
   }
+  for (const item of plan.deactivations) {
+    statements.push(
+      env.DB.prepare(
+        "UPDATE categories SET is_active=0,updated_at=?,updated_by=? WHERE household_id=? AND category_id=? AND deleted_at IS NULL"
+      ).bind(now, actor, MB_D1_HOUSEHOLD_ID, item.categoryId),
+      await mbD1InsertChange(env, "category", item.categoryId, "updated", null, session, { active: false })
+    );
+  }
   for (const item of plan.creates) {
     const id = mbD1Id("CAT");
     statements.push(
       env.DB.prepare(
         "INSERT INTO categories (category_id,household_id,type,name,is_active,default_tax_category_code,created_at,updated_at,created_by,updated_by,deleted_at,deleted_by,source_row) VALUES (?,?,?,?,1,?,?,?,?,?,NULL,NULL,NULL)"
-      ).bind(id, MB_D1_HOUSEHOLD_ID, "지출", item.name, item.taxCode || null, now, now, actor, actor),
-      await mbD1InsertChange(env, "category", id, "created", 1, session, { type: "지출", name: item.name, taxCode: item.taxCode })
+      ).bind(id, MB_D1_HOUSEHOLD_ID, item.type, item.name, item.taxCode || null, now, now, actor, actor),
+      await mbD1InsertChange(env, "category", id, "created", 1, session, { type: item.type, name: item.name, taxCode: item.taxCode })
     );
   }
   if (statements.length) await env.DB.batch(statements);

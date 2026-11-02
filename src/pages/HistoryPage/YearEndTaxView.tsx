@@ -255,7 +255,7 @@ export function YearEndTaxView() {
       if (apply) {
         setPresetPlan(null);
         setPresetMessage(
-          `추천 정리를 적용했어요. 분류 연결 ${plan.links.length}개, 새 카테고리 ${plan.creates.length}개.`
+          `카테고리 정리를 적용했어요. 이름 변경 ${plan.renames.length}개, 새 카테고리 ${plan.creates.length}개, 사용 중지 ${plan.deactivations.length}개, 분류 연결 ${plan.links.length}개.`
         );
         setReloadKey(value => value + 1);
       } else {
@@ -268,8 +268,14 @@ export function YearEndTaxView() {
     }
   }
 
-  const taxLabel = (code: string) =>
-    summary?.taxCodes.find(option => option.code === code)?.label || "일반";
+  const taxLabel = (code: string | null | undefined, type = "지출") => {
+    if (!code) return "";
+    const list = type === "수입" ? summary?.incomeTaxCodes : summary?.taxCodes;
+    return list?.find(option => option.code === code)?.label || "";
+  };
+  const presetChangeCount = presetPlan
+    ? presetPlan.renames.length + presetPlan.links.length + presetPlan.deactivations.length + presetPlan.creates.length
+    : 0;
 
   async function handleCategoryChange(categoryId: string, taxCode: string) {
     setSavingCategoryId(categoryId);
@@ -416,8 +422,8 @@ export function YearEndTaxView() {
                 {!presetPlan ? (
                   <>
                     <p>
-                      우리 가계부에 맞춘 연말정산용 카테고리 정리안이 있어요. 기존 거래는 그대로 두고,
-                      분류 연결과 새 카테고리 추가만 해요.
+                      우리 가계부에 맞춰 카테고리를 다시 짠 정리안이 있어요. 식비를 장보기·외식·배달·카페로 나누는 것처럼
+                      실제 쓰임과 연말정산에 맞게 이름 바꾸기·추가·사용 중지를 한 번에 해요. 지난 거래는 그대로 남아요.
                     </p>
                     <Button
                       size="sm"
@@ -426,23 +432,24 @@ export function YearEndTaxView() {
                       loadingLabel="불러오는 중"
                       onClick={() => void handlePreset(false)}
                     >
-                      추천 정리 미리보기
+                      정리안 미리보기
                     </Button>
                   </>
                 ) : (
                   <>
-                    {presetPlan.links.length + presetPlan.creates.length === 0 ? (
+                    {presetChangeCount === 0 ? (
                       <p>이미 모두 정리돼 있어요.</p>
                     ) : (
                       <>
-                        {presetPlan.links.length > 0 && (
+                        {presetPlan.renames.length > 0 && (
                           <>
-                            <h4>분류 연결</h4>
+                            <h4>이름 바꾸기 <small>지난 거래도 새 이름으로 보여요</small></h4>
                             <ul>
-                              {presetPlan.links.map(item => (
+                              {presetPlan.renames.map(item => (
                                 <li key={item.categoryId}>
-                                  <strong>{item.name}</strong> → {taxLabel(item.taxCode)}
-                                  <small>{item.note}</small>
+                                  <strong>{item.from} → {item.to}</strong>
+                                  {item.taxCode ? ` · ${taxLabel(item.taxCode, item.type)}` : ""}
+                                  {item.note && <small>{item.note}</small>}
                                 </li>
                               ))}
                             </ul>
@@ -453,14 +460,46 @@ export function YearEndTaxView() {
                             <h4>새 카테고리</h4>
                             <ul>
                               {presetPlan.creates.map(item => (
-                                <li key={item.name}>
-                                  <strong>+ {item.name}</strong> → {taxLabel(item.taxCode)}
-                                  <small>{item.note}</small>
+                                <li key={`${item.type}-${item.name}`}>
+                                  <strong>+ {item.name}</strong>
+                                  {item.type !== "지출" ? ` (${item.type})` : ""}
+                                  {item.taxCode && taxLabel(item.taxCode, item.type) ? ` · ${taxLabel(item.taxCode, item.type)}` : ""}
+                                  {item.note && <small>{item.note}</small>}
                                 </li>
                               ))}
                             </ul>
                           </>
                         )}
+                        {presetPlan.deactivations.length > 0 && (
+                          <>
+                            <h4>사용 중지 <small>입력 목록에서만 빠지고 지난 거래는 그대로예요</small></h4>
+                            <ul>
+                              {presetPlan.deactivations.map(item => (
+                                <li key={item.categoryId}>
+                                  <strong>− {item.name}</strong>{item.type !== "지출" ? ` (${item.type})` : ""}
+                                  {item.note && <small>{item.note}</small>}
+                                </li>
+                              ))}
+                            </ul>
+                          </>
+                        )}
+                        {presetPlan.links.length > 0 && (
+                          <>
+                            <h4>연말정산 분류 연결</h4>
+                            <ul>
+                              {presetPlan.links.map(item => (
+                                <li key={item.categoryId}>
+                                  <strong>{item.name}</strong> → {taxLabel(item.taxCode, item.type)}
+                                  {item.note && <small>{item.note}</small>}
+                                </li>
+                              ))}
+                            </ul>
+                          </>
+                        )}
+                        <p className={styles.hint}>
+                          적용 전에 설정 → 가계부 운영·데이터에서 JSON 백업을 받아두면 더 안심이에요.
+                          바꾼 뒤에도 설정 → 카테고리 관리에서 이름을 되돌리거나 다시 사용으로 켤 수 있어요.
+                        </p>
                       </>
                     )}
                     {presetPlan.skipped.length > 0 && (
@@ -472,7 +511,7 @@ export function YearEndTaxView() {
                       <Button size="sm" variant="ghost" disabled={presetBusy} onClick={() => setPresetPlan(null)}>
                         닫기
                       </Button>
-                      {presetPlan.links.length + presetPlan.creates.length > 0 && (
+                      {presetChangeCount > 0 && (
                         <Button
                           size="sm"
                           loading={presetBusy}
