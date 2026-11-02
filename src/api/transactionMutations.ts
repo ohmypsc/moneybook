@@ -63,6 +63,9 @@ export interface TransactionItem {
   billingMonth:
     string | null;
 
+  installmentMonths?:
+    number | null;
+
   groupId:
     string | null;
 
@@ -137,6 +140,8 @@ export interface UpdateTransactionInput {
   memo?: string;
 
   billingMonth?: string;
+
+  installmentMonths?: number | null;
 }
 
 

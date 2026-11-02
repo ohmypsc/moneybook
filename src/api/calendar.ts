@@ -65,6 +65,9 @@ export interface CalendarTransaction {
   billingMonth:
     string | null;
 
+  installmentMonths?:
+    number | null;
+
   groupId:
     string | null;
 

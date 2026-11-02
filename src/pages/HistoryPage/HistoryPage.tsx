@@ -149,6 +149,7 @@ function getTransactionMeta(transaction: Transaction) {
   return [
     transaction.description ? transaction.category : "",
     transaction.paymentMethod || transaction.fromAccount,
+    Number(transaction.installmentMonths) > 1 ? `${transaction.installmentMonths}개월 할부` : "",
     transaction.spendingTarget,
     transaction.createdBy
   ].filter(Boolean).join(" · ");

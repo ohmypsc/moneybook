@@ -53,6 +53,10 @@ export interface Transaction {
   billingMonth:
     string | null;
 
+  /** 신용카드 할부 개월 수(2~36). 일시불이면 null. */
+  installmentMonths?:
+    number | null;
+
   groupId:
     string | null;
 
@@ -124,6 +128,10 @@ export interface CreateTransactionInput {
 
   billingMonth?:
     string;
+
+  /** 신용카드 할부 개월 수(2~36). 일시불이면 생략하거나 null. */
+  installmentMonths?:
+    number | null;
 
   groupId?:
     string;

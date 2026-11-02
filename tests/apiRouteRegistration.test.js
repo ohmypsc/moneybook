@@ -23,3 +23,10 @@ test("push notification APIs stay registered in the Worker router", () => {
   assert.match(routeBlock("postPaths"), /"\/api\/push\/unsubscribe"/);
   assert.match(routeBlock("postPaths"), /"\/api\/push\/test"/);
 });
+
+test("change_log actions written by the Worker are allowed by the DB CHECK constraint", () => {
+  const allowed = new Set(["created", "updated", "deleted", "restored"]);
+  const actions = [...source.matchAll(/mbD1InsertChange\(\s*env,\s*[^,]+,\s*[^,]+,\s*"([a-z_]+)"/g)].map(match => match[1]);
+  assert.ok(actions.length > 10, "should find the change log writes");
+  assert.deepEqual(actions.filter(action => !allowed.has(action)), []);
+});
