@@ -7,6 +7,7 @@ import {
   deletePushSubscription,
   getPushConfig,
   notifyPartnersOfTransaction,
+  notifyPartnersOfTransactions,
   savePushSubscription,
   sendTestPush
 } from "../worker/push.js";
@@ -152,4 +153,26 @@ test("subscriptions pointing anywhere other than a browser push service are reje
     savePushSubscription(env, HOUSEHOLD, { name: "미영" }, { subscription: bad }),
     { code: "INVALID_PUSH_SUBSCRIPTION" }
   );
+});
+
+
+test("several transactions from 승철 reach 미영 as a single push", async () => {
+  const env = { DB: createD1() };
+  await savePushSubscription(
+    env, HOUSEHOLD, { name: "미영" },
+    { subscription: await browserSubscription("https://web.push.apple.com/miyoung-phone") }
+  );
+
+  const fetchMock = mockFetch();
+  try {
+    const result = await notifyPartnersOfTransactions(env, HOUSEHOLD, "승철", [
+      { transactionId: "1", type: "지출", amount: 1000, description: "a" },
+      { transactionId: "2", type: "지출", amount: 2000, description: "b" },
+      { transactionId: "3", type: "지출", amount: 3000, description: "c" }
+    ], "https://moneybook.example");
+    assert.deepEqual(result, { sent: 1, failed: 0, removed: 0 });
+    assert.equal(fetchMock.calls.length, 1);
+  } finally {
+    fetchMock.restore();
+  }
 });

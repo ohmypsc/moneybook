@@ -15,9 +15,16 @@ import {
   deletePushSubscription,
   getPushConfig,
   notifyPartnersOfTransaction,
+  notifyPartnersOfTransactions,
   savePushSubscription,
   sendTestPush
 } from "./push.js";
+
+import {
+  groupBatchedPush,
+  scheduleBatchedPush,
+  summarizeTransactionForPush
+} from "./domain/webPush.js";
 
 import {
   dateOnly as mbD1DateOnly,
@@ -6149,7 +6156,7 @@ async function mbD1ProductionRoute(request, url, session, env, ctx) {
       // 새 거래가 실제로 만들어졌을 때만(중복 재전송 제외) 배우자 기기에 알림을 보냅니다.
       if (path === "/api/transactions" && data?.created && !data?.duplicate && session?.name) {
         ctx.waitUntil(
-          notifyPartnersOfTransaction(env, MB_D1_HOUSEHOLD_ID, session.name, data.transaction, url.origin)
+          mbD1QueuePartnerPush(env, session.name, data.transaction, url.origin)
             .catch((error) => console.warn("[moneybook push] notify failed", error))
         );
       }
@@ -6169,6 +6176,35 @@ async function mbD1ProductionRoute(request, url, session, env, ctx) {
   }
 }
 
+
+/**
+ * 배우자 알림을 바로 보내지 않고 실시간 Durable Object의 대기열에 넣습니다.
+ * 잠깐(PUSH_BATCH_QUIET_MS) 더 입력이 없으면 그동안 모인 거래를 알림 하나로 보냅니다.
+ * Durable Object를 쓸 수 없으면 예전처럼 바로 한 건씩 보냅니다.
+ */
+async function mbD1QueuePartnerPush(env, actorName, transaction, origin) {
+  if (!transaction) return;
+  const stub = await getHouseholdRealtimeStub(env);
+  if (stub) {
+    try {
+      const response = await stub.fetch("https://moneybook-realtime.internal/push/enqueue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actor: actorName,
+          origin,
+          transaction: summarizeTransactionForPush(transaction)
+        })
+      });
+      if (response.ok) return;
+    } catch (error) {
+      console.warn("[moneybook push] queue failed, sending directly", error);
+    }
+  }
+  await notifyPartnersOfTransaction(env, MB_D1_HOUSEHOLD_ID, actorName, transaction, origin);
+}
+
+const MB_PUSH_PENDING_KEY = "push-pending:v1";
 
 export class HouseholdRealtime extends DurableObject {
   constructor(ctx, env) {
@@ -6228,6 +6264,27 @@ export class HouseholdRealtime extends DurableObject {
       return Response.json({ error: "unknown action" }, { status: 404 });
     }
 
+    if (request.method === "POST" && url.pathname === "/push/enqueue") {
+      let body;
+      try {
+        body = await request.json();
+      } catch {
+        return Response.json({ error: "invalid request" }, { status: 400 });
+      }
+      if (!body?.actor || !body?.transaction) {
+        return Response.json({ error: "missing fields" }, { status: 400 });
+      }
+      const current = (await this.ctx.storage.get(MB_PUSH_PENDING_KEY)) || [];
+      const { pending, sendAt } = scheduleBatchedPush(current, {
+        actor: String(body.actor),
+        origin: String(body.origin || ""),
+        transaction: body.transaction
+      });
+      await this.ctx.storage.put(MB_PUSH_PENDING_KEY, pending);
+      await this.ctx.storage.setAlarm(sendAt);
+      return Response.json({ queued: pending.length, sendAt });
+    }
+
     if (request.method === "POST" && url.pathname === "/broadcast") {
       let payload;
       try {
@@ -6259,6 +6316,27 @@ export class HouseholdRealtime extends DurableObject {
   }
 
   webSocketClose() {
+  }
+
+  async alarm() {
+    const pending = (await this.ctx.storage.get(MB_PUSH_PENDING_KEY)) || [];
+    // 보내기 전에 먼저 비워서, 발송 중 새로 들어온 입력은 다음 알림으로 넘어가게 합니다.
+    await this.ctx.storage.delete(MB_PUSH_PENDING_KEY);
+    if (!this.env?.DB) return;
+    for (const group of groupBatchedPush(pending)) {
+      try {
+        await notifyPartnersOfTransactions(
+          this.env,
+          MB_D1_HOUSEHOLD_ID,
+          group.actor,
+          group.transactions,
+          group.origin
+        );
+      } catch (error) {
+        // 알람 재시도로 같은 알림이 두 번 가지 않도록 여기서 오류를 삼킵니다.
+        console.warn("[moneybook push] batched notify failed", error);
+      }
+    }
   }
 
   webSocketError() {

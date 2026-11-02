@@ -2,8 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  PUSH_BATCH_MAX_WAIT_MS,
+  PUSH_BATCH_QUIET_MS,
   base64UrlToBytes,
+  buildBatchNotification,
   buildTransactionNotification,
+  groupBatchedPush,
+  scheduleBatchedPush,
   bytesToBase64Url,
   createVapidAuthorization,
   encryptPushPayload,
@@ -190,4 +195,54 @@ test("matches the RFC 8291 section 5 example byte for byte", async () => {
     bytesToBase64Url(body),
     "DGv6ra1nlYgDCS1FRnbzlwAAEABBBP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlmlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A_yl95bQpu6cVPTpK4Mqgkf1CXztLVBSt2Ks3oZwbuwXPXLWyouBWLVWGNWQexSgSxsj_Qulcy4a-fN"
   );
+});
+
+
+test("batched pushes wait for a quiet gap but never longer than the max wait", () => {
+  const t0 = 1_000_000;
+  let state = scheduleBatchedPush([], { actor: "승철", transaction: { transactionId: "1" } }, t0);
+  assert.equal(state.sendAt, t0 + PUSH_BATCH_QUIET_MS);
+
+  // 5초 뒤 한 건 더 → 그때부터 다시 조용한 시간을 기다림
+  state = scheduleBatchedPush(state.pending, { actor: "승철", transaction: { transactionId: "2" } }, t0 + 5_000);
+  assert.equal(state.sendAt, t0 + 5_000 + PUSH_BATCH_QUIET_MS);
+  assert.equal(state.pending.length, 2);
+
+  // 계속 들어와도 첫 입력 후 최대 대기시간에는 보냄
+  state = scheduleBatchedPush(state.pending, { actor: "승철", transaction: { transactionId: "3" } }, t0 + 28_000);
+  assert.equal(state.sendAt, t0 + PUSH_BATCH_MAX_WAIT_MS);
+});
+
+test("batched pushes are grouped by who entered them", () => {
+  const groups = groupBatchedPush([
+    { actor: "승철", origin: "https://a", transaction: { transactionId: "1" } },
+    { actor: "미영", origin: "https://a", transaction: { transactionId: "2" } },
+    { actor: "승철", origin: "https://a", transaction: { transactionId: "3" } },
+    { actor: "", transaction: { transactionId: "x" } }
+  ]);
+  assert.deepEqual(groups.map(group => [group.actor, group.transactions.map(tx => tx.transactionId)]), [
+    ["승철", ["1", "3"]],
+    ["미영", ["2"]]
+  ]);
+});
+
+test("several transactions become one notification with totals", () => {
+  const notification = buildBatchNotification([
+    { transactionId: "1", type: "지출", amount: 45200, description: "이마트" },
+    { transactionId: "2", type: "지출", amount: 38000, description: "쿠팡" },
+    { transactionId: "3", type: "지출", amount: 12800, description: "스타벅스" },
+    { transactionId: "4", type: "지출", amount: 4000, description: "편의점" },
+    { transactionId: "5", type: "수입", amount: 10000, description: "환급" }
+  ], "승철");
+
+  assert.equal(notification.title, "승철님이 거래 5건을 입력했어요");
+  assert.equal(
+    notification.body,
+    "이마트 45,200원, 쿠팡 38,000원, 스타벅스 12,800원 외 2건 · 지출 100,000원 · 수입 10,000원"
+  );
+  assert.equal(notification.url, "/?shortcut=history");
+
+  // 한 건이면 기존 한 건 알림과 똑같습니다.
+  const single = { transactionId: "9", type: "지출", amount: 1000, description: "커피" };
+  assert.deepEqual(buildBatchNotification([single], "승철"), buildTransactionNotification(single, "승철"));
 });
