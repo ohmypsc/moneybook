@@ -513,7 +513,7 @@ function getTransactionMethod(
     if (isSettlementTransaction(transaction)) {
         return [
             transaction.toAccount || "입금수단 미지정",
-            "회식비 정산 · 수입 합계 제외"
+            "정산받음 · 수입 합계 제외"
         ].filter(Boolean).join(" · ");
     }
 
@@ -1486,11 +1486,17 @@ export default function CalendarPage({
         );
 
     useEffect(() => {
+        // 모든 지출이 정산 대상이 되었으므로, 목록에 요약을 보여줄 필요가 있는
+        // (이미 정산·환불이 연결된) 지출만 미리 불러옵니다.
         const eligible = selectedTransactions.filter(
             transaction =>
                 transaction.type === "지출" &&
                 Boolean(transaction.settlementEligible) &&
-                !transaction.reversalOf
+                !transaction.reversalOf &&
+                (
+                    Number(transaction.settlementAmount) > 0 ||
+                    Number(transaction.refundAmount) > 0
+                )
         );
 
         if (eligible.length === 0) {
@@ -3575,7 +3581,7 @@ export default function CalendarPage({
                                                                 >
                                                                     <div className={styles.settlementHeader}>
                                                                         <div>
-                                                                            <p className={styles.editEyebrow}>회식비 정산</p>
+                                                                            <p className={styles.editEyebrow}>정산받기</p>
                                                                             <h3 className={styles.editTitle}>정산 현황과 받은 내역</h3>
                                                                         </div>
                                                                         <span className={styles.settlementHint}>정산금은 수입이 아니라 원래 지출에서 차감돼요</span>
@@ -3666,7 +3672,7 @@ export default function CalendarPage({
                                                                             </div>
                                                                         </>
                                                                     ) : (
-                                                                        <p className={styles.settlementComplete}>이 회식비는 정산이 모두 반영되었습니다.</p>
+                                                                        <p className={styles.settlementComplete}>이 지출은 정산이 모두 반영되었습니다.</p>
                                                                     )}
 
                                                                     {settlementSummary.settlements.length > 0 && (

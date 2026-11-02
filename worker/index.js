@@ -64,7 +64,6 @@ import {
 } from "./domain/monthStats.js";
 
 import {
-  SETTLEMENT_EXPENSE_CATEGORY_NAME,
   SETTLEMENT_INCOME_CATEGORY_NAME,
   BENEFIT_INCOME_CATEGORY_NAME,
   CASHBACK_INCOME_CATEGORY_NAME,
@@ -2113,7 +2112,7 @@ function mbD1MapCategory(row) {
     categoryId,
     type,
     name,
-    settlementEligible: systemRole === "settlement_expense",
+    settlementEligible: type === "지출",
     systemLocked: Boolean(systemRole),
     systemRole: systemRole || null,
     active: mbD1Bool(row.is_active),
@@ -2918,13 +2917,6 @@ async function mbD1EnsureDefaultCashbackIncomeCategory(env) {
   );
 }
 
-async function mbD1SettlementExpenseCategory(env) {
-  return mbD1EnsureSystemCategory(env, {
-    categoryId: SYSTEM_CATEGORY_IDS.settlementExpense,
-    type: "지출",
-    name: SETTLEMENT_EXPENSE_CATEGORY_NAME
-  });
-}
 
 async function mbD1SettlementIncomeCategory(env) {
   return mbD1EnsureSystemCategory(env, {
@@ -3232,7 +3224,6 @@ async function mbD1InputPreferencesData(env) {
 }
 
 async function mbD1BuildBootstrap(env) {
-  await mbD1SettlementExpenseCategory(env);
   await mbD1EnsureDefaultCashbackIncomeCategory(env);
   const [members, rawAccounts, categoryRows, ledgerConfig, inputPreferences, automationSettings] = await Promise.all([
     mbD1Members(env),
@@ -3276,7 +3267,6 @@ async function mbD1BuildBootstrap(env) {
 }
 
 async function mbD1GetCategoriesData(env, url) {
-  await mbD1SettlementExpenseCategory(env);
   await mbD1EnsureDefaultCashbackIncomeCategory(env);
   const includeDeleted = ["1", "true"].includes((url.searchParams.get("includeDeleted") || "").toLowerCase());
   const type = mbD1Text(url.searchParams.get("type"));
@@ -4255,7 +4245,7 @@ async function mbD1HandleTransactionMutation(path, body, session, env) {
         categoryId: category.category_id,
         amount,
         toAccountId: receiveAccountId,
-        description: `${current.description || current.category || SETTLEMENT_EXPENSE_CATEGORY_NAME} 정산받음`,
+        description: `${current.description || current.category || "지출"} 정산받음`,
         memo: mbD1Text(body.memo),
         reversalOf: transactionId
       },
@@ -4512,9 +4502,7 @@ async function mbD1HandleCategoryMutation(path, body, session, env) {
   if (current.systemLocked && (path === "/api/categories/update" || path === "/api/categories/delete")) {
     mbD1Fail(
       "SYSTEM_CATEGORY_LOCKED",
-      current.systemRole === "settlement_expense"
-        ? "회식비는 정산 기능에 사용되는 기본 카테고리라 이름 변경·사용 중지·삭제할 수 없습니다."
-        : "이 카테고리는 자동 기록에 사용되는 시스템 카테고리라 수정하거나 삭제할 수 없습니다.",
+      "이 카테고리는 자동 기록에 사용되는 시스템 카테고리라 수정하거나 삭제할 수 없습니다.",
       409
     );
   }

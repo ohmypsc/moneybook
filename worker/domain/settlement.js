@@ -20,11 +20,6 @@ export function systemCategoryRole(type, name, categoryId = "") {
   const cleanId = String(categoryId || "").trim();
 
   if (
-    cleanType === "지출" &&
-    (cleanName === SETTLEMENT_EXPENSE_CATEGORY_NAME || cleanId === SYSTEM_CATEGORY_IDS.settlementExpense)
-  ) return "settlement_expense";
-
-  if (
     cleanType === "수입" &&
     (cleanName === SETTLEMENT_INCOME_CATEGORY_NAME || cleanId === SYSTEM_CATEGORY_IDS.settlementIncome)
   ) return "settlement_income";
@@ -37,8 +32,12 @@ export function systemCategoryRole(type, name, categoryId = "") {
   return "";
 }
 
-export function isSettlementEligibleCategory(type, name, categoryId = "") {
-  return systemCategoryRole(type, name, categoryId) === "settlement_expense";
+/**
+ * 정산받기는 모든 지출에서 쓸 수 있습니다(회식비·여행 경비·공동 구매 등).
+ * 예전에는 '회식비' 카테고리에서만 가능해서 그 카테고리를 잠가 두었지만, 이제는 잠그지 않습니다.
+ */
+export function isSettlementEligibleCategory(type) {
+  return String(type || "") === "지출";
 }
 
 export function isSettlementRequestId(value) {
