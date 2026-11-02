@@ -48,6 +48,8 @@ export interface DashboardCard {
   usage: number;
   payments: number;
   estimatedRemaining: number;
+  /** 이번 청구월 다음 달부터 남은 할부 청구액 */
+  installmentRemaining?: number;
 }
 
 export interface MonthlyTrendItem {

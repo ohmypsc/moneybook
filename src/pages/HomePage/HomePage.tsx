@@ -63,6 +63,7 @@ interface DashboardCardView {
   usage: number;
   payments: number;
   estimatedRemaining: number;
+  installmentRemaining?: number;
   name: string;
   paymentDay: number | null;
   billingCutoffDay: number | null;
@@ -777,6 +778,11 @@ export default function HomePage({
                         ? `${card.paymentAccountName} 잔액 ${formatMoney(card.paymentAccountBalance || 0)}`
                         : "결제계좌 미설정"}
                     </small>
+                    {Number(card.installmentRemaining) > 0 && (
+                      <small className={styles.cardAccountMeta}>
+                        다음 달부터 남은 할부 {formatMoney(Number(card.installmentRemaining))}
+                      </small>
+                    )}
                   </div>
                 </div>
                 <div className={styles.cardAmountBlock}>

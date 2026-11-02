@@ -21,6 +21,12 @@ import {
 } from "./push.js";
 
 import {
+  installmentAmountForMonth,
+  installmentRemainingAfter,
+  normalizeInstallmentMonths
+} from "./domain/installment.js";
+
+import {
   groupBatchedPush,
   scheduleBatchedPush,
   summarizeTransactionForPush
@@ -2164,6 +2170,7 @@ function mbD1MapTransactionRow(row) {
     memo: mbD1Text(row.memo),
     billingOverride: row.billing_month_override || null,
     billingMonth: row.billing_month || null,
+    installmentMonths: Number(row.installment_months) >= 2 ? Number(row.installment_months) : null,
     groupId: row.group_id || null,
     requestId: row.request_id || null,
     reversalOf: row.reversal_of || null,
@@ -2493,6 +2500,7 @@ async function mbD1BuildDashboard(env, monthValue = "") {
     .map((card) => {
       let usage = 0;
       let payments = 0;
+      let installmentRemaining = 0;
       for (const tx of transactions) {
         if (tx.type === "지출" && tx.paymentMethodId === card.accountId) {
           const bill = tx.billingOverride || tx.billingMonth || mbD1EstimateBilling(
@@ -2500,7 +2508,11 @@ async function mbD1BuildDashboard(env, monthValue = "") {
             card.billingCutoffDay,
             card.paymentDay
           );
-          if (bill === month) usage += tx.amount;
+          // 할부는 첫 청구월부터 개월 수만큼 나눠 청구합니다(일시불이면 그 달 전액).
+          usage += installmentAmountForMonth(tx.amount, tx.installmentMonths, bill, month);
+          if (tx.installmentMonths) {
+            installmentRemaining += installmentRemainingAfter(tx.amount, tx.installmentMonths, bill, month);
+          }
         }
         if (tx.type === "이체" && tx.toAccountId === card.accountId) {
           const bill = tx.billingOverride || tx.billingMonth || tx.date.slice(0, 7);
@@ -2519,7 +2531,11 @@ async function mbD1BuildDashboard(env, monthValue = "") {
               card.billingCutoffDay,
               card.paymentDay
             );
-            if (bill === month) usage -= tx.amount;
+            // 할부 거래의 취소·환불은 남은 회차에 같은 비율로 나눠 빼서 전액 취소 시 정확히 0이 되게 합니다.
+            usage -= installmentAmountForMonth(tx.amount, original.installmentMonths, bill, month);
+            if (original.installmentMonths) {
+              installmentRemaining -= installmentRemainingAfter(tx.amount, original.installmentMonths, bill, month);
+            }
           }
           if (
             tx.fromAccountId === card.accountId &&
@@ -2538,7 +2554,9 @@ async function mbD1BuildDashboard(env, monthValue = "") {
         billingMonth: month,
         usage: mbD1Round(usage, 2),
         payments: mbD1Round(payments, 2),
-        estimatedRemaining: mbD1Round(usage - payments, 2)
+        estimatedRemaining: mbD1Round(usage - payments, 2),
+        // 이번 청구월 이후에 남은 할부 청구액(다음 달부터 나갈 돈)
+        installmentRemaining: mbD1Round(Math.max(0, installmentRemaining), 2)
       };
     });
   const trend = [];
@@ -3609,7 +3627,25 @@ async function mbD1BuildTransactionModel(env, payload, current = null, forCreate
   if (billingOverride && !mbD1MonthOnly(billingOverride)) {
     mbD1Fail("INVALID_BILLING_MONTH", "청구월은 YYYY-MM 형식이어야 합니다.");
   }
+
+  // 할부는 신용카드 지출에만 둡니다. 결제수단이 바뀌어 신용카드가 아니게 되면 일시불로 돌립니다.
+  let installmentMonths = null;
+  if (type === "지출" && paymentMethod?.subType === "신용카드") {
+    const installmentInput = mbD1Has(payload, "installmentMonths")
+      ? payload.installmentMonths
+      : source.installmentMonths;
+    const normalizedInstallment = normalizeInstallmentMonths(installmentInput);
+    if (normalizedInstallment.error) mbD1Fail("INVALID_INSTALLMENT_MONTHS", normalizedInstallment.error);
+    installmentMonths = normalizedInstallment.months;
+  } else if (mbD1Has(payload, "installmentMonths")) {
+    const normalizedInstallment = normalizeInstallmentMonths(payload.installmentMonths);
+    if (normalizedInstallment.months) {
+      mbD1Fail("INSTALLMENT_CREDIT_CARD_ONLY", "할부는 신용카드 지출에서만 선택할 수 있습니다.");
+    }
+  }
+
   return {
+    installmentMonths,
     date,
     type,
     categoryId,
@@ -4012,13 +4048,13 @@ async function mbD1HandleTransactionMutation(path, body, session, env) {
         transaction_id,household_id,request_id,date,type,category_id,amount,
         from_account_id,to_account_id,payment_method_id,spending_target,spender_member_id,
         entered_by_member_id,description,memo,billing_month_override,billing_month,group_id,reversal_of,
-        version,created_at,updated_at,created_by,updated_by,deleted_at,deleted_by,source_row
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+        version,created_at,updated_at,created_by,updated_by,deleted_at,deleted_by,source_row,installment_months
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
     ).bind(
       transactionId, MB_D1_HOUSEHOLD_ID, requestId, model.date, model.type, model.categoryId, model.amount,
       model.fromAccountId, model.toAccountId, model.paymentMethodId, model.spendingTarget, model.spenderMemberId,
       enteredBy, model.description || null, model.memo || null, model.billingOverride, model.billingMonth,
-      model.groupId, model.reversalOf, 1, now, now, actor, actor, null, null, null
+      model.groupId, model.reversalOf, 1, now, now, actor, actor, null, null, null, model.installmentMonths
     );
     const change = await mbD1InsertChange(env, "transaction", transactionId, "created", 1, session, {
       date: model.date,
@@ -4270,7 +4306,7 @@ async function mbD1HandleTransactionMutation(path, body, session, env) {
       : Number(body.expectedUpdatedAtMs);
     if (expected !== null && !Number.isFinite(expected)) mbD1Fail("INVALID_UPDATE_VERSION", "업데이트 버전 정보가 올바르지 않습니다.");
     if (current.updatedAtMs !== expected) mbD1Fail("CONCURRENT_MODIFICATION", "거래가 다른 기기에서 먼저 수정되었습니다. 최신 내용을 다시 불러온 뒤 수정하세요.", 409);
-    const financialKeys = ["date","type","categoryId","amount","fromAccountId","toAccountId","paymentMethodId","spendingTarget","billingMonth","groupId","reversalOf"];
+    const financialKeys = ["date","type","categoryId","amount","fromAccountId","toAccountId","paymentMethodId","spendingTarget","billingMonth","groupId","reversalOf","installmentMonths"];
     const financialChange = financialKeys.some((key) => mbD1Has(body, key));
     if (financialChange && current.reversalOf) mbD1Fail("REVERSAL_FINANCIAL_EDIT_NOT_ALLOWED", "환불/정산 거래의 금액·계좌·유형은 직접 수정할 수 없습니다.");
     if (financialChange && !current.reversalOf) {
@@ -4296,11 +4332,11 @@ async function mbD1HandleTransactionMutation(path, body, session, env) {
     const update = env.DB.prepare(
       `UPDATE transactions SET date=?,type=?,category_id=?,amount=?,from_account_id=?,to_account_id=?,payment_method_id=?,
        spending_target=?,spender_member_id=?,description=?,memo=?,billing_month_override=?,billing_month=?,group_id=?,reversal_of=?,
-       version=?,updated_at=?,updated_by=? WHERE household_id=? AND transaction_id=? AND deleted_at IS NULL`
+       installment_months=?,version=?,updated_at=?,updated_by=? WHERE household_id=? AND transaction_id=? AND deleted_at IS NULL`
     ).bind(
       model.date, model.type, model.categoryId, model.amount, model.fromAccountId, model.toAccountId, model.paymentMethodId,
       model.spendingTarget, model.spenderMemberId, model.description || null, model.memo || null, model.billingOverride,
-      model.billingMonth, model.groupId, model.reversalOf, nextVersion, now, actor, MB_D1_HOUSEHOLD_ID, transactionId
+      model.billingMonth, model.groupId, model.reversalOf, model.installmentMonths, nextVersion, now, actor, MB_D1_HOUSEHOLD_ID, transactionId
     );
     const change = await mbD1InsertChange(env, "transaction", transactionId, "updated", nextVersion, session, {
       date: model.date,
@@ -5690,9 +5726,9 @@ async function mbD1RestoreBackupMerge(document, session, env) {
   await mbD1RunBackupBatches(env, holdingStatements);
 
   const transactionStatements = payload.transactions.map((item) => env.DB.prepare(
-    `INSERT INTO transactions (transaction_id,household_id,request_id,date,type,category_id,amount,from_account_id,to_account_id,payment_method_id,spending_target,spender_member_id,entered_by_member_id,description,memo,billing_month_override,billing_month,group_id,reversal_of,version,taxpayer_member_id,tax_category_code,created_at,updated_at,created_by,updated_by,deleted_at,deleted_by,source_row)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-     ON CONFLICT(transaction_id) DO UPDATE SET request_id=excluded.request_id,date=excluded.date,type=excluded.type,category_id=excluded.category_id,amount=excluded.amount,from_account_id=excluded.from_account_id,to_account_id=excluded.to_account_id,payment_method_id=excluded.payment_method_id,spending_target=excluded.spending_target,spender_member_id=excluded.spender_member_id,entered_by_member_id=excluded.entered_by_member_id,description=excluded.description,memo=excluded.memo,billing_month_override=excluded.billing_month_override,billing_month=excluded.billing_month,group_id=excluded.group_id,reversal_of=NULL,version=excluded.version,taxpayer_member_id=excluded.taxpayer_member_id,tax_category_code=excluded.tax_category_code,updated_at=excluded.updated_at,updated_by=excluded.updated_by,deleted_at=excluded.deleted_at,deleted_by=excluded.deleted_by,source_row=excluded.source_row`
+    `INSERT INTO transactions (transaction_id,household_id,request_id,date,type,category_id,amount,from_account_id,to_account_id,payment_method_id,spending_target,spender_member_id,entered_by_member_id,description,memo,billing_month_override,billing_month,group_id,reversal_of,version,taxpayer_member_id,tax_category_code,created_at,updated_at,created_by,updated_by,deleted_at,deleted_by,source_row,installment_months)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+     ON CONFLICT(transaction_id) DO UPDATE SET installment_months=excluded.installment_months, request_id=excluded.request_id,date=excluded.date,type=excluded.type,category_id=excluded.category_id,amount=excluded.amount,from_account_id=excluded.from_account_id,to_account_id=excluded.to_account_id,payment_method_id=excluded.payment_method_id,spending_target=excluded.spending_target,spender_member_id=excluded.spender_member_id,entered_by_member_id=excluded.entered_by_member_id,description=excluded.description,memo=excluded.memo,billing_month_override=excluded.billing_month_override,billing_month=excluded.billing_month,group_id=excluded.group_id,reversal_of=NULL,version=excluded.version,taxpayer_member_id=excluded.taxpayer_member_id,tax_category_code=excluded.tax_category_code,updated_at=excluded.updated_at,updated_by=excluded.updated_by,deleted_at=excluded.deleted_at,deleted_by=excluded.deleted_by,source_row=excluded.source_row`
   ).bind(
     item.transactionId, MB_D1_HOUSEHOLD_ID, item.requestId || null, item.date, item.type, item.categoryId || null, mbD1BackupNumber(item.amount),
     item.fromAccountId || null, item.toAccountId || null, item.paymentMethodId || null, item.spendingTarget || null,
@@ -5700,7 +5736,9 @@ async function mbD1RestoreBackupMerge(document, session, env) {
     item.description || null, item.memo || null, item.billingOverride || null, item.billingMonth || null, item.groupId || null, null,
     Math.max(1, Math.floor(mbD1BackupNumber(item.version, 1))), item.taxpayerMemberId || null, item.taxCategoryCode || null,
     item.createdAt || now, item.updatedAt || item.createdAt || now, item.createdBy || actor, item.updatedBy || actor,
-    mbD1BackupDeletedAt(item), item.deletedBy || null, item.row || null
+    mbD1BackupDeletedAt(item), item.deletedBy || null, item.row || null,
+    // 예전 백업에는 할부 정보가 없으므로 일시불(null)로 복원됩니다.
+    normalizeInstallmentMonths(item.installmentMonths).months ?? null
   ));
   await mbD1RunBackupBatches(env, transactionStatements);
 
@@ -5806,7 +5844,9 @@ async function mbD1RestoreBackupMerge(document, session, env) {
     await mbD1RunBackupBatches(env, realEstateStatements);
   }
 
-  const change = await mbD1InsertChange(env, "backup_restore", `restore-${Date.now()}`, "merged", null, session, {
+  // change_log.action은 created/updated/deleted/restored만 허용하므로 결과 종류는 payload에 남깁니다.
+  const change = await mbD1InsertChange(env, "backup_restore", `restore-${Date.now()}`, "updated", null, session, {
+    result: "merged",
     version: validated.version,
     exportedAt: validated.exportedAt,
     summary: validated.summary
@@ -5830,10 +5870,11 @@ async function mbD1RestoreBackupMerge(document, session, env) {
           env,
           "backup_restore",
           `restore-failed-${Date.now()}`,
-          "partial_failure",
+          "updated",
           null,
           session,
           {
+            result: "partial_failure",
             version: validated.version,
             exportedAt: validated.exportedAt,
             summary: validated.summary
@@ -5995,6 +6036,23 @@ async function mbD1RefreshRealEstate(body, session, env) {
   return { refreshed: true, item };
 }
 
+// 할부 개월 수 칸(installment_months)이 없던 기존 DB에 한 번만 추가합니다.
+const mbD1InstallmentSchemaReadyFor = new WeakSet();
+
+async function mbD1EnsureInstallmentSchema(env) {
+  if (!env.DB || mbD1InstallmentSchemaReadyFor.has(env.DB)) return;
+  const columns = await mbD1All(env, "PRAGMA table_info(transactions)", []);
+  if (!columns.some((column) => column.name === "installment_months")) {
+    try {
+      await env.DB.prepare("ALTER TABLE transactions ADD COLUMN installment_months INTEGER").run();
+    } catch (error) {
+      // 다른 요청이 동시에 먼저 추가한 경우만 무시합니다.
+      if (!/duplicate column/i.test(String(error?.message || error))) throw error;
+    }
+  }
+  mbD1InstallmentSchemaReadyFor.add(env.DB);
+}
+
 async function mbD1ProductionRoute(request, url, session, env, ctx) {
   const path = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, "") : url.pathname;
   const getPaths = new Set([
@@ -6066,6 +6124,7 @@ async function mbD1ProductionRoute(request, url, session, env, ctx) {
     );
   }
   try {
+    await mbD1EnsureInstallmentSchema(env);
     if (request.method === "GET") {
       if (path === "/api/bootstrap") return mbD1Envelope(await mbD1BuildBootstrap(env));
       if (path === "/api/dashboard") {

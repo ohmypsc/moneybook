@@ -269,6 +269,9 @@ function getErrorMessage(
   return "저장 중 오류가 발생했습니다.";
 }
 
+// 할부 개월 선택지(국내 카드사에서 흔히 쓰는 값)
+const INSTALLMENT_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 18, 24, 36];
+
 export default function InputPage({
   userName,
   initialDate = null,
@@ -1314,6 +1317,23 @@ export default function InputPage({
       ]
     );
 
+  // 신용카드 할부(무이자). 1 = 일시불
+  const [installmentMonths, setInstallmentMonths] = useState(1);
+
+  const selectedPaymentAccount = useMemo(
+    () => allAccounts.find(account => account.accountId === paymentMethodId) ?? null,
+    [allAccounts, paymentMethodId]
+  );
+
+  const canUseInstallment =
+    mode === "expense" && selectedPaymentAccount?.subType === "신용카드";
+
+  useEffect(() => {
+    if (!canUseInstallment && installmentMonths !== 1) {
+      setInstallmentMonths(1);
+    }
+  }, [canUseInstallment, installmentMonths]);
+
   const selectedCard =
     useMemo(
       () =>
@@ -1680,6 +1700,7 @@ export default function InputPage({
     );
     setDescription(payload.description || "");
     setMemo(payload.memo || "");
+    setInstallmentMonths(Number(payload.installmentMonths) > 1 ? Number(payload.installmentMonths) : 1);
     setBenefitRewardUsedAmount(
       payload.benefitRewardUsedAmount
         ? String(payload.benefitRewardUsedAmount)
@@ -2520,7 +2541,8 @@ export default function InputPage({
       return {
         ...base,
         paymentMethodId,
-        spendingTarget
+        spendingTarget,
+        ...(canUseInstallment && installmentMonths > 1 ? { installmentMonths } : {})
       };
     }
 
@@ -2709,6 +2731,11 @@ export default function InputPage({
             ? billingMonth
             : undefined,
 
+        installmentMonths:
+          canUseInstallment && installmentMonths > 1
+            ? installmentMonths
+            : undefined,
+
         description:
           getEffectiveDescription(),
 
@@ -2801,6 +2828,7 @@ export default function InputPage({
 
       setAmount("");
       setCategoryId("");
+      setInstallmentMonths(1);
 
       // 같은 카드로 여러 건을 연달아 입력하는 경우가 많아 지출의 결제수단·지출대상은 그대로 둡니다.
       if (mode === "expense") {
@@ -3245,6 +3273,32 @@ export default function InputPage({
                     체크카드는 연결된 통장에서 자동 출금됩니다.
                   </p>
                 </label>
+
+                {canUseInstallment && (
+                  <label className={styles.field}>
+                    <span className={styles.fieldLabel}>할부</span>
+                    <select
+                      className={styles.input}
+                      value={installmentMonths}
+                      onChange={event => setInstallmentMonths(Number(event.target.value))}
+                      disabled={submitting}
+                    >
+                      {INSTALLMENT_OPTIONS.map(months => (
+                        <option key={months} value={months}>
+                          {months === 1 ? "일시불" : `${months}개월 (무이자)`}
+                        </option>
+                      ))}
+                    </select>
+                    {installmentMonths > 1 && (
+                      <p className={styles.helper}>
+                        {Number(amount) > 0
+                          ? `카드값에 매달 약 ${formatMoney(Math.floor(Number(amount) / installmentMonths))}씩 ${installmentMonths}개월 나눠 청구돼요. `
+                          : `카드값에 ${installmentMonths}개월 나눠 청구돼요. `}
+                        가계부 지출에는 오늘 날짜로 전액 기록돼요.
+                      </p>
+                    )}
+                  </label>
+                )}
 
                 <label
                   className={

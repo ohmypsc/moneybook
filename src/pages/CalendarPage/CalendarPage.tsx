@@ -117,6 +117,8 @@ interface EditForm {
     fromAccountId: string;
     toAccountId: string;
     billingMonth: string;
+    /** "1" = 일시불 */
+    installmentMonths: string;
     description: string;
     memo: string;
 }
@@ -543,6 +545,14 @@ function getTransactionMethod(
             );
         }
 
+        if (
+            Number(transaction.installmentMonths) > 1
+        ) {
+            parts.push(
+                `${transaction.installmentMonths}개월 할부`
+            );
+        }
+
         return parts.join(
             " · "
         );
@@ -710,6 +720,9 @@ type CalendarPageProps = {
         date: string;
     } | null;
 };
+
+// 할부 개월 선택지(입력 화면과 같음)
+const INSTALLMENT_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 18, 24, 36];
 
 export default function CalendarPage({
     onAddTransaction,
@@ -1928,6 +1941,13 @@ export default function CalendarPage({
                         .billingMonth ||
                     "",
 
+                installmentMonths:
+                    String(
+                        Number(transaction.installmentMonths) > 1
+                            ? transaction.installmentMonths
+                            : 1
+                    ),
+
                 description:
                     transaction.description ||
                     "",
@@ -2245,6 +2265,26 @@ export default function CalendarPage({
                 input.paymentMethodId =
                     editForm
                         .paymentMethodId;
+            }
+
+            const currentInstallment =
+                String(
+                    Number(editingTransaction.installmentMonths) > 1
+                        ? editingTransaction.installmentMonths
+                        : 1
+                );
+
+            if (
+                editForm.installmentMonths !==
+                currentInstallment
+            ) {
+                const nextMonths =
+                    Number(editForm.installmentMonths);
+
+                input.installmentMonths =
+                    nextMonths > 1
+                        ? nextMonths
+                        : null;
             }
 
             const currentTarget =
@@ -3898,6 +3938,25 @@ export default function CalendarPage({
                                                                                                 }
                                                                                             </select>
                                                                                         </label>
+
+                                                                                    {bootstrap.accounts.find(
+                                                                                        account => account.accountId === editForm.paymentMethodId
+                                                                                    )?.subType === "신용카드" && (
+                                                                                        <label className={styles.editField}>
+                                                                                            <span>할부</span>
+                                                                                            <select
+                                                                                                value={editForm.installmentMonths}
+                                                                                                disabled={isSaving || Boolean(transaction.reversalOf)}
+                                                                                                onChange={event => updateEditField("installmentMonths", event.target.value)}
+                                                                                            >
+                                                                                                {INSTALLMENT_OPTIONS.map(months => (
+                                                                                                    <option key={months} value={String(months)}>
+                                                                                                        {months === 1 ? "일시불" : `${months}개월 (무이자)`}
+                                                                                                    </option>
+                                                                                                ))}
+                                                                                            </select>
+                                                                                        </label>
+                                                                                    )}
 
                                                                                         <label
                                                                                             className={
