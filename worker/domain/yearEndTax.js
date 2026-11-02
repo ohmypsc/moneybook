@@ -454,13 +454,13 @@ export const CATEGORY_PRESET = {
   ],
   link: [
     { type: "지출", name: "대중교통", taxCode: "transit", note: "버스·지하철·기차·고속버스 (택시 제외)" },
-    { type: "지출", name: "보험", taxCode: "insurance", note: "보장성 보험료 (자동차보험 포함)" },
-    { type: "수입", name: "부수입", taxCode: "salary", note: "연봉에 더해지는 수당 → 총급여 추정에 포함" }
+    { type: "지출", name: "보험", taxCode: "insurance", note: "보장성 보험료 (자동차보험 포함)" }
   ],
   deactivate: [
     { type: "지출", name: "식비", note: "장보기·외식·배달·카페·간식으로 나눔" },
     { type: "지출", name: "생활비", note: "생활용품·미용 등으로 나눔" },
-    { type: "이체", name: "대출상환", note: "대출원금상환과 겹침" }
+    { type: "이체", name: "대출상환", note: "대출원금상환과 겹침" },
+    { type: "수입", name: "부수입", note: "학교 수당 / 외부 수당·원고료로 나눔" }
   ],
   create: [
     { type: "지출", name: "장보기", taxCode: "", note: "" },
@@ -481,7 +481,9 @@ export const CATEGORY_PRESET = {
     { type: "지출", name: "기부금", taxCode: "donation", note: "경조사(축의·조의)와 구분" },
     { type: "지출", name: "수수료·세금", taxCode: "excluded", note: "은행 수수료·자동차세 등 (카드공제 제외)" },
     { type: "지출", name: "전통시장", taxCode: "market", note: "전통시장 결제 (40%)" },
-    { type: "수입", name: "이자·배당", taxCode: "not-salary", note: "부수입과 구분" }
+    { type: "수입", name: "학교 수당", taxCode: "salary", note: "소속 학교에서 받는 수당 (따로 입금돼도 보통 근로소득) → 총급여에 포함" },
+    { type: "수입", name: "외부 수당·원고료", taxCode: "not-salary", note: "교육청 자료집 등 (기타소득 8.8%·사업소득 3.3%) → 총급여 아님" },
+    { type: "수입", name: "이자·배당", taxCode: "not-salary", note: "" }
   ]
 };
 

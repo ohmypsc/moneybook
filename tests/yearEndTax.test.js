@@ -226,9 +226,11 @@ test("restructure plan for this ledger renames, splits, links and adds without t
   ]);
   assert.equal(plan.renames.find(item => item.from === "의료").taxCode, "medical");
   assert.equal(plan.renames.find(item => item.from === "여가").taxCode, null);
-  assert.deepEqual(plan.links.map(item => `${item.name}:${item.taxCode}`), ["대중교통:transit", "보험:insurance", "부수입:salary"]);
-  assert.deepEqual(plan.deactivations.map(item => item.name), ["식비", "생활비", "대출상환"]);
-  assert.equal(plan.creates.length, 19);
+  assert.deepEqual(plan.links.map(item => `${item.name}:${item.taxCode}`), ["대중교통:transit", "보험:insurance"]);
+  assert.deepEqual(plan.deactivations.map(item => item.name), ["식비", "생활비", "대출상환", "부수입"]);
+  assert.equal(plan.creates.length, 21);
+  assert.ok(plan.creates.some(item => item.name === "학교 수당" && item.type === "수입" && item.taxCode === "salary"));
+  assert.ok(plan.creates.some(item => item.name === "외부 수당·원고료" && item.taxCode === "not-salary"));
   assert.ok(plan.creates.some(item => item.name === "도서" && item.taxCode === "culture"));
   assert.ok(plan.creates.some(item => item.name === "강의·자격증" && item.taxCode === ""));
   assert.ok(!plan.creates.some(item => item.name === "저축성 보험"));
@@ -245,8 +247,8 @@ test("restructure plan is safe to run twice and respects automation and manual c
     return {
       ...category,
       name: category.type === "지출" && rename ? rename : category.name,
-      active: !["식비", "생활비", "대출상환"].includes(category.name),
-      taxCode: { 의료: "medical", 공과금: "excluded", 교육비: "tuition", 대중교통: "transit", 보험: "insurance", 부수입: "salary" }[category.name] || ""
+      active: !["식비", "생활비", "대출상환", "부수입"].includes(category.name),
+      taxCode: { 의료: "medical", 공과금: "excluded", 교육비: "tuition", 대중교통: "transit", 보험: "insurance" }[category.name] || ""
     };
   });
   const created = planCategoryPreset(CURRENT).creates.map((item, index) => ({ categoryId: `N${index}`, type: item.type, name: item.name, taxCode: item.taxCode, active: true }));
@@ -260,4 +262,12 @@ test("restructure plan is safe to run twice and respects automation and manual c
   assert.ok(!guarded.deactivations.some(item => item.name === "식비"));
   assert.match(guarded.skipped.find(item => item.name === "식비").reason, /고정 거래/);
   assert.ok(!guarded.links.some(item => item.name === "보험"));
+});
+
+
+test("school allowance counts toward gross salary but outside manuscript fees do not", () => {
+  assert.equal(isSalaryCategory("학교 수당", "salary"), true);
+  assert.equal(isSalaryCategory("외부 수당·원고료", "not-salary"), false);
+  // 이름만으로 자동 판단할 때도 '수당'은 급여로 보지 않음(외부 수당이 섞일 수 있어서)
+  assert.equal(isSalaryCategory("외부 수당·원고료", ""), false);
 });

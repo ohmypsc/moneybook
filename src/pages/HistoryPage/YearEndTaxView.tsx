@@ -530,7 +530,10 @@ export function YearEndTaxView() {
             {showCategories && summary.incomeCategories.length > 0 && (
               <>
                 <h3 className={styles.categoryGroupTitle}>수입 · 급여로 볼 카테고리</h3>
-                <p className={styles.hint}>'자동'은 이름에 급여·월급·상여·보너스·성과급이 들어가면 급여로 봐요.</p>
+                <p className={styles.hint}>
+                  '자동'은 이름에 급여·월급·상여·보너스·성과급이 들어가면 급여로 봐요.
+                  소속 학교에서 받는 수당은 따로 입금돼도 보통 급여예요. 다른 기관 원고료·강사료처럼 8.8%나 3.3%를 떼고 받는 돈은 총급여가 아니에요.
+                </p>
                 <ul className={styles.categoryList}>
                   {summary.incomeCategories.map(category => (
                     <li key={category.categoryId}>
