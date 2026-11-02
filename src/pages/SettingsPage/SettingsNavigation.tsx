@@ -28,7 +28,7 @@ export function SettingsHome({
     {
       key: "accounts",
       title: "자산 관리",
-      description: "자산 추가·수정과 입력 화면 노출·순서"
+      description: "자산 추가·수정, 결제수단 노출과 입력 화면 순서"
     },
     {
       key: "automation",

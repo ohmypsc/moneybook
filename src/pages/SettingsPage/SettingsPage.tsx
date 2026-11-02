@@ -202,7 +202,7 @@ export default function SettingsPage({
                 "자산 관리",
 
             description:
-                "자산을 관리하고 입력 화면 노출과 순서를 정합니다."
+                "자산을 관리하고 결제수단 노출과 입력 화면 순서를 정합니다."
         },
 
         automation: {
