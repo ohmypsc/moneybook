@@ -109,3 +109,21 @@ export async function saveCategoryTaxCode(categoryId: string, taxCode: string) {
     "연말정산 분류를 저장하지 못했습니다."
   );
 }
+
+export interface TaxPresetPlan {
+  applied: boolean;
+  links: { categoryId: string; name: string; taxCode: string; note: string }[];
+  creates: { name: string; taxCode: string; note: string }[];
+  skipped: { name: string; reason: string }[];
+}
+
+/** 추천 카테고리 정리. apply=false면 미리보기만 합니다. */
+export async function runTaxCategoryPreset(apply: boolean) {
+  return unwrap(
+    await apiRequest<ApiEnvelope<TaxPresetPlan>>("/api/tax/preset", {
+      method: "POST",
+      body: JSON.stringify({ apply })
+    }),
+    apply ? "추천 정리를 적용하지 못했습니다." : "추천 정리안을 불러오지 못했습니다."
+  );
+}

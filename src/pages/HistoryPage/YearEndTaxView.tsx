@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 
 import {
   getTaxSummary,
+  runTaxCategoryPreset,
+  type TaxPresetPlan,
   saveCategoryTaxCode,
   saveTaxProfile,
   type TaxItemKey,
@@ -219,6 +221,9 @@ export function YearEndTaxView() {
   const [showCategories, setShowCategories] = useState(false);
   const [savingCategoryId, setSavingCategoryId] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
+  const [presetPlan, setPresetPlan] = useState<TaxPresetPlan | null>(null);
+  const [presetBusy, setPresetBusy] = useState(false);
+  const [presetMessage, setPresetMessage] = useState("");
 
   useEffect(() => subscribeLedgerChanges(() => setReloadKey(value => value + 1)), []);
 
@@ -240,6 +245,31 @@ export function YearEndTaxView() {
       active = false;
     };
   }, [year, reloadKey]);
+
+  async function handlePreset(apply: boolean) {
+    setPresetBusy(true);
+    setPresetMessage("");
+    setError("");
+    try {
+      const plan = await runTaxCategoryPreset(apply);
+      if (apply) {
+        setPresetPlan(null);
+        setPresetMessage(
+          `추천 정리를 적용했어요. 분류 연결 ${plan.links.length}개, 새 카테고리 ${plan.creates.length}개.`
+        );
+        setReloadKey(value => value + 1);
+      } else {
+        setPresetPlan(plan);
+      }
+    } catch (presetError) {
+      setError(presetError instanceof Error ? presetError.message : "추천 정리를 하지 못했습니다.");
+    } finally {
+      setPresetBusy(false);
+    }
+  }
+
+  const taxLabel = (code: string) =>
+    summary?.taxCodes.find(option => option.code === code)?.label || "일반";
 
   async function handleCategoryChange(categoryId: string, taxCode: string) {
     setSavingCategoryId(categoryId);
@@ -381,6 +411,83 @@ export function YearEndTaxView() {
               </span>
               <span aria-hidden="true">{showCategories ? "⌃" : "⌄"}</span>
             </button>
+            {showCategories && (
+              <div className={styles.presetBox}>
+                {!presetPlan ? (
+                  <>
+                    <p>
+                      우리 가계부에 맞춘 연말정산용 카테고리 정리안이 있어요. 기존 거래는 그대로 두고,
+                      분류 연결과 새 카테고리 추가만 해요.
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      loading={presetBusy}
+                      loadingLabel="불러오는 중"
+                      onClick={() => void handlePreset(false)}
+                    >
+                      추천 정리 미리보기
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    {presetPlan.links.length + presetPlan.creates.length === 0 ? (
+                      <p>이미 모두 정리돼 있어요.</p>
+                    ) : (
+                      <>
+                        {presetPlan.links.length > 0 && (
+                          <>
+                            <h4>분류 연결</h4>
+                            <ul>
+                              {presetPlan.links.map(item => (
+                                <li key={item.categoryId}>
+                                  <strong>{item.name}</strong> → {taxLabel(item.taxCode)}
+                                  <small>{item.note}</small>
+                                </li>
+                              ))}
+                            </ul>
+                          </>
+                        )}
+                        {presetPlan.creates.length > 0 && (
+                          <>
+                            <h4>새 카테고리</h4>
+                            <ul>
+                              {presetPlan.creates.map(item => (
+                                <li key={item.name}>
+                                  <strong>+ {item.name}</strong> → {taxLabel(item.taxCode)}
+                                  <small>{item.note}</small>
+                                </li>
+                              ))}
+                            </ul>
+                          </>
+                        )}
+                      </>
+                    )}
+                    {presetPlan.skipped.length > 0 && (
+                      <p className={styles.hint}>
+                        그대로 두는 것: {presetPlan.skipped.map(item => `${item.name}(${item.reason})`).join(", ")}
+                      </p>
+                    )}
+                    <div className={styles.presetActions}>
+                      <Button size="sm" variant="ghost" disabled={presetBusy} onClick={() => setPresetPlan(null)}>
+                        닫기
+                      </Button>
+                      {presetPlan.links.length + presetPlan.creates.length > 0 && (
+                        <Button
+                          size="sm"
+                          loading={presetBusy}
+                          loadingLabel="적용 중"
+                          onClick={() => void handlePreset(true)}
+                        >
+                          적용하기
+                        </Button>
+                      )}
+                    </div>
+                  </>
+                )}
+                {presetMessage && <p className={styles.estimateNotice}>{presetMessage}</p>}
+              </div>
+            )}
             {showCategories && summary.incomeCategories.length > 0 && (
               <>
                 <h3 className={styles.categoryGroupTitle}>수입 · 급여로 볼 카테고리</h3>
@@ -431,6 +538,7 @@ export function YearEndTaxView() {
             계산 기준: 총급여 25% 초과 사용분에 신용카드 15%, 체크카드·선불·지역화폐 30%, 전통시장·대중교통 40%,
             도서·공연·헬스장 등 30%(총급여 7천만 원 이하). 현금·계좌이체는 현금영수증 여부를 알 수 없어 넣지 않았어요.
             해외 사용, 신차 구입, 공과금·통신비 등은 '카드공제 제외'로 연결하세요.
+            대학원 등록금은 카드공제는 안 되고, 다니는 본인만 교육비 세액공제를 받을 수 있어요(회사 지원분 제외).
           </p>
         </>
       )}

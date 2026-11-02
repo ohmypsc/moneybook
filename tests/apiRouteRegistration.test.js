@@ -35,4 +35,5 @@ test("year-end tax APIs stay registered in the Worker router", () => {
   assert.match(routeBlock("getPaths"), /"\/api\/tax\/summary"/);
   assert.match(routeBlock("postPaths"), /"\/api\/tax\/profile"/);
   assert.match(routeBlock("postPaths"), /"\/api\/tax\/category"/);
+  assert.match(routeBlock("postPaths"), /"\/api\/tax\/preset"/);
 });

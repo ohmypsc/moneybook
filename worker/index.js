@@ -25,6 +25,7 @@ import {
   TAX_CODES,
   aggregateYearSpending,
   isSalaryCategory,
+  planCategoryPreset,
   summarizeSalaryIncome,
   buildRecommendations,
   computeCardDeduction,
@@ -6223,6 +6224,47 @@ async function mbD1HandleTaxCategory(body, session, env) {
   return { saved: true, categoryId, taxCode };
 }
 
+// 추천 카테고리 정리: apply=false면 바뀔 내용만 돌려주고, true면 적용합니다.
+async function mbD1HandleTaxPreset(body, session, env) {
+  const rows = await mbD1All(
+    env,
+    "SELECT category_id,name,type,default_tax_category_code,deleted_at FROM categories WHERE household_id=? AND type='지출'",
+    [MB_D1_HOUSEHOLD_ID]
+  );
+  const plan = planCategoryPreset(rows.map((row) => ({
+    categoryId: mbD1Text(row.category_id),
+    name: mbD1Text(row.name),
+    type: mbD1Text(row.type),
+    taxCode: isValidTaxCode(row.default_tax_category_code) ? mbD1Text(row.default_tax_category_code) : "",
+    deleted: Boolean(row.deleted_at)
+  })));
+
+  if (body.apply !== true) return { applied: false, ...plan };
+
+  const actor = session.name;
+  const now = mbD1Now();
+  const statements = [];
+  for (const item of plan.links) {
+    statements.push(
+      env.DB.prepare(
+        "UPDATE categories SET default_tax_category_code=?,updated_at=?,updated_by=? WHERE household_id=? AND category_id=? AND (default_tax_category_code IS NULL OR default_tax_category_code='')"
+      ).bind(item.taxCode, now, actor, MB_D1_HOUSEHOLD_ID, item.categoryId),
+      await mbD1InsertChange(env, "category", item.categoryId, "updated", null, session, { taxCode: item.taxCode })
+    );
+  }
+  for (const item of plan.creates) {
+    const id = mbD1Id("CAT");
+    statements.push(
+      env.DB.prepare(
+        "INSERT INTO categories (category_id,household_id,type,name,is_active,default_tax_category_code,created_at,updated_at,created_by,updated_by,deleted_at,deleted_by,source_row) VALUES (?,?,?,?,1,?,?,?,?,?,NULL,NULL,NULL)"
+      ).bind(id, MB_D1_HOUSEHOLD_ID, "지출", item.name, item.taxCode || null, now, now, actor, actor),
+      await mbD1InsertChange(env, "category", id, "created", 1, session, { type: "지출", name: item.name, taxCode: item.taxCode })
+    );
+  }
+  if (statements.length) await env.DB.batch(statements);
+  return { applied: true, ...plan };
+}
+
 // 할부 개월 수 칸(installment_months)이 없던 기존 DB에 한 번만 추가합니다.
 const mbD1InstallmentSchemaReadyFor = new WeakSet();
 
@@ -6301,7 +6343,8 @@ async function mbD1ProductionRoute(request, url, session, env, ctx) {
     "/api/push/unsubscribe",
     "/api/push/test",
     "/api/tax/profile",
-    "/api/tax/category"
+    "/api/tax/category",
+    "/api/tax/preset"
   ]);
   if (request.method === "GET" && !getPaths.has(path)) return null;
   if (request.method === "POST" && !postPaths.has(path)) return null;
@@ -6397,6 +6440,7 @@ async function mbD1ProductionRoute(request, url, session, env, ctx) {
     else if (path === "/api/real-estate/refresh") data = await mbD1RefreshRealEstate(body, session, env);
     else if (path === "/api/tax/profile") data = await mbD1HandleTaxProfile(body, session, env);
     else if (path === "/api/tax/category") data = await mbD1HandleTaxCategory(body, session, env);
+    else if (path === "/api/tax/preset") data = await mbD1HandleTaxPreset(body, session, env);
     else if (path === "/api/backup/preview") data = await mbD1PreviewBackupRestore(body.backup, env);
     else if (path === "/api/backup/restore") {
       if (body.confirm !== "RESTORE_MERGE") mbD1Fail("BACKUP_RESTORE_CONFIRM_REQUIRED", "복원 확인 문구가 올바르지 않습니다.", 400);

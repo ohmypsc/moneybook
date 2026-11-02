@@ -288,3 +288,42 @@
   color: var(--color-primary-text);
   font-size: 10px;
 }
+
+.presetBox {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.presetBox p {
+  margin: 0 0 8px;
+}
+
+.presetBox h4 {
+  margin: 8px 0 4px;
+  font-size: 12px;
+}
+
+.presetBox ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.presetBox li small {
+  display: block;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
+
+.presetActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 10px;
+}

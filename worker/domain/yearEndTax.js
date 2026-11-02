@@ -64,7 +64,7 @@ export const TAX_CODES = {
   culture: { label: "도서·공연·영화·헬스장·수영장 (30%)", cardBucket: "culture", item: null },
   medical: { label: "의료비", cardBucket: "general", item: "medical" },
   education: { label: "교육비 (학원 등)", cardBucket: "general", item: "education" },
-  tuition: { label: "학교 수업료·어린이집 (카드공제 제외)", cardBucket: "excluded", item: "education" },
+  tuition: { label: "학교·대학원 등록금·어린이집 (카드공제 제외)", cardBucket: "excluded", item: "education" },
   insurance: { label: "보장성 보험료", cardBucket: "excluded", item: "insurance" },
   donation: { label: "기부금", cardBucket: "excluded", item: "donation" },
   rent: { label: "월세", cardBucket: "excluded", item: "rent" }
@@ -437,4 +437,72 @@ export function summarizeSalaryIncome({ transactions, accounts, salaryCategoryId
     });
   }
   return summaries;
+}
+
+
+// ── 추천 카테고리 정리 ─────────────────────────────────────────
+// 이 가계부의 지출 카테고리에 맞춘 연말정산용 정리안입니다.
+// 기존 거래는 건드리지 않고, (1) 분류가 비어 있는 기존 카테고리에 분류를 연결하고
+// (2) 없는 카테고리를 새로 만듭니다.
+export const CATEGORY_PRESET = {
+  link: [
+    { name: "대중교통", taxCode: "transit", note: "버스·지하철·기차·고속버스 (택시 제외)" },
+    { name: "공과금", taxCode: "excluded", note: "전기·가스·수도·통신비·관리비" },
+    { name: "교육비", taxCode: "tuition", note: "대학원 등록금 — 본인 교육비 세액공제" },
+    { name: "의료", taxCode: "medical", note: "병원·약국·안경" },
+    { name: "보험", taxCode: "insurance", note: "실손·암보험 등 보장성" }
+  ],
+  create: [
+    { name: "기부금", taxCode: "donation", note: "경조사(축의·조의)와 구분" },
+    { name: "저축성 보험", taxCode: "excluded", note: "연금·저축보험 (보험료 공제 아님)" },
+    { name: "도서·공연·운동", taxCode: "culture", note: "책·공연·영화·헬스장·수영장" },
+    { name: "건강식품·영양제", taxCode: "", note: "의료비 공제가 안 되는 건강 관련 지출" },
+    { name: "전통시장", taxCode: "market", note: "전통시장 결제 (40%)" }
+  ]
+};
+
+/**
+ * 추천 정리안을 지금 카테고리에 맞춰 실제로 바꿀 목록으로 만듭니다.
+ * categories: [{ categoryId, name, type, taxCode, deleted }]
+ * 이미 다른 분류로 연결된 카테고리는 덮어쓰지 않습니다.
+ */
+export function planCategoryPreset(categories, preset = CATEGORY_PRESET) {
+  const expense = (categories || []).filter(category => category.type === "지출");
+  const active = expense.filter(category => !category.deleted);
+  const byName = new Map(active.map(category => [category.name, category]));
+  const deletedNames = new Set(expense.filter(category => category.deleted).map(category => category.name));
+
+  const links = [];
+  const creates = [];
+  const skipped = [];
+
+  for (const rule of preset.link) {
+    const category = byName.get(rule.name);
+    if (!category) {
+      skipped.push({ name: rule.name, reason: "카테고리가 없어요" });
+    } else if (category.taxCode === rule.taxCode) {
+      skipped.push({ name: rule.name, reason: "이미 연결돼 있어요" });
+    } else if (category.taxCode) {
+      skipped.push({ name: rule.name, reason: "다른 분류로 직접 연결해 둬서 그대로 둬요" });
+    } else {
+      links.push({ categoryId: category.categoryId, name: rule.name, taxCode: rule.taxCode, note: rule.note });
+    }
+  }
+
+  for (const rule of preset.create) {
+    const existing = byName.get(rule.name);
+    if (existing) {
+      if (!existing.taxCode && rule.taxCode) {
+        links.push({ categoryId: existing.categoryId, name: rule.name, taxCode: rule.taxCode, note: rule.note });
+      } else {
+        skipped.push({ name: rule.name, reason: "이미 있어요" });
+      }
+    } else if (deletedNames.has(rule.name)) {
+      skipped.push({ name: rule.name, reason: "삭제된 같은 이름 카테고리가 있어요 (설정에서 복원하세요)" });
+    } else {
+      creates.push({ name: rule.name, taxCode: rule.taxCode, note: rule.note });
+    }
+  }
+
+  return { links, creates, skipped };
 }

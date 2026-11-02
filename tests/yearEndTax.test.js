@@ -207,3 +207,29 @@ test("take-home salary is summed per receiving account owner and annualized mid-
   assert.equal(past.get("승철").annualized, false);
   assert.equal(past.get("승철").annualizedNet, 3_000_000);
 });
+
+import { planCategoryPreset } from "../worker/domain/yearEndTax.js";
+
+test("category preset links empty categories, creates missing ones and never overrides choices", () => {
+  const plan = planCategoryPreset([
+    { categoryId: "C1", name: "대중교통", type: "지출", taxCode: "" },
+    { categoryId: "C2", name: "의료", type: "지출", taxCode: "education" },
+    { categoryId: "C3", name: "교육비", type: "지출", taxCode: "tuition" },
+    { categoryId: "C4", name: "공과금", type: "지출", taxCode: "" },
+    { categoryId: "C5", name: "기부금", type: "지출", taxCode: "" },
+    { categoryId: "C6", name: "전통시장", type: "지출", taxCode: "", deleted: true },
+    { categoryId: "C7", name: "보험", type: "수입", taxCode: "" }
+  ]);
+
+  assert.deepEqual(plan.links.map(item => [item.name, item.taxCode]), [
+    ["대중교통", "transit"],
+    ["공과금", "excluded"],
+    ["기부금", "donation"]
+  ]);
+  assert.deepEqual(plan.creates.map(item => item.name), ["저축성 보험", "도서·공연·운동", "건강식품·영양제"]);
+  const reasons = Object.fromEntries(plan.skipped.map(item => [item.name, item.reason]));
+  assert.match(reasons["의료"], /직접 연결/);
+  assert.match(reasons["교육비"], /이미 연결/);
+  assert.match(reasons["보험"], /없어요/, "수입 카테고리는 대상이 아님");
+  assert.match(reasons["전통시장"], /삭제된/);
+});
