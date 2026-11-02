@@ -1342,9 +1342,7 @@ export function CategorySettings() {
                                                                                 </strong>
 
                                                                                 <span>
-                                                                                    {category.systemRole === "settlement_expense"
-                                                                                        ? "정산 기능용 · 사용 중"
-                                                                                        : category.active
+                                                                                    {category.active
                                                                                             ? "사용 중"
                                                                                             : "사용 중지"}
                                                                                 </span>

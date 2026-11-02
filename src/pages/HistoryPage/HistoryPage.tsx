@@ -128,7 +128,7 @@ function getTransactionMeta(transaction: Transaction) {
   }
 
   if (isSettlementTransaction(transaction)) {
-    return [transaction.toAccount, "회식비 정산 · 수입 합계 제외", transaction.createdBy]
+    return [transaction.toAccount, "정산받음 · 수입 합계 제외", transaction.createdBy]
       .filter(Boolean)
       .join(" · ");
   }

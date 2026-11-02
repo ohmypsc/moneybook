@@ -32,6 +32,12 @@ export interface CalendarTransaction {
 
   settlementEligible?: boolean;
 
+  /** 이 지출에 연결된 정산받은 금액 합계 */
+  settlementAmount?: number;
+
+  /** 이 지출에 연결된 취소·환불 금액 합계 */
+  refundAmount?: number;
+
   amount: number;
 
   fromAccountId:
