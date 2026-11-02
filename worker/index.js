@@ -1142,26 +1142,6 @@ async function prefetchDashboard(
   }
 }
 
-async function prepareBackend(
-  env,
-  origin
-) {
-  /*
-   * 앱 첫 진입에서는 홈 대시보드가 가장 먼저 필요합니다.
-   * 대시보드를 우선 준비한 뒤 입력용 bootstrap을 채워
-   * Apps Script 냉시작 요청이 서로 경쟁하지 않게 합니다.
-   */
-  await prefetchDashboard(
-    env,
-    origin
-  );
-
-  await prefetchBootstrap(
-    env,
-    origin
-  );
-}
-
 async function refreshAfterMutation(
   kind,
   data,
@@ -1485,18 +1465,7 @@ async function handleLogin(
       env
     );
 
-  if (
-    ctx &&
-    typeof ctx.waitUntil ===
-      "function"
-  ) {
-    ctx.waitUntil(
-      prepareBackend(
-        env,
-        origin
-      )
-    );
-  }
+  // D1 전환 이후에는 예전 Apps Script 백엔드를 미리 깨울 필요가 없습니다.
 
   return jsonResponse(
     {
@@ -1541,18 +1510,7 @@ async function handleSession(
       env
     );
 
-  if (
-    ctx &&
-    typeof ctx.waitUntil ===
-      "function"
-  ) {
-    ctx.waitUntil(
-      prepareBackend(
-        env,
-        origin
-      )
-    );
-  }
+  // D1 전환 이후에는 예전 Apps Script 백엔드를 미리 깨울 필요가 없습니다.
 
   return jsonResponse(
     {
@@ -3988,6 +3946,14 @@ function mbD1LooksLikeRequestIdUniqueConflict(error, tableName) {
     message.includes(`${tableName}.request_id`);
 }
 
+const MB_D1_CONCURRENCY_GUARD_TOKEN = "mb_concurrent_modification";
+
+// SQLite의 json()은 올바르지 않은 JSON을 받으면 오류를 내므로, batch 안에서 조건부로 트랜잭션을 중단하는 데 씁니다.
+function mbD1LooksLikeConcurrencyGuardFailure(error) {
+  const message = String(error?.message || error?.cause?.message || "");
+  return /malformed JSON/i.test(message);
+}
+
 async function mbD1HandleTransactionMutation(path, body, session, env) {
   const actor = session.name;
   if (path === "/api/transactions") {
@@ -4336,7 +4302,22 @@ async function mbD1HandleTransactionMutation(path, body, session, env) {
           matchingBenefitRule
         )
       : [];
-    await env.DB.batch([update, change, ...linkedBenefitStatements]);
+    // 위의 버전 확인과 실제 저장 사이에 다른 기기가 먼저 저장했다면 batch 전체를 취소합니다.
+    const concurrencyGuard = env.DB.prepare(
+      `SELECT CASE
+         WHEN (SELECT updated_at FROM transactions WHERE household_id=? AND transaction_id=? AND deleted_at IS NULL) IS ?
+         THEN 1
+         ELSE json('${MB_D1_CONCURRENCY_GUARD_TOKEN}')
+       END AS ok`
+    ).bind(MB_D1_HOUSEHOLD_ID, transactionId, current.updatedAt ?? null);
+    try {
+      await env.DB.batch([concurrencyGuard, update, change, ...linkedBenefitStatements]);
+    } catch (error) {
+      if (mbD1LooksLikeConcurrencyGuardFailure(error)) {
+        mbD1Fail("CONCURRENT_MODIFICATION", "거래가 다른 기기에서 먼저 수정되었습니다. 최신 내용을 다시 불러온 뒤 수정하세요.", 409);
+      }
+      throw error;
+    }
     return { updated: true, transaction: await mbD1TransactionById(env, transactionId, true) };
   }
 
@@ -5263,24 +5244,49 @@ async function mbD1FetchYahooChart(symbol) {
   }
 }
 
-async function mbD1FxRate(currency) {
-  const code = mbD1Text(currency).toUpperCase();
-  if (!code || code === "KRW") return 1;
-  const candidates = code === "USD" ? ["KRW=X", "USDKRW=X"] : [`${code}KRW=X`];
-  for (const symbol of candidates) {
-    const quote = await mbD1FetchYahooChart(symbol);
-    if (quote) return quote.price;
-  }
-  return null;
+// Cloudflare 무료 플랜은 Worker 호출 한 번당 외부 요청 수가 50개로 제한됩니다.
+// 시세 갱신은 그보다 넉넉히 적은 예산 안에서만 외부 요청을 보냅니다.
+const MB_D1_QUOTE_SUBREQUEST_BUDGET = 30;
+// 종목 코드 조회(lookupInvestmentSymbol)는 캐시가 없으면 최대 3번 외부 요청을 보냅니다.
+const MB_D1_QUOTE_LOOKUP_COST = 3;
+
+function mbD1CreateQuoteContext() {
+  return { remaining: MB_D1_QUOTE_SUBREQUEST_BUDGET, fx: new Map() };
 }
 
-async function mbD1QuoteForHolding(holding) {
+function mbD1SpendQuoteBudget(context, cost = 1) {
+  if (context.remaining < cost) return false;
+  context.remaining -= cost;
+  return true;
+}
+
+async function mbD1FxRate(currency, context) {
+  const code = mbD1Text(currency).toUpperCase();
+  if (!code || code === "KRW") return 1;
+  if (context.fx.has(code)) return context.fx.get(code);
+  const candidates = code === "USD" ? ["KRW=X", "USDKRW=X"] : [`${code}KRW=X`];
+  let rate = null;
+  for (const symbol of candidates) {
+    if (!mbD1SpendQuoteBudget(context)) return null;
+    const quote = await mbD1FetchYahooChart(symbol);
+    if (quote) {
+      rate = quote.price;
+      break;
+    }
+  }
+  context.fx.set(code, rate);
+  return rate;
+}
+
+async function mbD1QuoteForHolding(holding, context) {
   const code = mbD1Text(holding.stockCode).toUpperCase();
   const candidates = [];
-  try {
-    const lookup = await lookupInvestmentSymbol(code);
-    if (lookup?.found && lookup.symbol) candidates.push(lookup.symbol);
-  } catch {}
+  if (mbD1SpendQuoteBudget(context, MB_D1_QUOTE_LOOKUP_COST)) {
+    try {
+      const lookup = await lookupInvestmentSymbol(code);
+      if (lookup?.found && lookup.symbol) candidates.push(lookup.symbol);
+    } catch {}
+  }
   if (holding.market === "국내" && /^\d{6}$/.test(code)) {
     candidates.push(`${code}.KS`, `${code}.KQ`);
   } else {
@@ -5288,9 +5294,10 @@ async function mbD1QuoteForHolding(holding) {
   }
   const unique = Array.from(new Set(candidates.filter(Boolean)));
   for (const symbol of unique) {
+    if (!mbD1SpendQuoteBudget(context)) return null;
     const quote = await mbD1FetchYahooChart(symbol);
     if (!quote) continue;
-    const fx = holding.market === "국내" ? 1 : await mbD1FxRate(quote.currency || "USD");
+    const fx = holding.market === "국내" ? 1 : await mbD1FxRate(quote.currency || "USD", context);
     if (fx === null) continue;
     return { price: quote.price, fx };
   }
@@ -5303,9 +5310,26 @@ async function mbD1RefreshQuotes(env, force = false) {
   if (mbD1QuoteRefreshPromise) return mbD1QuoteRefreshPromise;
 
   mbD1QuoteRefreshPromise = (async () => {
-    const holdings = (await mbD1Holdings(env, false)).filter((holding) => holding.quoteMode === "자동");
+    // 갱신이 오래된 종목부터 처리해 외부 요청 예산이 모자라도 다음 호출에서 나머지가 갱신되게 합니다.
+    const holdings = (await mbD1Holdings(env, false))
+      .filter((holding) => holding.quoteMode === "자동")
+      .sort((a, b) => (a.updatedAtMs || 0) - (b.updatedAtMs || 0));
+    if (!holdings.length) {
+      mbD1LastQuoteRefreshAt = Date.now();
+      return;
+    }
+
+    // Worker 인스턴스가 바뀌어도 5분 간격이 지켜지도록 DB에 저장된 갱신 시각도 확인합니다.
+    const oldestUpdatedAtMs = holdings[0].updatedAtMs || 0;
+    if (!force && Date.now() - oldestUpdatedAtMs < MB_D1_QUOTE_REFRESH_MS) {
+      mbD1LastQuoteRefreshAt = Date.now();
+      return;
+    }
+
+    const context = mbD1CreateQuoteContext();
     for (const holding of holdings) {
-      const quote = await mbD1QuoteForHolding(holding);
+      if (context.remaining <= 0) break;
+      const quote = await mbD1QuoteForHolding(holding, context);
       if (!quote) continue;
       const valueKrw = mbD1Round(holding.quantity * quote.price * quote.fx, 2);
       const returnRate = holding.bookCostKrw > 0 ? (valueKrw - holding.bookCostKrw) / holding.bookCostKrw : null;
@@ -6318,14 +6342,11 @@ export default {
         url.pathname ===
           "/api/health"
       ) {
-        return jsonResponse(
-          await appsScriptGet(
-            env,
-            "health",
-            {},
-            false
-          )
-        );
+        return jsonResponse({
+          success: true,
+          backend: "d1",
+          database: Boolean(env.DB)
+        });
       }
 
       if (

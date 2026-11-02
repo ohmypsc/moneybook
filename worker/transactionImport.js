@@ -8,7 +8,7 @@ const FAST_IMAGE_MODEL = "@cf/moondream/moondream3.1-9B-A2B";
 const FALLBACK_MODEL = "@cf/google/gemma-4-26b-a4b-it";
 const MAX_AI_CONCURRENCY = 4;
 const MAX_TEXT_LENGTH = 20000;
-const MAX_IMAGES = 8;
+const MAX_IMAGES = 4; // 화면(TransactionImportSheet)과 README의 최대 4장과 맞춥니다.
 const MAX_IMAGE_DATA_URL_LENGTH = 4_500_000;
 
 function getOutputText(response) {

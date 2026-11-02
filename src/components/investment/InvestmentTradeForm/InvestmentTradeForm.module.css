@@ -224,7 +224,7 @@
     var(--color-text-primary);
 
   font: inherit;
-  font-size: 15px;
+  font-size: 16px /* iOS는 16px 미만 입력칸에 포커스하면 화면을 확대합니다 */;
 
   outline: none;
 }

@@ -33,7 +33,10 @@ interface StartRealtimeSyncOptions {
 }
 
 const LAST_SEQ_KEY = "moneybook:realtime:last-seq:v1";
-const ACTIVE_POLL_MS = 2000;
+// WebSocket이 끊긴 동안에는 짧은 간격으로 시작해 점점 간격을 늘려 확인합니다.
+// (고정 2초 간격은 기기 한 대당 시간당 1,800번 요청이 되어 무료 플랜 한도를 빠르게 씁니다.)
+const FALLBACK_POLL_MIN_MS = 3000;
+const FALLBACK_POLL_MAX_MS = 20000;
 const SOCKET_POLL_MS = 30000;
 const SOCKET_RETRY_MS = 60000;
 
@@ -122,6 +125,7 @@ export function startRealtimeSync({
   let pollTimer: number | null = null;
   let socketRetryTimer: number | null = null;
   let socket: WebSocket | null = null;
+  let fallbackPollMs = FALLBACK_POLL_MIN_MS;
 
   function clearPollTimer() {
     if (pollTimer !== null) {
@@ -215,8 +219,18 @@ export function startRealtimeSync({
     const socketOpen =
       socket?.readyState === WebSocket.OPEN;
 
-    const nextDelay =
-      delay ?? (socketOpen ? SOCKET_POLL_MS : ACTIVE_POLL_MS);
+    let nextDelay = delay;
+    if (nextDelay === undefined) {
+      if (socketOpen) {
+        nextDelay = SOCKET_POLL_MS;
+      } else {
+        nextDelay = fallbackPollMs;
+        fallbackPollMs = Math.min(
+          FALLBACK_POLL_MAX_MS,
+          fallbackPollMs * 2
+        );
+      }
+    }
 
     pollTimer = window.setTimeout(async () => {
       if (stopped) return;
@@ -259,6 +273,7 @@ export function startRealtimeSync({
     }
 
     socket.addEventListener("open", () => {
+      fallbackPollMs = FALLBACK_POLL_MIN_MS;
       void pullChanges();
       schedulePoll(SOCKET_POLL_MS);
     });
@@ -283,6 +298,7 @@ export function startRealtimeSync({
 
   function refreshNow() {
     if (stopped || document.visibilityState !== "visible") return;
+    fallbackPollMs = FALLBACK_POLL_MIN_MS;
     void pullChanges();
     connectSocket();
     schedulePoll();

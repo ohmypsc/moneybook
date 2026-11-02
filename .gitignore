@@ -1,0 +1,22 @@
+# 의존성 / 빌드 결과물
+node_modules/
+dist/
+.wrangler/
+
+# prebuild(scripts/generate-pwa-icons.mjs)가 빌드할 때마다 생성하는 아이콘
+public/apple-touch-icon.png
+public/icon-192.png
+public/icon-512.png
+public/maskable-512.png
+
+# 로컬 비밀값 / 환경
+.dev.vars
+.env
+.env.*
+
+# D1 내보내기 파일 (데이터가 들어 있을 수 있음)
+schema-before-stability.sql
+
+# OS / 편집기
+.DS_Store
+*.log
