@@ -1,5 +1,5 @@
 const CACHE_VERSION =
-  "v8.4.3-benefits-in-asset-form";
+  "v8.5.0-partner-push";
 
 const STATIC_CACHE =
   `moneybook-static-${CACHE_VERSION}`;
@@ -568,5 +568,76 @@ self.addEventListener(
         )()
       );
     }
+  }
+);
+
+/*
+ * 배우자 입력 알림(Web Push)
+ *
+ * 서버가 암호화해서 보낸 알림을 받아 휴대폰 알림으로 보여주고,
+ * 알림을 누르면 가계부 내역 화면을 엽니다.
+ */
+self.addEventListener(
+  "push",
+  event => {
+    let data = {};
+
+    try {
+      data = event.data ? event.data.json() : {};
+    } catch {
+      data = { body: event.data ? event.data.text() : "" };
+    }
+
+    const title = data.title || "우리 가계부";
+
+    event.waitUntil(
+      self.registration.showNotification(
+        title,
+        {
+          body: data.body || "",
+          icon: "/icon-192.png",
+          badge: "/icon-192.png",
+          tag: data.tag || "moneybook",
+          data: {
+            url: data.url || "/?shortcut=history"
+          }
+        }
+      )
+    );
+  }
+);
+
+self.addEventListener(
+  "notificationclick",
+  event => {
+    event.notification.close();
+
+    const targetUrl = new URL(
+      event.notification.data?.url || "/?shortcut=history",
+      self.location.origin
+    ).href;
+
+    event.waitUntil(
+      (async () => {
+        const windows = await self.clients.matchAll({
+          type: "window",
+          includeUncontrolled: true
+        });
+
+        for (const client of windows) {
+          if (new URL(client.url).origin === self.location.origin) {
+            await client.focus();
+
+            if ("navigate" in client) {
+              await client.navigate(targetUrl).catch(() => undefined);
+            }
+
+            return;
+          }
+        }
+
+        await self.clients.openWindow(targetUrl);
+      })()
+    );
   }
 );

@@ -11,6 +11,15 @@ import {
 } from "./auth.js";
 
 import {
+  PushError,
+  deletePushSubscription,
+  getPushConfig,
+  notifyPartnersOfTransaction,
+  savePushSubscription,
+  sendTestPush
+} from "./push.js";
+
+import {
   dateOnly as mbD1DateOnly,
   estimateBillingMonth as mbD1EstimateBilling,
   monthOnly as mbD1MonthOnly,
@@ -5998,7 +6007,8 @@ async function mbD1ProductionRoute(request, url, session, env, ctx) {
     "/api/investments/cash",
     "/api/real-estate",
     "/api/real-estate/regions",
-    "/api/backup/export"
+    "/api/backup/export",
+    "/api/push/config"
   ]);
   const postPaths = new Set([
     "/api/transactions",
@@ -6033,7 +6043,10 @@ async function mbD1ProductionRoute(request, url, session, env, ctx) {
     "/api/real-estate/delete",
     "/api/real-estate/refresh",
     "/api/backup/preview",
-    "/api/backup/restore"
+    "/api/backup/restore",
+    "/api/push/subscribe",
+    "/api/push/unsubscribe",
+    "/api/push/test"
   ]);
   if (request.method === "GET" && !getPaths.has(path)) return null;
   if (request.method === "POST" && !postPaths.has(path)) return null;
@@ -6089,11 +6102,24 @@ async function mbD1ProductionRoute(request, url, session, env, ctx) {
         return mbD1Envelope({ items });
       }
       if (path === "/api/backup/export") return mbD1Envelope(await mbD1BuildBackupDocument(env));
+      if (path === "/api/push/config") return mbD1Envelope(await getPushConfig(env, MB_D1_HOUSEHOLD_ID, session));
     }
     if (!isSameOrigin(request)) return errorResponse("INVALID_ORIGIN", "허용되지 않은 요청입니다.", 403);
     const allowEmpty = path === "/api/settings/ledger-start-date/clear";
     const body = await readJsonObject(request, { allowEmptyBody: allowEmpty });
     if (!body) return errorResponse("INVALID_JSON", "요청 형식이 올바르지 않습니다.", 400);
+
+    // 알림 구독은 가계부 데이터를 바꾸지 않으므로 실시간 동기화 신호 없이 바로 응답합니다.
+    if (path === "/api/push/subscribe") {
+      return mbD1Envelope(await savePushSubscription(env, MB_D1_HOUSEHOLD_ID, session, body, request.headers.get("User-Agent")));
+    }
+    if (path === "/api/push/unsubscribe") {
+      return mbD1Envelope(await deletePushSubscription(env, MB_D1_HOUSEHOLD_ID, session, body));
+    }
+    if (path === "/api/push/test") {
+      return mbD1Envelope(await sendTestPush(env, MB_D1_HOUSEHOLD_ID, session, url.origin));
+    }
+
     let data;
     if (path.startsWith("/api/transactions")) data = await mbD1HandleTransactionMutation(path, body, session, env);
     else if (path.startsWith("/api/categories")) data = await mbD1HandleCategoryMutation(path, body, session, env);
@@ -6120,10 +6146,20 @@ async function mbD1ProductionRoute(request, url, session, env, ctx) {
     else return null;
     if (ctx?.waitUntil) {
       ctx.waitUntil(mbD1RealtimePoke(env, { path, changedBy: session?.name || null }));
+      // 새 거래가 실제로 만들어졌을 때만(중복 재전송 제외) 배우자 기기에 알림을 보냅니다.
+      if (path === "/api/transactions" && data?.created && !data?.duplicate && session?.name) {
+        ctx.waitUntil(
+          notifyPartnersOfTransaction(env, MB_D1_HOUSEHOLD_ID, session.name, data.transaction, url.origin)
+            .catch((error) => console.warn("[moneybook push] notify failed", error))
+        );
+      }
     }
     return mbD1Envelope(data);
   } catch (error) {
     if (error instanceof MbD1Error) {
+      return errorResponse(error.code, error.message, error.status || 400);
+    }
+    if (error instanceof PushError) {
       return errorResponse(error.code, error.message, error.status || 400);
     }
     if (error instanceof BackupValidationError) {

@@ -223,10 +223,10 @@ export default function SettingsPage({
 
         profile: {
             title:
-                "내 계정·앱 정보",
+                "알림·내 계정",
 
             description:
-                "현재 로그인 정보와 앱의 저장 방식을 확인합니다."
+                "배우자 입력 알림을 켜고, 로그인 정보를 확인합니다."
         }
     } as const;
 

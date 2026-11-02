@@ -82,8 +82,8 @@ export function SettingsHome({
             onClick={() => onOpen("profile")}
           >
             <span className={styles.menuText}>
-              <strong>내 계정·앱 정보</strong>
-              <span>현재 사용자, 데이터 저장 방식, 로그아웃</span>
+              <strong>알림·내 계정</strong>
+              <span>배우자 입력 알림, 현재 사용자, 로그아웃</span>
             </span>
 
             <span className={styles.chevron} aria-hidden="true">

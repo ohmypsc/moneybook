@@ -7,6 +7,8 @@ import { clearInvestmentPrefetchCache } from "../../api/investments";
 import { clearManagedSettingsCache } from "../../api/settingsManagement";
 import { confirmAction } from "../../utils/confirmAction";
 import PwaInstallPrompt from "../../components/pwa/PwaInstallPrompt/PwaInstallPrompt";
+import { disablePushOnThisDevice } from "../../utils/pushNotifications";
+import { PartnerPushSettings } from "./PartnerPushSettings";
 import { Button } from "../../components/common/Button/Button";
 import { Card } from "../../components/common/Card/Card";
 import styles from "./SettingsPage.module.css";
@@ -93,6 +95,13 @@ export function ProfileSettings() {
         setLoggingOut(
             true
         );
+
+        // 로그아웃한 휴대폰으로 계속 알림이 가지 않도록 이 기기의 알림 구독을 먼저 해지합니다.
+        try {
+            await disablePushOnThisDevice();
+        } catch {
+            /* 알림 해지에 실패해도 로그아웃은 계속합니다. */
+        }
 
         try {
             await logout();
@@ -220,6 +229,8 @@ export function ProfileSettings() {
                     </div>
                 </dl>
             </Card>
+
+            <PartnerPushSettings userName={userName} />
 
             <PwaInstallPrompt />
 

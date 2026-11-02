@@ -1544,3 +1544,17 @@ summary::after {
     grid-template-columns: 1fr;
   }
 }
+
+/* 배우자 입력 알림 */
+.pushStatus {
+  margin: 12px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+.pushStatus strong { color: var(--color-text); }
+.pushActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}

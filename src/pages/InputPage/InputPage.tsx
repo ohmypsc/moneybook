@@ -17,7 +17,7 @@ import {
   getBootstrapCacheGeneration,
   getCachedBootstrapPayload
 } from "../../api/bootstrapCache";
-import { createTransaction } from "../../api/transactions";
+import { createTransaction, getTransactions } from "../../api/transactions";
 import { getDashboard, getDashboardSnapshot } from "../../api/dashboard";
 import { Button } from "../../components/common/Button/Button";
 import { PendingTransactionPanel } from "./PendingTransactionPanel";
@@ -2590,69 +2590,74 @@ export default function InputPage({
       return;
     }
 
-    const recentTransactions =
-      getDashboardSnapshot()
-        ?.recentTransactions ||
-      [];
-
     const numericAmount =
       Number(
         amount
       );
 
-    const possibleDuplicate =
-      recentTransactions.find(
-        transaction => {
-          if (
-            transaction.date !==
-              date ||
-            transaction.type !==
-              backendType ||
-            Math.abs(
-              Number(transaction.amount) -
-              numericAmount
-            ) >
-              0.000001
-          ) {
-            return false;
-          }
+    const isSameTransaction = (transaction: {
+      date: string;
+      type: string;
+      amount: number | string;
+      paymentMethodId?: string | null;
+      fromAccountId?: string | null;
+      toAccountId?: string | null;
+    }) => {
+      if (
+        transaction.date !== date ||
+        transaction.type !== backendType ||
+        Math.abs(Number(transaction.amount) - numericAmount) > 0.000001
+      ) {
+        return false;
+      }
 
-          if (
-            mode ===
-            "expense"
-          ) {
-            return (
-              !paymentMethodId ||
-              transaction.paymentMethodId ===
-                paymentMethodId
-            );
-          }
+      if (mode === "expense") {
+        return !paymentMethodId || transaction.paymentMethodId === paymentMethodId;
+      }
 
-          if (
-            mode ===
-            "income"
-          ) {
-            return (
-              !toAccountId ||
-              transaction.toAccountId ===
-                toAccountId
-            );
-          }
+      if (mode === "income") {
+        return !toAccountId || transaction.toAccountId === toAccountId;
+      }
 
-          return (
-            transaction.fromAccountId ===
-              fromAccountId &&
-            transaction.toAccountId ===
-              toAccountId
-          );
-        }
+      return (
+        transaction.fromAccountId === fromAccountId &&
+        transaction.toAccountId === toAccountId
       );
+    };
+
+    // 배우자가 다른 기기에서 방금 입력한 거래까지 잡도록 서버에서 같은 날짜·금액 거래를 확인합니다.
+    // 오프라인이거나 응답이 늦으면 기기에 남은 최근 거래 목록으로 대신 확인합니다.
+    let possibleDuplicate:
+      | { description?: string; createdBy?: string | null }
+      | undefined;
+
+    try {
+      const response = await getTransactions({
+        dateFrom: date,
+        dateTo: date,
+        type: backendType,
+        amount: numericAmount,
+        limit: 20,
+        timeoutMs: 3000
+      });
+      possibleDuplicate = (response.data?.items || []).find(
+        transaction => !transaction.isDeleted && isSameTransaction(transaction)
+      );
+    } catch {
+      possibleDuplicate = (getDashboardSnapshot()?.recentTransactions || []).find(
+        isSameTransaction
+      );
+    }
 
     if (
       possibleDuplicate &&
       !(await confirmAction({
         title: "중복 거래 확인",
-        message: `같은 날짜에 ${formatMoney(numericAmount)} ${backendType} 내역이 이미 있습니다.\n\n중복이 아니라면 그대로 저장하세요.`,
+        message: `같은 날짜에 ${formatMoney(numericAmount)} ${backendType} 내역이 이미 있습니다.${
+          possibleDuplicate.description || possibleDuplicate.createdBy
+            ? `\n(${[possibleDuplicate.description, possibleDuplicate.createdBy ? `${possibleDuplicate.createdBy}님 입력` : ""].filter(Boolean).join(" · ")})`
+            : ""
+        }\n\n중복이 아니라면 그대로 저장하세요.`,
         confirmLabel: "그래도 저장"
       }))
     ) {
@@ -2797,7 +2802,16 @@ export default function InputPage({
       setAmount("");
       setCategoryId("");
 
-      resetAccountSelections();
+      // 같은 카드로 여러 건을 연달아 입력하는 경우가 많아 지출의 결제수단·지출대상은 그대로 둡니다.
+      if (mode === "expense") {
+        setFromAccountId("");
+        setToAccountId("");
+        setBenefitRewardUsedAmount("");
+        setLoanPrincipalAmount("");
+        setLoanInterestAmount("");
+      } else {
+        resetAccountSelections();
+      }
 
       setBillingMonth(
         date.slice(
