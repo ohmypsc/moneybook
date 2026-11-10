@@ -13,7 +13,6 @@ import type {
 import type {
   InvestmentTrade,
   InvestmentTradesResponse,
-  InvestmentSymbolLookupResult,
   InvestmentSymbolSearchResponse,
   SetInvestmentCashBaselinePayload,
   CreateInvestmentTradePayload
@@ -423,29 +422,6 @@ export async function getInvestmentTrades(
 
   return requestInvestmentTrades(
     params
-  );
-}
-
-
-/*
- * =========================================================
- * 종목코드 → 종목명 자동 조회
- * =========================================================
- */
-
-export async function lookupInvestmentSymbol(
-  stockCode: string
-) {
-  const raw =
-    await apiRequest<
-      | ApiEnvelope<InvestmentSymbolLookupResult>
-      | InvestmentSymbolLookupResult
-    >(
-      `/api/investments/symbol-lookup?code=${encodeURIComponent(stockCode)}`
-    );
-
-  return unwrapEnvelope<InvestmentSymbolLookupResult>(
-    raw
   );
 }
 

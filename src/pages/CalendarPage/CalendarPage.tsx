@@ -7,19 +7,13 @@ import {
 
 
 import {
-    apiRequest
-} from "../../api/client";
-
-import {
     getBootstrap
 } from "../../api/bootstrap";
 
 import {
     getCalendarMonthSnapshot,
-    getDeletedCalendarMonthSnapshot,
     invalidateCalendarCache,
-    loadCalendarMonth,
-    loadDeletedCalendarMonth
+    loadCalendarMonth
 } from "../../api/calendarCache";
 
 import {
@@ -100,12 +94,6 @@ interface Account {
     subType: string;
     owner?: string;
     paymentAccountId?: string | null;
-}
-
-interface Category {
-    categoryId: string;
-    type: LedgerTransactionType;
-    name: string;
 }
 
 interface EditForm {
@@ -665,54 +653,6 @@ function getErrorMessage(
     return "요청을 처리하지 못했습니다.";
 }
 
-function formatDeletedAt(
-    value:
-        string |
-        null |
-        undefined
-) {
-    if (!value) {
-        return "삭제 시각 미확인";
-    }
-
-    const normalized =
-        /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/
-            .test(
-                value
-            )
-            ? value.replace(
-                  " ",
-                  "T"
-              )
-            : value;
-
-    const date =
-        new Date(
-            normalized
-        );
-
-    if (
-        Number.isNaN(
-            date.getTime()
-        )
-    ) {
-        return value;
-    }
-
-    return new Intl.DateTimeFormat(
-        "ko-KR",
-        {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit"
-        }
-    ).format(
-        date
-    );
-}
-
 type CalendarPageProps = {
     onAddTransaction?: (date: string) => void;
     openTransaction?: {
@@ -762,37 +702,6 @@ export default function CalendarPage({
         useState<
             CalendarTransaction[]
         >([]);
-
-    const [
-        deletedMonthTransactions,
-        setDeletedMonthTransactions
-    ] =
-        useState<
-            CalendarTransaction[]
-        >([]);
-
-    const [
-        deletedLoaded,
-        setDeletedLoaded
-    ] =
-        useState(false);
-
-    const [
-        deletedLoading,
-        setDeletedLoading
-    ] =
-        useState(false);
-
-    const [
-        deletedError,
-        setDeletedError
-    ] =
-        useState("");
-
-    const [
-        trashOpen,
-        setTrashOpen
-    ] = useState(false);
 
     const [
         loading,
@@ -858,14 +767,6 @@ export default function CalendarPage({
     const [
         deletingId,
         setDeletingId
-    ] =
-        useState<
-            string | null
-        >(null);
-
-    const [
-        restoringId,
-        setRestoringId
     ] =
         useState<
             string | null
@@ -943,26 +844,6 @@ export default function CalendarPage({
     ] =
         useState(false);
 
-    useEffect(() => {
-        if (!trashOpen) return;
-
-        const previousOverflow = document.body.style.overflow;
-        document.body.style.overflow = "hidden";
-
-        const handleKeyDown = (event: KeyboardEvent) => {
-            if (event.key === "Escape") {
-                setTrashOpen(false);
-            }
-        };
-
-        window.addEventListener("keydown", handleKeyDown);
-
-        return () => {
-            document.body.style.overflow = previousOverflow;
-            window.removeEventListener("keydown", handleKeyDown);
-        };
-    }, [trashOpen]);
-
     useEffect(
         () => {
             let cancelled =
@@ -970,11 +851,6 @@ export default function CalendarPage({
 
             const cached =
                 getCalendarMonthSnapshot(
-                    month
-                );
-
-            const cachedDeleted =
-                getDeletedCalendarMonthSnapshot(
                     month
                 );
 
@@ -988,19 +864,6 @@ export default function CalendarPage({
                 setTransactions([]);
                 setLoading(true);
             }
-
-            setDeletedMonthTransactions(
-                cachedDeleted ||
-                []
-            );
-
-            setDeletedLoaded(
-                cachedDeleted !==
-                null
-            );
-
-            setDeletedLoading(false);
-            setDeletedError("");
             setError("");
 
             async function loadMonth() {
@@ -1113,9 +976,6 @@ export default function CalendarPage({
         () => {
             return subscribeLedgerChanges(
                 () => {
-                    setDeletedMonthTransactions([]);
-                    setDeletedLoaded(false);
-                    setDeletedError("");
                     setReloadKey(
                         value =>
                             value + 1
@@ -1263,168 +1123,6 @@ export default function CalendarPage({
             ]
         );
 
-    const deletedTransactions =
-        useMemo(
-            () =>
-                deletedMonthTransactions
-                    .filter(
-                        transaction =>
-                            transaction.isDeleted &&
-                            (
-                                filter ===
-                                    "전체" ||
-                                transaction.type ===
-                                    filter
-                            )
-                    )
-                    .sort(
-                        (
-                            left,
-                            right
-                        ) => {
-                            const dateOrder =
-                                right.date.localeCompare(
-                                    left.date
-                                );
-
-                            if (
-                                dateOrder !==
-                                0
-                            ) {
-                                return dateOrder;
-                            }
-
-                            return String(
-                                right.deletedAt ||
-                                ""
-                            ).localeCompare(
-                                String(
-                                    left.deletedAt ||
-                                    ""
-                                )
-                            );
-                        }
-                    ),
-            [
-                deletedMonthTransactions,
-                filter
-            ]
-        );
-
-    const categoryNameById =
-        useMemo(
-            () => {
-                const map =
-                    new Map<
-                        string,
-                        string
-                    >();
-
-                bootstrap
-                    ?.categories
-                    .forEach(
-                        category => {
-                            map.set(
-                                category.categoryId,
-                                category.name
-                            );
-                        }
-                    );
-
-                [
-                    ...transactions,
-                    ...deletedMonthTransactions
-                ].forEach(
-                    transaction => {
-                        if (
-                            transaction.categoryId &&
-                            transaction.category
-                        ) {
-                            map.set(
-                                transaction.categoryId,
-                                transaction.category
-                            );
-                        }
-                    }
-                );
-
-                return map;
-            },
-            [
-                bootstrap,
-                transactions,
-                deletedMonthTransactions
-            ]
-        );
-
-    const accountNameById =
-        useMemo(
-            () => {
-                const map =
-                    new Map<
-                        string,
-                        string
-                    >();
-
-                bootstrap
-                    ?.accounts
-                    .forEach(
-                        account => {
-                            map.set(
-                                account.accountId,
-                                getAccountLabel(
-                                    account
-                                )
-                            );
-                        }
-                    );
-
-                [
-                    ...transactions,
-                    ...deletedMonthTransactions
-                ].forEach(
-                    transaction => {
-                        if (
-                            transaction.fromAccountId &&
-                            transaction.fromAccount
-                        ) {
-                            map.set(
-                                transaction.fromAccountId,
-                                transaction.fromAccount
-                            );
-                        }
-
-                        if (
-                            transaction.toAccountId &&
-                            transaction.toAccount
-                        ) {
-                            map.set(
-                                transaction.toAccountId,
-                                transaction.toAccount
-                            );
-                        }
-
-                        if (
-                            transaction.paymentMethodId &&
-                            transaction.paymentMethod
-                        ) {
-                            map.set(
-                                transaction.paymentMethodId,
-                                transaction.paymentMethod
-                            );
-                        }
-                    }
-                );
-
-                return map;
-            },
-            [
-                bootstrap,
-                transactions,
-                deletedMonthTransactions
-            ]
-        );
-
     const transactionsByDate =
         useMemo(
             () => {
@@ -1494,6 +1192,8 @@ export default function CalendarPage({
                 Boolean(transaction.settlementEligible) &&
                 !transaction.reversalOf &&
                 (
+                    // 예전 버전이 기기에 저장해 둔 달에는 이 값이 없으므로, 모르면 불러옵니다.
+                    transaction.settlementAmount === undefined ||
                     Number(transaction.settlementAmount) > 0 ||
                     Number(transaction.refundAmount) > 0
                 )
@@ -1548,54 +1248,10 @@ export default function CalendarPage({
             "이체"
         );
 
-    async function openTrash() {
-        setTrashOpen(true);
-
-        if (
-            deletedLoaded ||
-            deletedLoading
-        ) {
-            return;
-        }
-
-        setDeletedLoading(true);
-        setDeletedError("");
-
-        try {
-            const items =
-                await loadDeletedCalendarMonth(
-                    month
-                );
-
-            setDeletedMonthTransactions(
-                items
-            );
-
-            setDeletedLoaded(true);
-        } catch (
-            loadError
-        ) {
-            setDeletedError(
-                loadError instanceof Error
-                    ? loadError.message
-                    : "삭제 거래를 불러오지 못했습니다."
-            );
-        } finally {
-            setDeletedLoading(false);
-        }
-    }
-
     function refreshMonth() {
         invalidateCalendarCache(
             month
         );
-
-        setDeletedMonthTransactions(
-            []
-        );
-
-        setDeletedLoaded(false);
-        setDeletedError("");
 
         setReloadKey(
             value =>
@@ -2600,82 +2256,6 @@ export default function CalendarPage({
             );
         } finally {
             setUndoBusy(false);
-        }
-    }
-
-    async function handleRestoreDeleted(
-        transaction:
-            CalendarTransaction
-    ) {
-        if (restoringId) {
-            return;
-        }
-
-        const confirmed =
-            await confirmAction({
-                title:
-                    "거래 복원",
-                message:
-                    `${transaction.category || transaction.type} ${formatCurrency(
-                        transaction.amount
-                    )} 거래를 복원할까요?`,
-                confirmLabel:
-                    "복원"
-            });
-
-        if (!confirmed) {
-            return;
-        }
-
-        const targetId =
-            transaction
-                .transactionId;
-
-        setRestoringId(
-            targetId
-        );
-
-        setActionError("");
-        setActionFeedback("");
-
-        try {
-            await restoreTransaction(
-                targetId
-            );
-
-            if (
-                undoTransactionId ===
-                targetId
-            ) {
-                setUndoTransactionId(
-                    null
-                );
-
-                setUndoLabel("");
-            }
-
-            setActionFeedback(
-                "삭제된 거래를 복원했습니다."
-            );
-
-            invalidateCalendarCache(
-                month
-            );
-
-            setReloadKey(
-                value =>
-                    value + 1
-            );
-        } catch (
-            restoreError
-        ) {
-            setActionError(
-                getErrorMessage(
-                    restoreError
-                )
-            );
-        } finally {
-            setRestoringId(null);
         }
     }
 

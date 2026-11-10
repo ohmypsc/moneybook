@@ -10,8 +10,7 @@ import type {
 
 import {
   getSession,
-  login,
-  logout
+  login
 } from "./api/auth";
 
 import {
@@ -1234,7 +1233,6 @@ export default function App() {
   }
 
 
-
   function resetToGuest(
     message = ""
   ) {
@@ -1251,16 +1249,6 @@ export default function App() {
     setLoginError(message);
 
     window.history.replaceState({}, "");
-  }
-
-
-  async function handleLogout() {
-    try {
-      await logout();
-
-    } finally {
-      resetToGuest();
-    }
   }
 
 
