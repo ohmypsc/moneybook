@@ -27,8 +27,14 @@ src/
 worker/
   index.js              Worker 라우팅 및 D1 도메인 처리
   auth.js               로그인/세션
+  push.js               배우자 입력 알림(Web Push) 저장·발송
+  realEstate.js         아파트 실거래 시세
+  transactionImport.js  캡처·문자 거래 내역 분석(Workers AI)
   investmentSymbols.js  투자 종목 검색
-  domain/               테스트 가능한 Worker 순수 로직(날짜·자동화·검색조건 등)
+  domain/               테스트 가능한 Worker 순수 로직(날짜·자동화·할부·연말정산·푸시 암호화 등)
+migrations/
+  0000_schema.sql       운영 D1 테이블 구조(새 DB를 만들 때 사용)
+scripts/                PWA 아이콘 생성, 소스 경계 검사, 비밀번호 해시 도구
 tests/                  Node 기본 테스트 러너 기반 테스트
 ```
 
@@ -48,10 +54,25 @@ tests/                  Node 기본 테스트 러너 기반 테스트
 
 - `LOGIN_USERS`: 로그인 사용자 JSON
 - `SESSION_SECRET`: 세션 HMAC 서명 키
-- `LEDGER_API_SECRET`, `APPS_SCRIPT_URL`: (선택) 예전 Google Sheets → D1 이전 관리 도구에서만 사용합니다. 일반 운영에는 필요하지 않습니다.
 - `DATA_GO_KR_SERVICE_KEY`: 아파트 주소 검색·국토부 실거래가 자동 시세용 공공데이터포털 서비스키(부동산 자동평가를 쓸 때만 필요)
 
 비밀값은 저장소에 직접 커밋하지 않습니다.
+
+> 예전 Google Sheets 연동용 `LEDGER_API_SECRET`, `APPS_SCRIPT_URL`은 더 이상 쓰지 않습니다. Cloudflare에 남아 있다면 지워도 됩니다.
+
+### 로그인 비밀번호 해시
+
+`LOGIN_USERS`에는 평문 비밀번호 대신 PBKDF2 해시를 넣을 수 있습니다(둘 다 지원).
+
+```bash
+MONEYBOOK_PASSWORD='비밀번호' node scripts/hash-login-password.mjs
+```
+
+출력된 `pbkdf2-sha256$...` 문자열을 `LOGIN_USERS`의 해당 사용자 비밀번호 자리에 넣습니다.
+
+```json
+{"사용자1":"pbkdf2-sha256$210000$...$...","사용자2":"pbkdf2-sha256$210000$...$..."}
+```
 
 ## 오프라인/PWA
 

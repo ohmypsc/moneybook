@@ -9,10 +9,7 @@ import {
 import { apiRequest } from "../../api/client";
 import { getBootstrap } from "../../api/bootstrap";
 import { previewBenefit } from "../../api/automation";
-import type {
-  AutomationSettings,
-  BenefitPreview
-} from "../../api/automation";
+import type { BenefitPreview } from "../../api/automation";
 import {
   getBootstrapCacheGeneration,
   getCachedBootstrapPayload
@@ -52,7 +49,6 @@ import { getSeoulDateString } from "../../utils/dateTime";
 import { subscribeLedgerChanges } from "../../utils/ledgerEvents";
 import { confirmAction } from "../../utils/confirmAction";
 import {
-  CARD_PAYMENT_CATEGORY,
   CARD_PREPAYMENT_CATEGORY,
   LOAN_INTEREST_CATEGORY_NAME,
   LOAN_PRINCIPAL_CATEGORY_NAME,
@@ -82,14 +78,6 @@ import {
 import styles from "./InputPage.module.css";
 
 type CreateTransactionPayload = Parameters<typeof createTransaction>[0];
-
-interface ApiResult {
-  success?: boolean;
-  error?: {
-    code?: string;
-    message?: string;
-  };
-}
 
 interface AccountsResponse {
   success: boolean;

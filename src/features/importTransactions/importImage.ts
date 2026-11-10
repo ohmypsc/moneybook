@@ -107,8 +107,3 @@ export async function prepareImportImages(file: File, maxParts = MAX_SPLIT_PARTS
   }
   return results;
 }
-
-export async function prepareImportImage(file: File) {
-  const [result] = await prepareImportImages(file, 1);
-  return result;
-}
