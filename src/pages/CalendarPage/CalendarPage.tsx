@@ -1192,6 +1192,8 @@ export default function CalendarPage({
                 Boolean(transaction.settlementEligible) &&
                 !transaction.reversalOf &&
                 (
+                    // 예전 버전이 기기에 저장해 둔 달에는 이 값이 없으므로, 모르면 불러옵니다.
+                    transaction.settlementAmount === undefined ||
                     Number(transaction.settlementAmount) > 0 ||
                     Number(transaction.refundAmount) > 0
                 )

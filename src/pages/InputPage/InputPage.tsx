@@ -2641,22 +2641,29 @@ export default function InputPage({
       | { description?: string; createdBy?: string | null }
       | undefined;
 
-    try {
-      const response = await getTransactions({
-        dateFrom: date,
-        dateTo: date,
-        type: backendType,
-        amount: numericAmount,
-        limit: 20,
-        timeoutMs: 3000
-      });
-      possibleDuplicate = (response.data?.items || []).find(
-        transaction => !transaction.isDeleted && isSameTransaction(transaction)
-      );
-    } catch {
-      possibleDuplicate = (getDashboardSnapshot()?.recentTransactions || []).find(
-        isSameTransaction
-      );
+    const findInSnapshot = () =>
+      (getDashboardSnapshot()?.recentTransactions || []).find(isSameTransaction);
+
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      // 오프라인이면 서버를 기다리지 않고 기기의 최근 거래로만 확인합니다.
+      possibleDuplicate = findInSnapshot();
+    } else {
+      try {
+        const response = await getTransactions({
+          dateFrom: date,
+          dateTo: date,
+          type: backendType,
+          amount: numericAmount,
+          limit: 20,
+          // 연속 입력이 느려지지 않게 짧게 기다리고, 늦으면 기기 기록으로 대신 확인합니다.
+          timeoutMs: 1500
+        });
+        possibleDuplicate = (response.data?.items || []).find(
+          transaction => !transaction.isDeleted && isSameTransaction(transaction)
+        );
+      } catch {
+        possibleDuplicate = findInSnapshot();
+      }
     }
 
     if (

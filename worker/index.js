@@ -93,6 +93,7 @@ import {
 } from "./domain/backupRestore.js";
 
 import {
+  isInvestmentSymbolLookupCached,
   lookupInvestmentSymbol,
   normalizeInvestmentLookupCode,
   normalizeInvestmentSearchQuery,
@@ -796,7 +797,8 @@ function mbD1MapTransactionRow(row) {
     type: mbD1Text(row.type),
     categoryId: row.category_id || null,
     category: mbD1Text(row.category_name),
-    settlementEligible: mbD1IsSettlementEligibleCategory(row.type, row.category_name, row.category_id),
+    // 취소·환불 같은 연결 거래는 정산 대상이 아닙니다.
+    settlementEligible: !row.reversal_of && mbD1IsSettlementEligibleCategory(row.type, row.category_name, row.category_id),
     amount: mbD1Number(row.amount),
     fromAccountId: row.from_account_id || null,
     fromAccount: mbD1Text(row.from_account_name) || null,
@@ -1991,7 +1993,7 @@ async function mbD1SettlementSummaryData(env, transactionId) {
   if (!original || original.isDeleted) {
     mbD1Fail("TRANSACTION_NOT_FOUND", "정산할 거래를 찾을 수 없습니다.", 404);
   }
-  if (!mbD1IsSettlementEligibleCategory(original.type, original.category, original.categoryId)) {
+  if (original.reversalOf || !mbD1IsSettlementEligibleCategory(original.type, original.category, original.categoryId)) {
     mbD1Fail("SETTLEMENT_NOT_ELIGIBLE", "정산받기는 정산 가능한 지출에서만 사용할 수 있습니다.");
   }
 
@@ -2819,7 +2821,7 @@ async function mbD1HandleTransactionMutation(path, body, session, env) {
 
   if (path === "/api/transactions/settle") {
     if (current.isDeleted) mbD1Fail("TRANSACTION_NOT_FOUND", "정산할 거래를 찾을 수 없습니다.", 404);
-    if (!mbD1IsSettlementEligibleCategory(current.type, current.category, current.categoryId)) {
+    if (current.reversalOf || !mbD1IsSettlementEligibleCategory(current.type, current.category, current.categoryId)) {
       mbD1Fail("SETTLEMENT_NOT_ELIGIBLE", "정산받기는 정산 가능한 지출에서만 사용할 수 있습니다.");
     }
 
@@ -3961,7 +3963,9 @@ async function mbD1FxRate(currency, context) {
 async function mbD1QuoteForHolding(holding, context) {
   const code = mbD1Text(holding.stockCode).toUpperCase();
   const candidates = [];
-  if (mbD1SpendQuoteBudget(context, MB_D1_QUOTE_LOOKUP_COST)) {
+  // 메모리에 있는 조회 결과는 외부 요청을 쓰지 않으므로 예산에서 빼지 않습니다.
+  const lookupCost = isInvestmentSymbolLookupCached(code) ? 0 : MB_D1_QUOTE_LOOKUP_COST;
+  if (mbD1SpendQuoteBudget(context, lookupCost)) {
     try {
       const lookup = await lookupInvestmentSymbol(code);
       if (lookup?.found && lookup.symbol) candidates.push(lookup.symbol);
@@ -5141,6 +5145,8 @@ async function mbD1QueuePartnerPush(env, actorName, transaction, origin) {
 }
 
 const MB_PUSH_PENDING_KEY = "push-pending:v1";
+const MB_PUSH_MAX_RETRIES = 3;
+const MB_PUSH_RETRY_DELAY_MS = 30_000;
 
 export class HouseholdRealtime extends DurableObject {
   constructor(ctx, env) {
@@ -5259,6 +5265,8 @@ export class HouseholdRealtime extends DurableObject {
     // 보내기 전에 먼저 비워서, 발송 중 새로 들어온 입력은 다음 알림으로 넘어가게 합니다.
     await this.ctx.storage.delete(MB_PUSH_PENDING_KEY);
     if (!this.env?.DB) return;
+
+    const retry = [];
     for (const group of groupBatchedPush(pending)) {
       try {
         await notifyPartnersOfTransactions(
@@ -5269,9 +5277,23 @@ export class HouseholdRealtime extends DurableObject {
           group.origin
         );
       } catch (error) {
-        // 알람 재시도로 같은 알림이 두 번 가지 않도록 여기서 오류를 삼킵니다.
+        // 여기까지 올라온 오류는 기기로 보내기 전(구독 조회·키 준비)에 난 것이라
+        // 다시 보내도 중복 알림이 생기지 않습니다. 몇 번만 다시 시도합니다.
         console.warn("[moneybook push] batched notify failed", error);
+        for (const entry of pending) {
+          if (String(entry?.actor || "") !== group.actor || String(entry?.origin || "") !== group.origin) continue;
+          const attempt = Number(entry.attempt || 0) + 1;
+          if (attempt <= MB_PUSH_MAX_RETRIES) retry.push({ ...entry, attempt });
+        }
       }
+    }
+
+    if (retry.length) {
+      const arrived = (await this.ctx.storage.get(MB_PUSH_PENDING_KEY)) || [];
+      await this.ctx.storage.put(MB_PUSH_PENDING_KEY, [...retry, ...arrived].slice(0, 200));
+      const current = await this.ctx.storage.getAlarm();
+      const retryAt = Date.now() + MB_PUSH_RETRY_DELAY_MS;
+      if (!current || current > retryAt) await this.ctx.storage.setAlarm(retryAt);
     }
   }
 
