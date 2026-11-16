@@ -114,6 +114,12 @@ function rememberSymbolLookup(code, data) {
   }
 }
 
+/** 종목 코드 조회 결과가 메모리에 남아 있어 외부 요청 없이 답할 수 있는지 */
+export function isInvestmentSymbolLookupCached(code) {
+  const cached = symbolLookupMemory.get(code);
+  return Boolean(cached && cached.expiresAt > Date.now());
+}
+
 export async function lookupInvestmentSymbol(code) {
   const cached = symbolLookupMemory.get(code);
   if (cached && cached.expiresAt > Date.now()) {

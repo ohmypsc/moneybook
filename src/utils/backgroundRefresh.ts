@@ -35,14 +35,3 @@ export function markBackgroundRefreshed(key: string) {
   lastSuccessfulRefreshAt.set(key, Date.now());
   lastRefreshAttemptAt.delete(key);
 }
-
-export function clearBackgroundRefreshMark(key?: string) {
-  if (key) {
-    lastSuccessfulRefreshAt.delete(key);
-    lastRefreshAttemptAt.delete(key);
-    return;
-  }
-
-  lastSuccessfulRefreshAt.clear();
-  lastRefreshAttemptAt.clear();
-}

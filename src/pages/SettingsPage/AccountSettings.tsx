@@ -16,7 +16,6 @@ import {
 } from "../../api/automation";
 import type {
   AutomationSettings,
-  BenefitKind,
   BenefitRule
 } from "../../api/automation";
 import { getBootstrap } from "../../api/bootstrap";
@@ -795,13 +794,6 @@ export function AccountSettings({
                 editingId
             ]
         );
-
-
-    const isCard =
-        form.subType ===
-            "체크카드" ||
-        form.subType ===
-            "신용카드";
 
 
     const selectedKind =

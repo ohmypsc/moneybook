@@ -47,7 +47,6 @@ let loadPromise: Promise<void> | null = null;
 let dbPromise: Promise<IDBDatabase | null> | null = null;
 let indexedDbPrimary = false;
 let processing = false;
-let processingOwner = "";
 let lastCompletion: PendingTransactionCompletion | null = null;
 let activeOwner = "";
 let channel: BroadcastChannel | null = null;
@@ -544,7 +543,6 @@ async function processQueue(
   }
 
   processing = true;
-  processingOwner = owner;
 
   try {
     while (true) {
@@ -611,7 +609,6 @@ async function processQueue(
     }
   } finally {
     processing = false;
-    processingOwner = "";
 
     const hasPending = records.some(
       item =>

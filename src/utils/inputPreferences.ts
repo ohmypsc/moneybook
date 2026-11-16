@@ -521,30 +521,8 @@ export function saveInputPreferences(
 }
 
 
-export function resetInputPreferences(
-  categories:
-    PreferenceCategoryLike[],
-  accounts:
-    PreferenceAccountLike[]
-) {
-  if (
-    typeof window !==
-    "undefined"
-  ) {
-    window.localStorage.removeItem(
-      STORAGE_KEY
-    );
-  }
-
-  return createDefaultInputPreferences(
-    categories,
-    accounts
-  );
-}
-
-
 /**
- * Apps Script bootstrap에 포함된 부부 공통 설정을
+ * bootstrap에 포함된 부부 공통 설정을
  * 현재 브라우저의 백업값으로 동기화합니다.
  *
  * 서버에 아직 공통 설정이 없으면 기존 localStorage를
@@ -599,7 +577,6 @@ export function syncInputPreferencesFromBootstrapPayload(
 
   return true;
 }
-
 
 
 function getOrderIndex(

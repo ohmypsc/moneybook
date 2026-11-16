@@ -376,22 +376,6 @@ export async function getDashboard(
 }
 
 
-export async function prefetchDashboard(
-  month?: string
-) {
-  try {
-    await getDashboard(
-      month
-    );
-  } catch {
-    /*
-     * 프리페치 실패는 실제 화면 진입을
-     * 막지 않습니다.
-     */
-  }
-}
-
-
 if (
   typeof window !==
   "undefined"

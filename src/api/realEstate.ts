@@ -76,14 +76,6 @@ export async function getRealEstateAssets() {
   );
 }
 
-export async function searchLegalRegions(query: string) {
-  const params = new URLSearchParams({ q: query });
-  return unwrap(
-    await apiRequest<ApiEnvelope<{ items: LegalRegionCandidate[] }>>(`/api/real-estate/regions?${params}`),
-    "주소의 지역코드를 찾지 못했습니다."
-  ).items;
-}
-
 export async function saveRealEstateAsset(input: SaveRealEstateInput) {
   return unwrap(
     await apiRequest<ApiEnvelope<{ created: boolean; item: RealEstateAsset }>>(

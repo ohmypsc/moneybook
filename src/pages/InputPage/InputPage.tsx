@@ -9,10 +9,7 @@ import {
 import { apiRequest } from "../../api/client";
 import { getBootstrap } from "../../api/bootstrap";
 import { previewBenefit } from "../../api/automation";
-import type {
-  AutomationSettings,
-  BenefitPreview
-} from "../../api/automation";
+import type { BenefitPreview } from "../../api/automation";
 import {
   getBootstrapCacheGeneration,
   getCachedBootstrapPayload
@@ -52,7 +49,6 @@ import { getSeoulDateString } from "../../utils/dateTime";
 import { subscribeLedgerChanges } from "../../utils/ledgerEvents";
 import { confirmAction } from "../../utils/confirmAction";
 import {
-  CARD_PAYMENT_CATEGORY,
   CARD_PREPAYMENT_CATEGORY,
   LOAN_INTEREST_CATEGORY_NAME,
   LOAN_PRINCIPAL_CATEGORY_NAME,
@@ -82,14 +78,6 @@ import {
 import styles from "./InputPage.module.css";
 
 type CreateTransactionPayload = Parameters<typeof createTransaction>[0];
-
-interface ApiResult {
-  success?: boolean;
-  error?: {
-    code?: string;
-    message?: string;
-  };
-}
 
 interface AccountsResponse {
   success: boolean;
@@ -2653,22 +2641,29 @@ export default function InputPage({
       | { description?: string; createdBy?: string | null }
       | undefined;
 
-    try {
-      const response = await getTransactions({
-        dateFrom: date,
-        dateTo: date,
-        type: backendType,
-        amount: numericAmount,
-        limit: 20,
-        timeoutMs: 3000
-      });
-      possibleDuplicate = (response.data?.items || []).find(
-        transaction => !transaction.isDeleted && isSameTransaction(transaction)
-      );
-    } catch {
-      possibleDuplicate = (getDashboardSnapshot()?.recentTransactions || []).find(
-        isSameTransaction
-      );
+    const findInSnapshot = () =>
+      (getDashboardSnapshot()?.recentTransactions || []).find(isSameTransaction);
+
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      // 오프라인이면 서버를 기다리지 않고 기기의 최근 거래로만 확인합니다.
+      possibleDuplicate = findInSnapshot();
+    } else {
+      try {
+        const response = await getTransactions({
+          dateFrom: date,
+          dateTo: date,
+          type: backendType,
+          amount: numericAmount,
+          limit: 20,
+          // 연속 입력이 느려지지 않게 짧게 기다리고, 늦으면 기기 기록으로 대신 확인합니다.
+          timeoutMs: 1500
+        });
+        possibleDuplicate = (response.data?.items || []).find(
+          transaction => !transaction.isDeleted && isSameTransaction(transaction)
+        );
+      } catch {
+        possibleDuplicate = findInSnapshot();
+      }
     }
 
     if (

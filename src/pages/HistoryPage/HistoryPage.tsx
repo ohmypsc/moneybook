@@ -55,6 +55,24 @@ import styles from "./HistoryPage.module.css";
 import { YearEndTaxView } from "./YearEndTaxView";
 
 type HistoryView = "calendar" | "search" | "report" | "tax";
+
+interface AppliedFilters {
+  query: string;
+  dateFrom: string;
+  dateTo: string;
+  categoryId: string;
+  accountId: string;
+  spendingTarget: string;
+}
+
+const EMPTY_APPLIED_FILTERS: AppliedFilters = {
+  query: "",
+  dateFrom: "",
+  dateTo: "",
+  categoryId: "",
+  accountId: "",
+  spendingTarget: ""
+};
 type TransactionFilter = "전체" | "지출" | "수입" | "이체";
 
 interface HistoryPageProps {
@@ -167,7 +185,9 @@ export default function HistoryPage({
     storeHistoryView(next);
   };
   const [listMonth, setListMonth] = useState(getSeoulMonthString());
-  const [appliedQuery, setAppliedQuery] = useState("");
+  // 검색창·상세 조건에 입력만 하고 적용하지 않은 값은 목록에 쓰지 않습니다.
+  // 검색/조건 적용 버튼을 눌렀을 때의 값만 여기에 저장해 달 이동·유형 칩에도 그대로 씁니다.
+  const [appliedFilters, setAppliedFilters] = useState(EMPTY_APPLIED_FILTERS);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [searchNonce, setSearchNonce] = useState(0);
   const [calendarEditTarget, setCalendarEditTarget] = useState<{
@@ -206,9 +226,23 @@ export default function HistoryPage({
   ) {
     event?.preventDefault();
 
-    if (searchDateFrom && searchDateTo && searchDateFrom > searchDateTo) {
-      setSearchError("조회 시작일은 종료일보다 늦을 수 없습니다.");
-      return;
+    // 검색 버튼·조건 적용(폼 제출)일 때만 입력칸의 값을 새로 적용하고,
+    // 달 이동·칩·더 보기는 마지막으로 적용한 조건을 그대로 씁니다.
+    let applied = appliedFilters;
+    if (event) {
+      applied = {
+        query: query.trim(),
+        dateFrom: searchDateFrom,
+        dateTo: searchDateTo,
+        categoryId: searchCategoryId,
+        accountId: searchAccountId,
+        spendingTarget: searchSpendingTarget
+      };
+      if (applied.dateFrom && applied.dateTo && applied.dateFrom > applied.dateTo) {
+        setSearchError("조회 시작일은 종료일보다 늦을 수 없습니다.");
+        return;
+      }
+      setAppliedFilters(applied);
     }
 
     const append = Boolean(options.append);
@@ -220,24 +254,23 @@ export default function HistoryPage({
     setSearchError("");
 
     try {
-      const trimmed = query.trim();
+      const trimmed = applied.query;
       const normalizedNumber = trimmed.replace(/,/g, "");
       const numericQuery = /^\d+(?:\.\d+)?$/.test(normalizedNumber)
         ? Number(normalizedNumber)
         : undefined;
 
       // 검색어도 기간도 없으면 선택한 달의 내역을 날짜순으로 보여줍니다.
-      const browseMonth = !trimmed && !searchDateFrom && !searchDateTo;
+      const browseMonth = !trimmed && !applied.dateFrom && !applied.dateTo;
       const monthRange = browseMonth ? getMonthDateRange(listMonth) : null;
-      if (!append) setAppliedQuery(trimmed);
 
       const response = await getTransactions({
-        dateFrom: monthRange?.dateFrom || searchDateFrom || undefined,
-        dateTo: monthRange?.dateTo || searchDateTo || undefined,
+        dateFrom: monthRange?.dateFrom || applied.dateFrom || undefined,
+        dateTo: monthRange?.dateTo || applied.dateTo || undefined,
         type: filter === "전체" ? undefined : filter,
-        categoryId: searchCategoryId || undefined,
-        accountId: searchAccountId || undefined,
-        spendingTarget: searchSpendingTarget || undefined,
+        categoryId: applied.categoryId || undefined,
+        accountId: applied.accountId || undefined,
+        spendingTarget: applied.spendingTarget || undefined,
         amount: numericQuery,
         q: numericQuery === undefined && trimmed ? trimmed : undefined,
         limit: SEARCH_PAGE_SIZE,
@@ -282,11 +315,13 @@ export default function HistoryPage({
     setSearchCategoryId("");
     setSearchAccountId("");
     setSearchSpendingTarget("");
+    setAppliedFilters(EMPTY_APPLIED_FILTERS);
     setSearchNonce(value => value + 1);
   }
 
   function clearQuery() {
     setQuery("");
+    setAppliedFilters(current => ({ ...current, query: "" }));
     setSearchNonce(value => value + 1);
   }
 
@@ -425,13 +460,14 @@ export default function HistoryPage({
     [searchBootstrap]
   );
 
-  const browsingMonth = !appliedQuery && !searchDateFrom && !searchDateTo;
+  const appliedQuery = appliedFilters.query;
+  const browsingMonth = !appliedQuery && !appliedFilters.dateFrom && !appliedFilters.dateTo;
   const activeAdvancedFilterCount = [
-    searchDateFrom,
-    searchDateTo,
-    searchCategoryId,
-    searchAccountId,
-    searchSpendingTarget
+    appliedFilters.dateFrom,
+    appliedFilters.dateTo,
+    appliedFilters.categoryId,
+    appliedFilters.accountId,
+    appliedFilters.spendingTarget
   ].filter(Boolean).length;
 
   const groupedSearchItems = useMemo(() => {
@@ -579,6 +615,12 @@ export default function HistoryPage({
                     );
                     if (selected && item !== "전체" && selected.type !== item) {
                       setSearchCategoryId("");
+                    }
+                    const appliedCategory = searchBootstrap?.categories.find(
+                      category => category.categoryId === appliedFilters.categoryId
+                    );
+                    if (appliedCategory && item !== "전체" && appliedCategory.type !== item) {
+                      setAppliedFilters(current => ({ ...current, categoryId: "" }));
                     }
                     setSearchNonce(value => value + 1);
                   }}
