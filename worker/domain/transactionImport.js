@@ -44,7 +44,9 @@ export function normalizeImportedCandidate(raw, index = 0) {
   const amount = toPositiveAmount(source.amount ?? source.a);
   const merchant = String(source.merchant ?? source.m ?? source.description ?? "").trim().slice(0, 160);
   const status = String(source.status ?? source.s ?? source.kind ?? "expense").toLowerCase();
-  const kind = /refund|cancel|취소|환불/.test(status) ? "refund" : "expense";
+  const kind = /refund|cancel|취소|환불/.test(status) ? "refund"
+    : /transfer|이체/.test(status) ? "transfer"
+    : /income|deposit|수입|입금/.test(status) ? "income" : "expense";
   const confidenceRaw = String(source.confidence || "medium").toLowerCase();
   const confidence = ["high", "medium", "low"].includes(confidenceRaw)
     ? confidenceRaw
@@ -148,14 +150,15 @@ export function choosePaymentMethod(cardName, accounts) {
 }
 
 export function chooseCategory(candidate, categories, recentTransactions = []) {
+  const type = candidate?.kind === "income" ? "수입" : candidate?.kind === "transfer" ? "이체" : "지출";
   const merchant = normalizeMerchant(candidate?.merchant);
   if (merchant) {
     for (const transaction of recentTransactions || []) {
-      if (!transaction?.categoryId || transaction?.type !== "지출") continue;
+      if (!transaction?.categoryId || transaction?.type !== type) continue;
       const prior = normalizeMerchant(transaction.description);
       if (!prior) continue;
       if (merchant === prior || (merchant.length >= 4 && (merchant.includes(prior) || prior.includes(merchant)))) {
-        const category = (categories || []).find((item) => item.categoryId === transaction.categoryId && item.active && !item.isDeleted);
+        const category = (categories || []).find((item) => item.categoryId === transaction.categoryId && item.type === type && item.active && !item.isDeleted);
         if (category) return { category, source: "history" };
       }
     }
@@ -163,10 +166,10 @@ export function chooseCategory(candidate, categories, recentTransactions = []) {
 
   const suggested = String(candidate?.suggestedCategoryName || "").trim();
   if (suggested) {
-    const exact = (categories || []).find((item) => item.type === "지출" && item.active && !item.isDeleted && item.name === suggested);
+    const exact = (categories || []).find((item) => item.type === type && item.active && !item.isDeleted && item.name === suggested);
     if (exact) return { category: exact, source: "ai" };
     const normalized = normalizeMerchant(suggested);
-    const fuzzy = (categories || []).find((item) => item.type === "지출" && item.active && !item.isDeleted && normalizeMerchant(item.name) === normalized);
+    const fuzzy = (categories || []).find((item) => item.type === type && item.active && !item.isDeleted && normalizeMerchant(item.name) === normalized);
     if (fuzzy) return { category: fuzzy, source: "ai" };
   }
   return { category: null, source: null };
@@ -180,6 +183,7 @@ function dateDistanceDays(a, b) {
 }
 
 export function findDuplicateTransaction(candidate, transactions, paymentMethodId = null) {
+  const type = candidate?.kind === "income" ? "수입" : candidate?.kind === "transfer" ? "이체" : "지출";
   const merchant = normalizeMerchant(candidate?.merchant);
   const amount = Number(candidate?.amount || 0);
   if (!amount || !candidate?.date) return null;
@@ -187,13 +191,15 @@ export function findDuplicateTransaction(candidate, transactions, paymentMethodI
   let best = null;
   let bestScore = -1;
   for (const transaction of transactions || []) {
-    if (!transaction || transaction.isDeleted || transaction.type !== "지출") continue;
+    if (!transaction || transaction.isDeleted || transaction.type !== type) continue;
     if (Math.abs(Number(transaction.amount || 0) - amount) > 0.01) continue;
     const days = dateDistanceDays(candidate.date, transaction.date);
     if (days > 1) continue;
 
     let score = days === 0 ? 50 : 35;
-    if (paymentMethodId && transaction.paymentMethodId === paymentMethodId) score += 30;
+    if (type === "지출" && paymentMethodId && transaction.paymentMethodId === paymentMethodId) score += 30;
+    if (type === "수입" && candidate.toAccountId && transaction.toAccountId === candidate.toAccountId) score += 30;
+    if (type === "이체" && candidate.fromAccountId && candidate.toAccountId && transaction.fromAccountId === candidate.fromAccountId && transaction.toAccountId === candidate.toAccountId) score += 30;
     const priorMerchant = normalizeMerchant(transaction.description);
     if (merchant && priorMerchant) {
       if (merchant === priorMerchant) score += 30;

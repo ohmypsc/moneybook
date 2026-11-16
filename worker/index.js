@@ -2246,12 +2246,12 @@ async function mbD1AllTransactions(env, includeDeleted = false) {
   return rows.map(mbD1MapTransactionRow);
 }
 
-async function mbD1RecentExpenseTransactions(env, limit = 800) {
+async function mbD1RecentImportTransactions(env, limit = 800) {
   const safeLimit = Math.max(1, Math.min(2000, Math.trunc(Number(limit) || 800)));
   const rows = await mbD1All(
     env,
     `${MB_D1_TRANSACTION_SELECT}
-     WHERE t.household_id=? AND t.deleted_at IS NULL AND t.type='지출'
+     WHERE t.household_id=? AND t.deleted_at IS NULL
      ORDER BY t.date DESC, t.created_at DESC
      LIMIT ?`,
     [MB_D1_HOUSEHOLD_ID, safeLimit]
@@ -4209,14 +4209,6 @@ async function mbD1HandleTransactionMutation(path, body, session, env) {
       mbD1Fail("SETTLEMENT_ACCOUNT_INVALID", "정산금은 현금이나 입금 가능한 자산 계좌로 받아주세요.");
     }
 
-    const before = await mbD1SettlementSummaryData(env, transactionId);
-    if (amount > before.remainingAmount + 0.0001) {
-      mbD1Fail(
-        "SETTLEMENT_AMOUNT_EXCEEDS_REMAINING",
-        `남은 정산 가능 금액 ${Math.round(before.remainingAmount).toLocaleString("ko-KR")}원을 초과할 수 없습니다.`
-      );
-    }
-
     const rawRequestId = mbD1Text(body.requestId);
     const requestId = rawRequestId
       ? (rawRequestId.startsWith(SETTLEMENT_REQUEST_PREFIX) ? rawRequestId : `${SETTLEMENT_REQUEST_PREFIX}${rawRequestId}`)
@@ -4233,6 +4225,14 @@ async function mbD1HandleTransactionMutation(path, body, session, env) {
         transaction: await mbD1TransactionById(env, duplicateRow.transaction_id, true),
         summary: await mbD1SettlementSummaryData(env, transactionId)
       };
+    }
+
+    const before = await mbD1SettlementSummaryData(env, transactionId);
+    if (amount > before.remainingAmount + 0.0001) {
+      mbD1Fail(
+        "SETTLEMENT_AMOUNT_EXCEEDS_REMAINING",
+        `남은 정산 가능 금액 ${Math.round(before.remainingAmount).toLocaleString("ko-KR")}원을 초과할 수 없습니다.`
+      );
     }
 
     const category = await mbD1SettlementIncomeCategory(env);
@@ -4275,9 +4275,21 @@ async function mbD1HandleTransactionMutation(path, body, session, env) {
       settlementOf: transactionId
     });
     try {
-      await env.DB.batch([insert, change]);
+      const guard = env.DB.prepare(
+        `SELECT CASE WHEN EXISTS (
+          SELECT 1 FROM transactions original
+          WHERE original.household_id=? AND original.transaction_id=?
+            AND original.deleted_at IS NULL AND original.updated_at IS ?
+            AND ? <= original.amount - COALESCE((
+              SELECT SUM(offset.amount) FROM transactions offset
+              WHERE offset.household_id=original.household_id
+                AND offset.reversal_of=original.transaction_id AND offset.deleted_at IS NULL
+            ),0) + 0.0001
+        ) THEN 1 ELSE json('${MB_D1_CONCURRENCY_GUARD_TOKEN}') END AS ok`
+      ).bind(MB_D1_HOUSEHOLD_ID, transactionId, current.updatedAt ?? null, amount);
+      await env.DB.batch([guard, insert, change]);
     } catch (error) {
-      if (mbD1LooksLikeRequestIdUniqueConflict(error, "transactions")) {
+      if (mbD1LooksLikeRequestIdUniqueConflict(error, "transactions") || mbD1LooksLikeConcurrencyGuardFailure(error)) {
         const duplicate = await mbD1First(
           env,
           "SELECT transaction_id FROM transactions WHERE household_id=? AND request_id=? LIMIT 1",
@@ -4291,6 +4303,9 @@ async function mbD1HandleTransactionMutation(path, body, session, env) {
             summary: await mbD1SettlementSummaryData(env, transactionId)
           };
         }
+      }
+      if (mbD1LooksLikeConcurrencyGuardFailure(error)) {
+        mbD1Fail("CONCURRENT_MODIFICATION", "정산 잔액 또는 원거래가 변경되었습니다. 최신 정산 내역을 확인한 뒤 다시 시도하세요.", 409);
       }
       throw error;
     }
@@ -5606,7 +5621,7 @@ async function mbD1PreviewBackupRestore(document, env) {
       "같은 ID의 항목은 백업 값으로 갱신합니다.",
       "백업에 없는 현재 데이터는 삭제하지 않습니다.",
       "다른 항목이 같은 requestId를 사용 중이면 실제 복원 전에 차단합니다.",
-      "복원은 여러 D1 배치로 처리되므로, 복원 직전에 현재 상태의 안전 백업을 먼저 보관합니다."
+      "복원은 전체 항목을 한 번에 반영하며, 저장 중 오류가 발생하면 복원 변경을 모두 취소합니다. 실행 전 안전백업도 보관합니다."
     ]
   };
 }
@@ -5627,12 +5642,6 @@ function mbD1BackupNullableNumber(value) {
   return Number.isFinite(number) ? number : null;
 }
 
-async function mbD1RunBackupBatches(env, statements, size = 40) {
-  for (let index = 0; index < statements.length; index += size) {
-    await env.DB.batch(statements.slice(index, index + size));
-  }
-}
-
 function mbD1BackupMemberId(name) {
   const clean = mbD1Text(name);
   if (!clean || clean === "공동") return null;
@@ -5649,9 +5658,9 @@ async function mbD1RestoreBackupMerge(document, session, env) {
   await ensureRealEstateSchema(env);
   await mbD1AssertBackupRequestIdCompatibility(validated, env);
 
-  let restoreStarted = false;
-  try {
-    const currentMembers = await mbD1All(
+  // Keep all restore writes in one D1 batch: any failure rolls back the full merge.
+  const restoreStatements = [];
+  const currentMembers = await mbD1All(
     env,
     "SELECT member_id,display_name FROM members WHERE household_id=?",
     [MB_D1_HOUSEHOLD_ID]
@@ -5667,13 +5676,12 @@ async function mbD1RestoreBackupMerge(document, session, env) {
        ON CONFLICT(member_id) DO UPDATE SET display_name=excluded.display_name,is_active=1,updated_at=excluded.updated_at,deleted_at=NULL`
     ).bind(memberId, MB_D1_HOUSEHOLD_ID, name, 1, now, now));
   }
-    restoreStarted = true;
-    await mbD1RunBackupBatches(env, memberStatements);
+  restoreStatements.push(...memberStatements);
 
   const ledgerStartDate = payload.bootstrap?.ledgerConfig?.ledgerStartDate || null;
-  await env.DB.prepare(
+  restoreStatements.push(env.DB.prepare(
     "UPDATE households SET ledger_start_date=?,updated_at=? WHERE household_id=?"
-  ).bind(ledgerStartDate, now, MB_D1_HOUSEHOLD_ID).run();
+  ).bind(ledgerStartDate, now, MB_D1_HOUSEHOLD_ID));
 
   const categoryStatements = payload.categories.map((item) => env.DB.prepare(
     `INSERT INTO categories (category_id,household_id,type,name,is_active,created_at,updated_at,created_by,updated_by,deleted_at,deleted_by,source_row)
@@ -5685,7 +5693,7 @@ async function mbD1RestoreBackupMerge(document, session, env) {
     item.createdAt || now, item.updatedAt || now, item.createdBy || actor, item.updatedBy || actor,
     mbD1BackupDeletedAt(item), item.deletedBy || null, item.row || null
   ));
-  await mbD1RunBackupBatches(env, categoryStatements);
+  restoreStatements.push(...categoryStatements);
 
   const accountBaseStatements = payload.accounts.map((item) => env.DB.prepare(
     `INSERT INTO accounts (account_id,household_id,name,display_name,account_type,sub_type,owner_member_id,owner_label,opening_balance,billing_cutoff_day,payment_day,payment_account_id,start_year,end_year,is_active,balance_method,current_balance_override,asset_attribution,investment_cash_baseline_krw,investment_cash_baseline_at,created_at,updated_at,created_by,updated_by,deleted_at,deleted_by,source_row)
@@ -5702,14 +5710,14 @@ async function mbD1RestoreBackupMerge(document, session, env) {
     item.createdAt || now, item.updatedAt || now, item.createdBy || actor, item.updatedBy || actor,
     mbD1BackupDeletedAt(item), item.deletedBy || null, item.row || null
   ));
-  await mbD1RunBackupBatches(env, accountBaseStatements);
+  restoreStatements.push(...accountBaseStatements);
 
   const accountLinkStatements = payload.accounts
     .filter((item) => item.paymentAccountId)
     .map((item) => env.DB.prepare(
       "UPDATE accounts SET payment_account_id=? WHERE household_id=? AND account_id=?"
     ).bind(item.paymentAccountId, MB_D1_HOUSEHOLD_ID, item.accountId));
-  await mbD1RunBackupBatches(env, accountLinkStatements);
+  restoreStatements.push(...accountLinkStatements);
 
   const holdingStatements = payload.investmentHoldings.map((item) => env.DB.prepare(
     `INSERT INTO holdings (holding_id,household_id,account_id,stock_code,stock_name,market,quantity,avg_buy_price,quote_mode,manual_price,current_price,fx_rate,value_krw,book_cost_krw,return_rate,owner_label,last_updated,elapsed_days,baseline_quantity,baseline_avg_price,baseline_book_cost_krw,baseline_at,managed_by_trades,version,created_at,updated_at,created_by,updated_by,deleted_at,deleted_by,source_row)
@@ -5725,7 +5733,7 @@ async function mbD1RestoreBackupMerge(document, session, env) {
     Math.max(1, Math.floor(mbD1BackupNumber(item.version, 1))), item.createdAt || now, item.updatedAt || now,
     item.createdBy || actor, item.updatedBy || actor, mbD1BackupDeletedAt(item), item.deletedBy || null, item.row || null
   ));
-  await mbD1RunBackupBatches(env, holdingStatements);
+  restoreStatements.push(...holdingStatements);
 
   const transactionStatements = payload.transactions.map((item) => env.DB.prepare(
     `INSERT INTO transactions (transaction_id,household_id,request_id,date,type,category_id,amount,from_account_id,to_account_id,payment_method_id,spending_target,spender_member_id,entered_by_member_id,description,memo,billing_month_override,billing_month,group_id,reversal_of,version,taxpayer_member_id,tax_category_code,created_at,updated_at,created_by,updated_by,deleted_at,deleted_by,source_row,installment_months)
@@ -5742,14 +5750,14 @@ async function mbD1RestoreBackupMerge(document, session, env) {
     // 예전 백업에는 할부 정보가 없으므로 일시불(null)로 복원됩니다.
     normalizeInstallmentMonths(item.installmentMonths).months ?? null
   ));
-  await mbD1RunBackupBatches(env, transactionStatements);
+  restoreStatements.push(...transactionStatements);
 
   const reversalStatements = payload.transactions
     .filter((item) => item.reversalOf)
     .map((item) => env.DB.prepare(
       "UPDATE transactions SET reversal_of=? WHERE household_id=? AND transaction_id=?"
     ).bind(item.reversalOf, MB_D1_HOUSEHOLD_ID, item.transactionId));
-  await mbD1RunBackupBatches(env, reversalStatements);
+  restoreStatements.push(...reversalStatements);
 
   const tradeStatements = payload.investmentTrades.map((item) => env.DB.prepare(
     `INSERT INTO investment_trades (investment_trade_id,household_id,request_id,trade_date,trade_type,account_id,holding_id,stock_code,stock_name,market,quantity,unit_price,currency,fx_rate,fee_krw,tax_krw,settlement_krw,realized_pnl_krw,memo,version,created_at,updated_at,created_by,updated_by,deleted_at,deleted_by,source_row)
@@ -5763,7 +5771,7 @@ async function mbD1RestoreBackupMerge(document, session, env) {
     item.memo || null, Math.max(1, Math.floor(mbD1BackupNumber(item.version, 1))), item.createdAt || now, item.updatedAt || item.createdAt || now,
     item.createdBy || actor, item.updatedBy || actor, mbD1BackupDeletedAt(item), item.deletedBy || null, item.row || null
   ));
-  await mbD1RunBackupBatches(env, tradeStatements);
+  restoreStatements.push(...tradeStatements);
 
   const snapshotStatements = payload.assetSnapshots.map((item) => env.DB.prepare(
     `INSERT INTO asset_snapshots (household_id,month,assets,liabilities,net_worth,investment_value,cash_like_value,created_at,updated_at,created_by,updated_by)
@@ -5774,40 +5782,40 @@ async function mbD1RestoreBackupMerge(document, session, env) {
     mbD1BackupNumber(item.investmentValue), mbD1BackupNumber(item.cashLikeValue), item.createdAt || now, item.updatedAt || now,
     item.createdBy || actor, item.updatedBy || actor
   ));
-  await mbD1RunBackupBatches(env, snapshotStatements);
+  restoreStatements.push(...snapshotStatements);
 
   const inputState = payload.bootstrap?.inputPreferences;
   if (inputState?.preferences) {
-    await env.DB.prepare(
+    restoreStatements.push(env.DB.prepare(
       `INSERT INTO user_preferences (preference_id,household_id,member_id,preference_key,preference_json,version,created_at,updated_at)
        VALUES (?,?,?,?,?,?,?,?)
        ON CONFLICT(preference_id) DO UPDATE SET preference_json=excluded.preference_json,version=excluded.version,updated_at=excluded.updated_at`
     ).bind(
       "PREF_INPUT_SHARED", MB_D1_HOUSEHOLD_ID, null, "input_preferences", JSON.stringify(inputState.preferences),
       Number(inputState.version) || 1, inputState.updatedAt || now, inputState.updatedAt || now
-    ).run();
+    ));
   } else if (inputState?.configured === false) {
-    await env.DB.prepare(
+    restoreStatements.push(env.DB.prepare(
       "DELETE FROM user_preferences WHERE household_id=? AND preference_key='input_preferences'"
-    ).bind(MB_D1_HOUSEHOLD_ID).run();
+    ).bind(MB_D1_HOUSEHOLD_ID));
   }
 
   const automationSettings = payload.bootstrap?.automationSettings;
   if (automationSettings) {
     const normalized = mbD1NormalizeAutomationSettings(automationSettings);
     mbD1ValidateAutomationSettings(normalized);
-    await env.DB.prepare(
+    restoreStatements.push(env.DB.prepare(
       `INSERT INTO user_preferences (preference_id,household_id,member_id,preference_key,preference_json,version,created_at,updated_at)
        VALUES (?,?,?,?,?,?,?,?)
        ON CONFLICT(preference_id) DO UPDATE SET preference_json=excluded.preference_json,version=excluded.version,updated_at=excluded.updated_at`
-    ).bind(MB_D1_AUTOMATION_PREF_ID, MB_D1_HOUSEHOLD_ID, null, MB_D1_AUTOMATION_PREF_KEY, JSON.stringify(normalized), 1, now, now).run();
+    ).bind(MB_D1_AUTOMATION_PREF_ID, MB_D1_HOUSEHOLD_ID, null, MB_D1_AUTOMATION_PREF_KEY, JSON.stringify(normalized), 1, now, now));
   }
 
   if (validated.version >= 2) {
     const deleteUsageStatements = payload.transactions.map((item) => env.DB.prepare(
       "DELETE FROM benefit_reward_usage WHERE household_id=? AND transaction_id=?"
     ).bind(MB_D1_HOUSEHOLD_ID, item.transactionId));
-    await mbD1RunBackupBatches(env, deleteUsageStatements);
+    restoreStatements.push(...deleteUsageStatements);
 
     const usageStatements = (payload.benefitRewardUsage || []).map((item) => env.DB.prepare(
       `INSERT INTO benefit_reward_usage (transaction_id,household_id,rule_id,account_id,used_amount,created_at,updated_at)
@@ -5816,7 +5824,7 @@ async function mbD1RestoreBackupMerge(document, session, env) {
     ).bind(
       item.transactionId, MB_D1_HOUSEHOLD_ID, item.ruleId, item.accountId, mbD1BackupNumber(item.usedAmount), item.createdAt || now, item.updatedAt || now
     ));
-    await mbD1RunBackupBatches(env, usageStatements);
+    restoreStatements.push(...usageStatements);
   }
 
   if (validated.version >= 3) {
@@ -5843,7 +5851,7 @@ async function mbD1RestoreBackupMerge(document, session, env) {
       JSON.stringify(Array.isArray(item.recentTrades) ? item.recentTrades : []), item.createdAt || now, item.updatedAt || now,
       item.createdBy || actor, item.updatedBy || actor, item.deletedAt || (item.isDeleted ? "1970-01-01T00:00:00.000Z" : null), item.deletedBy || null
     ));
-    await mbD1RunBackupBatches(env, realEstateStatements);
+    restoreStatements.push(...realEstateStatements);
   }
 
   // change_log.action은 created/updated/deleted/restored만 허용하므로 결과 종류는 payload에 남깁니다.
@@ -5853,9 +5861,10 @@ async function mbD1RestoreBackupMerge(document, session, env) {
     exportedAt: validated.exportedAt,
     summary: validated.summary
   });
-  await env.DB.batch([change]);
+  restoreStatements.push(change);
+  await env.DB.batch(restoreStatements);
 
-    return {
+  return {
       restored: true,
       mode: "merge",
       version: validated.version,
@@ -5864,33 +5873,8 @@ async function mbD1RestoreBackupMerge(document, session, env) {
       warnings: validated.warnings,
       restoredAt: now,
       restoredBy: actor
-    };
-  } catch (error) {
-    if (restoreStarted) {
-      try {
-        const failureChange = await mbD1InsertChange(
-          env,
-          "backup_restore",
-          `restore-failed-${Date.now()}`,
-          "updated",
-          null,
-          session,
-          {
-            result: "partial_failure",
-            version: validated.version,
-            exportedAt: validated.exportedAt,
-            summary: validated.summary
-          }
-        );
-        await env.DB.batch([failureChange]);
-      } catch {
-        // 원래 복원 오류를 보존합니다.
-      }
-    }
-    throw error;
-  }
+  };
 }
-
 
 
 async function mbD1AnalyzeImportedTransactions(body, session, env) {
@@ -5904,11 +5888,11 @@ async function mbD1AnalyzeImportedTransactions(body, session, env) {
   );
   const categoriesPromise = mbD1All(
     env,
-    "SELECT * FROM categories WHERE household_id=? AND type='지출' AND deleted_at IS NULL AND is_active=1 ORDER BY name",
+    "SELECT * FROM categories WHERE household_id=? AND deleted_at IS NULL AND is_active=1 ORDER BY name",
     [MB_D1_HOUSEHOLD_ID]
   ).then((rows) => rows.map(mbD1MapCategory));
   const accountsPromise = mbD1RawAccounts(env).then((rows) => rows.map(mbD1MapAccountRow));
-  const recentTransactionsPromise = mbD1RecentExpenseTransactions(env, 800);
+  const recentTransactionsPromise = mbD1RecentImportTransactions(env, 800);
   const membersPromise = mbD1Members(env);
 
   const [analysisResult, categories, accounts, recentTransactions, memberRows] = await Promise.all([
@@ -5919,7 +5903,7 @@ async function mbD1AnalyzeImportedTransactions(body, session, env) {
     membersPromise
   ]);
   const paymentMethods = accounts.filter((account) =>
-    account.active && !account.isDeleted && ["신용카드", "체크카드", "선불/지역화폐"].includes(account.subType)
+    account.active && !account.isDeleted
   );
 
   let extracted;
@@ -5943,16 +5927,20 @@ async function mbD1AnalyzeImportedTransactions(body, session, env) {
     model: "@cf/moondream/moondream3.1-9B-A2B",
     items: extracted.map((candidate) => {
       let paymentMethod = mbImportChoosePaymentMethod(candidate.cardName, paymentMethods);
-      if (!paymentMethod && paymentMethods.length === 1) paymentMethod = paymentMethods[0];
+
       const categoryMatch = mbImportChooseCategory(candidate, categories, recentTransactions);
-      const duplicate = candidate.kind === "expense"
-        ? mbImportFindDuplicate(candidate, recentTransactions, paymentMethod?.accountId || null)
+      const toAccountId = candidate.kind === "income" && paymentMethod?.accountType === "자산" && !["신용카드", "체크카드"].includes(paymentMethod?.subType)
+        ? paymentMethod.accountId : "";
+      const duplicate = candidate.kind !== "refund"
+        ? mbImportFindDuplicate({ ...candidate, toAccountId }, recentTransactions, paymentMethod?.accountId || null)
         : null;
       const reasons = [];
       if (!candidate.date) reasons.push("날짜 확인 필요");
       if (!candidate.amount) reasons.push("금액 확인 필요");
       if (!candidate.merchant) reasons.push("가맹점 확인 필요");
-      if (!paymentMethod) reasons.push("결제수단 선택 필요");
+      if (candidate.kind === "expense" && !paymentMethod) reasons.push("결제수단 선택 필요");
+      if (candidate.kind === "income" && !toAccountId) reasons.push("입금계좌 선택 필요");
+      if (candidate.kind === "transfer") reasons.push("출금·입금계좌 선택 필요");
       if (!categoryMatch.category) reasons.push("카테고리 선택 필요");
       if (candidate.confidence === "low") reasons.push("인식 결과 확인 필요");
       if (duplicate) reasons.push("중복 거래 의심");
@@ -5962,7 +5950,9 @@ async function mbD1AnalyzeImportedTransactions(body, session, env) {
         categoryId: categoryMatch.category?.categoryId || null,
         categoryName: categoryMatch.category?.name || "",
         categorySuggestionSource: categoryMatch.source,
-        paymentMethodId: paymentMethod?.accountId || null,
+        fromAccountId: "",
+        toAccountId,
+        paymentMethodId: candidate.kind === "expense" ? paymentMethod?.accountId || null : null,
         paymentMethodName: paymentMethod?.displayName || "",
         spendingTarget: defaultTarget,
         duplicate: duplicate ? {
@@ -5973,7 +5963,7 @@ async function mbD1AnalyzeImportedTransactions(body, session, env) {
           paymentMethod: duplicate.paymentMethod,
           category: duplicate.category
         } : null,
-        selected: candidate.kind === "expense" && reasons.length === 0,
+        selected: candidate.kind !== "refund" && reasons.length === 0,
         reviewReasons: reasons
       };
     })

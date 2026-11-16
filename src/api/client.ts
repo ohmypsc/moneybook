@@ -155,17 +155,20 @@ export async function apiRequest<T>(
   }
 
   let response: Response;
-
+  let data: unknown;
   try {
-    response = await fetch(
-      url,
-      {
-        ...requestInit,
-        headers,
-        credentials: "same-origin",
-        signal: controller.signal
-      }
-    );
+    response = await fetch(url, {
+      ...requestInit,
+      headers,
+      credentials: "same-origin",
+      signal: controller.signal
+    });
+    try {
+      data = await response.json();
+    } catch (error) {
+      if (controller.signal.aborted) throw error;
+      throw new ApiError("서버 응답을 읽을 수 없습니다.", response.status, "INVALID_RESPONSE");
+    }
   } catch (error) {
     if (timedOut) {
       throw new ApiError(
@@ -174,30 +177,10 @@ export async function apiRequest<T>(
         "REQUEST_TIMEOUT"
       );
     }
-
     throw error;
   } finally {
-    if (timeoutHandle !== null) {
-      clearTimeout(timeoutHandle);
-    }
-
-    externalSignal?.removeEventListener(
-      "abort",
-      abortFromExternalSignal
-    );
-  }
-
-  let data: unknown;
-
-  try {
-    data =
-      await response.json();
-  } catch {
-    throw new ApiError(
-      "서버 응답을 읽을 수 없습니다.",
-      response.status,
-      "INVALID_RESPONSE"
-    );
+    if (timeoutHandle !== null) clearTimeout(timeoutHandle);
+    externalSignal?.removeEventListener("abort", abortFromExternalSignal);
   }
 
   const envelope =

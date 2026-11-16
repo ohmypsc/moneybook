@@ -626,3 +626,8 @@
     transition: none;
   }
 }
+
+.formFields { margin: 0; min-width: 0; border: 0; }
+.formFields:not(.candidateDetails) { padding: 0; }
+.formFields.candidateDetails { border-top: 1px solid var(--color-border); }
+.actions { flex-wrap: wrap; }

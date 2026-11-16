@@ -20,7 +20,9 @@ export interface ImportedTransactionCandidate {
   amount: number;
   cardName: string;
   suggestedCategoryName: string;
-  kind: "expense" | "refund";
+  kind: "expense" | "income" | "transfer" | "refund";
+  fromAccountId?: string;
+  toAccountId?: string;
   confidence: ImportConfidence;
   memo: string;
   sourceText: string;

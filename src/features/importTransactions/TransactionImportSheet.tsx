@@ -1,20 +1,18 @@
 import { useMemo, useRef, useState } from "react";
-import { analyzeTransactionImport, type ImportedTransactionCandidate } from "../../api/transactionImport";
+import { analyzeTransactionImport } from "../../api/transactionImport";
 import type { BootstrapData } from "../../types/bootstrap";
 import { BottomSheet } from "../../components/common/BottomSheet/BottomSheet";
 import { Button } from "../../components/common/Button/Button";
 import { formatMoney } from "../../components/common/Money/Money";
 import { enqueuePendingTransaction } from "../../utils/pendingTransactionQueue";
-import type { BenefitRule } from "../../api/automation";
+import { buildImportPayload, changeImportKind, deriveReviewReasons, IMPORT_TYPE_LABELS, type EditableCandidate, type ImportKind } from "./importReview";
+
+import { getSeoulDateString } from "../../utils/dateTime";
 import { prepareImportImages } from "./importImage";
 import { prioritizeAccountsForUser } from "../../pages/InputPage/inputDomain";
 import styles from "./TransactionImportSheet.module.css";
 
 const IMPORT_CARD_SUBTYPES = ["신용카드", "체크카드", "선불/지역화폐"];
-
-interface EditableCandidate extends ImportedTransactionCandidate {
-  selected: boolean;
-}
 
 type ImportSource = "image" | "text";
 
@@ -24,31 +22,10 @@ interface TransactionImportSheetProps {
   onClose: () => void;
 }
 
-function deriveReviewReasons(item: EditableCandidate) {
-  const reasons: string[] = [];
-  if (!item.date) reasons.push("날짜 확인 필요");
-  if (!(item.amount > 0)) reasons.push("금액 확인 필요");
-  if (!item.merchant.trim()) reasons.push("가맹점 확인 필요");
-  if (!item.paymentMethodId) reasons.push("결제수단 선택 필요");
-  if (!item.categoryId) reasons.push("카테고리 선택 필요");
-  if (!item.spendingTarget) reasons.push("지출대상 선택 필요");
-  if (item.confidence === "low") reasons.push("인식 결과 확인 필요");
-  if (item.duplicate) reasons.push("중복 거래 의심");
-  if (item.kind === "refund") reasons.push("취소/환불은 원거래 연결 확인 필요");
-  return reasons;
-}
-
 function createRequestId() {
   return globalThis.crypto?.randomUUID
     ? `IMPORT_${globalThis.crypto.randomUUID()}`
     : `IMPORT_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-}
-
-function benefitRuleActive(rule: BenefitRule, date: string) {
-  if (!rule.enabled || rule.kind !== "post_reward") return false;
-  if (rule.validFrom && date < rule.validFrom) return false;
-  if (rule.validTo && date > rule.validTo) return false;
-  return true;
 }
 
 export function TransactionImportSheet({
@@ -63,13 +40,14 @@ export function TransactionImportSheet({
   const [items, setItems] = useState<EditableCandidate[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState("");
   const [stage, setStage] = useState<"source" | "review">("source");
   const [expandedCandidateId, setExpandedCandidateId] = useState<string | null>(null);
 
-  const expenseCategories = useMemo(
-    () => bootstrap.categories.filter(item => item.type === "지출" && item.active && !item.isDeleted),
+  const categories = useMemo(
+    () => bootstrap.categories.filter(item => item.active && !item.isDeleted),
     [bootstrap]
   );
   // 카드뿐 아니라 현금·통장(계좌이체 결제)도 고를 수 있게 합니다. 내 명의 → 공동 → 배우자 순서입니다.
@@ -108,17 +86,24 @@ export function TransactionImportSheet({
       )}
     </>
   );
-  const selectedCount = items.filter(item => item.selected && item.kind === "expense").length;
+  const transferAccounts = useMemo(() => prioritizeAccountsForUser(
+    bootstrap.accounts.filter(account => account.active && !account.isDeleted && account.subType !== "체크카드"), userName
+  ), [bootstrap, userName]);
+  const accountOptions = transferAccounts.map(account => <option key={account.accountId} value={account.accountId}>{account.displayName}</option>);
+  const selectedKinds = new Set(items.filter(item => item.selected && !item.queued && item.kind !== "refund").map(item => item.kind));
+  const bulkKind = selectedKinds.size === 1 ? [...selectedKinds][0] : null;
+  const bulkCategories = categories.filter(category => bulkKind && category.type === IMPORT_TYPE_LABELS[bulkKind]);
+  const selectedCount = items.filter(item => item.selected && !item.queued && item.kind !== "refund").length;
   const duplicateCount = items.filter(item => item.duplicate).length;
   const reviewCount = items.filter(item => item.reviewReasons.length > 0).length;
 
   function patchItem(candidateId: string, patch: Partial<EditableCandidate>) {
     setItems(current => current.map(item => {
-      if (item.candidateId !== candidateId) return item;
-      const duplicateKeyChanged = ["date", "time", "amount", "merchant", "paymentMethodId"]
+      if (item.candidateId !== candidateId || item.queued || savingRef.current) return item;
+      const duplicateKeyChanged = ["kind", "date", "time", "amount", "merchant", "paymentMethodId", "fromAccountId", "toAccountId"]
         .some(key => Object.prototype.hasOwnProperty.call(patch, key));
       const next = {
-        ...item,
+        ...(patch.kind ? changeImportKind(item, patch.kind) : item),
         ...patch,
         ...(duplicateKeyChanged ? { duplicate: null } : {})
       } as EditableCandidate;
@@ -128,11 +113,11 @@ export function TransactionImportSheet({
 
   function patchSelected(patch: Partial<EditableCandidate>) {
     setItems(current => current.map(item => {
-      if (!item.selected || item.kind !== "expense") return item;
-      const duplicateKeyChanged = ["date", "time", "amount", "merchant", "paymentMethodId"]
+      if (!item.selected || item.kind === "refund" || item.queued || savingRef.current) return item;
+      const duplicateKeyChanged = ["kind", "date", "time", "amount", "merchant", "paymentMethodId", "fromAccountId", "toAccountId"]
         .some(key => Object.prototype.hasOwnProperty.call(patch, key));
       const next = {
-        ...item,
+        ...(patch.kind ? changeImportKind(item, patch.kind) : item),
         ...patch,
         ...(duplicateKeyChanged ? { duplicate: null } : {})
       } as EditableCandidate;
@@ -159,11 +144,11 @@ export function TransactionImportSheet({
 
   async function handleAnalyze() {
     if (source === "image" && files.length === 0) {
-      setError("카드 내역 캡처나 이미지를 선택해주세요.");
+      setError("카드·계좌 내역 캡처나 이미지를 선택해주세요.");
       return;
     }
     if (source === "text" && !text.trim()) {
-      setError("카드 승인 문자나 결제 내역을 붙여넣어주세요.");
+      setError("입출금 문자나 거래 내역을 붙여넣어주세요.");
       return;
     }
     setAnalyzing(true);
@@ -184,7 +169,7 @@ export function TransactionImportSheet({
         images
       });
       const mappedItems = result.items.map(item => {
-        const candidate = { ...item, selected: item.selected } as EditableCandidate;
+        const candidate = { ...item, requestId: createRequestId(), selected: item.selected } as EditableCandidate;
         return { ...candidate, reviewReasons: deriveReviewReasons(candidate) };
       });
       setItems(mappedItems);
@@ -202,66 +187,54 @@ export function TransactionImportSheet({
     }
   }
 
-  function validateSelected() {
-    for (const item of items) {
-      if (!item.selected || item.kind !== "expense") continue;
-      if (!item.date || !/^\d{4}-\d{2}-\d{2}$/.test(item.date)) return `${item.merchant || "거래"}의 날짜를 확인해주세요.`;
-      if (!(item.amount > 0)) return `${item.merchant || "거래"}의 금액을 확인해주세요.`;
-      if (!item.merchant.trim()) return "가맹점명을 확인해주세요.";
-      if (!item.categoryId) return `${item.merchant || "거래"}의 카테고리를 선택해주세요.`;
-      if (!item.paymentMethodId) return `${item.merchant || "거래"}의 결제수단을 선택해주세요.`;
-      if (!item.spendingTarget) return `${item.merchant || "거래"}의 지출대상을 선택해주세요.`;
-    }
-    return null;
+  function addManualItem() {
+    const requestId = createRequestId();
+    const item: EditableCandidate = {
+      candidateId: requestId, requestId, kind: "expense", selected: true,
+      date: getSeoulDateString(),
+      time: "", amount: 0, merchant: "", cardName: "", suggestedCategoryName: "", confidence: "high",
+      memo: "", sourceText: "", categoryId: null, categoryName: "", categorySuggestionSource: null,
+      paymentMethodId: null, paymentMethodName: "", fromAccountId: "", toAccountId: "",
+      spendingTarget: bootstrap.spendingTargets.includes(userName) ? userName : "공동", duplicate: null, reviewReasons: []
+    };
+    item.reviewReasons = deriveReviewReasons(item);
+    setItems(current => [...current, item]);
+    setExpandedCandidateId(requestId);
+    setStage("review");
   }
 
   async function handleSave() {
-    const validationError = validateSelected();
-    if (validationError) {
-      setError(validationError);
+    if (savingRef.current) return;
+    const selected = items.filter(item => item.selected && !item.queued && item.kind !== "refund");
+    if (!selected.length) { setError("저장할 거래를 선택해주세요."); return; }
+    // Validate the whole selection before queueing any item.
+    let payloads;
+    try { payloads = selected.map(item => buildImportPayload(item, bootstrap)); }
+    catch (validationError) {
+      setError(validationError instanceof Error ? validationError.message : "입력 내용을 확인해주세요.");
       return;
     }
-    if (selectedCount === 0) {
-      setError("저장할 거래를 선택해주세요.");
-      return;
-    }
+    savingRef.current = true;
     setSaving(true);
     setError("");
+    let queued = 0;
     try {
-      for (const item of items) {
-        if (!item.selected || item.kind !== "expense") continue;
-        const requestId = createRequestId();
-        const benefitRule = bootstrap.automationSettings?.benefitRules.find(
-          rule => rule.accountId === item.paymentMethodId && benefitRuleActive(rule, item.date)
-        );
+      for (let index = 0; index < selected.length; index += 1) {
+        const item = selected[index];
         await enqueuePendingTransaction({
           owner: userName,
-          label: `${item.merchant} · ${formatMoney(item.amount)}`,
-          payload: {
-            date: item.date,
-            type: "지출",
-            amount: item.amount,
-            categoryId: item.categoryId!,
-            paymentMethodId: item.paymentMethodId!,
-            spendingTarget: item.spendingTarget,
-            description: item.merchant,
-            memo: item.memo,
-            ...(benefitRule
-              ? {
-                  benefitRuleId: benefitRule.id,
-                  benefitRewardUsedAmount: 0,
-                  benefitAccrualEnabled: true
-                }
-              : {}),
-            requestId
-          }
+          label: `${IMPORT_TYPE_LABELS[item.kind]} · ${item.merchant} · ${formatMoney(item.amount)}`,
+          payload: payloads[index]
         });
+        queued += 1;
+        setItems(current => current.map(row => row.candidateId === item.candidateId
+          ? { ...row, queued: true, selected: false } : row));
       }
-      setFeedback(`${selectedCount}건을 저장 대기열에 추가했습니다.`);
-      window.setTimeout(onClose, 550);
+      setFeedback(`${queued}건을 기기에 보관했습니다. 서버 저장 상태는 입력 화면에서 확인할 수 있습니다.`);
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "거래를 저장하지 못했습니다.");
+      setError(`${queued}건은 대기열에 추가되었습니다. 나머지 항목만 다시 시도해주세요. ${saveError instanceof Error ? saveError.message : "저장 공간을 확인해주세요."}`);
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }
@@ -269,15 +242,17 @@ export function TransactionImportSheet({
   return (
     <BottomSheet
       title="거래 내역 가져오기"
-      onClose={onClose}
+      onClose={() => { if (!savingRef.current && !analyzing) onClose(); }}
       contentClassName={styles.content}
       size="large"
     >
+      <fieldset disabled={saving || analyzing} className={styles.formFields}>
       {stage === "source" ? (
         <div className={styles.sourceGrid}>
           <div className={styles.sourceIntro}>
             <strong>가져올 방식을 선택해주세요</strong>
-            <p>캡처와 텍스트 중 하나만 사용하면 됩니다.</p>
+            <p>지출·수입·이체 내역을 가져오거나 직접 여러 건 입력할 수 있습니다.</p>
+            <Button variant="secondary" onClick={addManualItem}>직접 일괄 입력</Button>
           </div>
 
           <div className={styles.sourceTabs} role="tablist" aria-label="거래 내역 입력 방식">
@@ -332,7 +307,7 @@ export function TransactionImportSheet({
                   </svg>
                 </span>
                 <span className={styles.uploadCopy}>
-                  <strong>{files.length > 0 ? "다른 캡처 선택하기" : "카드 내역 캡처 선택"}</strong>
+                  <strong>{files.length > 0 ? "다른 캡처 선택하기" : "카드·계좌 내역 캡처 선택"}</strong>
                   <small>스크린샷 또는 사진 · 최대 4장</small>
                 </span>
                 <span className={styles.uploadAction}>{files.length > 0 ? "변경" : "선택"}</span>
@@ -363,12 +338,12 @@ export function TransactionImportSheet({
                 </div>
               )}
 
-              <p className={styles.sourceHint}>카드 앱의 승인 내역이 보이도록 캡처하면 여러 건을 한 번에 인식합니다.</p>
+              <p className={styles.sourceHint}>카드·은행 앱의 거래 내역을 캡처해주세요. 인식 후 지출·수입·이체와 계좌를 확인할 수 있습니다.</p>
             </div>
           ) : (
             <div className={styles.textPanel}>
               <label className={styles.field}>
-                <span>카드 승인 문자 또는 결제 내역</span>
+                <span>입출금 문자 또는 거래 내역</span>
                 <textarea
                   className={styles.textarea}
                   value={text}
@@ -410,36 +385,30 @@ export function TransactionImportSheet({
                 <span>{selectedCount > 0 ? `${selectedCount}건에 바로 적용됩니다.` : "먼저 저장할 거래를 선택해주세요."}</span>
               </div>
               <div className={styles.bulkControls}>
-                <select
-                  className={styles.bulkSelect}
-                  value=""
-                  disabled={selectedCount === 0}
-                  onChange={event => {
-                    const category = expenseCategories.find(item => item.categoryId === event.target.value);
-                    if (!category) return;
-                    patchSelected({ categoryId: category.categoryId, categoryName: category.name });
-                  }}
-                  aria-label="선택 항목 카테고리 일괄 변경"
-                >
-                  <option value="">카테고리 일괄 변경</option>
-                  {expenseCategories.map(category => (
-                    <option key={category.categoryId} value={category.categoryId}>{category.name}</option>
-                  ))}
+                <select className={styles.bulkSelect} value="" disabled={!selectedCount} aria-label="선택 항목 유형 일괄 변경"
+                  onChange={event => patchSelected({ kind: event.target.value as ImportKind })}>
+                  <option value="">거래 유형 일괄 변경</option>
+                  <option value="expense">지출</option><option value="income">수입</option><option value="transfer">이체</option>
                 </select>
-                <select
-                  className={styles.bulkSelect}
-                  value=""
-                  disabled={selectedCount === 0}
-                  onChange={event => {
-                    const account = paymentMethods.find(item => item.accountId === event.target.value);
-                    if (!account) return;
-                    patchSelected({ paymentMethodId: account.accountId, paymentMethodName: account.displayName });
-                  }}
-                  aria-label="선택 항목 결제수단 일괄 변경"
-                >
-                  <option value="">결제수단 일괄 변경</option>
-                  {paymentMethodOptions}
+                <select className={styles.bulkSelect} value="" disabled={!selectedCount || !bulkKind} aria-label="선택 항목 카테고리 일괄 변경"
+                  onChange={event => { const category = bulkCategories.find(row => row.categoryId === event.target.value); if (category) patchSelected({ categoryId: category.categoryId, categoryName: category.name }); }}>
+                  <option value="">{bulkKind ? "카테고리 일괄 변경" : "같은 유형끼리 선택해주세요"}</option>
+                  {bulkCategories.map(category => <option key={category.categoryId} value={category.categoryId}>{category.name}</option>)}
                 </select>
+                {bulkKind === "expense" && <>
+                  <select className={styles.bulkSelect} value="" aria-label="선택 항목 결제수단 일괄 변경" onChange={event => { const account = paymentMethods.find(row => row.accountId === event.target.value); if (account) patchSelected({ paymentMethodId: account.accountId, paymentMethodName: account.displayName }); }}>
+                    <option value="">결제수단 일괄 변경</option>{paymentMethodOptions}
+                  </select>
+                  <select className={styles.bulkSelect} value="" aria-label="선택 항목 지출대상 일괄 변경" onChange={event => patchSelected({ spendingTarget: event.target.value })}>
+                    <option value="">지출대상 일괄 변경</option>{bootstrap.spendingTargets.map(target => <option key={target}>{target}</option>)}
+                  </select>
+                </>}
+                {bulkKind === "transfer" && <select className={styles.bulkSelect} value="" aria-label="선택 항목 출금계좌 일괄 변경" onChange={event => patchSelected({ fromAccountId: event.target.value })}>
+                  <option value="">출금계좌 일괄 변경</option>{accountOptions}
+                </select>}
+                {(bulkKind === "income" || bulkKind === "transfer") && <select className={styles.bulkSelect} value="" aria-label="선택 항목 입금계좌 일괄 변경" onChange={event => patchSelected({ toAccountId: event.target.value })}>
+                  <option value="">입금계좌 일괄 변경</option>{accountOptions}
+                </select>}
               </div>
             </div>
           )}
@@ -457,7 +426,7 @@ export function TransactionImportSheet({
                 <input
                   type="checkbox"
                   checked={item.selected}
-                  disabled={item.kind === "refund"}
+                  disabled={item.kind === "refund" || item.queued}
                   aria-label={`${item.merchant || "거래"} 저장 선택`}
                   onChange={event => patchItem(item.candidateId, { selected: event.target.checked })}
                 />
@@ -468,9 +437,9 @@ export function TransactionImportSheet({
                   onClick={() => setExpandedCandidateId(current => current === item.candidateId ? null : item.candidateId)}
                 >
                   <div className={styles.candidateTitle}>
-                    <strong>{item.kind === "refund" ? "취소/환불 · " : ""}{item.merchant || "가맹점 확인 필요"}</strong>
+                    <strong>{item.queued ? "대기열 추가됨 · " : `${IMPORT_TYPE_LABELS[item.kind]} · `}{item.merchant || "거래 내용 확인 필요"}</strong>
                     <p>
-                      {[item.date || "날짜 확인", item.time, item.categoryName || "카테고리 확인", item.paymentMethodName]
+                      {[item.date || "날짜 확인", item.time, item.categoryName || "카테고리 확인", item.kind === "expense" ? item.paymentMethodName : transferAccounts.find(account => account.accountId === item.toAccountId)?.displayName]
                         .filter(Boolean)
                         .join(" · ")}
                     </p>
@@ -486,7 +455,7 @@ export function TransactionImportSheet({
               </div>
 
               {expandedCandidateId === item.candidateId && (
-                <div className={styles.candidateDetails}>
+                <fieldset disabled={item.queued} className={[styles.formFields, styles.candidateDetails].join(" ")}>
                   {item.reviewReasons.length > 0 && (
                     <ul className={styles.reasonList}>
                       {item.reviewReasons.map(reason => <li key={reason}>{reason}</li>)}
@@ -496,6 +465,14 @@ export function TransactionImportSheet({
                     <p className={styles.notice}>기존 거래: {item.duplicate.date} · {item.duplicate.description || item.duplicate.category} · {formatMoney(item.duplicate.amount)}</p>
                   )}
 
+                  <label className={styles.field}>
+                    <span>거래 유형</span>
+                    <select className={styles.select} value={item.kind} disabled={item.kind === "refund"}
+                      onChange={event => patchItem(item.candidateId, { kind: event.target.value as ImportKind })}>
+                      <option value="expense">지출</option><option value="income">수입</option><option value="transfer">이체</option>
+                      {item.kind === "refund" && <option value="refund">취소/환불 · 원거래 연결 필요</option>}
+                    </select>
+                  </label>
                   <div className={styles.grid2}>
                     <label className={styles.field}>
                       <span>날짜</span>
@@ -513,7 +490,7 @@ export function TransactionImportSheet({
                       <input className={styles.input} inputMode="numeric" value={item.amount || ""} onChange={event => patchItem(item.candidateId, { amount: Number(event.target.value.replace(/[^0-9]/g, "")) || 0 })} />
                     </label>
                     <label className={styles.field}>
-                      <span>가맹점</span>
+                      <span>거래 내용·가맹점</span>
                       <input className={styles.input} value={item.merchant} onChange={event => patchItem(item.candidateId, { merchant: event.target.value })} />
                     </label>
                   </div>
@@ -525,15 +502,15 @@ export function TransactionImportSheet({
                         className={styles.select}
                         value={item.categoryId || ""}
                         onChange={event => {
-                          const category = expenseCategories.find(categoryItem => categoryItem.categoryId === event.target.value);
+                          const category = categories.find(categoryItem => categoryItem.categoryId === event.target.value);
                           patchItem(item.candidateId, { categoryId: event.target.value || null, categoryName: category?.name || "" });
                         }}
                       >
                         <option value="">선택</option>
-                        {expenseCategories.map(category => <option key={category.categoryId} value={category.categoryId}>{category.name}</option>)}
+                        {categories.filter(category => category.type === IMPORT_TYPE_LABELS[item.kind]).map(category => <option key={category.categoryId} value={category.categoryId}>{category.name}</option>)}
                       </select>
                     </label>
-                    <label className={styles.field}>
+                    {item.kind === "expense" && <label className={styles.field}>
                       <span>결제수단</span>
                       <select
                         className={styles.select}
@@ -546,17 +523,30 @@ export function TransactionImportSheet({
                         <option value="">선택</option>
                         {paymentMethodOptions}
                       </select>
-                    </label>
+                    </label>}
                   </div>
 
-                  <label className={styles.field}>
+                  {item.kind === "expense" && <label className={styles.field}>
                     <span>지출대상</span>
                     <select className={styles.select} value={item.spendingTarget} onChange={event => patchItem(item.candidateId, { spendingTarget: event.target.value })}>
                       <option value="">선택</option>
                       {bootstrap.spendingTargets.map(target => <option key={target} value={target}>{target}</option>)}
                     </select>
-                  </label>
-                </div>
+                  </label>}
+                  {item.kind === "transfer" && <label className={styles.field}>
+                    <span>출금계좌</span>
+                    <select className={styles.select} value={item.fromAccountId || ""} onChange={event => patchItem(item.candidateId, { fromAccountId: event.target.value })}>
+                      <option value="">선택</option>{accountOptions}
+                    </select>
+                  </label>}
+                  {(item.kind === "income" || item.kind === "transfer") && <label className={styles.field}>
+                    <span>입금계좌</span>
+                    <select className={styles.select} value={item.toAccountId || ""} onChange={event => patchItem(item.candidateId, { toAccountId: event.target.value })}>
+                      <option value="">선택</option>{accountOptions}
+                    </select>
+                  </label>}
+                  <label className={styles.field}><span>메모</span><input className={styles.input} value={item.memo} onChange={event => patchItem(item.candidateId, { memo: event.target.value })} /></label>
+                </fieldset>
               )}
             </article>
           ))}
@@ -564,11 +554,13 @@ export function TransactionImportSheet({
           {error && <p className={styles.error}>{error}</p>}
           {feedback && <p className={styles.feedback}>{feedback}</p>}
           <div className={styles.actions}>
+            <Button variant="secondary" onClick={addManualItem}>거래 추가</Button>
             <Button variant="secondary" onClick={() => { setStage("source"); setError(""); }}>다시 분석</Button>
             <Button loading={saving} loadingLabel="추가 중..." disabled={selectedCount === 0} onClick={handleSave}>선택 {selectedCount}건 저장</Button>
           </div>
         </div>
       )}
+      </fieldset>
     </BottomSheet>
   );
 }

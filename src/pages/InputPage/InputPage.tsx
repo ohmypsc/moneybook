@@ -602,7 +602,7 @@ export default function InputPage({
   const [
     benefitEnabled,
     setBenefitEnabled
-  ] = useState(true);
+  ] = useState(hasLaunchPreset ? true : initialDraft?.benefitEnabled !== false);
 
   const [
     benefitRewardUsedAmount,
@@ -697,6 +697,10 @@ export default function InputPage({
     setInvestmentTradeHistoryRefreshKey
   ] = useState(0);
 
+  const [installmentMonths, setInstallmentMonths] = useState(
+    hasLaunchPreset ? 1 : initialDraft?.installmentMonths || 1
+  );
+
   useEffect(
     () => {
       if (!success) {
@@ -739,7 +743,9 @@ export default function InputPage({
           memo,
           benefitRewardUsedAmount,
           loanPrincipalAmount,
-          loanInterestAmount
+          loanInterestAmount,
+          installmentMonths,
+          benefitEnabled
         }
       );
     },
@@ -758,7 +764,9 @@ export default function InputPage({
       memo,
       benefitRewardUsedAmount,
       loanPrincipalAmount,
-      loanInterestAmount
+      loanInterestAmount,
+      installmentMonths,
+      benefitEnabled
     ]
   );
 
@@ -1011,7 +1019,6 @@ export default function InputPage({
   const savingCount =
     pendingTransactions.filter(
       item =>
-        item.status === "pending" ||
         item.status === "saving"
     ).length;
 
@@ -1318,7 +1325,7 @@ export default function InputPage({
     );
 
   // 신용카드 할부(무이자). 1 = 일시불
-  const [installmentMonths, setInstallmentMonths] = useState(1);
+
 
   const selectedPaymentAccount = useMemo(
     () => allAccounts.find(account => account.accountId === paymentMethodId) ?? null,
@@ -1329,10 +1336,10 @@ export default function InputPage({
     mode === "expense" && selectedPaymentAccount?.subType === "신용카드";
 
   useEffect(() => {
-    if (!canUseInstallment && installmentMonths !== 1) {
+    if ((mode !== "expense" || (selectedPaymentAccount && !canUseInstallment)) && installmentMonths !== 1) {
       setInstallmentMonths(1);
     }
-  }, [canUseInstallment, installmentMonths]);
+  }, [mode, selectedPaymentAccount, canUseInstallment, installmentMonths]);
 
   const selectedCard =
     useMemo(
@@ -1465,16 +1472,20 @@ export default function InputPage({
         )
       : "";
 
+  const benefitSelectionRef = useRef(`${mode}:${paymentMethodId}:${toAccountId}`);
   useEffect(
     () => {
-      setBenefitEnabled(true);
+      const selection = `${mode}:${paymentMethodId}:${toAccountId}`;
+      if (benefitSelectionRef.current !== selection) {
+        setBenefitEnabled(true);
+        setBenefitRewardUsedAmount("");
+        benefitSelectionRef.current = selection;
+      }
       setBenefitPreview(null);
       setBenefitPreviewError("");
-      if (!selectedBenefitRule || selectedBenefitRule.kind !== "post_reward") {
-        setBenefitRewardUsedAmount("");
-      }
+
     },
-    [selectedBenefitRule?.id, selectedBenefitRule?.kind]
+    [mode, paymentMethodId, toAccountId, selectedBenefitRule?.id, selectedBenefitRule?.kind]
   );
 
   useEffect(
@@ -1700,6 +1711,8 @@ export default function InputPage({
     );
     setDescription(payload.description || "");
     setMemo(payload.memo || "");
+    benefitSelectionRef.current = `${nextMode}:${payload.paymentMethodId || ""}:${payload.toAccountId || ""}`;
+    setBenefitEnabled(payload.benefitAccrualEnabled !== false);
     setInstallmentMonths(Number(payload.installmentMonths) > 1 ? Number(payload.installmentMonths) : 1);
     setBenefitRewardUsedAmount(
       payload.benefitRewardUsedAmount
@@ -4019,6 +4032,7 @@ export default function InputPage({
           <PendingTransactionPanel
             userName={userName}
             savingCount={savingCount}
+            waitingCount={pendingTransactions.filter(item => item.status === "pending").length}
             failedTransactions={failedTransactions}
             onEditFailed={loadFailedTransactionForEdit}
           />

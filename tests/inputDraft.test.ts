@@ -39,3 +39,12 @@ test("meaningful draft ignores date/billing month alone but keeps real user inpu
   assert.equal(hasMeaningfulInputDraft({ ...draft, description: "점심" }), true);
   assert.equal(hasMeaningfulInputDraft({ ...draft, amount: "10000" }), true);
 });
+
+test("draft preserves installments and disabled benefit accrual, and reads legacy drafts", () => {
+  const draft = parseInputDraft({ ...emptyDraft(), amount: "360000", installmentMonths: 12, benefitEnabled: false });
+  assert.equal(draft?.installmentMonths, 12);
+  assert.equal(draft?.benefitEnabled, false);
+  assert.equal(parseInputDraft(emptyDraft())?.installmentMonths, 1);
+  assert.equal(parseInputDraft(emptyDraft())?.benefitEnabled, true);
+  assert.equal(parseInputDraft({ ...emptyDraft(), installmentMonths: 99 })?.installmentMonths, 1);
+});

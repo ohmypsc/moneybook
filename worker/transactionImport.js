@@ -8,7 +8,7 @@ const FAST_IMAGE_MODEL = "@cf/moondream/moondream3.1-9B-A2B";
 const FALLBACK_MODEL = "@cf/google/gemma-4-26b-a4b-it";
 const MAX_AI_CONCURRENCY = 4;
 const MAX_TEXT_LENGTH = 20000;
-const MAX_IMAGES = 4; // 화면(TransactionImportSheet)과 README의 최대 4장과 맞춥니다.
+const MAX_IMAGES = 8; // 최대 4개 원본을 자른 이미지 조각을 모두 처리합니다.
 const MAX_IMAGE_DATA_URL_LENGTH = 4_500_000;
 
 function getOutputText(response) {
@@ -33,10 +33,10 @@ function getOutputText(response) {
 }
 
 function buildPrompt({ today, sourceLabel }) {
-  return `Read the Korean card/payment ${sourceLabel} carefully and extract ALL visible purchase, approval, charge, cancellation, or refund rows.
+  return `Read the Korean card/bank transaction ${sourceLabel} carefully and extract ALL visible expenses, income/deposits, transfers between own accounts, cancellations, and refunds.
 Today is ${today}. If a row has a merchant and an amount, KEEP IT even when the date, time, or card name is unclear. Do not return an empty list when real transaction rows are visible.
-Return JSON only: {"transactions":[{"d":"YYYY-MM-DD or empty","t":"HH:MM or empty","m":"merchant","a":12500,"s":"expense or refund","c":"card name or empty","r":"short text copied from that row"}]}
-Ignore totals, balances, limits, points, section headings, and bill summaries. Amounts are positive integer KRW. Keep repeated purchases as separate rows. For unclear fields use an empty string or 0 instead of dropping the transaction. Infer a missing year from today when reasonable.`;
+Return JSON only: {"transactions":[{"d":"YYYY-MM-DD or empty","t":"HH:MM or empty","m":"merchant","a":12500,"s":"expense, income, transfer, or refund","c":"card name or empty","r":"short text copied from that row"}]}
+Classify salary/interest/received income as income, purchases as expense, and explicit movement between own accounts as transfer. A transfer to a merchant is an expense. Do not infer ownership from the word transfer alone; mark ambiguous rows with confidence:"low". Never turn cancellations/refunds into income. Use c for the visible card/bank account label; leave unknown account labels empty. Ignore totals, balances, limits, points, section headings, and bill summaries. Amounts are positive integer KRW. Keep repeated purchases as separate rows. For unclear fields use an empty string or 0 instead of dropping the transaction. Infer a missing year from today when reasonable.`;
 }
 
 function isUsefulTransactionList(values) {

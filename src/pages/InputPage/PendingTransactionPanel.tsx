@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Button } from "../../components/common/Button/Button";
 import { confirmAction } from "../../utils/confirmAction";
 import {
@@ -11,6 +12,7 @@ import styles from "./InputPage.module.css";
 interface PendingTransactionPanelProps {
   userName: string;
   savingCount: number;
+  waitingCount: number;
   failedTransactions: PendingTransactionRecord[];
   onEditFailed: (item: PendingTransactionRecord) => Promise<void> | void;
 }
@@ -18,11 +20,17 @@ interface PendingTransactionPanelProps {
 export function PendingTransactionPanel({
   userName,
   savingCount,
+  waitingCount,
   failedTransactions,
   onEditFailed
 }: PendingTransactionPanelProps) {
+  const [showAll, setShowAll] = useState(false);
   return (
     <>
+      {waitingCount > 0 && <div className={styles.queueStatus} role="status">
+        <strong>기기에 보관됨 · {waitingCount}건</strong>
+        <span>서버 전송을 기다리고 있어요. 오프라인이면 연결 후 자동으로 저장합니다.</span>
+      </div>}
       {savingCount > 0 && (
         <div className={styles.queueStatus} role="status">
           <strong>저장 중 · {savingCount}건</strong>
@@ -46,7 +54,10 @@ export function PendingTransactionPanel({
             )}
           </div>
 
-          {failedTransactions.slice(0, 3).map(item => (
+          {failedTransactions.length > 3 && <Button variant="secondary" size="sm" onClick={() => setShowAll(value => !value)}>
+            {showAll ? "접기" : `실패 내역 전체 ${failedTransactions.length}건 보기`}
+          </Button>}
+          {(showAll ? failedTransactions : failedTransactions.slice(0, 3)).map(item => (
             <div key={item.id} className={styles.queueFailureItem}>
               <div>
                 <span className={styles.queueFailureLabel}>{item.label}</span>

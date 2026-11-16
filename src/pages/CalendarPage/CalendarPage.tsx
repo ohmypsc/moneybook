@@ -1754,6 +1754,9 @@ export default function CalendarPage({
             [bootstrap]
         );
 
+    const settlementRequestRef = useRef<{ fingerprint: string; requestId: string } | null>(null);
+    const settlementSavingRef = useRef(false);
+
     async function ensureBootstrap() {
         if (bootstrap) {
             return bootstrap;
@@ -1837,6 +1840,7 @@ export default function CalendarPage({
     async function handleSettlementSave(
         transaction: CalendarTransaction
     ) {
+        if (settlementSavingRef.current) return;
         const amount = Number(settlementAmount.replace(/,/g, ""));
         if (!Number.isFinite(amount) || amount <= 0) {
             setActionError("정산받은 금액을 입력해주세요.");
@@ -1851,22 +1855,33 @@ export default function CalendarPage({
             return;
         }
 
+        settlementSavingRef.current = true;
         setSettlementSavingId(transaction.transactionId);
         setActionError("");
         setActionFeedback("");
 
         try {
-            const requestToken = globalThis.crypto?.randomUUID
-                ? globalThis.crypto.randomUUID()
-                : `${Date.now()}_${Math.random().toString(16).slice(2)}`;
-            const result = await createSettlement({
+            const payload = {
                 transactionId: transaction.transactionId,
                 amount,
                 toAccountId: settlementAccountId,
                 date: getToday(),
-                memo: settlementMemo.trim(),
-                requestId: requestToken
+                memo: settlementMemo.trim()
+            };
+            const fingerprint = JSON.stringify(payload);
+            if (settlementRequestRef.current?.fingerprint !== fingerprint) {
+                settlementRequestRef.current = {
+                    fingerprint,
+                    requestId: globalThis.crypto?.randomUUID
+                        ? globalThis.crypto.randomUUID()
+                        : `${Date.now()}_${Math.random().toString(16).slice(2)}`
+                };
+            }
+            const result = await createSettlement({
+                ...payload,
+                requestId: settlementRequestRef.current.requestId
             });
+            settlementRequestRef.current = null;
             setSettlementSummary(result.summary);
             setSettlementSummaries(current => ({
                 ...current,
@@ -1880,6 +1895,7 @@ export default function CalendarPage({
         } catch (settlementError) {
             setActionError(getErrorMessage(settlementError));
         } finally {
+            settlementSavingRef.current = false;
             setSettlementSavingId(null);
         }
     }

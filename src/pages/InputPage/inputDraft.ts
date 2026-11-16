@@ -4,6 +4,8 @@ const INPUT_DRAFT_KEY_PREFIX = "moneybook:input-draft:v1:";
 
 export interface InputDraft {
   mode: InputMode;
+  installmentMonths?: number;
+  benefitEnabled?: boolean;
   date: string;
   amount: string;
   description: string;
@@ -40,6 +42,9 @@ export function parseInputDraft(value: unknown): InputDraft | null {
 
   return {
     mode: draft.mode,
+    installmentMonths: Number.isInteger(draft.installmentMonths) && Number(draft.installmentMonths) >= 1 && Number(draft.installmentMonths) <= 36
+      ? Number(draft.installmentMonths) : 1,
+    benefitEnabled: draft.benefitEnabled !== false,
     date: text(draft.date),
     amount: text(draft.amount),
     description: text(draft.description),

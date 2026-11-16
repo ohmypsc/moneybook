@@ -286,3 +286,16 @@ test("multiple images are analyzed concurrently", async () => {
 test("merchant normalization ignores punctuation and parenthetical text", () => {
   assert.equal(normalizeMerchant("스타벅스(세종점)"), "스타벅스");
 });
+
+test("income and transfer recognition is preserved and category history respects type", () => {
+  const income = normalizeImportedCandidate({ date: "2026-11-16", amount: 1000, merchant: "급여", kind: "income" });
+  const transfer = normalizeImportedCandidate({ d: "2026-11-16", a: 1000, m: "저축", s: "transfer" });
+  assert.equal(income.kind, "income");
+  assert.equal(transfer.kind, "transfer");
+  const categories = [
+    { categoryId: "E", name: "급여", type: "지출", active: true },
+    { categoryId: "I", name: "급여", type: "수입", active: true }
+  ];
+  assert.equal(chooseCategory({ ...income, suggestedCategoryName: "급여" }, categories, [{ description: "급여", type: "지출", categoryId: "E" }]).category.categoryId, "I");
+  assert.equal(findDuplicateTransaction(income, [{ transactionId: "E", date: income.date, amount: 1000, type: "지출", description: "급여" }]), null);
+});

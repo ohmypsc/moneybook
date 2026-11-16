@@ -174,7 +174,7 @@ export function BackupRestorePanel() {
     } catch (restoreError) {
       invalidateAfterRestoreAttempt();
       setError(
-        `${getErrorMessage(restoreError, "백업을 복원하지 못했습니다.")} 안전백업을 보관한 채 현재 데이터를 다시 확인해주세요.`
+        `${getErrorMessage(restoreError, "백업을 복원하지 못했습니다.")} 안전백업을 보관해주세요. 연결 오류라면 복원이 완료됐을 수도 있으므로 현재 데이터를 새로고침하여 확인한 뒤 다시 시도해주세요.`
       );
       setFeedback("");
     } finally {
@@ -188,7 +188,7 @@ export function BackupRestorePanel() {
         <h2>전체 백업 · 복원</h2>
         <p>
           JSON 백업은 계좌·카테고리·거래·투자·부동산·설정·카드 혜택 사용 누계까지 보관합니다.
-          복원은 현재 데이터에 안전하게 병합합니다.
+          같은 ID는 백업 값으로 갱신합니다. 저장 중 오류가 발생하면 복원 변경 전체를 취소합니다.
         </p>
       </div>
 

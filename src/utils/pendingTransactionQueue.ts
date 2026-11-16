@@ -52,6 +52,15 @@ let lastCompletion: PendingTransactionCompletion | null = null;
 let activeOwner = "";
 let channel: BroadcastChannel | null = null;
 
+// Queue UI and background sync can write concurrently. Serialize in-tab writes so
+// an older snapshot cannot erase a newly queued row during bulk input.
+let queueWrite = Promise.resolve();
+function serializeQueueWrite<T>(operation: () => Promise<T>): Promise<T> {
+  const result = queueWrite.then(operation);
+  queueWrite = result.then(() => undefined, () => undefined);
+  return result;
+}
+
 function now() {
   return Date.now();
 }
@@ -498,40 +507,44 @@ async function updateRecord(
   id: string,
   patch: Partial<PendingTransactionRecord>
 ) {
-  await ensureLoadedAsync();
+  return serializeQueueWrite(async () => {
+    await ensureLoadedAsync();
 
-  const current = records.find(record => record.id === id);
-  if (!current) return;
+    const current = records.find(record => record.id === id);
+    if (!current) return;
 
-  const updated: PendingTransactionRecord = {
-    ...current,
-    ...patch,
-    updatedAt: now()
-  };
+    const updated: PendingTransactionRecord = {
+      ...current,
+      ...patch,
+      updatedAt: now()
+    };
 
-  const nextRecords = records.map(record =>
-    record.id === id ? updated : record
-  );
+    const nextRecords = records.map(record =>
+      record.id === id ? updated : record
+    );
 
-  await persistRecordBestEffort(updated, nextRecords);
-  records = nextRecords;
-  emit();
-  broadcastQueueChanged();
+    await persistRecordBestEffort(updated, nextRecords);
+    records = nextRecords;
+    emit();
+    broadcastQueueChanged();
+  });
 }
 
 async function removeRecord(
   id: string
 ) {
-  await ensureLoadedAsync();
+  return serializeQueueWrite(async () => {
+    await ensureLoadedAsync();
 
-  const nextRecords = records.filter(
-    record => record.id !== id
-  );
+    const nextRecords = records.filter(
+      record => record.id !== id
+    );
 
-  await removePersistentRecord(id, nextRecords);
-  records = nextRecords;
-  emit();
-  broadcastQueueChanged();
+    await removePersistentRecord(id, nextRecords);
+    records = nextRecords;
+    emit();
+    broadcastQueueChanged();
+  });
 }
 
 async function processQueue(
@@ -753,39 +766,41 @@ export async function enqueuePendingTransaction(
     throw new Error("로그인 사용자를 확인할 수 없습니다.");
   }
 
-  await ensureLoadedAsync();
+  return serializeQueueWrite(async () => {
+    await ensureLoadedAsync();
 
-  const existing = records.find(
-    record => record.id === requestId
-  );
+    const existing = records.find(
+      record => record.id === requestId
+    );
 
-  if (!existing) {
-    const timestamp = now();
+    if (!existing) {
+      const timestamp = now();
 
-    const record: PendingTransactionRecord = {
-      id: requestId,
-      owner: input.owner,
-      label: input.label,
-      payload: input.payload,
-      status: "pending",
-      error: "",
-      createdAt: timestamp,
-      updatedAt: timestamp
-    };
+      const record: PendingTransactionRecord = {
+        id: requestId,
+        owner: input.owner,
+        label: input.label,
+        payload: input.payload,
+        status: "pending",
+        error: "",
+        createdAt: timestamp,
+        updatedAt: timestamp
+      };
 
-    const nextRecords = [
-      ...records,
-      record
-    ];
+      const nextRecords = [
+        ...records,
+        record
+      ];
 
-    await persistRecordBestEffort(record, nextRecords);
+      await persistRecordBestEffort(record, nextRecords);
 
-    records = nextRecords;
-    emit();
-    broadcastQueueChanged();
-  }
+      records = nextRecords;
+      emit();
+      broadcastQueueChanged();
+    }
 
-  void processQueue(input.owner);
+    void processQueue(input.owner);
+  });
 }
 
 export function retryPendingTransaction(
