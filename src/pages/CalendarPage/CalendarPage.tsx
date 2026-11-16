@@ -2519,7 +2519,8 @@ export default function CalendarPage({
 
         try {
             await deleteTransaction(
-                targetId
+                targetId,
+                transaction.updatedAtMs
             );
 
             setTransactions(

@@ -51,6 +51,8 @@ import {
   processRecurringTransactions
 } from "./api/automation";
 
+import { confirmAction } from "./utils/confirmAction";
+
 import {
   getPendingTransactions,
   startPendingTransactionQueue,
@@ -491,6 +493,7 @@ function scheduleSecondaryWarm() {
 
 
 export default function App() {
+  const logoutInProgress = useRef(false);
   const [
     status,
     setStatus
@@ -1256,11 +1259,22 @@ export default function App() {
 
 
   async function handleLogout() {
+    if (logoutInProgress.current) return;
+    logoutInProgress.current = true;
     try {
-      await logout();
-
+      const pending = user ? getPendingTransactions(user.name) : [];
+      if (pending.length && !(await confirmAction({
+        title: "아직 저장되지 않은 거래가 있어요",
+        message: `서버 저장이 완료되지 않은 거래가 ${pending.length}건 있습니다. 로그아웃해도 이 기기에 남지만, 서버 저장을 마치려면 같은 계정으로 다시 로그인해야 합니다. 로그아웃할까요?`,
+        confirmLabel: "로그아웃", cancelLabel: "계속 사용하기"
+      }))) return;
+      try {
+        await logout();
+      } finally {
+        resetToGuest();
+      }
     } finally {
-      resetToGuest();
+      logoutInProgress.current = false;
     }
   }
 

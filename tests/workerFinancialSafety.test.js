@@ -161,3 +161,56 @@ test("backup merge preserves both people's quick-entry settings and shared livin
     assert.equal(exported.payload.userDisplayPreferences.length, 3);
   } finally { env.sqlite.close(); }
 });
+
+const removeOriginal = (env, expectedUpdatedAtMs = Date.parse("2026-11-16T00:00:00.000Z")) =>
+  worker.mbD1HandleTransactionMutation("/api/transactions/delete", { transactionId: "ORIGINAL", expectedUpdatedAtMs }, session, env);
+
+test("deletion rejects a stale screen and leaves the partner's changes intact", async () => {
+  const env = database();
+  try {
+    env.sqlite.exec("UPDATE transactions SET amount=120000,updated_at='2026-11-16T00:01:00.000Z' WHERE transaction_id='ORIGINAL'");
+    await assert.rejects(removeOriginal(env), /다른 기기에서 수정/);
+    const row = env.sqlite.prepare("SELECT amount,deleted_at FROM transactions WHERE transaction_id='ORIGINAL'").get();
+    assert.equal(row.amount, 120000);
+    assert.equal(row.deleted_at, null);
+  } finally { env.sqlite.close(); }
+});
+
+test("deletion requires a screen version, allows a current version and is retry safe", async () => {
+  const env = database();
+  try {
+    await assert.rejects(worker.mbD1HandleTransactionMutation("/api/transactions/delete", { transactionId: "ORIGINAL" }, session, env), /최신 버전/);
+    assert.equal((await removeOriginal(env)).deleted, true);
+    assert.equal((await removeOriginal(env)).alreadyDeleted, true);
+    assert.equal(env.sqlite.prepare("SELECT COUNT(*) AS count FROM change_log WHERE action='deleted'").get().count, 1);
+  } finally { env.sqlite.close(); }
+});
+
+test("deletion rolls back when another device edits immediately before the write", async () => {
+  const env = database();
+  try {
+    const batch = env.DB.batch;
+    env.DB.batch = async statements => {
+      env.sqlite.exec("UPDATE transactions SET amount=200000,updated_at='2026-11-16T00:02:00.000Z' WHERE transaction_id='ORIGINAL'");
+      return batch(statements);
+    };
+    await assert.rejects(removeOriginal(env), /変更|변경/);
+    assert.equal(env.sqlite.prepare("SELECT deleted_at FROM transactions WHERE transaction_id='ORIGINAL'").get().deleted_at, null);
+    assert.equal(env.sqlite.prepare("SELECT COUNT(*) AS count FROM change_log WHERE action='deleted'").get().count, 0);
+  } finally { env.sqlite.close(); }
+});
+
+test("deletion cannot orphan a settlement added immediately before the write", async () => {
+  const env = database();
+  try {
+    const batch = env.DB.batch;
+    env.DB.batch = async statements => {
+      env.sqlite.exec(`INSERT INTO transactions(transaction_id,household_id,request_id,date,type,amount,reversal_of)
+        VALUES ('NEW_SETTLEMENT','HH_MAIN','NEW_SETTLEMENT','2026-11-16','수입',1000,'ORIGINAL')`);
+      return batch(statements);
+    };
+    await assert.rejects(removeOriginal(env), /변경/);
+    assert.equal(env.sqlite.prepare("SELECT deleted_at FROM transactions WHERE transaction_id='ORIGINAL'").get().deleted_at, null);
+    assert.equal(env.sqlite.prepare("SELECT COUNT(*) AS count FROM change_log WHERE action='deleted'").get().count, 0);
+  } finally { env.sqlite.close(); }
+});

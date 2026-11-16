@@ -219,8 +219,8 @@ export async function updateTransaction(
  * =========================================================
  */
 export async function deleteTransaction(
-  transactionId:
-    string
+  transactionId: string,
+  expectedUpdatedAtMs: number | null
 ) {
   const raw =
     await apiRequest<
@@ -236,7 +236,8 @@ export async function deleteTransaction(
 
         body:
           JSON.stringify({
-            transactionId
+            transactionId,
+            expectedUpdatedAtMs
           })
       }
     );

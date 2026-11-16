@@ -4427,6 +4427,10 @@ async function mbD1HandleTransactionMutation(path, body, session, env) {
 
   if (path === "/api/transactions/delete") {
     if (current.isDeleted) return { deleted: true, alreadyDeleted: true, transactionId };
+    if (!mbD1Has(body, "expectedUpdatedAtMs")) mbD1Fail("UPDATE_VERSION_REQUIRED", "거래의 최신 버전 정보가 필요합니다. 화면을 새로고침한 뒤 다시 시도하세요.", 409);
+    const expected = body.expectedUpdatedAtMs;
+    if (expected !== null && (typeof expected !== "number" || !Number.isFinite(expected))) mbD1Fail("INVALID_UPDATE_VERSION", "거래 버전 정보가 올바르지 않습니다.");
+    if (current.updatedAtMs !== expected) mbD1Fail("CONCURRENT_MODIFICATION", "거래가 다른 기기에서 수정되었습니다. 최신 내용을 확인한 뒤 다시 삭제하세요.", 409);
     if (!current.reversalOf) {
       const reversal = await mbD1First(
         env,
@@ -4459,7 +4463,22 @@ async function mbD1HandleTransactionMutation(path, body, session, env) {
         );
       }
     }
-    await env.DB.batch(statements);
+    // Recheck the version and linked settlements inside the same atomic batch as deletion.
+    const guard = env.DB.prepare(
+      `SELECT CASE WHEN
+         EXISTS (SELECT 1 FROM transactions WHERE household_id=? AND transaction_id=? AND deleted_at IS NULL AND updated_at IS ?)
+         AND (? IS NOT NULL OR NOT EXISTS (SELECT 1 FROM transactions WHERE household_id=? AND reversal_of=? AND deleted_at IS NULL))
+       THEN 1 ELSE json('${MB_D1_CONCURRENCY_GUARD_TOKEN}') END AS ok`
+    ).bind(MB_D1_HOUSEHOLD_ID, transactionId, current.updatedAt ?? null,
+      current.reversalOf || null, MB_D1_HOUSEHOLD_ID, transactionId);
+    try {
+      await env.DB.batch([guard, ...statements]);
+    } catch (error) {
+      if (mbD1LooksLikeConcurrencyGuardFailure(error)) {
+        mbD1Fail("CONCURRENT_MODIFICATION", "거래 또는 연결된 정산 내역이 변경되었습니다. 최신 내용을 확인한 뒤 다시 삭제하세요.", 409);
+      }
+      throw error;
+    }
     return { deleted: true, transactionId };
   }
 

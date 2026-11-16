@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { analyzeTransactionImport } from "../../api/transactionImport";
 import type { BootstrapData } from "../../types/bootstrap";
 import { BottomSheet } from "../../components/common/BottomSheet/BottomSheet";
@@ -11,6 +11,9 @@ import { getSeoulDateString } from "../../utils/dateTime";
 import { prepareImportImages } from "./importImage";
 import { prioritizeAccountsForUser } from "../../pages/InputPage/inputDomain";
 import styles from "./TransactionImportSheet.module.css";
+
+import { confirmAction } from "../../utils/confirmAction";
+import { readImportDraft, saveImportDraft, type ImportDraft } from "./importDraft";
 
 const IMPORT_CARD_SUBTYPES = ["신용카드", "체크카드", "선불/지역화폐"];
 
@@ -33,18 +36,62 @@ export function TransactionImportSheet({
   bootstrap,
   onClose
 }: TransactionImportSheetProps) {
-  const [source, setSource] = useState<ImportSource>("image");
-  const [text, setText] = useState("");
+  const [restored] = useState(() => readImportDraft(userName));
+  const [source, setSource] = useState<ImportSource>(restored?.source || "image");
+  const [text, setText] = useState(restored?.text || "");
   const [files, setFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [items, setItems] = useState<EditableCandidate[]>([]);
+  const [items, setItems] = useState<EditableCandidate[]>(restored?.items || []);
   const [analyzing, setAnalyzing] = useState(false);
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
   const [error, setError] = useState("");
-  const [feedback, setFeedback] = useState("");
-  const [stage, setStage] = useState<"source" | "review">("source");
+  const [feedback, setFeedback] = useState(restored ? "이 기기에 임시저장한 내용을 불러왔습니다. 거래 정보와 저장 상태를 확인해주세요." : "");
+  const [stage, setStage] = useState<"source" | "review">(restored?.stage || "source");
   const [expandedCandidateId, setExpandedCandidateId] = useState<string | null>(null);
+
+  const [draftSaved, setDraftSaved] = useState(true);
+  const closeInProgress = useRef(false);
+  const draft: ImportDraft = { version: 1, source, text, stage, items };
+  const hasUnsubmitted = items.some(item => !item.queued) || (items.length === 0 && Boolean(text.trim()));
+
+  useEffect(() => {
+    setDraftSaved(saveImportDraft(userName, { version: 1, source, text, stage, items }));
+  }, [userName, source, text, stage, items]);
+
+  useEffect(() => {
+    if (!hasUnsubmitted && files.length === 0 && !saving && !analyzing) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [hasUnsubmitted, files.length, saving, analyzing]);
+
+  async function handleClose() {
+    if (savingRef.current || analyzing || closeInProgress.current) return;
+    closeInProgress.current = true;
+    try {
+      const saved = saveImportDraft(userName, draft);
+      setDraftSaved(saved);
+      if ((hasUnsubmitted || files.length > 0) && !(await confirmAction({
+        title: "일괄 입력을 닫을까요?",
+        message: saved
+          ? "작성한 거래 목록과 텍스트는 이 기기에 임시저장됩니다. 아직 서버에 저장된 것은 아닙니다. 선택한 원본 이미지는 다시 선택해야 합니다."
+          : "임시저장 공간을 사용할 수 없습니다. 지금 닫으면 작성 중인 내용이 사라질 수 있습니다.",
+        confirmLabel: "닫기", cancelLabel: "계속 입력하기"
+      }))) return;
+      onClose();
+    } finally { closeInProgress.current = false; }
+  }
+
+  async function discardDraft() {
+    if (savingRef.current || analyzing || !(await confirmAction({
+      title: "일괄 입력 새로 시작", message: "작성 중인 목록과 텍스트를 비울까요? 이미 저장 대기열에 추가한 거래는 유지됩니다.",
+      confirmLabel: "비우기", tone: "danger"
+    }))) return;
+    setItems([]); setText(""); setFiles([]); setStage("source");
+    setExpandedCandidateId(null); setError(""); setFeedback("");
+    setDraftSaved(saveImportDraft(userName, { version: 1, source, text: "", stage: "source", items: [] }));
+  }
 
   const categories = useMemo(
     () => bootstrap.categories.filter(item => item.active && !item.isDeleted),
@@ -151,6 +198,10 @@ export function TransactionImportSheet({
       setError("입출금 문자나 거래 내역을 붙여넣어주세요.");
       return;
     }
+    if (items.some(item => !item.queued) && !(await confirmAction({
+      title: "다시 분석하기", message: "현재 작성 중인 목록을 새 분석 결과로 바꿀까요? 이미 저장 대기열에 넣은 거래는 유지됩니다.",
+      confirmLabel: "다시 분석", cancelLabel: "계속 입력하기"
+    }))) return;
     setAnalyzing(true);
     setError("");
     setFeedback("");
@@ -242,11 +293,15 @@ export function TransactionImportSheet({
   return (
     <BottomSheet
       title="거래 내역 가져오기"
-      onClose={() => { if (!savingRef.current && !analyzing) onClose(); }}
+      onClose={() => void handleClose()}
       contentClassName={styles.content}
       size="large"
     >
       <fieldset disabled={saving || analyzing} className={styles.formFields}>
+      <p className={draftSaved ? styles.notice : styles.error} role="status">
+        {draftSaved ? "작성 내용은 이 기기에 자동 임시저장됩니다. 원본 이미지는 보관하지 않습니다." : "임시저장에 실패했습니다. 화면을 닫기 전에 거래를 저장해주세요."}
+      </p>
+      {(items.length > 0 || text || files.length > 0) && <Button variant="secondary" onClick={() => void discardDraft()}>새로 시작</Button>}
       {stage === "source" ? (
         <div className={styles.sourceGrid}>
           <div className={styles.sourceIntro}>
