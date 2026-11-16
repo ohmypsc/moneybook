@@ -3,6 +3,8 @@ import type { InputMode } from "./inputDomain";
 const INPUT_DRAFT_KEY_PREFIX = "moneybook:input-draft:v1:";
 
 export interface InputDraft {
+  tagsText?: string;
+  categorySource?: "auto" | "manual";
   mode: InputMode;
   installmentMonths?: number;
   benefitEnabled?: boolean;
@@ -41,6 +43,8 @@ export function parseInputDraft(value: unknown): InputDraft | null {
     typeof candidate === "string" ? candidate : "";
 
   return {
+    tagsText: text(draft.tagsText),
+    categorySource: draft.categorySource === "auto" ? "auto" : "manual",
     mode: draft.mode,
     installmentMonths: Number.isInteger(draft.installmentMonths) && Number(draft.installmentMonths) >= 1 && Number(draft.installmentMonths) <= 36
       ? Number(draft.installmentMonths) : 1,
@@ -63,6 +67,7 @@ export function parseInputDraft(value: unknown): InputDraft | null {
 
 export function hasMeaningfulInputDraft(draft: InputDraft) {
   return Boolean(
+    draft.tagsText ||
     draft.amount ||
       draft.categoryId ||
       draft.paymentMethodId ||

@@ -1,3 +1,5 @@
+import { classifyTransaction, normalizeTags } from "../../../shared/classification.js";
+import { TagsInput, TagChips } from "../../components/classification/TagsInput";
 import { QuickEntryBar } from "../../components/household/QuickEntryBar";
 import type { QuickEntry } from "../../utils/inputPreferences";
 import {
@@ -511,7 +513,7 @@ export default function InputPage({
       }
 
       if (launchCategoryId) {
-        setCategoryId(launchCategoryId);
+        setCategoryId(launchCategoryId); setCategorySource("manual");
       }
 
       if (launchAmount !== null) {
@@ -586,6 +588,8 @@ export default function InputPage({
           : initialDraft?.memo || ""
     );
 
+  const [tagsText, setTagsText] = useState(hasLaunchPreset ? "" : initialDraft?.tagsText || "");
+  const [categorySource, setCategorySource] = useState<"auto" | "manual">(launchCategoryId ? "manual" : hasLaunchPreset ? "auto" : initialDraft?.categorySource || (initialDraft?.categoryId ? "manual" : "auto"));
   const [
     cardBillingInfo,
     setCardBillingInfo
@@ -736,6 +740,7 @@ export default function InputPage({
           date,
           amount,
           categoryId,
+          categorySource, tagsText,
           paymentMethodId,
           spendingTarget,
           fromAccountId,
@@ -757,6 +762,7 @@ export default function InputPage({
       date,
       amount,
       categoryId,
+      categorySource, tagsText,
       paymentMethodId,
       spendingTarget,
       fromAccountId,
@@ -1101,6 +1107,11 @@ export default function InputPage({
         backendType
       ]
     );
+
+  const classification = useMemo(() => { let tags: string[] = []; try { tags = normalizeTags(tagsText); } catch { /* validate() shows the error before save. */ } return classifyTransaction({ tags, type: backendType, description, categoryId: categorySource === "auto" ? "" : categoryId, categorySource, paymentMethodId, fromAccountId, toAccountId }, bootstrap?.classificationSettings?.rules || [], categories); }, [tagsText, backendType, description, categoryId, categorySource, paymentMethodId, fromAccountId, toAccountId, bootstrap, categories]);
+  useEffect(() => {
+    if (categorySource === "auto" && categoryId !== classification.categoryId) setCategoryId(classification.categoryId);
+  }, [classification.categoryId, categoryId, categorySource]);
 
   const selectedCategory =
     useMemo(
@@ -1705,6 +1716,8 @@ export default function InputPage({
     setDate(payload.date || today);
     setAmount(String(payload.amount || ""));
     setCategoryId(payload.categoryId || "");
+    setCategorySource(payload.categorySource || "manual");
+    setTagsText((payload.tags || []).join(", "));
     setPaymentMethodId(payload.paymentMethodId || "");
     setSpendingTarget(payload.spendingTarget || "");
     setFromAccountId(payload.fromAccountId || "");
@@ -1769,7 +1782,7 @@ export default function InputPage({
 
   async function applyQuickEntry(entry: QuickEntry) {
     if (amount && !(await confirmAction({ title: "빠른 입력으로 바꾸기", message: "작성 중인 금액과 내용을 비우고 선택한 버튼의 내용으로 바꿀까요?", confirmLabel: "바꾸기" }))) return;
-    setMode(entry.mode); setDate(today); setBillingMonth(today.slice(0, 7)); setAmount(""); setCategoryId(entry.categoryId);
+    setMode(entry.mode); setDate(today); setBillingMonth(today.slice(0, 7)); setAmount(""); setCategoryId(entry.categoryId); setCategorySource("manual"); setTagsText("");
     cardAmountEditedRef.current = false; setCardBillingInfo(null); setCardBillingError("");
     setPaymentMethodId(entry.paymentMethodId); setSpendingTarget(entry.spendingTarget);
     setFromAccountId(entry.fromAccountId); setToAccountId(entry.toAccountId); setDescription(entry.description);
@@ -1798,7 +1811,7 @@ export default function InputPage({
       nextMode
     );
 
-    setCategoryId("");
+    setCategoryId(""); setCategorySource("auto"); setTagsText("");
 
     resetAccountSelections();
 
@@ -1923,6 +1936,7 @@ export default function InputPage({
   function handleCategoryChange(
     nextCategoryId: string
   ) {
+    setCategorySource(nextCategoryId ? "manual" : "auto");
     if (
       nextCategoryId ===
       categoryId
@@ -2159,6 +2173,8 @@ export default function InputPage({
 
   function validate():
     string | null {
+    try { normalizeTags(tagsText); } catch (error) { return error instanceof Error ? error.message : "태그를 확인해주세요."; }
+
     if (
       !bootstrap
     ) {
@@ -2512,7 +2528,7 @@ export default function InputPage({
           fromAccountId,
           toAccountId,
           description: baseDescription || `${loanLabel} 원금 상환`,
-          memo: baseMemo,
+          memo: baseMemo, tags: normalizeTags(tagsText), categorySource: "manual",
           groupId,
           requestId: `${requestId}_PRINCIPAL`
         }
@@ -2531,7 +2547,7 @@ export default function InputPage({
           paymentMethodId: fromAccountId,
           spendingTarget,
           description: baseDescription || `${loanLabel} 이자`,
-          memo: baseMemo,
+          memo: baseMemo, tags: normalizeTags(tagsText), categorySource: "manual",
           groupId,
           requestId: `${requestId}_INTEREST`
         }
@@ -2540,7 +2556,7 @@ export default function InputPage({
 
     clearInputDraft(userName);
     setAmount("");
-    setCategoryId("");
+    setCategoryId(""); setCategorySource("auto"); setTagsText("");
     setLoanPrincipalAmount("");
     setLoanInterestAmount("");
     resetAccountSelections();
@@ -2562,6 +2578,8 @@ export default function InputPage({
       amount: Number(amount),
       description: getEffectiveDescription(),
       memo: getEffectiveMemo(),
+      tags: classification.tags,
+      categorySource,
       ...getBenefitPayloadFields(),
       requestId
     };
@@ -2717,6 +2735,7 @@ export default function InputPage({
 
     const fingerprint =
       JSON.stringify({
+        tagsText, categorySource, automaticTags: classification.tags,
         date,
 
         type:
@@ -2856,7 +2875,7 @@ export default function InputPage({
       );
 
       setAmount("");
-      setCategoryId("");
+      setCategoryId(""); setCategorySource("auto"); setTagsText("");
       setInstallmentMonths(1);
 
       // 같은 카드로 여러 건을 연달아 입력하는 경우가 많아 지출의 결제수단·지출대상은 그대로 둡니다.
@@ -3976,6 +3995,9 @@ export default function InputPage({
             )
           }
 
+          <TagsInput value={tagsText} onChange={value => {setTagsText(value); requestMemory.current = null;}} disabled={submitting}/>
+          {classification.matchedNames.length > 0 && <div><p className={styles.helper}>일치 규칙: {classification.matchedNames.join(" · ")}{categorySource === "manual" ? " · 직접 선택한 카테고리 유지" : " · 카테고리 자동 분류"}</p><TagChips tags={classification.tags}/></div>}
+          {categorySource === "manual" && <button type="button" disabled={submitting} onClick={() => setCategorySource("auto")}>카테고리 자동 분류로 전환</button>}
           {!isCardTransfer && (
             <>
           <label

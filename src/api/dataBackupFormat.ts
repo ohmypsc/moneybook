@@ -2,6 +2,7 @@ import type { Transaction } from "./transactions";
 import type { BootstrapData } from "../types/bootstrap";
 
 export interface MoneybookBackupPayload {
+  classificationSettings?: import("./classification").ClassificationSettings;
   bootstrap: BootstrapData;
   userDisplayPreferences?: Array<{ key: string; value: Record<string, unknown> }>;
   categories: unknown[];

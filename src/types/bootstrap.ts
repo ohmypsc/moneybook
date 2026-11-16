@@ -16,6 +16,7 @@ import type {
 } from "../utils/inputPreferences";
 
 export interface BootstrapData {
+  classificationSettings?: import("../api/classification").ClassificationSettings;
   userName?: string;
   householdOverview?: { livingAccountIds: string[] | null };
   backendVersion: string;

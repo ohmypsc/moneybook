@@ -18,6 +18,8 @@ export type LedgerTransactionType =
 
 
 export interface CalendarTransaction {
+  tags?: string[];
+  categorySource?: "manual" | "auto";
   transactionId: string;
 
   date: string;

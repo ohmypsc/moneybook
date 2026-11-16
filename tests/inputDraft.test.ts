@@ -48,3 +48,10 @@ test("draft preserves installments and disabled benefit accrual, and reads legac
   assert.equal(parseInputDraft(emptyDraft())?.benefitEnabled, true);
   assert.equal(parseInputDraft({ ...emptyDraft(), installmentMonths: 99 })?.installmentMonths, 1);
 });
+
+test("draft preserves transaction tags and manual/automatic category choice", () => {
+ const draft=parseInputDraft({...emptyDraft(),tagsText:"제주여행, 가족",categorySource:"auto"});
+ assert.equal(draft?.tagsText,"제주여행, 가족");assert.equal(draft?.categorySource,"auto");
+ assert.equal(hasMeaningfulInputDraft(draft!),true);
+ assert.equal(parseInputDraft({...emptyDraft(),categoryId:"C1"})?.categorySource,"manual");
+});

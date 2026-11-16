@@ -1,3 +1,5 @@
+import { normalizeTags, normalizeRules, classifyTransaction } from "./domain/classification.js";
+import { ensureClassificationSchema, getClassificationSettings, classificationSettingsStatement } from "./classification.js";
 import { DurableObject } from "cloudflare:workers";
 
 import {
@@ -2165,6 +2167,8 @@ async function mbD1RawAccounts(env) {
 
 function mbD1MapTransactionRow(row) {
   return {
+    tags: normalizeTags(JSON.parse(row.tags_json || "[]")),
+    categorySource: row.category_source || "manual",
     transactionId: mbD1Text(row.transaction_id),
     date: mbD1Text(row.date),
     type: mbD1Text(row.type),
@@ -3268,6 +3272,7 @@ async function mbD1BuildBootstrap(env, session = null) {
   const categories = categoryRows.map(mbD1MapCategory);
   const memberNames = members.map((member) => mbD1Text(member.display_name)).filter(Boolean);
   return {
+    classificationSettings: await getClassificationSettings(env, MB_D1_HOUSEHOLD_ID),
     userName: session?.name || "",
     householdOverview: await mbD1HouseholdOverviewData(env),
     backendVersion: MB_D1_API_VERSION,
@@ -3363,7 +3368,8 @@ async function mbD1GetTransactionsData(env, url) {
     dateFrom,
     dateTo,
     amount,
-    query: q
+    query: q,
+    tag: mbD1Text(url.searchParams.get("tag"))
   });
   const countRow = await mbD1First(
     env,
@@ -4046,6 +4052,9 @@ function mbD1LooksLikeConcurrencyGuardFailure(error) {
 }
 
 async function mbD1HandleTransactionMutation(path, body, session, env) {
+  await ensureClassificationSchema(env);
+  if (mbD1Has(body, "categorySource") && !["auto", "manual"].includes(body.categorySource)) mbD1Fail("INVALID_CATEGORY_SOURCE", "분류 출처가 올바르지 않습니다.");
+  if (mbD1Has(body, "tags")) { try { body = { ...body, tags: normalizeTags(body.tags) }; } catch (error) { mbD1Fail("INVALID_TAGS", error.message); } }
   const actor = session.name;
   if (path === "/api/transactions") {
     const started = Date.now();
@@ -4068,6 +4077,9 @@ async function mbD1HandleTransactionMutation(path, body, session, env) {
       };
     }
 
+    const rules = (await getClassificationSettings(env, MB_D1_HOUSEHOLD_ID)).rules;
+    const classification = classifyTransaction(body, rules, (await mbD1GetCategoriesData(env, new URL("https://local/api/categories"))).items);
+    body = { ...body, categoryId: classification.categoryId, categorySource: classification.categorySource, tags: classification.tags };
     const benefit = await mbD1PrepareBenefit(env, body, { strictRewardUsage: true });
     const needsBenefitGroup = Boolean(
       benefit && (benefit.benefitAmount > 0 || benefit.rewardUsedAmount > 0)
@@ -4103,7 +4115,7 @@ async function mbD1HandleTransactionMutation(path, body, session, env) {
       categoryId: model.categoryId
     });
 
-    const statements = [insert, change];
+    const statements = [insert, change, env.DB.prepare("UPDATE transactions SET tags_json=?,category_source=? WHERE household_id=? AND transaction_id=?").bind(JSON.stringify(body.tags), body.categorySource, MB_D1_HOUSEHOLD_ID, transactionId)];
     let benefitTransactionId = null;
     if (benefit && benefit.benefitAmount > 0) {
       const benefitCategory = await mbD1BenefitCategory(env);
@@ -4383,7 +4395,7 @@ async function mbD1HandleTransactionMutation(path, body, session, env) {
         groupId: `BENEFIT_GROUP_${current.requestId || transactionId}`
       };
     }
-    const now = mbD1Now();
+    const now = new Date(Math.max(Date.now(), (current.updatedAtMs || 0) + 1)).toISOString();
     const nextVersion = mbD1Number((await mbD1First(env, "SELECT version FROM transactions WHERE transaction_id=?", [transactionId]))?.version, 1) + 1;
     const update = env.DB.prepare(
       `UPDATE transactions SET date=?,type=?,category_id=?,amount=?,from_account_id=?,to_account_id=?,payment_method_id=?,
@@ -4419,7 +4431,14 @@ async function mbD1HandleTransactionMutation(path, body, session, env) {
        END AS ok`
     ).bind(MB_D1_HOUSEHOLD_ID, transactionId, current.updatedAt ?? null);
     try {
-      await env.DB.batch([concurrencyGuard, update, change, ...linkedBenefitStatements]);
+      await env.DB.batch([concurrencyGuard,
+        ...(body.classificationVersion !== undefined ? [env.DB.prepare(`SELECT CASE WHEN COALESCE((SELECT version FROM user_preferences WHERE household_id=? AND preference_key='classification_rules'),0)=? THEN 1 ELSE json('${MB_D1_CONCURRENCY_GUARD_TOKEN}') END`).bind(MB_D1_HOUSEHOLD_ID, body.classificationVersion)] : []),
+        update, change, ...linkedBenefitStatements,
+        env.DB.prepare("UPDATE transactions SET tags_json=?,category_source=? WHERE household_id=? AND transaction_id=?").bind(
+          JSON.stringify(mbD1Has(body, "tags") ? body.tags : current.tags),
+          mbD1Has(body, "categoryId") ? (body.categorySource === "auto" ? "auto" : "manual") : current.categorySource,
+          MB_D1_HOUSEHOLD_ID, transactionId)
+      ]);
     } catch (error) {
       if (mbD1LooksLikeConcurrencyGuardFailure(error)) {
         mbD1Fail("CONCURRENT_MODIFICATION", "거래가 다른 기기에서 먼저 수정되었습니다. 최신 내용을 다시 불러온 뒤 수정하세요.", 409);
@@ -5473,6 +5492,7 @@ async function mbD1RefreshQuotes(env, force = false) {
 }
 
 async function mbD1BuildBackupDocument(env) {
+  await ensureClassificationSchema(env);
   await mbD1EnsureBenefitUsageSchema(env);
   const [
     bootstrap,
@@ -5571,6 +5591,7 @@ async function mbD1BuildBackupDocument(env) {
     version: 3,
     exportedAt: mbD1Now(),
     payload: {
+      classificationSettings: await getClassificationSettings(env, MB_D1_HOUSEHOLD_ID),
       userDisplayPreferences: (await mbD1All(env,
         "SELECT preference_key,preference_json FROM user_preferences WHERE household_id=? AND (preference_key LIKE 'input_preferences:%' OR preference_key='household_overview')", [MB_D1_HOUSEHOLD_ID]
       )).map(row => ({ key: row.preference_key, value: JSON.parse(row.preference_json) })),
@@ -5711,6 +5732,7 @@ function mbD1BackupMemberId(name) {
 }
 
 async function mbD1RestoreBackupMerge(document, session, env) {
+  await ensureClassificationSchema(env);
   const validated = validateBackupDocument(document);
   const payload = validated.payload;
   const now = mbD1Now();
@@ -5812,6 +5834,13 @@ async function mbD1RestoreBackupMerge(document, session, env) {
     normalizeInstallmentMonths(item.installmentMonths).months ?? null
   ));
   restoreStatements.push(...transactionStatements);
+  for (const item of payload.transactions) {
+    // Old backups do not erase tags or source provenance on existing rows.
+    if (item.tags !== undefined || item.categorySource !== undefined) restoreStatements.push(env.DB.prepare(
+      "UPDATE transactions SET tags_json=COALESCE(?,tags_json),category_source=COALESCE(?,category_source) WHERE household_id=? AND transaction_id=?"
+    ).bind(item.tags === undefined ? null : JSON.stringify(normalizeTags(item.tags)), item.categorySource || null, MB_D1_HOUSEHOLD_ID, item.transactionId));
+  }
+  if (payload.classificationSettings !== undefined) restoreStatements.push(classificationSettingsStatement(env, MB_D1_HOUSEHOLD_ID, normalizeRules(payload.classificationSettings.rules), now));
 
   const reversalStatements = payload.transactions
     .filter((item) => item.reversalOf)
@@ -6360,6 +6389,78 @@ async function mbD1EnsureInstallmentSchema(env) {
   mbD1InstallmentSchemaReadyFor.add(env.DB);
 }
 
+async function mbSaveClassification(body, session, env) {
+  let rules;
+  try { rules = normalizeRules(body.rules); } catch (error) { mbD1Fail("INVALID_CLASSIFICATION", error.message); }
+  const categories = (await mbD1GetCategoriesData(env, new URL("https://local/api/categories"))).items;
+  const accounts = await mbD1RawAccounts(env);
+  for (const rule of rules) {
+    if (rule.categoryId && !categories.some(c => c.categoryId === rule.categoryId && c.type === rule.type && c.active && !c.isDeleted)) mbD1Fail("INVALID_RULE_CATEGORY", `${rule.name}: 사용 가능한 카테고리를 선택해주세요.`);
+    if (rule.accountId && !accounts.some(a => a.account_id === rule.accountId && !a.deleted_at && a.is_active)) mbD1Fail("INVALID_RULE_ACCOUNT", `${rule.name}: 사용 가능한 계좌를 선택해주세요.`);
+  }
+  const current = await getClassificationSettings(env, MB_D1_HOUSEHOLD_ID);
+  if (body.version !== current.version) mbD1Fail("CONCURRENT_MODIFICATION", "다른 기기에서 규칙이 변경되었습니다. 다시 불러와주세요.", 409);
+  const guard = env.DB.prepare(`SELECT CASE WHEN COALESCE((SELECT version FROM user_preferences WHERE household_id=? AND preference_key='classification_rules'),0)=? THEN 1 ELSE json('${MB_D1_CONCURRENCY_GUARD_TOKEN}') END`).bind(MB_D1_HOUSEHOLD_ID, body.version);
+  try {
+    await env.DB.batch([guard, classificationSettingsStatement(env, MB_D1_HOUSEHOLD_ID, rules, mbD1Now()), await mbD1InsertChange(env, "classification_rules", "shared", "updated", null, session)]);
+  } catch (error) {
+    if (mbD1LooksLikeConcurrencyGuardFailure(error)) mbD1Fail("CONCURRENT_MODIFICATION", "규칙이 변경되었습니다. 다시 불러와주세요.", 409);
+    throw error;
+  }
+  return getClassificationSettings(env, MB_D1_HOUSEHOLD_ID);
+}
+async function mbClassificationToken(transaction, result, version) {
+  const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify({ transaction, result, version })));
+  return Array.from(new Uint8Array(bytes), byte => byte.toString(16).padStart(2, "0")).join("");
+}
+function mbClassificationResult(transaction, settings, categories) {
+  // Transfers and financial companion rows have category-dependent semantics.
+  // Historical reclassification only changes categories for plain income/expenses.
+  const protectedCategory = transaction.categorySource !== "auto" || transaction.type === "이체" || transaction.reversalOf || transaction.groupId || transaction.reversalAmount > 0;
+  return classifyTransaction({ ...transaction, categorySource: protectedCategory ? "manual" : "auto" }, settings.rules, categories);
+}
+async function mbClassificationPreview(body, env) {
+  const dateFrom = mbD1DateOnly(body.dateFrom), dateTo = mbD1DateOnly(body.dateTo);
+  if (!dateFrom || !dateTo || dateFrom > dateTo) mbD1Fail("INVALID_DATE_RANGE", "조회 기간을 올바르게 선택해주세요.");
+  const offset = Math.max(0, Math.floor(Number(body.offset) || 0));
+  const settings = await getClassificationSettings(env, MB_D1_HOUSEHOLD_ID);
+  const categories = (await mbD1GetCategoriesData(env, new URL("https://local/api/categories"))).items;
+  const url = new URL("https://local/api/transactions");
+  for (const [key, value] of Object.entries({ dateFrom, dateTo, limit: "10", offset: String(offset) })) url.searchParams.set(key, value);
+  const page = await mbD1GetTransactionsData(env, url);
+  const items = [];
+  for (const transaction of page.items) {
+    const result = mbClassificationResult(transaction, settings, categories);
+    if (result.categoryId === (transaction.categoryId || "") && JSON.stringify(result.tags) === JSON.stringify(transaction.tags)) continue;
+    items.push({ transactionId: transaction.transactionId, date: transaction.date, description: transaction.description, amount: transaction.amount, beforeCategory: transaction.category, afterCategory: categories.find(c => c.categoryId === result.categoryId)?.name || transaction.category,
+      beforeTags: transaction.tags, afterTags: result.tags, matchedNames: result.matchedNames,
+      token: await mbClassificationToken(transaction, result, settings.version) });
+  }
+  return { items, version: settings.version, total: page.total, offset, nextOffset: offset + page.items.length < page.total ? offset + page.items.length : null };
+}
+async function mbApplyClassification(body, session, env) {
+  if (!Array.isArray(body.items) || body.items.length > 2 || body.confirm !== "APPLY_RULES") mbD1Fail("INVALID_APPLY", "한 번의 요청에는 미리보기 항목을 최대 2건씩 전달해주세요.");
+  const settings = await getClassificationSettings(env, MB_D1_HOUSEHOLD_ID);
+  if (body.version !== settings.version) mbD1Fail("CONCURRENT_MODIFICATION", "규칙이 변경되었습니다. 미리보기를 다시 실행해주세요.", 409);
+  const categories = (await mbD1GetCategoriesData(env, new URL("https://local/api/categories"))).items;
+  const results = [];
+  for (const selected of body.items) {
+    try {
+      const tx = await mbD1TransactionById(env, mbD1Text(selected.transactionId), false);
+      if (!tx || tx.isDeleted) throw new Error("거래가 삭제되었습니다.");
+      const next = mbClassificationResult(tx, settings, categories);
+      if (selected.token !== await mbClassificationToken(tx, next, settings.version)) throw new Error("거래가 변경되었습니다. 미리보기를 다시 확인해주세요.");
+      await mbD1HandleTransactionMutation("/api/transactions/update", {
+        transactionId: tx.transactionId, expectedUpdatedAtMs: tx.updatedAtMs, tags: next.tags,
+        ...(next.categoryId !== (tx.categoryId || "") ? { categoryId: next.categoryId, categorySource: "auto" } : {}),
+        classificationVersion: settings.version
+      }, session, env);
+      results.push({ transactionId: tx.transactionId, applied: true });
+    } catch (error) { results.push({ transactionId: selected.transactionId, applied: false, error: error.message || "적용 실패" }); }
+  }
+  return { results };
+}
+
 async function mbD1ProductionRoute(request, url, session, env, ctx) {
   const path = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, "") : url.pathname;
   const getPaths = new Set([
@@ -6381,6 +6482,7 @@ async function mbD1ProductionRoute(request, url, session, env, ctx) {
     "/api/real-estate/regions",
     "/api/backup/export",
     "/api/push/config",
+    "/api/settings/classification",
     "/api/tax/summary"
   ]);
   const postPaths = new Set([
@@ -6423,6 +6525,9 @@ async function mbD1ProductionRoute(request, url, session, env, ctx) {
     "/api/push/test",
     "/api/tax/profile",
     "/api/tax/category",
+    "/api/settings/classification",
+    "/api/classification/preview",
+    "/api/classification/apply",
     "/api/tax/preset"
   ]);
   if (request.method === "GET" && !getPaths.has(path)) return null;
@@ -6437,7 +6542,9 @@ async function mbD1ProductionRoute(request, url, session, env, ctx) {
   }
   try {
     await mbD1EnsureInstallmentSchema(env);
+    await ensureClassificationSchema(env);
     if (request.method === "GET") {
+      if (path === "/api/settings/classification") return mbD1Envelope(await getClassificationSettings(env, MB_D1_HOUSEHOLD_ID));
       if (path === "/api/bootstrap") return mbD1Envelope(await mbD1BuildBootstrap(env, session));
       if (path === "/api/dashboard") {
         const refreshQuotes = url.searchParams.get("refreshQuotes") === "1";
@@ -6500,7 +6607,10 @@ async function mbD1ProductionRoute(request, url, session, env, ctx) {
     }
 
     let data;
-    if (path.startsWith("/api/transactions")) data = await mbD1HandleTransactionMutation(path, body, session, env);
+    if (path === "/api/classification/preview") return mbD1Envelope(await mbClassificationPreview(body, env));
+    if (path === "/api/settings/classification") data = await mbSaveClassification(body, session, env);
+    else if (path === "/api/classification/apply") data = await mbApplyClassification(body, session, env);
+    else if (path.startsWith("/api/transactions")) data = await mbD1HandleTransactionMutation(path, body, session, env);
     else if (path.startsWith("/api/categories")) data = await mbD1HandleCategoryMutation(path, body, session, env);
     else if (path.startsWith("/api/accounts")) data = await mbD1HandleAccountMutation(path, body, session, env);
     else if (path.startsWith("/api/settings/ledger-start-date")) data = await mbD1HandleLedgerConfig(path, body, session, env);

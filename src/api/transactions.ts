@@ -8,6 +8,8 @@ import type {
 
 
 export interface Transaction {
+  tags?: string[];
+  categorySource?: "manual" | "auto";
   transactionId: string;
 
   date: string;
@@ -99,6 +101,8 @@ export interface Transaction {
 
 
 export interface CreateTransactionInput {
+  tags?: string[];
+  categorySource?: "manual" | "auto";
   date: string;
 
   type:
@@ -198,6 +202,7 @@ export interface TransactionsResponse {
 
 
 export interface GetTransactionsParams {
+  tag?: string;
   expenseCategory?: string;
   expenseTarget?: string;
   /** 기본 요청 제한시간(30초) 대신 쓸 값. 저장 전 빠른 확인용. */
@@ -262,6 +267,7 @@ export async function getTransactions(
     new URLSearchParams();
 
 
+  if (params.tag) searchParams.set("tag", params.tag);
   if (params.dateFrom) {
     searchParams.set(
       "dateFrom",

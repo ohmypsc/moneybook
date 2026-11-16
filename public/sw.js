@@ -1,5 +1,5 @@
 const CACHE_VERSION =
-  "v8.5.0-partner-push";
+  "v8.6.0-classification-tags";
 
 const STATIC_CACHE =
   `moneybook-static-${CACHE_VERSION}`;

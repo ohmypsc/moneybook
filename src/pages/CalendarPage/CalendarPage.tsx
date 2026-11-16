@@ -1,3 +1,6 @@
+import { normalizeTags } from "../../../shared/classification.js";
+import { TagsInput, TagChips } from "../../components/classification/TagsInput";
+import tagStyles from "../../components/classification/classification.module.css";
 import {
     useEffect,
     useMemo,
@@ -109,6 +112,7 @@ interface Category {
 }
 
 interface EditForm {
+    tagsText: string;
     date: string;
     categoryId: string;
     amount: string;
@@ -1220,6 +1224,8 @@ export default function CalendarPage({
         ]
     );
 
+    const [tagFilter, setTagFilter] = useState("");
+    const availableTags = [...new Set(transactions.filter(t => !t.isDeleted).flatMap(t => t.tags || []))].sort((a,b) => a.localeCompare(b,"ko"));
     const activeTransactions =
         useMemo(
             () =>
@@ -1250,18 +1256,18 @@ export default function CalendarPage({
                     filter ===
                     "전체"
                 ) {
-                    return activeTransactions;
+                    return activeTransactions.filter(t => !tagFilter || (t.tags || []).includes(tagFilter));
                 }
 
                 return activeTransactions.filter(
                     transaction =>
                         transaction.type ===
-                        filter
+                        filter && (!tagFilter || (transaction.tags || []).includes(tagFilter))
                 );
             },
             [
                 activeTransactions,
-                filter
+                filter, tagFilter
             ]
         );
 
@@ -1927,6 +1933,7 @@ export default function CalendarPage({
             );
 
             setEditForm({
+                tagsText: (transaction.tags || []).join(", "),
                 date:
                     transaction.date,
 
@@ -2088,6 +2095,7 @@ export default function CalendarPage({
             return "수정할 거래를 찾을 수 없습니다.";
         }
 
+        try { normalizeTags(editForm.tagsText); } catch (error) { return error instanceof Error ? error.message : "태그를 확인해주세요."; }
         if (
             editingTransaction
                 .reversalOf
@@ -2210,6 +2218,9 @@ export default function CalendarPage({
                         .updatedAtMs ??
                     null
             };
+
+        const nextTags = normalizeTags(editForm.tagsText);
+        if (JSON.stringify(nextTags) !== JSON.stringify(editingTransaction.tags || [])) input.tags = nextTags;
 
         const currentDescription =
             editingTransaction.description ||
@@ -2901,6 +2912,10 @@ export default function CalendarPage({
                 </div>
             </Card>
 
+            <div className={tagStyles.tagFilter}>
+                <label>태그로 보기 <select aria-label="태그로 보기" value={tagFilter} onChange={e => setTagFilter(e.target.value)}><option value="">모든 태그</option>{tagFilter && !availableTags.includes(tagFilter) && <option value={tagFilter}>{tagFilter} (이번 달 0건)</option>}{availableTags.map(tag => <option key={tag} value={tag}>#{tag}</option>)}</select></label>
+                {tagFilter && <p className={tagStyles.muted}>현재 월·거래 유형 기준 {filteredTransactions.length}건 · 수입 {formatMoney(filteredTransactions.filter(t=>t.type === "수입").reduce((sum,t)=>sum+t.amount,0))} · 지출 {formatMoney(filteredTransactions.filter(t=>t.type === "지출").reduce((sum,t)=>sum+t.amount,0))} · 이체 {formatMoney(filteredTransactions.filter(t=>t.type === "이체").reduce((sum,t)=>sum+t.amount,0))} (원거래 금액 합계)</p>}
+            </div>
             <div
                 className={
                     styles.filters
@@ -3546,6 +3561,7 @@ export default function CalendarPage({
                                                                 </div>
                                                             )}
 
+                                                            <TagChips tags={transaction.tags}/>
                                                             {
                                                                 transaction.memo && (
                                                                     <p
@@ -4324,6 +4340,7 @@ export default function CalendarPage({
                                                                             </label>
                                                                         </div>
 
+                                                                        <TagsInput value={editForm.tagsText} onChange={value => updateEditField("tagsText", value)} disabled={isSaving}/>
                                                                         <div
                                                                             className={
                                                                                 styles.editActions

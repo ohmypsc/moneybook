@@ -824,6 +824,7 @@ export default function App() {
             "household_overview",
             "ledger_config",
             "automation_settings",
+            "classification_rules",
             "backup_restore"
           ]);
 

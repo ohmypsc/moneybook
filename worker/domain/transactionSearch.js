@@ -24,6 +24,7 @@ export function buildTransactionSearchWhere({
   dateFrom = "",
   dateTo = "",
   amount = null,
+  tag = "",
   query = ""
 }) {
   const where = ["t.household_id=?"];
@@ -69,6 +70,10 @@ export function buildTransactionSearchWhere({
   if (amount !== null) {
     where.push("ABS(t.amount - ?) <= 0.000001");
     binds.push(amount);
+  }
+  if (tag) {
+    where.push("EXISTS (SELECT 1 FROM json_each(COALESCE(t.tags_json,'[]')) WHERE value=?)");
+    binds.push(tag);
   }
   if (query) {
     const like = `%${escapeSqlLike(query.toLowerCase())}%`;

@@ -1,3 +1,4 @@
+import { normalizeTags, normalizeRules } from "../../shared/classification.js";
 import { dateOnly, monthOnly } from "./date.js";
 
 export class BackupValidationError extends Error {
@@ -63,6 +64,13 @@ function optionalObject(value, label) {
 }
 
 export function validateBackupDocument(input) {
+  try {
+    if (input?.payload?.classificationSettings !== undefined) normalizeRules(input.payload.classificationSettings.rules);
+    for (const item of input?.payload?.transactions || []) {
+      if (item.tags !== undefined) normalizeTags(item.tags);
+      if (item.categorySource !== undefined && !["auto", "manual"].includes(item.categorySource)) throw new Error("분류 출처가 올바르지 않습니다.");
+    }
+  } catch (error) { fail("BACKUP_INVALID_CLASSIFICATION", error.message); }
   if (!isObject(input)) fail("BACKUP_INVALID_DOCUMENT", "백업 파일의 최상위 형식이 올바르지 않습니다.");
   if (input.format !== "moneybook-backup") fail("BACKUP_INVALID_FORMAT", "Moneybook 백업 파일이 아닙니다.");
   const version = Number(input.version);

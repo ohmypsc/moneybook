@@ -18,6 +18,8 @@ export type TransactionType =
 
 
 export interface TransactionItem {
+  tags?: string[];
+  categorySource?: "manual" | "auto";
   transactionId: string;
 
   date: string;
@@ -108,6 +110,8 @@ export interface TransactionItem {
 
 
 export interface UpdateTransactionInput {
+  tags?: string[];
+  categorySource?: "manual" | "auto";
   transactionId: string;
 
   /*
