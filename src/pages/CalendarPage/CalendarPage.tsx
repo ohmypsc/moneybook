@@ -714,6 +714,7 @@ function formatDeletedAt(
 }
 
 type CalendarPageProps = {
+    onReturnToList?: () => void;
     onAddTransaction?: (date: string) => void;
     openTransaction?: {
         transactionId: string;
@@ -726,7 +727,8 @@ const INSTALLMENT_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 18, 24, 36];
 
 export default function CalendarPage({
     onAddTransaction,
-    openTransaction = null
+    openTransaction = null,
+    onReturnToList
 }: CalendarPageProps) {
     const today =
         getToday();
@@ -1993,6 +1995,20 @@ export default function CalendarPage({
         }
     }
 
+    function closeEditFromList() {
+        cancelEdit();
+        onReturnToList?.();
+    }
+
+    async function returnToList() {
+        if (savingId || deletingId || settlementSavingId) return;
+        if (editForm && !(await confirmAction({
+            title: "목록으로 돌아가기", message: "저장하지 않은 수정 내용은 반영되지 않습니다. 목록으로 돌아갈까요?",
+            confirmLabel: "돌아가기", cancelLabel: "계속 수정하기"
+        }))) return;
+        onReturnToList?.();
+    }
+
     function cancelEdit() {
         setEditingId(null);
         setEditForm(null);
@@ -2471,6 +2487,7 @@ export default function CalendarPage({
                 value =>
                     value + 1
             );
+            onReturnToList?.();
         } catch (
             saveError
         ) {
@@ -2710,6 +2727,9 @@ export default function CalendarPage({
                     styles.header
                 }
             >
+                {onReturnToList && <Button variant="secondary" size="sm"
+                    disabled={Boolean(savingId || deletingId || settlementSavingId)}
+                    onClick={() => void returnToList()}>← 보던 목록으로</Button>}
                 <p className={styles.eyebrow}>거래 기록</p>
 
                 <h1 className={styles.title}>내역</h1>
@@ -3763,7 +3783,7 @@ export default function CalendarPage({
                                                                                     isSaving
                                                                                 }
                                                                                 onClick={
-                                                                                    cancelEdit
+                                                                                    closeEditFromList
                                                                                 }
                                                                             >
                                                                                 ×
@@ -4316,7 +4336,7 @@ export default function CalendarPage({
                                                                                     isSaving
                                                                                 }
                                                                                 onClick={
-                                                                                    cancelEdit
+                                                                                    closeEditFromList
                                                                                 }
                                                                             >
                                                                                 취소

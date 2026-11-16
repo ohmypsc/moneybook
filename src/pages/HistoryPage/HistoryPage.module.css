@@ -508,3 +508,7 @@ button.rankRow:hover, .targetGrid button:hover { background: var(--color-surface
 button.rankRow:focus-visible, .targetGrid button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
 button.rankRow:disabled, .targetGrid button:disabled { opacity: .55; cursor: wait; }
 .reportDetailHint { margin: 8px 0; color: var(--color-text-secondary); font-size: 12px; line-height: 1.6; }
+
+.expenseBreakdown { display: grid; gap: 3px; text-align: right; color: var(--color-text-secondary); font-size: 11px; line-height: 1.4; }
+
+.reportTransactionActions { flex-direction: column; align-items: flex-end; }

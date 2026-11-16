@@ -6,6 +6,8 @@ import {
   useState
 } from "react";
 
+import { reportExpenseAmounts, reloadTransactionWindow } from "./reportDetails";
+
 import CalendarPage from "../CalendarPage/CalendarPage";
 
 import { getBootstrap } from "../../api/bootstrap";
@@ -164,6 +166,16 @@ export default function HistoryPage({
   // 마지막으로 본 화면(캘린더/목록/리포트)을 기억해 다음에 그대로 엽니다.
   const [view, setViewState] = useState<HistoryView>(readStoredHistoryView);
   const setView = (next: HistoryView) => {
+    if (next === "search" && calendarEditTarget) {
+      returnToSearchList();
+      storeHistoryView(next);
+      return;
+    }
+    if (calendarEditTarget) {
+      setCalendarEditTarget(null);
+      listReturn.current = null;
+      restoreListScroll.current = false;
+    }
     setViewState(next);
     storeHistoryView(next);
   };
@@ -174,6 +186,9 @@ export default function HistoryPage({
   const [reportSelection, setReportSelection] = useState<{ category?: string; target?: string; month: string } | null>(null);
   const searchRequest = useRef(0);
   const reportRequest = useRef(0);
+  const listReturn = useRef<{ scrollY: number; count: number } | null>(null);
+  const restoreListScroll = useRef(false);
+  const [showAllCategories, setShowAllCategories] = useState(false);
   const [calendarEditTarget, setCalendarEditTarget] = useState<{
     transactionId: string;
     date: string;
@@ -236,7 +251,7 @@ export default function HistoryPage({
       const monthRange = browseMonth ? getMonthDateRange(listMonth) : null;
       if (!append) setAppliedQuery(trimmed);
 
-      const response = await getTransactions({
+      const searchParams = {
         dateFrom: monthRange?.dateFrom || searchDateFrom || undefined,
         dateTo: monthRange?.dateTo || searchDateTo || undefined,
         type: filter === "전체" ? undefined : filter,
@@ -247,19 +262,25 @@ export default function HistoryPage({
         spendingTarget: searchSpendingTarget || undefined,
         amount: numericQuery,
         q: numericQuery === undefined && trimmed ? trimmed : undefined,
-        limit: SEARCH_PAGE_SIZE,
-        offset: append ? searchItems.length : 0
-      });
-
-      if (request !== searchRequest.current) return;
-      const activeItems = (response.data.items || []).filter(
+      };
+      const fetchPage = async (offset: number, limit: number) => {
+        const response = await getTransactions({ ...searchParams, offset, limit });
+        return { items: response.data.items || [], total: response.data.total || 0 };
+      };
+      const result = append
+        ? await fetchPage(searchItems.length, SEARCH_PAGE_SIZE)
+        : await reloadTransactionWindow(fetchPage,
+            restoreListScroll.current ? listReturn.current?.count || SEARCH_PAGE_SIZE : SEARCH_PAGE_SIZE,
+            () => request === searchRequest.current);
+      if (!result || request !== searchRequest.current) return;
+      const activeItems = result.items.filter(
         transaction => !transaction.isDeleted
       );
 
       setSearchItems(current =>
         append ? [...current, ...activeItems] : activeItems
       );
-      setSearchTotal(response.data.total || 0);
+      setSearchTotal(result.total);
     } catch (error) {
       if (request !== searchRequest.current) return;
       setSearchError(
@@ -276,6 +297,7 @@ export default function HistoryPage({
   }
 
   function openSearchResultForEdit(transaction: Transaction) {
+    listReturn.current = { scrollY: window.scrollY, count: searchItems.length };
     setCalendarEditTarget({
       transactionId: transaction.transactionId,
       date: transaction.date
@@ -283,6 +305,24 @@ export default function HistoryPage({
     // 수정을 위해 잠깐 캘린더로 이동할 뿐이라 '마지막으로 본 화면'으로는 기억하지 않습니다.
     setViewState("calendar");
   }
+
+  function returnToSearchList() {
+    restoreListScroll.current = true;
+    setSearchLoading(true);
+    setCalendarEditTarget(null);
+    setViewState("search");
+  }
+
+  useEffect(() => {
+    if (view !== "search" || searchLoading || !restoreListScroll.current || !listReturn.current) return;
+    const scrollY = listReturn.current.scrollY;
+    const frame = requestAnimationFrame(() => {
+      window.scrollTo({ top: scrollY, behavior: "instant" });
+      restoreListScroll.current = false;
+      listReturn.current = null;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [view, searchLoading, searchItems]);
 
   function resetSearchFilters() {
     setReportSelection(null);
@@ -433,8 +473,8 @@ export default function HistoryPage({
   }, [view]);
 
   const topCategories = useMemo(
-    () => (report?.categoryExpense || []).slice(0, 5),
-    [report]
+    () => showAllCategories ? (report?.categoryExpense || []) : (report?.categoryExpense || []).slice(0, 5),
+    [report, showAllCategories]
   );
 
   const spendingTargets = useMemo(
@@ -547,6 +587,7 @@ export default function HistoryPage({
         <CalendarPage
           onAddTransaction={onAddTransaction}
           openTransaction={calendarEditTarget}
+          onReturnToList={calendarEditTarget ? returnToSearchList : undefined}
         />
       )}
 
@@ -592,7 +633,7 @@ export default function HistoryPage({
                 <strong>{formatMonthLabel(reportSelection.month)} · {reportSelection.category || reportSelection.target} 지출 내역</strong>
                 <Button variant="ghost" size="sm" onClick={() => setView("report")}>리포트로 돌아가기</Button>
               </div>
-              <p className={styles.reportDetailHint}>리포트는 환불·정산을 차감한 금액이며, 아래 목록은 해당 지출의 원래 금액을 표시합니다. 거래를 누르면 상세 내용을 확인할 수 있습니다.</p>
+              <p className={styles.reportDetailHint}>리포트와 같은 기준으로 환불·정산을 차감한 실제 지출을 표시합니다. 차감된 거래는 원금과 환불·정산 금액도 함께 확인할 수 있습니다.</p>
               <Button variant="ghost" size="sm" onClick={resetSearchFilters}>리포트 조건 해제</Button>
             </Card>
           )}
@@ -742,6 +783,7 @@ export default function HistoryPage({
             {group.items.map(transaction => {
                 const isBenefit = isBenefitTransaction(transaction);
                 const isSettlement = isSettlementTransaction(transaction);
+                const expense = reportSelection ? reportExpenseAmounts(transaction) : null;
 
                 return (
                   <article key={transaction.transactionId} className={styles.transactionRow}>
@@ -754,7 +796,7 @@ export default function HistoryPage({
                       <strong>{getTransactionTitle(transaction)}</strong>
                       <span>{getTransactionMeta(transaction)}</span>
                     </button>
-                    <div className={styles.transactionActions}>
+                    <div className={[styles.transactionActions, expense ? styles.reportTransactionActions : ""].filter(Boolean).join(" ")}>
                       <strong className={
                         isBenefit || isSettlement
                           ? styles.transfer
@@ -765,7 +807,7 @@ export default function HistoryPage({
                               : styles.transfer
                       }>
                         <Money
-                          amount={transaction.type === "지출" ? -transaction.amount : transaction.amount}
+                          amount={expense ? -expense.actual : transaction.type === "지출" ? -transaction.amount : transaction.amount}
                           showPlus={transaction.type === "수입"}
                           tone={
                             isBenefit || isSettlement
@@ -778,6 +820,13 @@ export default function HistoryPage({
                           }
                         />
                       </strong>
+                      {expense && expense.deducted !== 0 && (
+                        <span className={styles.expenseBreakdown}>
+                          <span>원금 <Money amount={expense.original} absolute /></span>
+                          <span>환불·정산 −<Money amount={expense.deducted} absolute /></span>
+                          <span>실제 지출 <Money amount={expense.actual} absolute /></span>
+                        </span>
+                      )}
                       {onCopyTransaction && (
                         <button
                           type="button"
@@ -896,7 +945,7 @@ export default function HistoryPage({
               <section className={styles.reportSection}>
                 <div className={styles.sectionTitle}>
                   <h2>카테고리별 지출</h2>
-                  <span>상위 5개 · 누르면 내역 보기</span>
+                  <span>{showAllCategories ? "전체" : "상위 5개"} · 누르면 내역 보기</span>
                 </div>
                 <Card padding="none" className={styles.rankList}>
                   {topCategories.length ? topCategories.map((item, index) => (
@@ -910,6 +959,12 @@ export default function HistoryPage({
                     </button>
                   )) : <p className={styles.empty}>이 달의 지출이 없습니다.</p>}
                 </Card>
+                {(report.categoryExpense || []).length > 5 && (
+                  <Button variant="ghost" size="sm" aria-expanded={showAllCategories}
+                    onClick={() => setShowAllCategories(value => !value)}>
+                    {showAllCategories ? "상위 5개만 보기" : `전체 ${(report.categoryExpense || []).length}개 보기`}
+                  </Button>
+                )}
               </section>
 
               <section className={styles.reportSection}>
