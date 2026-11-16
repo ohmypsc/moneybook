@@ -3199,14 +3199,40 @@ async function mbD1ProcessRecurring(env, session, options = {}) {
   return { created, due };
 }
 
-async function mbD1InputPreferencesData(env) {
+async function mbD1HouseholdOverviewData(env) {
+  const row = await mbD1First(env, "SELECT preference_json FROM user_preferences WHERE household_id=? AND preference_key='household_overview' LIMIT 1", [MB_D1_HOUSEHOLD_ID]);
+  if (!row) return { livingAccountIds: null };
+  try {
+    const value = JSON.parse(row.preference_json);
+    return { livingAccountIds: Array.isArray(value.livingAccountIds) ? value.livingAccountIds.filter(id => typeof id === "string") : null };
+  } catch { return { livingAccountIds: null }; }
+}
+
+async function mbD1SaveHouseholdOverview(body, session, env) {
+  if (!Array.isArray(body.livingAccountIds)) mbD1Fail("INVALID_ACCOUNTS", "생활비 계좌를 선택해주세요.");
+  const ids = [...new Set(body.livingAccountIds)];
+  const accounts = (await mbD1RawAccounts(env)).map(mbD1MapAccountRow);
+  if (ids.some(id => !accounts.some(account => account.accountId === id && account.active && !account.isDeleted && account.accountType === "자산" && !["신용카드", "체크카드", "주식"].includes(account.subType)))) {
+    mbD1Fail("INVALID_ACCOUNTS", "사용 중인 현금·자산 계좌만 생활비 계좌로 선택할 수 있습니다.");
+  }
+  const now = mbD1Now();
+  const update = env.DB.prepare(`INSERT INTO user_preferences(preference_id,household_id,preference_key,preference_json,version,created_at,updated_at)
+    VALUES (?,?,?,?,1,?,?) ON CONFLICT(preference_id) DO UPDATE SET preference_json=excluded.preference_json,updated_at=excluded.updated_at`)
+    .bind("PREF_HOUSEHOLD_OVERVIEW", MB_D1_HOUSEHOLD_ID, "household_overview", JSON.stringify({livingAccountIds: ids}), now, now);
+  await env.DB.batch([update, await mbD1InsertChange(env, "household_overview", "shared", "updated", 1, session)]);
+  return { livingAccountIds: ids };
+}
+
+async function mbD1InputPreferencesData(env, userName = "") {
   const row = await mbD1First(
     env,
-    "SELECT preference_json,version,updated_at FROM user_preferences WHERE household_id=? AND preference_key='input_preferences' ORDER BY updated_at DESC LIMIT 1",
-    [MB_D1_HOUSEHOLD_ID]
+    `SELECT preference_json,version,updated_at FROM user_preferences
+     WHERE household_id=? AND preference_key IN (?, 'input_preferences')
+     ORDER BY CASE WHEN preference_key=? THEN 0 ELSE 1 END,updated_at DESC LIMIT 1`,
+    [MB_D1_HOUSEHOLD_ID, `input_preferences:${userName}`, `input_preferences:${userName}`]
   );
   if (!row) {
-    return { configured: false, version: 1, preferences: null, updatedAt: null, updatedBy: null };
+    return { ownerName: userName, configured: false, version: 1, preferences: null, updatedAt: null, updatedBy: null };
   }
   let preferences = null;
   try {
@@ -3215,6 +3241,7 @@ async function mbD1InputPreferencesData(env) {
     mbD1Fail("INPUT_PREFERENCES_CORRUPT", "저장된 입력 설정 형식을 읽을 수 없습니다.", 500);
   }
   return {
+    ownerName: userName,
     configured: true,
     version: mbD1Number(row.version, 1),
     preferences,
@@ -3223,7 +3250,7 @@ async function mbD1InputPreferencesData(env) {
   };
 }
 
-async function mbD1BuildBootstrap(env) {
+async function mbD1BuildBootstrap(env, session = null) {
   await mbD1EnsureDefaultCashbackIncomeCategory(env);
   const [members, rawAccounts, categoryRows, ledgerConfig, inputPreferences, automationSettings] = await Promise.all([
     mbD1Members(env),
@@ -3234,13 +3261,15 @@ async function mbD1BuildBootstrap(env) {
       [MB_D1_HOUSEHOLD_ID]
     ),
     mbD1GetLedgerConfigData(env),
-    mbD1InputPreferencesData(env),
+    mbD1InputPreferencesData(env, session?.name || ""),
     mbD1AutomationSettingsData(env)
   ]);
   const accounts = rawAccounts.map(mbD1MapAccountRow).filter((account) => account.active && !account.isDeleted);
   const categories = categoryRows.map(mbD1MapCategory);
   const memberNames = members.map((member) => mbD1Text(member.display_name)).filter(Boolean);
   return {
+    userName: session?.name || "",
+    householdOverview: await mbD1HouseholdOverviewData(env),
     backendVersion: MB_D1_API_VERSION,
     transactionTypes: ["수입", "지출", "이체"],
     investmentTradeTypes: ["매수", "매도"],
@@ -3694,8 +3723,9 @@ async function mbD1GetChangesData(env, url) {
   if (url.searchParams.get("head") === "1") {
     return { latestSeq, changes: [], hasMore: false };
   }
+  const recent = url.searchParams.get("recent") === "1";
   const after = Math.max(0, Math.floor(mbD1Number(url.searchParams.get("after"), 0)));
-  const limit = Math.max(1, Math.min(200, Math.floor(mbD1Number(url.searchParams.get("limit"), 100))));
+  const limit = Math.max(1, Math.min(200, Math.floor(mbD1Number(url.searchParams.get("limit") || (recent ? 20 : 100), 100))));
   const rows = await mbD1All(
     env,
     `SELECT c.change_seq,c.entity_type,c.entity_id,c.action,c.entity_version,c.payload_json,c.changed_at,
@@ -3703,7 +3733,8 @@ async function mbD1GetChangesData(env, url) {
      FROM change_log c
      LEFT JOIN members m ON m.member_id=c.changed_by_member_id
      WHERE c.household_id=? AND c.change_seq>?
-     ORDER BY c.change_seq ASC
+       ${recent ? "AND c.entity_type IN ('transaction','account','category','holding','investment_trade','real_estate','backup_restore')" : ""}
+     ORDER BY c.change_seq ${recent ? "DESC" : "ASC"}
      LIMIT ?`,
     [MB_D1_HOUSEHOLD_ID, after, limit]
   );
@@ -3727,7 +3758,7 @@ async function mbD1GetChangesData(env, url) {
   return {
     latestSeq,
     changes,
-    hasMore: lastSeq < latestSeq
+    hasMore: !recent && lastSeq < latestSeq
   };
 }
 
@@ -4063,7 +4094,9 @@ async function mbD1HandleTransactionMutation(path, body, session, env) {
     const change = await mbD1InsertChange(env, "transaction", transactionId, "created", 1, session, {
       date: model.date,
       type: model.type,
-      amount: model.amount
+      amount: model.amount,
+      description: model.description || "",
+      categoryId: model.categoryId
     });
 
     const statements = [insert, change];
@@ -4358,9 +4391,9 @@ async function mbD1HandleTransactionMutation(path, body, session, env) {
       model.billingMonth, model.groupId, model.reversalOf, model.installmentMonths, nextVersion, now, actor, MB_D1_HOUSEHOLD_ID, transactionId
     );
     const change = await mbD1InsertChange(env, "transaction", transactionId, "updated", nextVersion, session, {
-      date: model.date,
-      type: model.type,
-      amount: model.amount
+      date: model.date, type: model.type, amount: model.amount, description: model.description || "",
+      before: { amount: current.amount, description: current.description, date: current.date, category: current.category, paymentMethodId: current.paymentMethodId, fromAccountId: current.fromAccountId, toAccountId: current.toAccountId },
+      after: { amount: model.amount, description: model.description, date: model.date, categoryId: model.categoryId, paymentMethodId: model.paymentMethodId, fromAccountId: model.fromAccountId, toAccountId: model.toAccountId }
     });
     const linkedBenefitStatements = financialChange
       ? await mbD1LinkedBenefitUpdateStatements(
@@ -4408,7 +4441,7 @@ async function mbD1HandleTransactionMutation(path, body, session, env) {
     const update = env.DB.prepare(
       "UPDATE transactions SET deleted_at=?,deleted_by=?,updated_at=?,updated_by=?,version=? WHERE household_id=? AND transaction_id=?"
     ).bind(now, actor, now, actor, nextVersion, MB_D1_HOUSEHOLD_ID, transactionId);
-    const change = await mbD1InsertChange(env, "transaction", transactionId, "deleted", nextVersion, session);
+    const change = await mbD1InsertChange(env, "transaction", transactionId, "deleted", nextVersion, session, { amount: current.amount, description: current.description, date: current.date, type: current.type });
     const statements = [update, change];
     if (current.groupId && !mbD1Text(current.requestId).startsWith("BENEFIT_")) {
       const linkedBenefits = await mbD1All(
@@ -4776,17 +4809,19 @@ async function mbD1HandleInputPreferences(body, session, env) {
   for (const type of ["지출", "수입", "이체"]) {
     if (!Array.isArray(preferences.categoryOrder[type])) mbD1Fail("INVALID_INPUT_PREFERENCES", `${type} 카테고리 순서는 배열이어야 합니다.`);
   }
+  if (!Array.isArray(preferences.accountOrder) || !Array.isArray(preferences.hiddenAccountIds)) mbD1Fail("INVALID_INPUT_PREFERENCES", "계좌 설정 형식을 확인해주세요.");
+  if (preferences.quickEntries !== undefined && (!Array.isArray(preferences.quickEntries) || preferences.quickEntries.length > 5)) mbD1Fail("INVALID_INPUT_PREFERENCES", "빠른 입력은 최대 5개까지 등록할 수 있습니다.");
   const now = mbD1Now();
   const update = env.DB.prepare(
     `INSERT INTO user_preferences (preference_id,household_id,member_id,preference_key,preference_json,version,created_at,updated_at)
      VALUES (?,?,?,?,?,?,?,?)
      ON CONFLICT(preference_id) DO UPDATE SET preference_json=excluded.preference_json,version=excluded.version,updated_at=excluded.updated_at`
   ).bind(
-    "PREF_INPUT_SHARED", MB_D1_HOUSEHOLD_ID, null, "input_preferences", JSON.stringify(preferences), 1, now, now
+    `PREF_INPUT_${encodeURIComponent(session.name)}`, MB_D1_HOUSEHOLD_ID, null, `input_preferences:${session.name}`, JSON.stringify(preferences), 1, now, now
   );
-  const change = await mbD1InsertChange(env, "input_preferences", "shared", "updated", 1, session);
+  const change = await mbD1InsertChange(env, "input_preferences", session.name, "updated", 1, session);
   await env.DB.batch([update, change]);
-  return { configured: true, version: 1, preferences, updatedAt: now, updatedBy: session.name };
+  return { ownerName: session.name, configured: true, version: 1, preferences, updatedAt: now, updatedBy: session.name };
 }
 
 async function mbD1HandleLedgerConfig(path, body, session, env) {
@@ -5513,6 +5548,9 @@ async function mbD1BuildBackupDocument(env) {
     version: 3,
     exportedAt: mbD1Now(),
     payload: {
+      userDisplayPreferences: (await mbD1All(env,
+        "SELECT preference_key,preference_json FROM user_preferences WHERE household_id=? AND (preference_key LIKE 'input_preferences:%' OR preference_key='household_overview')", [MB_D1_HOUSEHOLD_ID]
+      )).map(row => ({ key: row.preference_key, value: JSON.parse(row.preference_json) })),
       bootstrap,
       categories,
       accounts,
@@ -5852,6 +5890,18 @@ async function mbD1RestoreBackupMerge(document, session, env) {
       item.createdBy || actor, item.updatedBy || actor, item.deletedAt || (item.isDeleted ? "1970-01-01T00:00:00.000Z" : null), item.deletedBy || null
     ));
     restoreStatements.push(...realEstateStatements);
+  }
+
+  if (payload.userDisplayPreferences !== undefined) {
+    if (!Array.isArray(payload.userDisplayPreferences)) mbD1Fail("INVALID_BACKUP", "개인 입력 설정 형식이 올바르지 않습니다.");
+    for (const item of payload.userDisplayPreferences) {
+      const personal = typeof item?.key === "string" && item.key.startsWith("input_preferences:") && item.key.length > "input_preferences:".length;
+      if ((!personal && item?.key !== "household_overview") || !isObject(item.value)) mbD1Fail("INVALID_BACKUP", "입력 설정 항목이 올바르지 않습니다.");
+      const id = personal ? `PREF_INPUT_${encodeURIComponent(item.key.slice("input_preferences:".length))}` : "PREF_HOUSEHOLD_OVERVIEW";
+      restoreStatements.push(env.DB.prepare(`INSERT INTO user_preferences(preference_id,household_id,preference_key,preference_json,version,created_at,updated_at)
+        VALUES (?,?,?,?,1,?,?) ON CONFLICT(preference_id) DO UPDATE SET preference_json=excluded.preference_json,updated_at=excluded.updated_at`)
+        .bind(id, MB_D1_HOUSEHOLD_ID, item.key, JSON.stringify(item.value), now, now));
+    }
   }
 
   // change_log.action은 created/updated/deleted/restored만 허용하므로 결과 종류는 payload에 남깁니다.
@@ -6327,6 +6377,7 @@ async function mbD1ProductionRoute(request, url, session, env, ctx) {
     "/api/settings/ledger-start-date",
     "/api/settings/ledger-start-date/clear",
     "/api/settings/input-preferences",
+    "/api/settings/household-overview",
     "/api/settings/automation",
     "/api/automations/recurring/process",
     "/api/automations/recurring/create",
@@ -6364,7 +6415,7 @@ async function mbD1ProductionRoute(request, url, session, env, ctx) {
   try {
     await mbD1EnsureInstallmentSchema(env);
     if (request.method === "GET") {
-      if (path === "/api/bootstrap") return mbD1Envelope(await mbD1BuildBootstrap(env));
+      if (path === "/api/bootstrap") return mbD1Envelope(await mbD1BuildBootstrap(env, session));
       if (path === "/api/dashboard") {
         const refreshQuotes = url.searchParams.get("refreshQuotes") === "1";
 
@@ -6431,6 +6482,7 @@ async function mbD1ProductionRoute(request, url, session, env, ctx) {
     else if (path.startsWith("/api/accounts")) data = await mbD1HandleAccountMutation(path, body, session, env);
     else if (path.startsWith("/api/settings/ledger-start-date")) data = await mbD1HandleLedgerConfig(path, body, session, env);
     else if (path === "/api/settings/input-preferences") data = await mbD1HandleInputPreferences(body, session, env);
+    else if (path === "/api/settings/household-overview") data = await mbD1SaveHouseholdOverview(body, session, env);
     else if (path === "/api/settings/automation") data = await mbD1HandleAutomationSettings(body, session, env);
     else if (path === "/api/automations/recurring/process") data = await mbD1ProcessRecurring(env, session, {});
     else if (path === "/api/automations/recurring/create") data = await mbD1ProcessRecurring(env, session, { ruleId: body.ruleId, month: body.month });

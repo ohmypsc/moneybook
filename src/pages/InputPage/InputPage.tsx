@@ -1,3 +1,5 @@
+import { QuickEntryBar } from "../../components/household/QuickEntryBar";
+import type { QuickEntry } from "../../utils/inputPreferences";
 import {
   type FormEvent,
   useEffect,
@@ -1067,11 +1069,13 @@ export default function InputPage({
 
         return getInputPreferences(
           bootstrap.categories,
-          bootstrap.accounts
+          bootstrap.accounts,
+          userName
         );
       },
       [
-        bootstrap
+        bootstrap,
+        userName
       ]
     );
 
@@ -1761,6 +1765,18 @@ export default function InputPage({
 
     setError("");
     setSuccess("저장 실패 내용을 불러왔습니다. 확인 후 다시 저장하세요.");
+  }
+
+  async function applyQuickEntry(entry: QuickEntry) {
+    if (amount && !(await confirmAction({ title: "빠른 입력으로 바꾸기", message: "작성 중인 금액과 내용을 비우고 선택한 버튼의 내용으로 바꿀까요?", confirmLabel: "바꾸기" }))) return;
+    setMode(entry.mode); setDate(today); setBillingMonth(today.slice(0, 7)); setAmount(""); setCategoryId(entry.categoryId);
+    cardAmountEditedRef.current = false; setCardBillingInfo(null); setCardBillingError("");
+    setPaymentMethodId(entry.paymentMethodId); setSpendingTarget(entry.spendingTarget);
+    setFromAccountId(entry.fromAccountId); setToAccountId(entry.toAccountId); setDescription(entry.description);
+    setMemo(""); setInstallmentMonths(1); setBenefitRewardUsedAmount(""); setBenefitEnabled(true);
+    setLoanPrincipalAmount(""); setLoanInterestAmount(""); setError(""); setSuccess("");
+    requestMemory.current = null;
+    window.requestAnimationFrame(() => document.querySelector<HTMLInputElement>('input[inputmode="numeric"]')?.focus());
   }
 
   function resetAccountSelections() {
@@ -2975,6 +2991,11 @@ export default function InputPage({
       </header>
 
       <InputModeTabs value={mode} onChange={handleModeChange} />
+
+      {mode !== "investment" && <QuickEntryBar userName={userName} bootstrap={bootstrap}
+        current={{ mode, categoryId, paymentMethodId: mode === "expense" ? paymentMethodId : "", spendingTarget: mode === "expense" ? spendingTarget : "", fromAccountId: mode === "transfer" ? fromAccountId : "", toAccountId: mode !== "expense" ? toAccountId : "", description }}
+        onApply={applyQuickEntry} />}
+
 
       {showTransactionImport && (
         <TransactionImportSheet

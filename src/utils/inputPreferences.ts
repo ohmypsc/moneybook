@@ -17,7 +17,36 @@ export interface PreferenceAccountLike {
   subType: string;
 }
 
+export interface QuickEntry {
+  id: string;
+  name: string;
+  mode: "expense" | "income" | "transfer";
+  categoryId: string;
+  paymentMethodId: string;
+  spendingTarget: string;
+  fromAccountId: string;
+  toAccountId: string;
+  description: string;
+}
+
+export function parseQuickEntries(value: unknown): QuickEntry[] {
+  if (!Array.isArray(value)) return [];
+  const ids = new Set<string>();
+  return value.filter((item): item is QuickEntry => {
+    if (!item || typeof item !== "object" || !["expense", "income", "transfer"].includes(item.mode)) return false;
+    if (!["id", "name", "categoryId", "paymentMethodId", "spendingTarget", "fromAccountId", "toAccountId", "description"].every(key => typeof item[key] === "string")) return false;
+    if (!item.id || !item.name.trim() || ids.has(item.id)) return false;
+    ids.add(item.id);
+    return true;
+  }).slice(0, 5).map(item => ({
+    id: item.id.slice(0, 100), name: item.name.trim().slice(0, 24), mode: item.mode,
+    categoryId: item.categoryId, paymentMethodId: item.paymentMethodId, spendingTarget: item.spendingTarget,
+    fromAccountId: item.fromAccountId, toAccountId: item.toAccountId, description: item.description.slice(0, 160)
+  }));
+}
+
 export interface InputPreferences {
+  quickEntries?: QuickEntry[];
   version: 1;
 
   categoryOrder: Record<
@@ -31,6 +60,7 @@ export interface InputPreferences {
 }
 
 export interface SharedInputPreferencesState {
+  ownerName?: string;
   configured: boolean;
   version: 1;
   preferences: InputPreferences | null;
@@ -40,6 +70,10 @@ export interface SharedInputPreferencesState {
 
 const STORAGE_KEY =
   "moneybook.inputPreferences.v1";
+
+function storageKey(userName = "") {
+  return userName ? `${STORAGE_KEY}:${encodeURIComponent(userName)}` : STORAGE_KEY;
+}
 
 const TRANSACTION_TYPES:
   PreferenceTransactionType[] = [
@@ -254,6 +288,7 @@ export function parseInputPreferences(
 
   return {
     version: 1,
+    quickEntries: parseQuickEntries(value.quickEntries),
 
     categoryOrder: {
       지출: expenseOrder,
@@ -268,7 +303,7 @@ export function parseInputPreferences(
 }
 
 
-function safeReadStoredPreferences():
+function safeReadStoredPreferences(userName = ""):
   InputPreferences | null {
   if (
     typeof window ===
@@ -280,7 +315,7 @@ function safeReadStoredPreferences():
   try {
     const raw =
       window.localStorage.getItem(
-        STORAGE_KEY
+        storageKey(userName)
       );
 
     if (!raw) {
@@ -470,6 +505,7 @@ export function normalizeInputPreferences(
 
   return {
     version: 1,
+    quickEntries: parseQuickEntries(stored.quickEntries),
 
     categoryOrder,
 
@@ -487,10 +523,11 @@ export function getInputPreferences(
   categories:
     PreferenceCategoryLike[],
   accounts:
-    PreferenceAccountLike[]
+    PreferenceAccountLike[],
+  userName = ""
 ) {
   return normalizeInputPreferences(
-    safeReadStoredPreferences(),
+    safeReadStoredPreferences(userName),
     categories,
     accounts
   );
@@ -498,12 +535,13 @@ export function getInputPreferences(
 
 
 /**
- * localStorage는 서버 공통 설정의 로컬 백업입니다.
+ * localStorage는 사용자별 서버 설정의 로컬 백업입니다.
  * 서버가 잠시 응답하지 않아도 입력 화면은 이 값을 사용합니다.
  */
 export function saveInputPreferences(
   preferences:
-    InputPreferences
+    InputPreferences,
+  userName = ""
 ) {
   if (
     typeof window ===
@@ -513,7 +551,7 @@ export function saveInputPreferences(
   }
 
   window.localStorage.setItem(
-    STORAGE_KEY,
+    storageKey(userName),
     JSON.stringify(
       preferences
     )
@@ -525,14 +563,15 @@ export function resetInputPreferences(
   categories:
     PreferenceCategoryLike[],
   accounts:
-    PreferenceAccountLike[]
+    PreferenceAccountLike[],
+  userName = ""
 ) {
   if (
     typeof window !==
     "undefined"
   ) {
     window.localStorage.removeItem(
-      STORAGE_KEY
+      storageKey(userName)
     );
   }
 
@@ -544,12 +583,12 @@ export function resetInputPreferences(
 
 
 /**
- * Apps Script bootstrap에 포함된 부부 공통 설정을
+ * bootstrap에 포함된 사용자별 설정을
  * 현재 브라우저의 백업값으로 동기화합니다.
  *
- * 서버에 아직 공통 설정이 없으면 기존 localStorage를
+ * 서버에 아직 개인 설정이 없으면 기존 localStorage를
  * 지우지 않습니다. 최초 저장 시 현재 브라우저 설정이
- * 서버 공통값이 됩니다.
+ * 개인 서버 설정이 됩니다.
  */
 export function syncInputPreferencesFromBootstrapPayload(
   payload: unknown
@@ -594,7 +633,8 @@ export function syncInputPreferencesFromBootstrapPayload(
   }
 
   saveInputPreferences(
-    parsed
+    parsed,
+    typeof data.userName === "string" ? data.userName : typeof data.inputPreferences.ownerName === "string" ? data.inputPreferences.ownerName : ""
   );
 
   return true;

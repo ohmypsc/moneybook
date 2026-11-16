@@ -8,6 +8,12 @@ import {
   sendWebPush
 } from "./domain/webPush.js";
 
+export const PUSH_RECIPIENT_NAME = "미영";
+
+function requireRecipient(session) {
+  if (session?.name !== PUSH_RECIPIENT_NAME) throw new PushError("PUSH_DISABLED_FOR_USER", "알림은 미영님 기기에서만 사용할 수 있습니다.", 403);
+}
+
 const VAPID_META_KEY = "web_push_vapid_v1";
 
 export class PushError extends Error {
@@ -75,17 +81,20 @@ async function getVapidKeys(env) {
 
 export async function getPushConfig(env, householdId, session) {
   await ensurePushSchema(env);
+  if (session.name !== PUSH_RECIPIENT_NAME) return { publicKey: "", myDeviceCount: 0, allowed: false };
   const vapid = await getVapidKeys(env);
   const row = await env.DB.prepare(
     "SELECT COUNT(*) AS count FROM push_subscriptions WHERE household_id=? AND member_name=?"
   ).bind(householdId, session.name).first();
   return {
+    allowed: true,
     publicKey: vapid.publicKey,
     myDeviceCount: Number(row?.count || 0)
   };
 }
 
 export async function savePushSubscription(env, householdId, session, body, userAgent) {
+  requireRecipient(session);
   const subscription = normalizePushSubscription(body?.subscription);
   if (!subscription) {
     throw new PushError("INVALID_PUSH_SUBSCRIPTION", "알림 구독 정보가 올바르지 않습니다.");
@@ -170,7 +179,7 @@ async function deliver(env, rows, payload, origin) {
 }
 
 /**
- * 거래를 입력한 사람이 아닌, 다른 구성원의 기기에만 알림을 보냅니다.
+ * 미영님이 등록한 기기에만 알림을 보냅니다. 본인이 입력한 거래는 알리지 않습니다.
  * 여러 건이면 알림 하나로 묶습니다. (알림은 각자 설정에서 켠 기기로만 갑니다.)
  */
 export async function notifyPartnersOfTransactions(env, householdId, actorName, transactions, origin) {
@@ -178,8 +187,8 @@ export async function notifyPartnersOfTransactions(env, householdId, actorName, 
   if (!list.length || !actorName) return { sent: 0, failed: 0, removed: 0 };
   await ensurePushSchema(env);
   const result = await env.DB.prepare(
-    "SELECT endpoint,p256dh,auth FROM push_subscriptions WHERE household_id=? AND member_name<>?"
-  ).bind(householdId, actorName).all();
+    "SELECT endpoint,p256dh,auth FROM push_subscriptions WHERE household_id=? AND member_name=? AND member_name<>?"
+  ).bind(householdId, PUSH_RECIPIENT_NAME, actorName).all();
   const rows = result.results || [];
   return deliver(env, rows, buildBatchNotification(list, actorName), origin);
 }
@@ -189,6 +198,7 @@ export async function notifyPartnersOfTransaction(env, householdId, actorName, t
 }
 
 export async function sendTestPush(env, householdId, session, origin) {
+  requireRecipient(session);
   await ensurePushSchema(env);
   const result = await env.DB.prepare(
     "SELECT endpoint,p256dh,auth FROM push_subscriptions WHERE household_id=? AND member_name=?"

@@ -861,7 +861,7 @@ export function CategorySettings() {
                                 .accounts,
 
                         successMessage:
-                            "카테고리 순서를 저장했습니다."
+                            "내 입력 화면의 카테고리 순서를 저장했습니다."
                     }
                 );
 
@@ -950,7 +950,7 @@ export function CategorySettings() {
                         {
                             reordering
                                 ? "≡ 손잡이를 잡고 원하는 위치로 끌어 순서를 조정합니다."
-                                : "카테고리를 관리하거나 입력 화면 순서를 바꿀 수 있습니다."
+                                : "카테고리 추가·수정은 함께 반영되고, 입력 순서는 나에게만 적용됩니다."
                         }
                     </p>
 

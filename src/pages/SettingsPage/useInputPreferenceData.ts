@@ -102,11 +102,12 @@ export function useInputPreferenceData() {
             )
           : getInputPreferences(
               data.categories,
-              data.accounts
+              data.accounts,
+              data.userName || ""
             );
 
         if (sharedPreferences) {
-          saveInputPreferences(nextPreferences);
+          saveInputPreferences(nextPreferences, data.userName || "");
         }
 
         setBootstrap(data);
@@ -161,7 +162,7 @@ export function useInputPreferenceData() {
         accountSource
       );
 
-    saveInputPreferences(normalized);
+    saveInputPreferences(normalized, bootstrap.userName || "");
     setPreferences(normalized);
     setSaving(true);
     clearMessages();
@@ -185,7 +186,7 @@ export function useInputPreferenceData() {
       ) {
         throw new Error(
           response.error?.message ||
-          "부부 공통 설정을 저장하지 못했습니다."
+          "내 입력 설정을 저장하지 못했습니다."
         );
       }
 
@@ -195,13 +196,13 @@ export function useInputPreferenceData() {
         accountSource
       );
 
-      saveInputPreferences(saved);
+      saveInputPreferences(saved, bootstrap.userName || "");
       setPreferences(saved);
       setFeedback(options.successMessage);
       return true;
     } catch (saveFailure) {
       setSaveError(
-        `공통 서버 저장에 실패했습니다. 현재 브라우저에는 저장했습니다. (${getErrorMessage(
+        `내 설정의 서버 저장에 실패했습니다. 현재 브라우저에는 저장했습니다. (${getErrorMessage(
           saveFailure,
           "알 수 없는 오류"
         )})`

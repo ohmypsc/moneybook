@@ -1499,7 +1499,7 @@ export function AccountSettings({
                             inputAccounts,
 
                         successMessage:
-                            "입력 화면 자산 순서를 저장했습니다."
+                            "내 입력 화면의 계좌 순서를 저장했습니다."
                     }
                 );
 
@@ -2263,7 +2263,7 @@ export function AccountSettings({
                                                     activeMenuAccount.accountId
                                                 )
                                                     ? "결제수단에 표시"
-                                                    : "결제수단에서 숨기기"
+                                                    : "내 입력 목록에서만 숨기기"
                                             }
                                         </button>
                                     )

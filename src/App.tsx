@@ -818,6 +818,7 @@ export default function App() {
             "account",
             "category",
             "input_preferences",
+            "household_overview",
             "ledger_config",
             "automation_settings",
             "backup_restore"

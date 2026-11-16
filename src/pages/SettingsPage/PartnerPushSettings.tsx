@@ -26,6 +26,7 @@ function unsupportedMessage(reason: string) {
 
 export function PartnerPushSettings({ userName }: { userName: string }) {
   const support = getPushSupport();
+  const allowed = userName === "미영";
   const [partnerName, setPartnerName] = useState("");
   const [status, setStatus] = useState<Status>("checking");
   const [busy, setBusy] = useState(false);
@@ -34,7 +35,7 @@ export function PartnerPushSettings({ userName }: { userName: string }) {
   const [feedback, setFeedback] = useState("");
 
   useEffect(() => {
-    if (!support.supported) {
+    if (!allowed || !support.supported) {
       setStatus("off");
       return;
     }
@@ -51,7 +52,7 @@ export function PartnerPushSettings({ userName }: { userName: string }) {
     return () => {
       active = false;
     };
-  }, [support.supported]);
+  }, [support.supported, allowed]);
 
   useEffect(() => {
     if (!userName) return;
@@ -72,6 +73,7 @@ export function PartnerPushSettings({ userName }: { userName: string }) {
   const partner = partnerName ? `${partnerName}님` : "배우자";
 
   async function handleToggle() {
+    if (!allowed) return;
     setBusy(true);
     setError("");
     setFeedback("");
@@ -94,6 +96,7 @@ export function PartnerPushSettings({ userName }: { userName: string }) {
   }
 
   async function handleTest() {
+    if (!allowed) return;
     setTesting(true);
     setError("");
     setFeedback("");
@@ -111,6 +114,14 @@ export function PartnerPushSettings({ userName }: { userName: string }) {
       setTesting(false);
     }
   }
+
+  if (!allowed) return (
+    <Card as="section"><div className={styles.sectionHeading}>
+      <h2>거래 알림</h2>
+      <p>알림은 미영님이 알림을 켠 기기에만 전송합니다. 승철님 기기에는 보내지 않습니다.</p>
+      <p>가계부 내역과 최근 변경 사항은 두 분 모두 확인할 수 있습니다.</p>
+    </div></Card>
+  );
 
   return (
     <Card as="section">

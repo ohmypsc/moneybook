@@ -16,6 +16,8 @@ import type {
 } from "../utils/inputPreferences";
 
 export interface BootstrapData {
+  userName?: string;
+  householdOverview?: { livingAccountIds: string[] | null };
   backendVersion: string;
   transactionTypes: TransactionType[];
   investmentTradeTypes: InvestmentTradeType[];

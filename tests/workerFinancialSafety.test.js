@@ -9,7 +9,7 @@ const workerUrl = new URL("../worker/index.js", import.meta.url);
 const source = readFileSync(workerUrl, "utf8")
   .replace('import { DurableObject } from "cloudflare:workers";', 'class DurableObject {}')
   .replace(/from "(\.\/[^\"]+)"/g, (_match, path) => `from ${JSON.stringify(new URL(path, workerUrl).href)}`);
-const worker = await import(`data:text/javascript;base64,${Buffer.from(source + '\nexport { mbD1HandleTransactionMutation, mbD1RestoreBackupMerge };').toString("base64")}`);
+const worker = await import(`data:text/javascript;base64,${Buffer.from(source + '\nexport { mbD1HandleTransactionMutation, mbD1RestoreBackupMerge, mbD1HandleInputPreferences, mbD1InputPreferencesData, mbD1SaveHouseholdOverview, mbD1HouseholdOverviewData, mbD1GetChangesData, mbD1BuildBackupDocument };').toString("base64")}`);
 
 function database() {
   const sqlite = new DatabaseSync(":memory:");
@@ -99,5 +99,65 @@ test("backup restore rolls back earlier writes if a later insert fails", async (
     env.state.failSql = "";
     await worker.mbD1RestoreBackupMerge(backup(), session, env);
     assert.equal(env.sqlite.prepare("SELECT amount FROM transactions WHERE transaction_id='NEW'").get().amount, 5000);
+  } finally { env.sqlite.close(); }
+});
+
+const basePreferences = { version: 1, categoryOrder: { 지출: ["C1"], 수입: [], 이체: [] }, accountOrder: ["A1"], hiddenAccountIds: [] };
+
+test("personal input settings inherit legacy defaults without overwriting the partner", async () => {
+  const env = database();
+  try {
+    env.sqlite.prepare("INSERT INTO user_preferences(preference_id,household_id,preference_key,preference_json) VALUES ('PREF_INPUT_SHARED','HH_MAIN','input_preferences',?)").run(JSON.stringify(basePreferences));
+    const first = await worker.mbD1InputPreferencesData(env, "미영");
+    assert.equal(first.ownerName, "미영");
+    assert.deepEqual(first.preferences.accountOrder, ["A1"]);
+    await worker.mbD1HandleInputPreferences({ preferences: { ...basePreferences, hiddenAccountIds: ["A1"] }, ownerName: "승철" }, {name: "미영"}, env);
+    assert.deepEqual((await worker.mbD1InputPreferencesData(env, "미영")).preferences.hiddenAccountIds, ["A1"]);
+    assert.deepEqual((await worker.mbD1InputPreferencesData(env, "승철")).preferences.hiddenAccountIds, []);
+    await worker.mbD1HandleInputPreferences({preferences: { ...basePreferences, accountOrder: ["A1", "A2"] }}, {name: "승철"}, env);
+    assert.deepEqual((await worker.mbD1InputPreferencesData(env, "미영")).preferences.accountOrder, ["A1"]);
+    assert.deepEqual((await worker.mbD1InputPreferencesData(env, "승철")).preferences.accountOrder, ["A1", "A2"]);
+  } finally { env.sqlite.close(); }
+});
+
+test("living-account selection is shared and rejects unavailable accounts", async () => {
+  const env = database();
+  try {
+    await worker.mbD1SaveHouseholdOverview({livingAccountIds: ["A1", "A1"]}, session, env);
+    assert.deepEqual(await worker.mbD1HouseholdOverviewData(env), {livingAccountIds: ["A1"]});
+    await assert.rejects(() => worker.mbD1SaveHouseholdOverview({livingAccountIds: ["missing"]}, session, env), /계좌/);
+    assert.deepEqual(await worker.mbD1HouseholdOverviewData(env), {livingAccountIds: ["A1"]});
+  } finally { env.sqlite.close(); }
+});
+
+test("recent changes show newest financial changes, while incremental sync keeps ascending order", async () => {
+  const env = database();
+  try {
+    env.sqlite.exec(`INSERT INTO change_log(household_id,entity_type,entity_id,action,payload_json) VALUES
+      ('HH_MAIN','transaction','OLD','created','{"amount":1000}'),
+      ('HH_MAIN','input_preferences','미영','updated',NULL),
+      ('HH_MAIN','transaction','NEW','updated','{"amount":5000,"before":{"amount":1000}}');`);
+    const recent = await worker.mbD1GetChangesData(env, new URL("https://example/api/changes?recent=1&limit=1"));
+    assert.deepEqual(recent.changes.map(row => row.entityId), ["NEW"]);
+    assert.equal(recent.hasMore, false);
+    const sync = await worker.mbD1GetChangesData(env, new URL("https://example/api/changes?after=0"));
+    assert.deepEqual(sync.changes.map(row => row.entityId), ["OLD", "미영", "NEW"]);
+  } finally { env.sqlite.close(); }
+});
+
+test("backup merge preserves both people's quick-entry settings and shared living accounts", async () => {
+  const env = database();
+  try {
+    const document = backup();
+    document.payload.userDisplayPreferences = [
+      { key: "input_preferences:미영", value: { ...basePreferences, quickEntries: [{id: "Q", name: "점심"}] } },
+      { key: "input_preferences:승철", value: { ...basePreferences, hiddenAccountIds: ["A1"] } },
+      { key: "household_overview", value: {livingAccountIds: ["A1"]} }
+    ];
+    await worker.mbD1RestoreBackupMerge(document, session, env);
+    assert.equal((await worker.mbD1InputPreferencesData(env, "미영")).preferences.quickEntries[0].name, "점심");
+    assert.deepEqual((await worker.mbD1InputPreferencesData(env, "승철")).preferences.hiddenAccountIds, ["A1"]);
+    const exported = await worker.mbD1BuildBackupDocument(env);
+    assert.equal(exported.payload.userDisplayPreferences.length, 3);
   } finally { env.sqlite.close(); }
 });

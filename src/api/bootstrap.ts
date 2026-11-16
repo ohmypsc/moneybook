@@ -1,6 +1,8 @@
-import { apiRequest } from "./client";
-import { getCachedBootstrapPayload } from "./bootstrapCache";
+import { apiRequest } from "./client.ts";
+import { getBootstrapCacheGeneration, getCachedBootstrapPayload } from "./bootstrapCache.ts";
 import type { BootstrapResponse } from "../types/bootstrap";
+
+let bootstrapRequestGeneration = -1;
 
 let bootstrapRequestPromise:
   Promise<BootstrapResponse> | null =
@@ -13,7 +15,9 @@ let bootstrapRequestPromise:
 export function getBootstrap<
   TResponse = BootstrapResponse
 >() {
-  if (!bootstrapRequestPromise) {
+  const generation = getBootstrapCacheGeneration();
+  if (!bootstrapRequestPromise || bootstrapRequestGeneration !== generation) {
+    bootstrapRequestGeneration = generation;
     const task =
       apiRequest<BootstrapResponse>(
         "/api/bootstrap"
@@ -22,17 +26,10 @@ export function getBootstrap<
     bootstrapRequestPromise =
       task;
 
-    void task.finally(
-      () => {
-        if (
-          bootstrapRequestPromise ===
-            task
-        ) {
-          bootstrapRequestPromise =
-            null;
-        }
-      }
-    );
+    const clearRequest = () => {
+      if (bootstrapRequestPromise === task) bootstrapRequestPromise = null;
+    };
+    void task.then(clearRequest, clearRequest);
   }
 
   return bootstrapRequestPromise as

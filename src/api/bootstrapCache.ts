@@ -34,6 +34,7 @@ const BOOTSTRAP_MUTATION_PATHS =
   new Set([
     SETTINGS_PATH,
     "/api/settings/automation",
+    "/api/settings/household-overview",
     "/api/settings/ledger-start-date",
     "/api/settings/ledger-start-date/clear",
     "/api/backup/restore",
@@ -42,6 +43,7 @@ const BOOTSTRAP_MUTATION_PATHS =
 
 const LEDGER_MUTATION_PATHS =
   new Set([
+    "/api/settings/household-overview",
     ...MASTER_MUTATION_PATHS,
 
     "/api/transactions",

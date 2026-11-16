@@ -84,7 +84,10 @@ test("a transaction entered by 승철 notifies only 미영's devices", async () 
   const miyoung = await browserSubscription("https://web.push.apple.com/miyoung-phone");
   const seungcheol = await browserSubscription("https://fcm.googleapis.com/fcm/send/seungcheol-phone");
   await savePushSubscription(env, HOUSEHOLD, { name: "미영" }, { subscription: miyoung }, "iPhone");
-  await savePushSubscription(env, HOUSEHOLD, { name: "승철" }, { subscription: seungcheol }, "Android");
+  await assert.rejects(savePushSubscription(env, HOUSEHOLD, { name: "승철" }, { subscription: seungcheol }, "Android"), { code: "PUSH_DISABLED_FOR_USER" });
+  // Simulate subscriptions registered before the recipient-only policy was deployed.
+  env.DB.raw.prepare("INSERT INTO push_subscriptions(endpoint,household_id,member_name,p256dh,auth,created_at,updated_at) VALUES (?,?,?,?,?,?,?)")
+    .run(seungcheol.endpoint, HOUSEHOLD, "승철", seungcheol.keys.p256dh, seungcheol.keys.auth, "2026-01-01", "2026-01-01");
 
   const fetchMock = mockFetch();
   try {
@@ -131,7 +134,7 @@ test("unsubscribe and test push only touch the caller's own devices", async () =
 
   await assert.rejects(
     sendTestPush(env, HOUSEHOLD, { name: "승철" }, "https://moneybook.example"),
-    { code: "PUSH_NOT_SUBSCRIBED" }
+    { code: "PUSH_DISABLED_FOR_USER" }
   );
 
   const fetchMock = mockFetch();
@@ -175,4 +178,19 @@ test("several transactions from 승철 reach 미영 as a single push", async () 
   } finally {
     fetchMock.restore();
   }
+});
+
+test("미영's own entries do not notify 승철 even when a legacy subscription exists", async () => {
+  const env = { DB: createD1() };
+  const subscription = await browserSubscription("https://fcm.googleapis.com/fcm/send/old-seungcheol");
+  await getPushConfig(env, HOUSEHOLD, { name: "미영" });
+  env.DB.raw.prepare("INSERT INTO push_subscriptions(endpoint,household_id,member_name,p256dh,auth,created_at,updated_at) VALUES (?,?,?,?,?,?,?)")
+    .run(subscription.endpoint, HOUSEHOLD, "승철", subscription.keys.p256dh, subscription.keys.auth, "2026-01-01", "2026-01-01");
+  const mock = mockFetch();
+  try {
+    const result = await notifyPartnersOfTransaction(env, HOUSEHOLD, "미영", {transactionId: "T", type: "수입", amount: 100}, "https://moneybook.example");
+    assert.equal(result.sent, 0);
+    assert.equal(mock.calls.length, 0);
+    assert.equal((await getPushConfig(env, HOUSEHOLD, {name: "승철"})).allowed, false);
+  } finally { mock.restore(); }
 });

@@ -3,6 +3,7 @@ import type { BootstrapData } from "../types/bootstrap";
 
 export interface MoneybookBackupPayload {
   bootstrap: BootstrapData;
+  userDisplayPreferences?: Array<{ key: string; value: Record<string, unknown> }>;
   categories: unknown[];
   accounts: unknown[];
   transactions: Transaction[];
