@@ -17,6 +17,8 @@ export function buildTransactionSearchWhere({
   includeDeleted = false,
   type = "",
   categoryId = "",
+  expenseCategory = "",
+  expenseTarget = "",
   accountId = "",
   spendingTarget = "",
   dateFrom = "",
@@ -31,6 +33,18 @@ export function buildTransactionSearchWhere({
   if (type) {
     where.push("t.type=?");
     binds.push(type);
+  }
+  // Report totals group original expenses by display name, including inactive categories.
+  if (expenseCategory || expenseTarget) {
+    where.push("t.type='지출'", "(t.reversal_of IS NULL OR t.reversal_of='')");
+  }
+  if (expenseCategory) {
+    where.push("COALESCE(NULLIF(TRIM(c.name),''),'미분류')=?");
+    binds.push(expenseCategory);
+  }
+  if (expenseTarget) {
+    where.push("COALESCE(NULLIF(TRIM(t.spending_target),''),'미분류')=?");
+    binds.push(expenseTarget);
   }
   if (categoryId) {
     where.push("t.category_id=?");

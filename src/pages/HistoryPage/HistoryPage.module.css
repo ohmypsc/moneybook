@@ -107,7 +107,7 @@
 .rankRow b { font-size: 12px; white-space: nowrap; }
 
 .targetGrid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); padding: 14px; gap: 10px; }
-.targetGrid div { min-width: 0; padding: 12px 8px; border-radius: var(--radius-md); background: var(--color-surface-soft); text-align: center; }
+.targetGrid button { min-width: 0; padding: 12px 8px; border-radius: var(--radius-md); background: var(--color-surface-soft); text-align: center; }
 .targetGrid span { display: block; color: var(--color-text-secondary); font-size: 11px; }
 .targetGrid strong { display: block; margin-top: 4px; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -501,3 +501,10 @@ button.transactionMain {
   font-size: 11px;
   font-weight: 600;
 }
+
+button.rankRow { width: 100%; border-top: 0; border-left: 0; border-right: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.targetGrid button { border: 0; color: inherit; font: inherit; cursor: pointer; min-height: 64px; }
+button.rankRow:hover, .targetGrid button:hover { background: var(--color-surface-soft); }
+button.rankRow:focus-visible, .targetGrid button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+button.rankRow:disabled, .targetGrid button:disabled { opacity: .55; cursor: wait; }
+.reportDetailHint { margin: 8px 0; color: var(--color-text-secondary); font-size: 12px; line-height: 1.6; }

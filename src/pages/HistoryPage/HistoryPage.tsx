@@ -2,6 +2,7 @@ import {
   type FormEvent,
   useEffect,
   useMemo,
+  useRef,
   useState
 } from "react";
 
@@ -170,6 +171,9 @@ export default function HistoryPage({
   const [appliedQuery, setAppliedQuery] = useState("");
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [searchNonce, setSearchNonce] = useState(0);
+  const [reportSelection, setReportSelection] = useState<{ category?: string; target?: string; month: string } | null>(null);
+  const searchRequest = useRef(0);
+  const reportRequest = useRef(0);
   const [calendarEditTarget, setCalendarEditTarget] = useState<{
     transactionId: string;
     date: string;
@@ -211,6 +215,7 @@ export default function HistoryPage({
       return;
     }
 
+    const request = ++searchRequest.current;
     const append = Boolean(options.append);
     if (append) {
       setSearchLoadingMore(true);
@@ -236,6 +241,8 @@ export default function HistoryPage({
         dateTo: monthRange?.dateTo || searchDateTo || undefined,
         type: filter === "전체" ? undefined : filter,
         categoryId: searchCategoryId || undefined,
+        expenseCategory: reportSelection?.category,
+        expenseTarget: reportSelection?.target,
         accountId: searchAccountId || undefined,
         spendingTarget: searchSpendingTarget || undefined,
         amount: numericQuery,
@@ -244,6 +251,7 @@ export default function HistoryPage({
         offset: append ? searchItems.length : 0
       });
 
+      if (request !== searchRequest.current) return;
       const activeItems = (response.data.items || []).filter(
         transaction => !transaction.isDeleted
       );
@@ -253,10 +261,12 @@ export default function HistoryPage({
       );
       setSearchTotal(response.data.total || 0);
     } catch (error) {
+      if (request !== searchRequest.current) return;
       setSearchError(
         error instanceof Error ? error.message : "내역을 검색하지 못했습니다."
       );
     } finally {
+      if (request !== searchRequest.current) return;
       if (append) {
         setSearchLoadingMore(false);
       } else {
@@ -275,6 +285,7 @@ export default function HistoryPage({
   }
 
   function resetSearchFilters() {
+    setReportSelection(null);
     setQuery("");
     setFilter("전체");
     setSearchDateFrom("");
@@ -285,12 +296,32 @@ export default function HistoryPage({
     setSearchNonce(value => value + 1);
   }
 
+  function openReportDetails(kind: "category" | "target", name: string) {
+    if (!report || report.month !== reportMonth || reportLoading) return;
+    searchRequest.current += 1;
+    resetSearchFilters();
+    const range = getMonthDateRange(reportMonth);
+    setListMonth(reportMonth);
+    setSearchDateFrom(range.dateFrom);
+    setSearchDateTo(range.dateTo);
+    setFilter("지출");
+    setReportSelection({ month: reportMonth, [kind]: name });
+    setSearchItems([]);
+    setSearchTotal(0);
+    setSearchError("");
+    setSearchLoading(true);
+    setSearchLoadingMore(false);
+    setShowAdvancedFilters(false);
+    setView("search");
+  }
+
   function clearQuery() {
     setQuery("");
     setSearchNonce(value => value + 1);
   }
 
   async function loadReport(month: string, forceRefresh = false) {
+    const request = ++reportRequest.current;
     const cached = getDashboardSnapshot(month);
     if (cached) setReport(cached);
     if (!cached) setReportLoading(true);
@@ -298,15 +329,17 @@ export default function HistoryPage({
 
     try {
       const data = await getDashboard(month, { forceRefresh });
+      if (request !== reportRequest.current) return;
       setReport(data);
     } catch (error) {
+      if (request !== reportRequest.current) return;
       if (!cached) {
         setReportError(
           error instanceof Error ? error.message : "리포트를 불러오지 못했습니다."
         );
       }
     } finally {
-      setReportLoading(false);
+      if (request === reportRequest.current) setReportLoading(false);
     }
   }
 
@@ -365,6 +398,7 @@ export default function HistoryPage({
     if (view === "search") {
       void runSearch();
     }
+    return () => { searchRequest.current += 1; };
   }, [view, ledgerVersion, listMonth, searchNonce]);
 
   useEffect(() => {
@@ -552,7 +586,17 @@ export default function HistoryPage({
             </div>
           )}
 
-          <Card as="form" padding="sm" onSubmit={runSearch}>
+          {reportSelection && (
+            <Card padding="sm">
+              <div className={styles.searchModeBar}>
+                <strong>{formatMonthLabel(reportSelection.month)} · {reportSelection.category || reportSelection.target} 지출 내역</strong>
+                <Button variant="ghost" size="sm" onClick={() => setView("report")}>리포트로 돌아가기</Button>
+              </div>
+              <p className={styles.reportDetailHint}>리포트는 환불·정산을 차감한 금액이며, 아래 목록은 해당 지출의 원래 금액을 표시합니다. 거래를 누르면 상세 내용을 확인할 수 있습니다.</p>
+              <Button variant="ghost" size="sm" onClick={resetSearchFilters}>리포트 조건 해제</Button>
+            </Card>
+          )}
+          {!reportSelection && <Card as="form" padding="sm" onSubmit={runSearch}>
             <div className={styles.searchRow}>
               <input
                 type="search"
@@ -669,7 +713,7 @@ export default function HistoryPage({
             </div>
             </>
             )}
-          </Card>
+          </Card>}
 
           <div className={styles.resultHeader}>
             <strong>{searchTotal.toLocaleString("ko-KR")}건</strong>
@@ -852,15 +896,18 @@ export default function HistoryPage({
               <section className={styles.reportSection}>
                 <div className={styles.sectionTitle}>
                   <h2>카테고리별 지출</h2>
-                  <span>상위 5개</span>
+                  <span>상위 5개 · 누르면 내역 보기</span>
                 </div>
                 <Card padding="none" className={styles.rankList}>
                   {topCategories.length ? topCategories.map((item, index) => (
-                    <div key={item.name} className={styles.rankRow}>
+                    <button type="button" key={item.name} className={styles.rankRow}
+                      disabled={reportLoading || report.month !== reportMonth}
+                      onClick={() => openReportDetails("category", item.name)}
+                      aria-label={`${item.name} 지출 내역 보기`}>
                       <span>{index + 1}</span>
                       <strong>{item.name}</strong>
-                      <b><Money amount={item.amount} absolute /></b>
-                    </div>
+                      <b><Money amount={item.amount} absolute /> <span aria-hidden="true">›</span></b>
+                    </button>
                   )) : <p className={styles.empty}>이 달의 지출이 없습니다.</p>}
                 </Card>
               </section>
@@ -868,14 +915,17 @@ export default function HistoryPage({
               <section className={styles.reportSection}>
                 <div className={styles.sectionTitle}>
                   <h2>지출대상별</h2>
-                  <span>상세 분석용</span>
+                  <span>누르면 내역 보기</span>
                 </div>
                 <Card padding="sm" className={styles.targetGrid}>
                   {spendingTargets.length ? spendingTargets.map(item => (
-                    <div key={item.name}>
-                      <span>{item.name}</span>
+                    <button type="button" key={item.name}
+                      disabled={reportLoading || report.month !== reportMonth}
+                      onClick={() => openReportDetails("target", item.name)}
+                      aria-label={`${item.name} 지출 내역 보기`}>
+                      <span>{item.name} ›</span>
                       <strong><Money amount={item.amount} absolute /></strong>
-                    </div>
+                    </button>
                   )) : <p className={styles.empty}>분류된 지출이 없습니다.</p>}
                 </Card>
               </section>

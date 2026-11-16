@@ -3327,6 +3327,8 @@ async function mbD1GetTransactionsData(env, url) {
   const includeDeleted = ["1", "true"].includes((url.searchParams.get("includeDeleted") || "").toLowerCase());
   const type = mbD1Text(url.searchParams.get("type"));
   const categoryId = mbD1Text(url.searchParams.get("categoryId"));
+  const expenseCategory = mbD1Text(url.searchParams.get("expenseCategory"));
+  const expenseTarget = mbD1Text(url.searchParams.get("expenseTarget"));
   const accountId = mbD1Text(url.searchParams.get("accountId"));
   const spendingTarget = mbD1Text(url.searchParams.get("spendingTarget"));
   const q = mbD1Text(url.searchParams.get("q")).toLowerCase();
@@ -3353,6 +3355,8 @@ async function mbD1GetTransactionsData(env, url) {
     householdId: MB_D1_HOUSEHOLD_ID,
     includeDeleted,
     type,
+    expenseCategory,
+    expenseTarget,
     categoryId,
     accountId,
     spendingTarget,

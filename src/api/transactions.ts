@@ -198,6 +198,8 @@ export interface TransactionsResponse {
 
 
 export interface GetTransactionsParams {
+  expenseCategory?: string;
+  expenseTarget?: string;
   /** 기본 요청 제한시간(30초) 대신 쓸 값. 저장 전 빠른 확인용. */
   timeoutMs?: number;
 
@@ -283,6 +285,9 @@ export async function getTransactions(
     );
   }
 
+
+  if (params.expenseCategory) searchParams.set("expenseCategory", params.expenseCategory);
+  if (params.expenseTarget) searchParams.set("expenseTarget", params.expenseTarget);
 
   if (params.categoryId) {
     searchParams.set(

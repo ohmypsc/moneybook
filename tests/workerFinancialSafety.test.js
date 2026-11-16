@@ -9,7 +9,7 @@ const workerUrl = new URL("../worker/index.js", import.meta.url);
 const source = readFileSync(workerUrl, "utf8")
   .replace('import { DurableObject } from "cloudflare:workers";', 'class DurableObject {}')
   .replace(/from "(\.\/[^\"]+)"/g, (_match, path) => `from ${JSON.stringify(new URL(path, workerUrl).href)}`);
-const worker = await import(`data:text/javascript;base64,${Buffer.from(source + '\nexport { mbD1HandleTransactionMutation, mbD1RestoreBackupMerge, mbD1HandleInputPreferences, mbD1InputPreferencesData, mbD1SaveHouseholdOverview, mbD1HouseholdOverviewData, mbD1GetChangesData, mbD1BuildBackupDocument };').toString("base64")}`);
+const worker = await import(`data:text/javascript;base64,${Buffer.from(source + '\nexport { mbD1GetTransactionsData, mbD1HandleTransactionMutation, mbD1RestoreBackupMerge, mbD1HandleInputPreferences, mbD1InputPreferencesData, mbD1SaveHouseholdOverview, mbD1HouseholdOverviewData, mbD1GetChangesData, mbD1BuildBackupDocument };').toString("base64")}`);
 
 function database() {
   const sqlite = new DatabaseSync(":memory:");
@@ -212,5 +212,43 @@ test("deletion cannot orphan a settlement added immediately before the write", a
     await assert.rejects(removeOriginal(env), /변경/);
     assert.equal(env.sqlite.prepare("SELECT deleted_at FROM transactions WHERE transaction_id='ORIGINAL'").get().deleted_at, null);
     assert.equal(env.sqlite.prepare("SELECT COUNT(*) AS count FROM change_log WHERE action='deleted'").get().count, 0);
+  } finally { env.sqlite.close(); }
+});
+
+test("report drilldown matches the month, exact category name and original expenses", async () => {
+  const env = database();
+  try {
+    env.sqlite.exec(`
+      INSERT INTO categories(category_id,household_id,type,name,is_active) VALUES ('OLD_CATEGORY','HH_MAIN','지출','경조사비',0);
+      INSERT INTO transactions(transaction_id,household_id,date,type,category_id,amount,description,reversal_of,deleted_at) VALUES
+      ('OLD','HH_MAIN','2026-11-10','지출','OLD_CATEGORY',1000,'',NULL,NULL),
+      ('OTHER_MONTH','HH_MAIN','2026-10-10','지출','C1',1000,'',NULL,NULL),
+      ('INCOME','HH_MAIN','2026-11-10','수입','C1',1000,'',NULL,NULL),
+      ('REVERSAL','HH_MAIN','2026-11-10','지출','C1',1000,'','INCOME',NULL),
+      ('DELETED','HH_MAIN','2026-11-10','지출','C1',1000,'',NULL,'2026-11-11'),
+      ('TEXT_ONLY','HH_MAIN','2026-11-10','지출',NULL,1000,'경조사비',NULL,NULL);`);
+    const result = await worker.mbD1GetTransactionsData(env, new URL('https://example.test/api/transactions?dateFrom=2026-11-01&dateTo=2026-11-30&expenseCategory=' + encodeURIComponent('경조사비')));
+    assert.equal(result.total, 2);
+    assert.deepEqual(result.items.map(item => item.transactionId).sort(), ['OLD','ORIGINAL']);
+    const page = await worker.mbD1GetTransactionsData(env, new URL('https://example.test/api/transactions?dateFrom=2026-11-01&dateTo=2026-11-30&limit=1&offset=1&expenseCategory=' + encodeURIComponent('경조사비')));
+    assert.equal(page.total, 2);
+    assert.equal(page.items.length, 1);
+    assert.equal(page.items[0].transactionId, 'OLD');
+  } finally { env.sqlite.close(); }
+});
+
+test("report target drilldown includes only the exact target and supports uncategorized rows", async () => {
+  const env = database();
+  try {
+    env.sqlite.exec(`UPDATE transactions SET spending_target='미영' WHERE transaction_id='ORIGINAL';
+      INSERT INTO transactions(transaction_id,household_id,date,type,amount,spending_target) VALUES
+      ('OTHER','HH_MAIN','2026-11-10','지출',1000,'승철'),
+      ('UNCLASSIFIED','HH_MAIN','2026-11-10','지출',1000,NULL),
+      ('TARGET_INCOME','HH_MAIN','2026-11-10','수입',1000,'미영');`);
+    const get = (key, value) => worker.mbD1GetTransactionsData(env, new URL('https://example.test/api/transactions?dateFrom=2026-11-01&dateTo=2026-11-30&' + key + '=' + encodeURIComponent(value)));
+    assert.deepEqual((await get('expenseTarget','미영')).items.map(item => item.transactionId), ['ORIGINAL']);
+    assert.deepEqual((await get('expenseTarget','미분류')).items.map(item => item.transactionId), ['UNCLASSIFIED']);
+    assert.equal((await get('expenseCategory',"' OR 1=1 --")).total, 0);
+    assert.equal((await get('expenseCategory','미분류')).total, 2);
   } finally { env.sqlite.close(); }
 });

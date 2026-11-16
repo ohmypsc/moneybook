@@ -1,5 +1,3 @@
-import { HouseholdOverview } from "../../components/household/HouseholdOverview";
-import { RecentChangesPanel } from "../../components/household/RecentChangesPanel";
 import {
   useEffect,
   useMemo,
@@ -671,7 +669,6 @@ export default function HomePage({
         <DataFreshnessNotice fetchedAt={fallbackSnapshotAt} />
       )}
 
-      <HouseholdOverview dashboard={dashboard} updatedLabel={lastUpdatedLabel} />
 
       <Card as="section" className={styles.summaryCard}>
         <div className={styles.summaryHeader}>
@@ -730,7 +727,6 @@ export default function HomePage({
         </div>
       </Card>
 
-      <RecentChangesPanel />
 
       <section className={styles.section}>
         <div className={styles.sectionHeader}>
