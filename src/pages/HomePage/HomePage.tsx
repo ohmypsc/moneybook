@@ -589,7 +589,7 @@ export default function HomePage({ onCopyTransaction }: HomePageProps) {
     <main className={styles.page}>
       <header className={styles.header}>
         <div className={styles.togetherBlock}>
-          <img src="/splash-photo.jpg" alt="" className={styles.homePhoto} aria-hidden="true" />
+          <img src="/splash-thumb.jpg" alt="" className={styles.homePhoto} aria-hidden="true" />
           <div>
             <p className={styles.togetherLabel}>함께한 지</p>
             <h1 className={styles.togetherValue}>
