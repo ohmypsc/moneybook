@@ -5,6 +5,8 @@ import {
   rememberBootstrapPayload
 } from "./bootstrapCache.ts";
 import { notifyAuthExpired } from "../utils/authEvents.ts";
+import { readLastAuthenticatedUser } from "../app/lastAuthenticatedUser.ts";
+import { readPersistedBootstrapSnapshot } from "./bootstrapPersistence.ts";
 
 export class ApiError extends Error {
   status: number;
@@ -113,6 +115,16 @@ export async function apiRequest<T>(url: string, init: ApiRequestInit = {}): Pro
       throw new ApiError("서버 응답을 읽을 수 없습니다.", response.status, "INVALID_RESPONSE");
     }
   } catch (error) {
+    // 인터넷 연결 문제(연결 실패·시간 초과)로 bootstrap을 못 받으면
+    // 이 기기에 저장해 둔 마지막 목록으로 입력 화면을 띄웁니다.
+    const isNetworkFailure = timedOut || !(error instanceof ApiError);
+    if (isBootstrapRequest && isNetworkFailure && !externalSignal?.aborted) {
+      const snapshot = readPersistedBootstrapSnapshot(readLastAuthenticatedUser()?.name);
+      if (snapshot) {
+        return { ...(snapshot.payload as object), offlineSnapshotAt: snapshot.fetchedAt } as T;
+      }
+    }
+
     if (timedOut) {
       throw new ApiError(
         "서버 응답이 지연되고 있습니다. 잠시 후 다시 시도해주세요.",
