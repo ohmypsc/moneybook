@@ -106,7 +106,7 @@
 
   /* 글꼴 */
   --font-family-base:
-    "NanumSquareRound", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif;
+    "Paperlogy", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif;
 
   /* 글자 크기: 11px 미만은 쓰지 않습니다. */
   --font-size-2xs: 11px;

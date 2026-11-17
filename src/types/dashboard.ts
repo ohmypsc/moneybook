@@ -64,6 +64,12 @@ export interface NamedAmount {
   amount: number;
 }
 
+export interface CategoryUsage {
+  categoryId: string;
+  count: number;
+  lastDate: string;
+}
+
 export interface RecentTransaction {
   transactionId: string;
   date: string;
@@ -157,5 +163,7 @@ export interface DashboardData {
   cards: DashboardCard[];
   monthlyTrend: MonthlyTrendItem[];
   recentTransactions: RecentTransaction[];
+  // 최근 180일 실제 거래의 카테고리별 사용 횟수 (예전 서버 응답에는 없을 수 있음)
+  categoryUsage?: CategoryUsage[];
   investments: DashboardInvestments;
 }
