@@ -3,6 +3,7 @@ import { getCurrentCalendarMonth, loadCalendarMonth } from "../api/calendarCache
 import { getDashboard } from "../api/dashboard";
 import { prefetchInvestmentTrades } from "../api/investments";
 import { prefetchManagedSettings } from "../api/settingsManagement";
+import { prefetchSecondaryPages } from "./pages";
 import { wait } from "./splash";
 
 const PRIMARY_WARM_TIMEOUT_MS = 2500;
@@ -26,9 +27,10 @@ export async function warmPrimaryData() {
   await Promise.race([Promise.allSettled([dashboardRequest]), wait(PRIMARY_WARM_TIMEOUT_MS)]);
 }
 
-/** 홈이 실제로 뜬 뒤에만 필요한 투자 매매내역을 준비합니다. */
+/** 홈이 실제로 뜬 뒤에만 필요한 투자 매매내역과 다른 화면 코드를 준비합니다. */
 export function scheduleSecondaryWarm() {
   window.setTimeout(() => {
     void prefetchInvestmentTrades().catch(() => {});
+    prefetchSecondaryPages();
   }, SECONDARY_WARM_DELAY_MS);
 }

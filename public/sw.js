@@ -1,5 +1,5 @@
 const CACHE_VERSION =
-  "v8.6.0-classification-tags";
+  "v8.7.0-faster-start";
 
 const STATIC_CACHE =
   `moneybook-static-${CACHE_VERSION}`;
@@ -13,6 +13,7 @@ const CACHE_PREFIX =
 
 const PRECACHE_URLS = [
   "/splash-photo.jpg",
+  "/splash-thumb.jpg",
   "/manifest.webmanifest",
   "/apple-touch-icon.png",
   "/icon-192.png",
@@ -297,9 +298,42 @@ async function networkFirstNavigation(
 
 /*
  * 새 Service Worker가 설치될 때 현재 index.html이 참조하는
- * Vite JS/CSS까지 함께 저장합니다. 핵심 앱 셸 중 하나라도
- * 실패하면 새 Worker를 활성화하지 않아 기존 정상 캐시를 보존합니다.
+ * Vite JS/CSS와, 그 JS가 나중에 불러오는 화면별 JS/CSS까지 함께 저장합니다.
+ * (화면별 코드는 처음 열 때가 아니라 필요할 때 받으므로, 오프라인에서도
+ * 모든 화면이 열리려면 설치 시점에 미리 받아 두어야 합니다.)
+ * 핵심 앱 셸 중 하나라도 실패하면 새 Worker를 활성화하지 않아 기존 정상 캐시를 보존합니다.
  */
+const ASSET_REFERENCE_PATTERN = /(?:^|[^A-Za-z0-9_.-])\/?assets\/([A-Za-z0-9_.-]+\.(?:js|css))/g;
+const RELATIVE_CHUNK_PATTERN = /["']\.\/([A-Za-z0-9_.-]+\.(?:js|css))["']/g;
+
+function findAssetUrls(text, { includeRelative }) {
+  const urls = new Set();
+
+  for (const match of text.matchAll(ASSET_REFERENCE_PATTERN)) {
+    urls.add(`/assets/${match[1]}`);
+  }
+
+  if (includeRelative) {
+    for (const match of text.matchAll(RELATIVE_CHUNK_PATTERN)) {
+      urls.add(`/assets/${match[1]}`);
+    }
+  }
+
+  return urls;
+}
+
+async function precacheUrl(cache, url) {
+  const request = new Request(url, { cache: "reload" });
+  const response = await fetch(request);
+
+  if (!response.ok) {
+    throw new Error(`Precache failed: ${url}`);
+  }
+
+  await cache.put(request, response.clone());
+  return response;
+}
+
 async function installAppShell() {
   const cache = await caches.open(STATIC_CACHE);
 
@@ -313,21 +347,28 @@ async function installAppShell() {
   const html = await rootResponse.clone().text();
   await cache.put(rootRequest, rootResponse.clone());
 
-  const assetMatches = html.match(/\/assets\/[^"'\s>]+\.(?:js|css)/g) || [];
-  const urls = Array.from(new Set([...PRECACHE_URLS, ...assetMatches]));
+  await Promise.all(PRECACHE_URLS.map(url => precacheUrl(cache, url)));
 
-  await Promise.all(
-    urls.map(async url => {
-      const request = new Request(url, { cache: "reload" });
-      const response = await fetch(request);
+  // index.html의 JS/CSS에서 시작해 JS가 참조하는 화면별 파일을 차례로 따라갑니다.
+  const seen = new Set();
+  let pending = [...findAssetUrls(html, { includeRelative: false })];
 
-      if (!response.ok) {
-        throw new Error(`Precache failed: ${url}`);
+  while (pending.length > 0) {
+    const batch = pending.filter(url => !seen.has(url));
+    batch.forEach(url => seen.add(url));
+    pending = [];
+
+    const responses = await Promise.all(batch.map(url => precacheUrl(cache, url)));
+
+    for (let index = 0; index < batch.length; index += 1) {
+      if (!batch[index].endsWith(".js")) continue;
+
+      const text = await responses[index].text();
+      for (const url of findAssetUrls(text, { includeRelative: true })) {
+        if (!seen.has(url)) pending.push(url);
       }
-
-      await cache.put(request, response);
-    })
-  );
+    }
+  }
 }
 
 self.addEventListener(
@@ -521,16 +562,11 @@ self.addEventListener(
       event.respondWith(
         (
           async () => {
-            const cache =
-              await caches.open(
-                RUNTIME_CACHE
-              );
-
-
+            // 설치 때 저장한 앱 파일(STATIC_CACHE)을 먼저 찾고, 없으면 실행 중 저장한 파일을 찾습니다.
+            // (예전에는 RUNTIME_CACHE만 찾아서 설치 직후 오프라인으로 열면 앱 코드를 못 불러왔습니다.)
             const cached =
-              await cache.match(
-                request
-              );
+              (await (await caches.open(STATIC_CACHE)).match(request)) ||
+              (await (await caches.open(RUNTIME_CACHE)).match(request));
 
 
             if (

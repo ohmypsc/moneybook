@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { ReactNode } from "react";
 
 import { useAppNavigation, useNavigationHistorySync } from "./app/hooks/useAppNavigation";
@@ -5,16 +6,13 @@ import { useAuthSession } from "./app/hooks/useAuthSession";
 import { useLedgerBackgroundSync } from "./app/hooks/useLedgerBackgroundSync";
 import { usePendingTransactionSummary } from "./app/hooks/usePendingTransactionSummary";
 import { createInputPresetFromTransaction } from "./app/navigation";
+import { AssetsPage, HistoryPage, InputPage, SettingsPage } from "./app/pages";
 import type { Transaction } from "./api/transactions";
 import { Card } from "./components/common/Card/Card";
 import { ConfirmDialogHost } from "./components/common/ConfirmDialog/ConfirmDialog";
 import { AppShell } from "./components/layout/AppShell/AppShell";
-import AssetsPage from "./pages/AssetsPage/AssetsPage";
-import HistoryPage from "./pages/HistoryPage/HistoryPage";
 import HomePage from "./pages/HomePage/HomePage";
-import InputPage from "./pages/InputPage/InputPage";
 import LoginPage from "./pages/LoginPage/LoginPage";
-import SettingsPage from "./pages/SettingsPage/SettingsPage";
 import styles from "./App.module.css";
 
 /*
@@ -93,7 +91,7 @@ export default function App() {
         pendingTransactionFailedCount={pendingTransactionSummary.failed}
         onNavigate={nextNavigation => navigateTo(nextNavigation, null)}
       >
-        {pageContent}
+        <Suspense fallback={null}>{pageContent}</Suspense>
       </AppShell>
 
       <ConfirmDialogHost />

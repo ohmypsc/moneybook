@@ -8,6 +8,7 @@ import { clearInvestmentPrefetchCache } from "../../api/investments";
 import { clearManagedSettingsCache } from "../../api/settingsManagement";
 import type { User } from "../../types/api";
 import { subscribeAuthExpired } from "../../utils/authEvents";
+import { prefetchSecondaryPages } from "../pages";
 import { readLastAuthenticatedUser, saveLastAuthenticatedUser } from "../lastAuthenticatedUser";
 import {
   hideLaunchSplashNow,
@@ -109,6 +110,7 @@ export function useAuthSession(onEnterApp: () => void) {
           await waitForMinimumSplash();
           if (!cancelled) {
             hideSplashAfterPaint();
+            prefetchSecondaryPages();
           }
           return;
         }
