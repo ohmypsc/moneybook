@@ -3,20 +3,15 @@ const lastRefreshAttemptAt = new Map<string, number>();
 
 const DUPLICATE_ATTEMPT_GUARD_MS = 5_000;
 
-export function shouldBackgroundRefresh(
-  key: string,
-  minimumIntervalMs = 60_000
-) {
+export function shouldBackgroundRefresh(key: string, minimumIntervalMs = 60_000) {
   const now = Date.now();
-  const previousSuccess =
-    lastSuccessfulRefreshAt.get(key) || 0;
+  const previousSuccess = lastSuccessfulRefreshAt.get(key) || 0;
 
   if (now - previousSuccess < minimumIntervalMs) {
     return false;
   }
 
-  const previousAttempt =
-    lastRefreshAttemptAt.get(key) || 0;
+  const previousAttempt = lastRefreshAttemptAt.get(key) || 0;
 
   if (now - previousAttempt < DUPLICATE_ATTEMPT_GUARD_MS) {
     return false;

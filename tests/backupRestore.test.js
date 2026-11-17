@@ -20,14 +20,37 @@ function sample(version = 3) {
         automationSettings: { version: 1, recurringRules: [], benefitRules: [] }
       },
       categories: [{ categoryId: "C1", type: "지출", name: "식비", active: true }],
-      accounts: [{ accountId: "A1", accountName: "카드", displayName: "카드", paymentAccountId: null }],
-      transactions: [{ transactionId: "T1", date: "2026-09-01", type: "지출", categoryId: "C1", amount: 1000, paymentMethodId: "A1" }],
+      accounts: [
+        { accountId: "A1", accountName: "카드", displayName: "카드", paymentAccountId: null }
+      ],
+      transactions: [
+        {
+          transactionId: "T1",
+          date: "2026-09-01",
+          type: "지출",
+          categoryId: "C1",
+          amount: 1000,
+          paymentMethodId: "A1"
+        }
+      ],
       assetSnapshots: [{ month: "2026-09", assets: 100, liabilities: 0, netWorth: 100 }],
       investmentHoldings: [],
       investmentTrades: [],
       investmentCash: null,
       benefitRewardUsage: [],
-      realEstateAssets: [{ propertyId: "RE1", name: "우리집", propertyType: "아파트", address: "세종", lawdCode: "36110", apartmentName: "두루마을", exclusiveAreaSqm: 84.9, valuationMode: "manual", manualValueKrw: 500000000 }]
+      realEstateAssets: [
+        {
+          propertyId: "RE1",
+          name: "우리집",
+          propertyType: "아파트",
+          address: "세종",
+          lawdCode: "36110",
+          apartmentName: "두루마을",
+          exclusiveAreaSqm: 84.9,
+          valuationMode: "manual",
+          manualValueKrw: 500000000
+        }
+      ]
     }
   };
 }
@@ -48,7 +71,6 @@ test("version 1 backup is supported with a benefit warning", () => {
   assert.equal(result.version, 1);
   assert.match(result.warnings[0], /혜택 사용 누계/);
 });
-
 
 test("version 2 backup remains supported without real estate", () => {
   const document = sample(2);
@@ -89,13 +111,13 @@ test("request id conflict helper detects another item using the same request id"
   assert.deepEqual(conflicts, [{ requestId: "REQ1", id: "T1" }]);
 });
 
-
 test("invalid transaction calendar date is rejected", () => {
   const document = sample();
   document.payload.transactions[0].date = "2026-02-30";
   assert.throws(
     () => validateBackupDocument(document),
-    error => error instanceof BackupValidationError && error.code === "BACKUP_TRANSACTION_DATE_INVALID"
+    error =>
+      error instanceof BackupValidationError && error.code === "BACKUP_TRANSACTION_DATE_INVALID"
   );
 });
 
@@ -104,7 +126,9 @@ test("invalid billing month is rejected", () => {
   document.payload.transactions[0].billingMonth = "2026-13";
   assert.throws(
     () => validateBackupDocument(document),
-    error => error instanceof BackupValidationError && error.code === "BACKUP_TRANSACTION_BILLING_MONTH_INVALID"
+    error =>
+      error instanceof BackupValidationError &&
+      error.code === "BACKUP_TRANSACTION_BILLING_MONTH_INVALID"
   );
 });
 
@@ -113,13 +137,18 @@ test("invalid snapshot month is rejected", () => {
   document.payload.assetSnapshots[0].month = "2026-99";
   assert.throws(
     () => validateBackupDocument(document),
-    error => error instanceof BackupValidationError && error.code === "BACKUP_SNAPSHOT_MONTH_INVALID"
+    error =>
+      error instanceof BackupValidationError && error.code === "BACKUP_SNAPSHOT_MONTH_INVALID"
   );
 });
 
 test("invalid investment trade date is rejected", () => {
   const document = sample();
-  document.payload.investmentHoldings.push({ holdingId: "H1", accountId: "A1", stockCode: "005930" });
+  document.payload.investmentHoldings.push({
+    holdingId: "H1",
+    accountId: "A1",
+    stockCode: "005930"
+  });
   document.payload.investmentTrades.push({
     investmentTradeId: "IT1",
     tradeDate: "2026-02-31",

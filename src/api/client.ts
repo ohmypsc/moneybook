@@ -6,27 +6,18 @@ import {
 } from "./bootstrapCache.ts";
 import { notifyAuthExpired } from "../utils/authEvents.ts";
 
-export class ApiError
-  extends Error {
-
+export class ApiError extends Error {
   status: number;
   code: string;
 
-  constructor(
-    message: string,
-    status = 500,
-    code = "API_ERROR"
-  ) {
+  constructor(message: string, status = 500, code = "API_ERROR") {
     super(message);
 
-    this.name =
-      "ApiError";
+    this.name = "ApiError";
 
-    this.status =
-      status;
+    this.status = status;
 
-    this.code =
-      code;
+    this.code = code;
   }
 }
 
@@ -39,8 +30,7 @@ interface ErrorEnvelope {
   };
 }
 
-const BOOTSTRAP_PATH =
-  "/api/bootstrap";
+const BOOTSTRAP_PATH = "/api/bootstrap";
 
 const DEFAULT_API_TIMEOUT_MS = 30_000;
 
@@ -48,82 +38,42 @@ export interface ApiRequestInit extends RequestInit {
   timeoutMs?: number;
 }
 
-function getPathname(
-  url: string
-) {
-  const hashIndex =
-    url.indexOf("#");
+function getPathname(url: string) {
+  const hashIndex = url.indexOf("#");
 
-  const withoutHash =
-    hashIndex >= 0
-      ? url.slice(0, hashIndex)
-      : url;
+  const withoutHash = hashIndex >= 0 ? url.slice(0, hashIndex) : url;
 
-  const queryIndex =
-    withoutHash.indexOf("?");
+  const queryIndex = withoutHash.indexOf("?");
 
-  return queryIndex >= 0
-    ? withoutHash.slice(0, queryIndex)
-    : withoutHash;
+  return queryIndex >= 0 ? withoutHash.slice(0, queryIndex) : withoutHash;
 }
 
-export async function apiRequest<T>(
-  url: string,
-  init: ApiRequestInit = {}
-): Promise<T> {
-  const method =
-    String(
-      init.method || "GET"
-    ).toUpperCase();
+export async function apiRequest<T>(url: string, init: ApiRequestInit = {}): Promise<T> {
+  const method = String(init.method || "GET").toUpperCase();
 
-  const pathname =
-    getPathname(url);
+  const pathname = getPathname(url);
 
-  const isBootstrapRequest =
-    method === "GET" &&
-    pathname === BOOTSTRAP_PATH;
+  const isBootstrapRequest = method === "GET" && pathname === BOOTSTRAP_PATH;
 
-  if (
-    isBootstrapRequest
-  ) {
-    const cached =
-      getCachedBootstrapPayload<T>();
+  if (isBootstrapRequest) {
+    const cached = getCachedBootstrapPayload<T>();
 
     if (cached) {
       return cached;
     }
   }
 
-  const requestGeneration =
-    isBootstrapRequest
-      ? getBootstrapCacheGeneration()
-      : -1;
+  const requestGeneration = isBootstrapRequest ? getBootstrapCacheGeneration() : -1;
 
-  const {
-    timeoutMs = DEFAULT_API_TIMEOUT_MS,
-    signal: externalSignal,
-    ...requestInit
-  } = init;
+  const { timeoutMs = DEFAULT_API_TIMEOUT_MS, signal: externalSignal, ...requestInit } = init;
 
-  const headers =
-    new Headers(
-      requestInit.headers
-    );
+  const headers = new Headers(requestInit.headers);
 
-  if (
-    requestInit.body &&
-    !headers.has(
-      "Content-Type"
-    )
-  ) {
-    headers.set(
-      "Content-Type",
-      "application/json"
-    );
+  if (requestInit.body && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
   }
 
-  const controller =
-    new AbortController();
+  const controller = new AbortController();
 
   let timedOut = false;
   let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
@@ -136,22 +86,15 @@ export async function apiRequest<T>(
     if (externalSignal.aborted) {
       controller.abort();
     } else {
-      externalSignal.addEventListener(
-        "abort",
-        abortFromExternalSignal,
-        { once: true }
-      );
+      externalSignal.addEventListener("abort", abortFromExternalSignal, { once: true });
     }
   }
 
   if (Number.isFinite(timeoutMs) && timeoutMs > 0) {
-    timeoutHandle = setTimeout(
-      () => {
-        timedOut = true;
-        controller.abort();
-      },
-      timeoutMs
-    );
+    timeoutHandle = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, timeoutMs);
   }
 
   let response: Response;
@@ -183,42 +126,24 @@ export async function apiRequest<T>(
     externalSignal?.removeEventListener("abort", abortFromExternalSignal);
   }
 
-  const envelope =
-    data as ErrorEnvelope;
+  const envelope = data as ErrorEnvelope;
 
-  if (
-    !response.ok ||
-    envelope.success === false
-  ) {
-    if (
-      response.status === 401 &&
-      !pathname.startsWith("/api/auth/")
-    ) {
+  if (!response.ok || envelope.success === false) {
+    if (response.status === 401 && !pathname.startsWith("/api/auth/")) {
       notifyAuthExpired();
     }
 
     throw new ApiError(
-      envelope.error?.message ||
-        "요청 처리 중 오류가 발생했습니다.",
+      envelope.error?.message || "요청 처리 중 오류가 발생했습니다.",
       response.status,
-      envelope.error?.code ||
-        "API_ERROR"
+      envelope.error?.code || "API_ERROR"
     );
   }
 
-  if (
-    isBootstrapRequest
-  ) {
-    rememberBootstrapPayload(
-      data,
-      requestGeneration
-    );
-  } else if (
-    method !== "GET"
-  ) {
-    handleSuccessfulApiMutation(
-      pathname
-    );
+  if (isBootstrapRequest) {
+    rememberBootstrapPayload(data, requestGeneration);
+  } else if (method !== "GET") {
+    handleSuccessfulApiMutation(pathname);
   }
 
   return data as T;

@@ -1,8 +1,4 @@
-import {
-  useEffect,
-  useMemo,
-  useState
-} from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   createRecurringTransaction,
@@ -16,14 +12,8 @@ import type {
   RecurringMode,
   RecurringTransactionRule
 } from "../../api/automation";
-import {
-  getManagedAccounts,
-  getManagedCategories
-} from "../../api/settingsManagement";
-import type {
-  ManagedAccount,
-  ManagedCategory
-} from "../../api/settingsManagement";
+import { getManagedAccounts, getManagedCategories } from "../../api/settingsManagement";
+import type { ManagedAccount, ManagedCategory } from "../../api/settingsManagement";
 import { markLedgerChanged } from "../../utils/ledgerEvents";
 import { clearBootstrapMemoryCache } from "../../api/bootstrapCache";
 import { getSeoulDateString } from "../../utils/dateTime";
@@ -141,30 +131,26 @@ export default function AutomationSettingsPanel() {
   const spendingTargets = useMemo(() => {
     const names = Array.from(
       new Set<string>(
-        activeAccounts
-          .map(account => account.owner)
-          .filter(owner => owner && owner !== "공동")
+        activeAccounts.map(account => account.owner).filter(owner => owner && owner !== "공동")
       )
     ).sort((a, b) => a.localeCompare(b, "ko"));
     return ["공동", ...names];
   }, [activeAccounts]);
 
   const recurringCategories = useMemo(
-    () => categories.filter(
-      category =>
-        !category.isDeleted &&
-        category.active &&
-        category.type === recurringForm.type &&
-        !isSystemSettlementCategory(category)
-    ),
+    () =>
+      categories.filter(
+        category =>
+          !category.isDeleted &&
+          category.active &&
+          category.type === recurringForm.type &&
+          !isSystemSettlementCategory(category)
+      ),
     [categories, recurringForm.type]
   );
 
   const currentMonth = getSeoulDateString().slice(0, 7);
-  const dueByRuleId = useMemo(
-    () => new Map(dueItems.map(item => [item.ruleId, item])),
-    [dueItems]
-  );
+  const dueByRuleId = useMemo(() => new Map(dueItems.map(item => [item.ruleId, item])), [dueItems]);
 
   async function refreshDue() {
     const result = await processRecurringTransactions();
@@ -195,12 +181,13 @@ export default function AutomationSettingsPanel() {
             markLedgerChanged();
             setFeedback(`고정 거래 ${recurring.created.length}건을 자동 등록했습니다.`);
           }
-        } catch {
-        }
+        } catch {}
       })
       .catch(loadError => {
         if (!active) return;
-        setError(loadError instanceof Error ? loadError.message : "자동화 설정을 불러오지 못했습니다.");
+        setError(
+          loadError instanceof Error ? loadError.message : "자동화 설정을 불러오지 못했습니다."
+        );
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -224,7 +211,10 @@ export default function AutomationSettingsPanel() {
     setFeedback("");
   }
 
-  async function persistRecurringRules(nextRules: RecurringTransactionRule[], successMessage: string) {
+  async function persistRecurringRules(
+    nextRules: RecurringTransactionRule[],
+    successMessage: string
+  ) {
     const nextSettings: AutomationSettings = {
       ...settings,
       recurringRules: nextRules
@@ -270,7 +260,10 @@ export default function AutomationSettingsPanel() {
       paymentMethodId: recurringForm.type === "지출" ? recurringForm.paymentMethodId || null : null,
       spendingTarget: recurringForm.type === "지출" ? recurringForm.spendingTarget || null : null,
       fromAccountId: recurringForm.type === "이체" ? recurringForm.fromAccountId || null : null,
-      toAccountId: recurringForm.type === "수입" || recurringForm.type === "이체" ? recurringForm.toAccountId || null : null,
+      toAccountId:
+        recurringForm.type === "수입" || recurringForm.type === "이체"
+          ? recurringForm.toAccountId || null
+          : null,
       description: recurringForm.description.trim(),
       memo: recurringForm.memo.trim()
     };
@@ -280,13 +273,15 @@ export default function AutomationSettingsPanel() {
     setFeedback("");
     try {
       const nextRules = settings.recurringRules.some(item => item.id === rule.id)
-        ? settings.recurringRules.map(item => item.id === rule.id ? rule : item)
+        ? settings.recurringRules.map(item => (item.id === rule.id ? rule : item))
         : [...settings.recurringRules, rule];
       await persistRecurringRules(nextRules, "고정 거래 설정을 저장했습니다.");
       setShowRecurringForm(false);
       setRecurringForm(emptyRecurringForm());
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "고정 거래 설정을 저장하지 못했습니다.");
+      setError(
+        saveError instanceof Error ? saveError.message : "고정 거래 설정을 저장하지 못했습니다."
+      );
     } finally {
       setSavingRecurring(false);
     }
@@ -300,7 +295,8 @@ export default function AutomationSettingsPanel() {
         confirmLabel: "삭제",
         tone: "danger"
       }))
-    ) return;
+    )
+      return;
     setBusyRuleId(rule.id);
     setError("");
     try {
@@ -309,7 +305,9 @@ export default function AutomationSettingsPanel() {
         "고정 거래 설정을 삭제했습니다."
       );
     } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : "고정 거래 설정을 삭제하지 못했습니다.");
+      setError(
+        deleteError instanceof Error ? deleteError.message : "고정 거래 설정을 삭제하지 못했습니다."
+      );
     } finally {
       setBusyRuleId("");
     }
@@ -329,7 +327,9 @@ export default function AutomationSettingsPanel() {
       }
       setDueItems(result.due);
     } catch (createError) {
-      setError(createError instanceof Error ? createError.message : "고정 거래를 등록하지 못했습니다.");
+      setError(
+        createError instanceof Error ? createError.message : "고정 거래를 등록하지 못했습니다."
+      );
     } finally {
       setBusyRuleId("");
     }
@@ -347,7 +347,10 @@ export default function AutomationSettingsPanel() {
       <Card as="section">
         <div className={styles.sectionHeading}>
           <h2>고정 거래</h2>
-          <p>월급·적금·회비처럼 반복되는 거래를 미리 등록합니다. 자동 등록은 서버가 매일 확인하며, 앱을 열 때도 한 번 더 확인합니다.</p>
+          <p>
+            월급·적금·회비처럼 반복되는 거래를 미리 등록합니다. 자동 등록은 서버가 매일 확인하며,
+            앱을 열 때도 한 번 더 확인합니다.
+          </p>
         </div>
 
         {settings.recurringRules.length === 0 ? (
@@ -356,11 +359,7 @@ export default function AutomationSettingsPanel() {
           <ul className={styles.itemList}>
             {settings.recurringRules.map(rule => {
               const due = dueByRuleId.get(rule.id);
-              const accountNames = [
-                rule.paymentMethodId,
-                rule.fromAccountId,
-                rule.toAccountId
-              ]
+              const accountNames = [rule.paymentMethodId, rule.fromAccountId, rule.toAccountId]
                 .filter(Boolean)
                 .map(id => activeAccounts.find(account => account.accountId === id))
                 .filter(Boolean)
@@ -370,7 +369,8 @@ export default function AutomationSettingsPanel() {
                   <span className={styles.itemTextGroup}>
                     <strong>{rule.name}</strong>
                     <span>
-                      매월 {rule.dayOfMonth}일 · {rule.type} · {formatAmount(rule.amount)} · {recurringTypeSummary(rule)}
+                      매월 {rule.dayOfMonth}일 · {rule.type} · {formatAmount(rule.amount)} ·{" "}
+                      {recurringTypeSummary(rule)}
                       {accountNames.length > 0 ? ` · ${accountNames.join(" → ")}` : ""}
                     </span>
                   </span>
@@ -406,9 +406,7 @@ export default function AutomationSettingsPanel() {
 
         {!showRecurringForm && (
           <div className={styles.rowActions}>
-            <Button onClick={beginNewRecurring}>
-              고정 거래 추가
-            </Button>
+            <Button onClick={beginNewRecurring}>고정 거래 추가</Button>
           </div>
         )}
 
@@ -424,7 +422,9 @@ export default function AutomationSettingsPanel() {
                 <span>이름</span>
                 <input
                   value={recurringForm.name}
-                  onChange={event => setRecurringForm(current => ({ ...current, name: event.target.value }))}
+                  onChange={event =>
+                    setRecurringForm(current => ({ ...current, name: event.target.value }))
+                  }
                   placeholder="예: 월급, 청년도약계좌"
                 />
               </label>
@@ -433,14 +433,16 @@ export default function AutomationSettingsPanel() {
                 <span>거래 유형</span>
                 <select
                   value={recurringForm.type}
-                  onChange={event => setRecurringForm(current => ({
-                    ...current,
-                    type: event.target.value as RecurringFormState["type"],
-                    categoryId: "",
-                    paymentMethodId: "",
-                    fromAccountId: "",
-                    toAccountId: ""
-                  }))}
+                  onChange={event =>
+                    setRecurringForm(current => ({
+                      ...current,
+                      type: event.target.value as RecurringFormState["type"],
+                      categoryId: "",
+                      paymentMethodId: "",
+                      fromAccountId: "",
+                      toAccountId: ""
+                    }))
+                  }
                 >
                   <option value="지출">지출</option>
                   <option value="수입">수입</option>
@@ -455,7 +457,9 @@ export default function AutomationSettingsPanel() {
                   min="1"
                   max="31"
                   value={recurringForm.dayOfMonth}
-                  onChange={event => setRecurringForm(current => ({ ...current, dayOfMonth: event.target.value }))}
+                  onChange={event =>
+                    setRecurringForm(current => ({ ...current, dayOfMonth: event.target.value }))
+                  }
                 />
               </label>
 
@@ -466,7 +470,9 @@ export default function AutomationSettingsPanel() {
                   min="1"
                   inputMode="numeric"
                   value={recurringForm.amount}
-                  onChange={event => setRecurringForm(current => ({ ...current, amount: event.target.value }))}
+                  onChange={event =>
+                    setRecurringForm(current => ({ ...current, amount: event.target.value }))
+                  }
                 />
               </label>
 
@@ -474,7 +480,12 @@ export default function AutomationSettingsPanel() {
                 <span>등록 방식</span>
                 <select
                   value={recurringForm.mode}
-                  onChange={event => setRecurringForm(current => ({ ...current, mode: event.target.value as RecurringMode }))}
+                  onChange={event =>
+                    setRecurringForm(current => ({
+                      ...current,
+                      mode: event.target.value as RecurringMode
+                    }))
+                  }
                 >
                   <option value="confirm">확인 후 등록</option>
                   <option value="auto">자동 등록(매일 자동 확인)</option>
@@ -485,11 +496,15 @@ export default function AutomationSettingsPanel() {
                 <span>카테고리</span>
                 <select
                   value={recurringForm.categoryId}
-                  onChange={event => setRecurringForm(current => ({ ...current, categoryId: event.target.value }))}
+                  onChange={event =>
+                    setRecurringForm(current => ({ ...current, categoryId: event.target.value }))
+                  }
                 >
                   <option value="">선택하세요</option>
                   {recurringCategories.map(category => (
-                    <option key={category.categoryId} value={category.categoryId}>{category.name}</option>
+                    <option key={category.categoryId} value={category.categoryId}>
+                      {category.name}
+                    </option>
                   ))}
                 </select>
               </label>
@@ -500,11 +515,18 @@ export default function AutomationSettingsPanel() {
                     <span>결제수단</span>
                     <select
                       value={recurringForm.paymentMethodId}
-                      onChange={event => setRecurringForm(current => ({ ...current, paymentMethodId: event.target.value }))}
+                      onChange={event =>
+                        setRecurringForm(current => ({
+                          ...current,
+                          paymentMethodId: event.target.value
+                        }))
+                      }
                     >
                       <option value="">선택하세요</option>
                       {activeAccounts.map(account => (
-                        <option key={account.accountId} value={account.accountId}>{accountLabel(account)}</option>
+                        <option key={account.accountId} value={account.accountId}>
+                          {accountLabel(account)}
+                        </option>
                       ))}
                     </select>
                   </label>
@@ -512,9 +534,18 @@ export default function AutomationSettingsPanel() {
                     <span>지출대상</span>
                     <select
                       value={recurringForm.spendingTarget}
-                      onChange={event => setRecurringForm(current => ({ ...current, spendingTarget: event.target.value }))}
+                      onChange={event =>
+                        setRecurringForm(current => ({
+                          ...current,
+                          spendingTarget: event.target.value
+                        }))
+                      }
                     >
-                      {spendingTargets.map(target => <option key={target} value={target}>{target}</option>)}
+                      {spendingTargets.map(target => (
+                        <option key={target} value={target}>
+                          {target}
+                        </option>
+                      ))}
                     </select>
                   </label>
                 </>
@@ -525,11 +556,15 @@ export default function AutomationSettingsPanel() {
                   <span>입금수단</span>
                   <select
                     value={recurringForm.toAccountId}
-                    onChange={event => setRecurringForm(current => ({ ...current, toAccountId: event.target.value }))}
+                    onChange={event =>
+                      setRecurringForm(current => ({ ...current, toAccountId: event.target.value }))
+                    }
                   >
                     <option value="">선택하세요</option>
                     {activeAccounts.map(account => (
-                      <option key={account.accountId} value={account.accountId}>{accountLabel(account)}</option>
+                      <option key={account.accountId} value={account.accountId}>
+                        {accountLabel(account)}
+                      </option>
                     ))}
                   </select>
                 </label>
@@ -541,11 +576,18 @@ export default function AutomationSettingsPanel() {
                     <span>보내는 수단</span>
                     <select
                       value={recurringForm.fromAccountId}
-                      onChange={event => setRecurringForm(current => ({ ...current, fromAccountId: event.target.value }))}
+                      onChange={event =>
+                        setRecurringForm(current => ({
+                          ...current,
+                          fromAccountId: event.target.value
+                        }))
+                      }
                     >
                       <option value="">선택하세요</option>
                       {activeAccounts.map(account => (
-                        <option key={account.accountId} value={account.accountId}>{accountLabel(account)}</option>
+                        <option key={account.accountId} value={account.accountId}>
+                          {accountLabel(account)}
+                        </option>
                       ))}
                     </select>
                   </label>
@@ -553,11 +595,18 @@ export default function AutomationSettingsPanel() {
                     <span>받는 수단</span>
                     <select
                       value={recurringForm.toAccountId}
-                      onChange={event => setRecurringForm(current => ({ ...current, toAccountId: event.target.value }))}
+                      onChange={event =>
+                        setRecurringForm(current => ({
+                          ...current,
+                          toAccountId: event.target.value
+                        }))
+                      }
                     >
                       <option value="">선택하세요</option>
                       {activeAccounts.map(account => (
-                        <option key={account.accountId} value={account.accountId}>{accountLabel(account)}</option>
+                        <option key={account.accountId} value={account.accountId}>
+                          {accountLabel(account)}
+                        </option>
                       ))}
                     </select>
                   </label>
@@ -569,7 +618,9 @@ export default function AutomationSettingsPanel() {
                 <input
                   type="month"
                   value={recurringForm.startMonth}
-                  onChange={event => setRecurringForm(current => ({ ...current, startMonth: event.target.value }))}
+                  onChange={event =>
+                    setRecurringForm(current => ({ ...current, startMonth: event.target.value }))
+                  }
                 />
               </label>
 
@@ -578,7 +629,9 @@ export default function AutomationSettingsPanel() {
                 <input
                   type="month"
                   value={recurringForm.endMonth}
-                  onChange={event => setRecurringForm(current => ({ ...current, endMonth: event.target.value }))}
+                  onChange={event =>
+                    setRecurringForm(current => ({ ...current, endMonth: event.target.value }))
+                  }
                 />
               </label>
 
@@ -586,7 +639,9 @@ export default function AutomationSettingsPanel() {
                 <span>내용</span>
                 <input
                   value={recurringForm.description}
-                  onChange={event => setRecurringForm(current => ({ ...current, description: event.target.value }))}
+                  onChange={event =>
+                    setRecurringForm(current => ({ ...current, description: event.target.value }))
+                  }
                   placeholder="비우면 고정 거래 이름 사용"
                 />
               </label>
@@ -595,7 +650,9 @@ export default function AutomationSettingsPanel() {
                 <span>메모</span>
                 <input
                   value={recurringForm.memo}
-                  onChange={event => setRecurringForm(current => ({ ...current, memo: event.target.value }))}
+                  onChange={event =>
+                    setRecurringForm(current => ({ ...current, memo: event.target.value }))
+                  }
                 />
               </label>
             </div>
@@ -604,7 +661,9 @@ export default function AutomationSettingsPanel() {
               <input
                 type="checkbox"
                 checked={recurringForm.enabled}
-                onChange={event => setRecurringForm(current => ({ ...current, enabled: event.target.checked }))}
+                onChange={event =>
+                  setRecurringForm(current => ({ ...current, enabled: event.target.checked }))
+                }
               />
               이 고정 거래 사용
             </label>
@@ -631,7 +690,6 @@ export default function AutomationSettingsPanel() {
           </Card>
         )}
       </Card>
-
     </div>
   );
 }

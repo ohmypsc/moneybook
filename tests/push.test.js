@@ -48,11 +48,15 @@ function createD1() {
 }
 
 async function browserSubscription(endpoint) {
-  const keys = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
+  const keys = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, [
+    "deriveBits"
+  ]);
   return {
     endpoint,
     keys: {
-      p256dh: bytesToBase64Url(new Uint8Array(await crypto.subtle.exportKey("raw", keys.publicKey))),
+      p256dh: bytesToBase64Url(
+        new Uint8Array(await crypto.subtle.exportKey("raw", keys.publicKey))
+      ),
       auth: bytesToBase64Url(crypto.getRandomValues(new Uint8Array(16)))
     }
   };
@@ -65,7 +69,12 @@ function mockFetch(statusByEndpoint = {}) {
     calls.push({ url: String(url), init });
     return new Response(null, { status: statusByEndpoint[String(url)] ?? 201 });
   };
-  return { calls, restore: () => { globalThis.fetch = original; } };
+  return {
+    calls,
+    restore: () => {
+      globalThis.fetch = original;
+    }
+  };
 }
 
 test("VAPID keys are created once and reused", async () => {
@@ -75,19 +84,37 @@ test("VAPID keys are created once and reused", async () => {
 
   assert.equal(first.publicKey, second.publicKey);
   assert.equal(first.myDeviceCount, 0);
-  const rows = env.DB.raw.prepare("SELECT key FROM schema_meta WHERE key='web_push_vapid_v1'").all();
+  const rows = env.DB.raw
+    .prepare("SELECT key FROM schema_meta WHERE key='web_push_vapid_v1'")
+    .all();
   assert.equal(rows.length, 1);
 });
 
 test("a transaction entered by 승철 notifies only 미영's devices", async () => {
   const env = { DB: createD1() };
   const miyoung = await browserSubscription("https://web.push.apple.com/miyoung-phone");
-  const seungcheol = await browserSubscription("https://fcm.googleapis.com/fcm/send/seungcheol-phone");
+  const seungcheol = await browserSubscription(
+    "https://fcm.googleapis.com/fcm/send/seungcheol-phone"
+  );
   await savePushSubscription(env, HOUSEHOLD, { name: "미영" }, { subscription: miyoung }, "iPhone");
-  await assert.rejects(savePushSubscription(env, HOUSEHOLD, { name: "승철" }, { subscription: seungcheol }, "Android"), { code: "PUSH_DISABLED_FOR_USER" });
+  await assert.rejects(
+    savePushSubscription(env, HOUSEHOLD, { name: "승철" }, { subscription: seungcheol }, "Android"),
+    { code: "PUSH_DISABLED_FOR_USER" }
+  );
   // Simulate subscriptions registered before the recipient-only policy was deployed.
-  env.DB.raw.prepare("INSERT INTO push_subscriptions(endpoint,household_id,member_name,p256dh,auth,created_at,updated_at) VALUES (?,?,?,?,?,?,?)")
-    .run(seungcheol.endpoint, HOUSEHOLD, "승철", seungcheol.keys.p256dh, seungcheol.keys.auth, "2026-01-01", "2026-01-01");
+  env.DB.raw
+    .prepare(
+      "INSERT INTO push_subscriptions(endpoint,household_id,member_name,p256dh,auth,created_at,updated_at) VALUES (?,?,?,?,?,?,?)"
+    )
+    .run(
+      seungcheol.endpoint,
+      HOUSEHOLD,
+      "승철",
+      seungcheol.keys.p256dh,
+      seungcheol.keys.auth,
+      "2026-01-01",
+      "2026-01-01"
+    );
 
   const fetchMock = mockFetch();
   try {
@@ -99,7 +126,10 @@ test("a transaction entered by 승철 notifies only 미영's devices", async () 
       "https://moneybook.example"
     );
     assert.deepEqual(result, { sent: 1, failed: 0, removed: 0 });
-    assert.deepEqual(fetchMock.calls.map(call => call.url), ["https://web.push.apple.com/miyoung-phone"]);
+    assert.deepEqual(
+      fetchMock.calls.map(call => call.url),
+      ["https://web.push.apple.com/miyoung-phone"]
+    );
   } finally {
     fetchMock.restore();
   }
@@ -110,12 +140,21 @@ test("a transaction entered by 승철 notifies only 미영's devices", async () 
 test("expired subscriptions are removed after the push service says they are gone", async () => {
   const env = { DB: createD1() };
   const endpoint = "https://web.push.apple.com/old-phone";
-  await savePushSubscription(env, HOUSEHOLD, { name: "미영" }, { subscription: await browserSubscription(endpoint) });
+  await savePushSubscription(
+    env,
+    HOUSEHOLD,
+    { name: "미영" },
+    { subscription: await browserSubscription(endpoint) }
+  );
 
   const fetchMock = mockFetch({ [endpoint]: 410 });
   try {
     const result = await notifyPartnersOfTransaction(
-      env, HOUSEHOLD, "승철", { transactionId: "TX2", type: "수입", amount: 1 }, "https://moneybook.example"
+      env,
+      HOUSEHOLD,
+      "승철",
+      { transactionId: "TX2", type: "수입", amount: 1 },
+      "https://moneybook.example"
     );
     assert.deepEqual(result, { sent: 0, failed: 0, removed: 1 });
   } finally {
@@ -127,7 +166,12 @@ test("expired subscriptions are removed after the push service says they are gon
 test("unsubscribe and test push only touch the caller's own devices", async () => {
   const env = { DB: createD1() };
   const endpoint = "https://web.push.apple.com/miyoung-phone";
-  await savePushSubscription(env, HOUSEHOLD, { name: "미영" }, { subscription: await browserSubscription(endpoint) });
+  await savePushSubscription(
+    env,
+    HOUSEHOLD,
+    { name: "미영" },
+    { subscription: await browserSubscription(endpoint) }
+  );
 
   await deletePushSubscription(env, HOUSEHOLD, { name: "승철" }, { endpoint });
   assert.equal((await getPushConfig(env, HOUSEHOLD, { name: "미영" })).myDeviceCount, 1);
@@ -139,7 +183,12 @@ test("unsubscribe and test push only touch the caller's own devices", async () =
 
   const fetchMock = mockFetch();
   try {
-    const result = await sendTestPush(env, HOUSEHOLD, { name: "미영" }, "https://moneybook.example");
+    const result = await sendTestPush(
+      env,
+      HOUSEHOLD,
+      { name: "미영" },
+      "https://moneybook.example"
+    );
     assert.equal(result.sent, 1);
   } finally {
     fetchMock.restore();
@@ -158,21 +207,28 @@ test("subscriptions pointing anywhere other than a browser push service are reje
   );
 });
 
-
 test("several transactions from 승철 reach 미영 as a single push", async () => {
   const env = { DB: createD1() };
   await savePushSubscription(
-    env, HOUSEHOLD, { name: "미영" },
+    env,
+    HOUSEHOLD,
+    { name: "미영" },
     { subscription: await browserSubscription("https://web.push.apple.com/miyoung-phone") }
   );
 
   const fetchMock = mockFetch();
   try {
-    const result = await notifyPartnersOfTransactions(env, HOUSEHOLD, "승철", [
-      { transactionId: "1", type: "지출", amount: 1000, description: "a" },
-      { transactionId: "2", type: "지출", amount: 2000, description: "b" },
-      { transactionId: "3", type: "지출", amount: 3000, description: "c" }
-    ], "https://moneybook.example");
+    const result = await notifyPartnersOfTransactions(
+      env,
+      HOUSEHOLD,
+      "승철",
+      [
+        { transactionId: "1", type: "지출", amount: 1000, description: "a" },
+        { transactionId: "2", type: "지출", amount: 2000, description: "b" },
+        { transactionId: "3", type: "지출", amount: 3000, description: "c" }
+      ],
+      "https://moneybook.example"
+    );
     assert.deepEqual(result, { sent: 1, failed: 0, removed: 0 });
     assert.equal(fetchMock.calls.length, 1);
   } finally {
@@ -182,15 +238,36 @@ test("several transactions from 승철 reach 미영 as a single push", async () 
 
 test("미영's own entries do not notify 승철 even when a legacy subscription exists", async () => {
   const env = { DB: createD1() };
-  const subscription = await browserSubscription("https://fcm.googleapis.com/fcm/send/old-seungcheol");
+  const subscription = await browserSubscription(
+    "https://fcm.googleapis.com/fcm/send/old-seungcheol"
+  );
   await getPushConfig(env, HOUSEHOLD, { name: "미영" });
-  env.DB.raw.prepare("INSERT INTO push_subscriptions(endpoint,household_id,member_name,p256dh,auth,created_at,updated_at) VALUES (?,?,?,?,?,?,?)")
-    .run(subscription.endpoint, HOUSEHOLD, "승철", subscription.keys.p256dh, subscription.keys.auth, "2026-01-01", "2026-01-01");
+  env.DB.raw
+    .prepare(
+      "INSERT INTO push_subscriptions(endpoint,household_id,member_name,p256dh,auth,created_at,updated_at) VALUES (?,?,?,?,?,?,?)"
+    )
+    .run(
+      subscription.endpoint,
+      HOUSEHOLD,
+      "승철",
+      subscription.keys.p256dh,
+      subscription.keys.auth,
+      "2026-01-01",
+      "2026-01-01"
+    );
   const mock = mockFetch();
   try {
-    const result = await notifyPartnersOfTransaction(env, HOUSEHOLD, "미영", {transactionId: "T", type: "수입", amount: 100}, "https://moneybook.example");
+    const result = await notifyPartnersOfTransaction(
+      env,
+      HOUSEHOLD,
+      "미영",
+      { transactionId: "T", type: "수입", amount: 100 },
+      "https://moneybook.example"
+    );
     assert.equal(result.sent, 0);
     assert.equal(mock.calls.length, 0);
-    assert.equal((await getPushConfig(env, HOUSEHOLD, {name: "승철"})).allowed, false);
-  } finally { mock.restore(); }
+    assert.equal((await getPushConfig(env, HOUSEHOLD, { name: "승철" })).allowed, false);
+  } finally {
+    mock.restore();
+  }
 });

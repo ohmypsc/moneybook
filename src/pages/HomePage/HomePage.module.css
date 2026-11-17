@@ -19,10 +19,8 @@
   overflow: hidden;
   border: 1px solid rgba(207, 222, 220, 0.86);
   border-radius: var(--radius-xl);
-  background:
-    linear-gradient(145deg, #f8fbfa 0%, #e9f2f2 100%);
+  background: linear-gradient(145deg, #f8fbfa 0%, #e9f2f2 100%);
 }
-
 
 .togetherBlock {
   width: 100%;
@@ -72,12 +70,28 @@
   margin-bottom: 8px;
 }
 
-.summaryHeader h2 { margin: 0; font-size: 16px; }
-.summaryHeader span { color: var(--color-text-secondary); font-size: 12px; }
-.summaryMeta { display: grid; justify-items: end; gap: 2px; }
-.summaryMeta small { color: var(--color-text-tertiary, var(--color-text-secondary)); font-size: 10px; font-weight: 600; }
+.summaryHeader h2 {
+  margin: 0;
+  font-size: 16px;
+}
+.summaryHeader span {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+.summaryMeta {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+}
+.summaryMeta small {
+  color: var(--color-text-tertiary, var(--color-text-secondary));
+  font-size: 10px;
+  font-weight: 600;
+}
 
-.summaryRows { display: grid; }
+.summaryRows {
+  display: grid;
+}
 .summaryRow {
   min-height: 47px;
   display: flex;
@@ -86,8 +100,14 @@
   gap: 16px;
   border-top: 1px solid rgba(220, 229, 229, 0.72);
 }
-.summaryRow:first-child { border-top: 0; }
-.summaryLabel { color: var(--color-text-secondary); font-size: 13px; font-weight: 700; }
+.summaryRow:first-child {
+  border-top: 0;
+}
+.summaryLabel {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+}
 .summaryRow strong {
   min-width: 0;
   font-size: 16px;
@@ -96,10 +116,18 @@
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
-.incomeAmount { color: var(--color-income); }
-.expenseAmount { color: var(--color-expense); }
-.netAmount { color: var(--color-positive); }
-.negativeAmount { color: var(--color-error); }
+.incomeAmount {
+  color: var(--color-income);
+}
+.expenseAmount {
+  color: var(--color-expense);
+}
+.netAmount {
+  color: var(--color-positive);
+}
+.negativeAmount {
+  color: var(--color-error);
+}
 
 .assetComposition {
   display: grid;
@@ -137,7 +165,9 @@
   font-weight: 700;
 }
 
-.section { margin-top: 26px; }
+.section {
+  margin-top: 26px;
+}
 .sectionHeader {
   min-height: 34px;
   display: flex;
@@ -147,10 +177,26 @@
   margin-bottom: 10px;
   padding: 0 2px;
 }
-.sectionHeader > div { min-width: 0; display: grid; gap: 2px; }
-.sectionHeader h2 { margin: 0; font-size: 17px; letter-spacing: -0.02em; }
-.sectionHint { color: var(--color-text-secondary); font-size: 11px; }
-.sectionTotal { flex: 0 0 auto; font-size: 15px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.sectionHeader > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.sectionHeader h2 {
+  margin: 0;
+  font-size: 17px;
+  letter-spacing: -0.02em;
+}
+.sectionHint {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
+.sectionTotal {
+  flex: 0 0 auto;
+  font-size: 15px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
 
 .cardList,
 .rankList {
@@ -167,10 +213,19 @@
   border-bottom: 1px solid rgba(220, 229, 229, 0.72);
 }
 .cardRow:last-child,
-.rankRow:last-child { border-bottom: 0; }
-.cardRow { justify-content: space-between; }
+.rankRow:last-child {
+  border-bottom: 0;
+}
+.cardRow {
+  justify-content: space-between;
+}
 
-.cardName { min-width: 0; display: flex; align-items: center; gap: 11px; }
+.cardName {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
 .cardIcon {
   width: 34px;
   height: 34px;
@@ -183,9 +238,21 @@
   font-size: 13px;
   font-weight: 800;
 }
-.cardName div { min-width: 0; display: grid; gap: 3px; }
-.cardName strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
-.cardName span { color: var(--color-text-secondary); font-size: 11px; }
+.cardName div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+.cardName strong {
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cardName span {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
 .cardAccountMeta {
   color: var(--color-text-secondary);
   font-size: 10.5px;
@@ -197,7 +264,12 @@
   justify-items: end;
   gap: 5px;
 }
-.cardAmount { flex: 0 0 auto; font-size: 14px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.cardAmount {
+  flex: 0 0 auto;
+  font-size: 14px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
 .cardEmptyStatus,
 .cardPaidStatus {
   padding: 5px 8px;
@@ -296,8 +368,9 @@
   font-variant-numeric: tabular-nums;
 }
 
-
-.rankRow { min-height: 58px; }
+.rankRow {
+  min-height: 58px;
+}
 .rankNumber {
   width: 26px;
   height: 26px;
@@ -310,8 +383,22 @@
   font-size: 12px;
   font-weight: 800;
 }
-.rankName { min-width: 0; flex: 1 1 auto; overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
-.rankAmount { flex: 0 0 auto; color: var(--color-text); font-size: 13px; font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rankName {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rankAmount {
+  flex: 0 0 auto;
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
 
 .emptyText {
   margin: 0;
@@ -328,20 +415,57 @@
 }
 .loadingLineShort,
 .loadingLineLong,
-.loadingGrid div { border-radius: var(--radius-sm); background: var(--color-surface-soft); }
-.loadingLineShort { width: 72px; height: 14px; }
-.loadingLineLong { width: 180px; max-width: 70%; height: 30px; margin-top: 12px; }
-.loadingGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 24px; }
-.loadingGrid div { height: 48px; }
-.errorCard p { margin: 0; color: var(--color-error); font-size: 14px; line-height: 1.6; }
+.loadingGrid div {
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-soft);
+}
+.loadingLineShort {
+  width: 72px;
+  height: 14px;
+}
+.loadingLineLong {
+  width: 180px;
+  max-width: 70%;
+  height: 30px;
+  margin-top: 12px;
+}
+.loadingGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+.loadingGrid div {
+  height: 48px;
+}
+.errorCard p {
+  margin: 0;
+  color: var(--color-error);
+  font-size: 14px;
+  line-height: 1.6;
+}
 
 /* 로딩/오류 화면의 기존 헤더 클래스 호환 */
-.monthLabel { margin: 0 0 4px; color: var(--color-text-secondary); font-size: 13px; font-weight: 700; }
-.header h1:not(.togetherValue) { margin: 0; font-size: 26px; }
+.monthLabel {
+  margin: 0 0 4px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+}
+.header h1:not(.togetherValue) {
+  margin: 0;
+  font-size: 26px;
+}
 
 @media (max-width: 390px) {
-  .page { padding-right: 14px; padding-left: 14px; }
-  .header { min-height: 126px; padding: 20px 16px 18px; }
+  .page {
+    padding-right: 14px;
+    padding-left: 14px;
+  }
+  .header {
+    min-height: 126px;
+    padding: 20px 16px 18px;
+  }
   .togetherBlock {
     gap: 20px;
   }
@@ -351,15 +475,31 @@
     flex-basis: 68px;
     border-radius: 18px;
   }
-  .summaryCard { padding: 16px; }
-  .summaryRow strong { font-size: 15px; }
+  .summaryCard {
+    padding: 16px;
+  }
+  .summaryRow strong {
+    font-size: 15px;
+  }
   .cardRow,
-  .rankRow { padding-right: 13px; padding-left: 13px; }
+  .rankRow {
+    padding-right: 13px;
+    padding-left: 13px;
+  }
   .cardAmount,
-  .rankAmount { font-size: 12.5px; }
-  .cardAmountBlock { min-width: 96px; }
-  .upcomingRow { padding-right: 13px; padding-left: 13px; }
-  .upcomingAmount { font-size: 12.5px; }
+  .rankAmount {
+    font-size: 12.5px;
+  }
+  .cardAmountBlock {
+    min-width: 96px;
+  }
+  .upcomingRow {
+    padding-right: 13px;
+    padding-left: 13px;
+  }
+  .upcomingAmount {
+    font-size: 12.5px;
+  }
 }
 
 .summaryRowButton {

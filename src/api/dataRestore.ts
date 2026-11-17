@@ -53,33 +53,23 @@ function unwrap<T>(response: ApiEnvelope<T>, fallback: string): T {
   return response.data;
 }
 
-export async function previewMoneybookBackup(
-  backup: MoneybookBackupDocument
-) {
-  const response = await apiRequest<ApiEnvelope<BackupRestorePreview>>(
-    "/api/backup/preview",
-    {
-      method: "POST",
-      body: JSON.stringify({ backup }),
-      timeoutMs: 60_000
-    }
-  );
+export async function previewMoneybookBackup(backup: MoneybookBackupDocument) {
+  const response = await apiRequest<ApiEnvelope<BackupRestorePreview>>("/api/backup/preview", {
+    method: "POST",
+    body: JSON.stringify({ backup }),
+    timeoutMs: 60_000
+  });
   return unwrap(response, "백업 파일을 검증하지 못했습니다.");
 }
 
-export async function restoreMoneybookBackup(
-  backup: MoneybookBackupDocument
-) {
-  const response = await apiRequest<ApiEnvelope<BackupRestoreResult>>(
-    "/api/backup/restore",
-    {
-      method: "POST",
-      body: JSON.stringify({
-        backup,
-        confirm: "RESTORE_MERGE"
-      }),
-      timeoutMs: 120_000
-    }
-  );
+export async function restoreMoneybookBackup(backup: MoneybookBackupDocument) {
+  const response = await apiRequest<ApiEnvelope<BackupRestoreResult>>("/api/backup/restore", {
+    method: "POST",
+    body: JSON.stringify({
+      backup,
+      confirm: "RESTORE_MERGE"
+    }),
+    timeoutMs: 120_000
+  });
   return unwrap(response, "백업을 복원하지 못했습니다.");
 }

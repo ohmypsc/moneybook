@@ -89,8 +89,7 @@ export function useNavigationHistorySync(
   user: User | null,
   navigation: AppNavigation
 ) {
-  const { activeNavigation, setActiveNavigation, setInputInitialDate, setInputPreset } =
-    navigation;
+  const { activeNavigation, setActiveNavigation, setInputInitialDate, setInputPreset } = navigation;
   const shortcutHandledRef = useRef(false);
 
   useEffect(() => {
@@ -103,12 +102,10 @@ export function useNavigationHistorySync(
 
     function handlePopState(event: PopStateEvent) {
       const state = event.state as AppHistoryState | null;
-      const nextNavigation = isPrimaryNavigation(state?.navigation)
-        ? state.navigation
-        : "home";
+      const nextNavigation = isPrimaryNavigation(state?.navigation) ? state.navigation : "home";
 
-      setInputInitialDate(nextNavigation === "input" ? state?.inputInitialDate ?? null : null);
-      setInputPreset(nextNavigation === "input" ? state?.inputPreset ?? null : null);
+      setInputInitialDate(nextNavigation === "input" ? (state?.inputInitialDate ?? null) : null);
+      setInputPreset(nextNavigation === "input" ? (state?.inputPreset ?? null) : null);
       setActiveNavigation(nextNavigation);
     }
 

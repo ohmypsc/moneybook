@@ -1,0 +1,8 @@
+dist
+node_modules
+.wrangler
+package-lock.json
+public/sw.js
+migrations
+database
+*.md

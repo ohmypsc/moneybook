@@ -33,8 +33,18 @@ export const TAX_RULES = {
     rates: { credit: 0.15, debit: 0.3, culture: 0.3, market: 0.4, transit: 0.4 },
     cultureSalaryCap: 70 * MILLION,
     basicLimits: [
-      { maxSalary: 70 * MILLION, base: 3 * MILLION, perChild: 0.5 * MILLION, maxChildBonus: 1 * MILLION },
-      { maxSalary: Infinity, base: 2.5 * MILLION, perChild: 0.25 * MILLION, maxChildBonus: 0.5 * MILLION }
+      {
+        maxSalary: 70 * MILLION,
+        base: 3 * MILLION,
+        perChild: 0.5 * MILLION,
+        maxChildBonus: 1 * MILLION
+      },
+      {
+        maxSalary: Infinity,
+        base: 2.5 * MILLION,
+        perChild: 0.25 * MILLION,
+        maxChildBonus: 0.5 * MILLION
+      }
     ],
     additionalLimits: [
       { maxSalary: 70 * MILLION, amount: 3 * MILLION },
@@ -50,7 +60,9 @@ export const TAX_RULES = {
 export function getTaxRules(year) {
   const target = Number(year);
   if (TAX_RULES[target]) return { ...TAX_RULES[target], estimated: false };
-  const known = Object.keys(TAX_RULES).map(Number).sort((a, b) => a - b);
+  const known = Object.keys(TAX_RULES)
+    .map(Number)
+    .sort((a, b) => a - b);
   const fallback = known.filter(value => value <= target).pop() ?? known[0];
   return { ...TAX_RULES[fallback], year: target, basedOnYear: fallback, estimated: true };
 }
@@ -58,13 +70,21 @@ export function getTaxRules(year) {
 /** 카테고리에 붙이는 연말정산 분류 */
 export const TAX_CODES = {
   "": { label: "일반", cardBucket: "general", item: null },
-  excluded: { label: "카드공제 제외 (공과금·통신비·세금·상품권 등)", cardBucket: "excluded", item: null },
+  excluded: {
+    label: "카드공제 제외 (공과금·통신비·세금·상품권 등)",
+    cardBucket: "excluded",
+    item: null
+  },
   market: { label: "전통시장 (40%)", cardBucket: "market", item: null },
   transit: { label: "대중교통 (40%)", cardBucket: "transit", item: null },
   culture: { label: "도서·공연·영화·헬스장·수영장 (30%)", cardBucket: "culture", item: null },
   medical: { label: "의료비", cardBucket: "general", item: "medical" },
   education: { label: "교육비 (학원 등)", cardBucket: "general", item: "education" },
-  tuition: { label: "학교·대학원 등록금·어린이집 (카드공제 제외)", cardBucket: "excluded", item: "education" },
+  tuition: {
+    label: "학교·대학원 등록금·어린이집 (카드공제 제외)",
+    cardBucket: "excluded",
+    item: "education"
+  },
   insurance: { label: "보장성 보험료", cardBucket: "excluded", item: "insurance" },
   donation: { label: "기부금", cardBucket: "excluded", item: "donation" },
   rent: { label: "월세", cardBucket: "excluded", item: "rent" }
@@ -124,7 +144,8 @@ export function aggregateYearSpending({ transactions, accounts, categoryTaxCodes
   for (const name of memberSet) ensure(name);
 
   for (const tx of transactions || []) {
-    if (tx?.type !== "지출" || tx?.reversalOf || !String(tx?.date || "").startsWith(prefix)) continue;
+    if (tx?.type !== "지출" || tx?.reversalOf || !String(tx?.date || "").startsWith(prefix))
+      continue;
     const amount = Math.max(0, (Number(tx.amount) || 0) - (Number(tx.refundAmount) || 0));
     if (amount <= 0) continue;
 
@@ -191,7 +212,8 @@ export function computeCardDeduction({ salary, children = 0, usage }, rules) {
   const { rates } = rules;
   const threshold = gross * rules.thresholdRate;
   const special = market * rates.market + transit * rates.transit;
-  const grossDeduction = credit * rates.credit + debit * rates.debit + culture * rates.culture + special;
+  const grossDeduction =
+    credit * rates.credit + debit * rates.debit + culture * rates.culture + special;
 
   let thresholdDeduction;
   if (threshold <= credit) {
@@ -200,18 +222,24 @@ export function computeCardDeduction({ salary, children = 0, usage }, rules) {
     thresholdDeduction = credit * rates.credit + (threshold - credit) * rates.debit;
   } else {
     const rest = Math.min(threshold - credit - debit - culture, market + transit);
-    thresholdDeduction = credit * rates.credit + (debit + culture) * rates.debit + rest * rates.market;
+    thresholdDeduction =
+      credit * rates.credit + (debit + culture) * rates.debit + rest * rates.market;
   }
 
   const deductible = gross > 0 ? Math.max(0, grossDeduction - thresholdDeduction) : 0;
   const basicRule = pickLimit(rules.basicLimits, gross);
   const childCount = Math.max(0, Math.trunc(Number(children) || 0));
-  const basicLimit = basicRule.base + Math.min(basicRule.maxChildBonus, childCount * basicRule.perChild);
+  const basicLimit =
+    basicRule.base + Math.min(basicRule.maxChildBonus, childCount * basicRule.perChild);
   const additionalLimit = pickLimit(rules.additionalLimits, gross).amount;
 
   const basicDeduction = Math.min(deductible, basicLimit);
   const specialPool = special + culture * rates.culture;
-  const additionalDeduction = Math.min(Math.max(0, deductible - basicLimit), specialPool, additionalLimit);
+  const additionalDeduction = Math.min(
+    Math.max(0, deductible - basicLimit),
+    specialPool,
+    additionalLimit
+  );
   const total = basicDeduction + additionalDeduction;
 
   const remainingToThreshold = Math.max(0, threshold - totalUsage);
@@ -226,7 +254,16 @@ export function computeCardDeduction({ salary, children = 0, usage }, rules) {
   return {
     salary: gross,
     children: childCount,
-    usage: { credit, debit, culture, market, transit, excluded: u.excluded, notCounted: u.notCounted, total: totalUsage },
+    usage: {
+      credit,
+      debit,
+      culture,
+      market,
+      transit,
+      excluded: u.excluded,
+      notCounted: u.notCounted,
+      total: totalUsage
+    },
     cultureSeparate,
     threshold: round(threshold),
     remainingToThreshold: round(remainingToThreshold),
@@ -319,7 +356,10 @@ export function buildRecommendations(people, rules) {
     }
 
     // 의료비: 총급여의 3%를 넘는 부분부터 세액공제 → 총급여가 낮은 쪽이 유리
-    const medicalTotal = withSalary.reduce((sum, person) => sum + (person.items?.medical?.total || 0), 0);
+    const medicalTotal = withSalary.reduce(
+      (sum, person) => sum + (person.items?.medical?.total || 0),
+      0
+    );
     if (medicalTotal > 0) {
       const lower = a.card.salary <= b.card.salary ? a : b;
       const higher = lower === a ? b : a;
@@ -347,7 +387,7 @@ export const NET_PAY_RATIOS = [
   [50 * MILLION, 0.85],
   [60 * MILLION, 0.835],
   [70 * MILLION, 0.82],
-  [80 * MILLION, 0.80],
+  [80 * MILLION, 0.8],
   [100 * MILLION, 0.77],
   [150 * MILLION, 0.72],
   [200 * MILLION, 0.68]
@@ -402,7 +442,14 @@ export const INCOME_TAX_CODES = {
  * 사람별(받은 통장 명의자) 한 해 급여 실수령액과 총급여 추정치.
  * currentMonth(YYYY-MM)가 같은 해면 받은 달 수로 1년치를 환산합니다.
  */
-export function summarizeSalaryIncome({ transactions, accounts, salaryCategoryIds, members, year, currentMonth }) {
+export function summarizeSalaryIncome({
+  transactions,
+  accounts,
+  salaryCategoryIds,
+  members,
+  year,
+  currentMonth
+}) {
   const accountMap = new Map((accounts || []).map(account => [account.accountId, account]));
   const memberSet = new Set(members || []);
   const result = new Map();
@@ -425,9 +472,10 @@ export function summarizeSalaryIncome({ transactions, accounts, salaryCategoryId
   const summaries = new Map();
   for (const [name, entry] of result) {
     const monthCount = entry.months.size;
-    const annualizedNet = inProgress && monthCount > 0 && monthCount < 12
-      ? (entry.netTotal / monthCount) * 12
-      : entry.netTotal;
+    const annualizedNet =
+      inProgress && monthCount > 0 && monthCount < 12
+        ? (entry.netTotal / monthCount) * 12
+        : entry.netTotal;
     summaries.set(name, {
       netTotal: Math.round(entry.netTotal),
       months: monthCount,
@@ -439,21 +487,43 @@ export function summarizeSalaryIncome({ transactions, accounts, salaryCategoryId
   return summaries;
 }
 
-
 // ── 추천 카테고리 정리 ─────────────────────────────────────────
 // 이 가계부(승철·미영)의 실제 카테고리 목록과 대화로 정한 새 구성입니다.
 // 기존 거래는 건드리지 않습니다. 이름 바꾸기 · 새로 만들기 · 사용 중지(입력 목록에서만 숨김) ·
 // 연말정산 분류 연결을 한 번에 합니다. 이미 직접 정한 분류는 덮어쓰지 않습니다.
 export const CATEGORY_PRESET = {
   rename: [
-    { type: "지출", from: "의료", to: "병원·약국", taxCode: "medical", note: "부모님 병원비도 여기로 (의료비 공제)" },
-    { type: "지출", from: "공과금", to: "관리비·공과금", taxCode: "excluded", note: "관리비·전기·가스·수도" },
-    { type: "지출", from: "교육비", to: "대학원 등록금", taxCode: "tuition", note: "카드공제 제외 · 본인 교육비 세액공제" },
+    {
+      type: "지출",
+      from: "의료",
+      to: "병원·약국",
+      taxCode: "medical",
+      note: "부모님 병원비도 여기로 (의료비 공제)"
+    },
+    {
+      type: "지출",
+      from: "공과금",
+      to: "관리비·공과금",
+      taxCode: "excluded",
+      note: "관리비·전기·가스·수도"
+    },
+    {
+      type: "지출",
+      from: "교육비",
+      to: "대학원 등록금",
+      taxCode: "tuition",
+      note: "카드공제 제외 · 본인 교육비 세액공제"
+    },
     { type: "지출", from: "여가", to: "취미·여가", taxCode: "", note: "" },
     { type: "지출", from: "옥천", to: "부모님께 갚는 돈", taxCode: "", note: "" }
   ],
   link: [
-    { type: "지출", name: "대중교통", taxCode: "transit", note: "버스·지하철·기차·고속버스 (택시 제외)" },
+    {
+      type: "지출",
+      name: "대중교통",
+      taxCode: "transit",
+      note: "버스·지하철·기차·고속버스 (택시 제외)"
+    },
     { type: "지출", name: "보험", taxCode: "insurance", note: "보장성 보험료 (자동차보험 포함)" }
   ],
   deactivate: [
@@ -476,21 +546,47 @@ export const CATEGORY_PRESET = {
     { type: "지출", name: "건강식품·영양제", taxCode: "", note: "의료비 공제 안 됨" },
     { type: "지출", name: "도서", taxCode: "culture", note: "책 (문화 30%)" },
     { type: "지출", name: "강의·자격증", taxCode: "", note: "온라인 강의·시험 응시료" },
-    { type: "지출", name: "공연·영화·운동", taxCode: "culture", note: "공연·영화·박물관·헬스장·수영장 (30%)" },
+    {
+      type: "지출",
+      name: "공연·영화·운동",
+      taxCode: "culture",
+      note: "공연·영화·박물관·헬스장·수영장 (30%)"
+    },
     { type: "지출", name: "여행·숙박", taxCode: "", note: "" },
     { type: "지출", name: "기부금", taxCode: "donation", note: "경조사(축의·조의)와 구분" },
-    { type: "지출", name: "수수료·세금", taxCode: "excluded", note: "은행 수수료·자동차세 등 (카드공제 제외)" },
+    {
+      type: "지출",
+      name: "수수료·세금",
+      taxCode: "excluded",
+      note: "은행 수수료·자동차세 등 (카드공제 제외)"
+    },
     { type: "지출", name: "전통시장", taxCode: "market", note: "전통시장 결제 (40%)" },
-    { type: "수입", name: "학교 수당", taxCode: "salary", note: "소속 학교에서 받는 수당 (따로 입금돼도 보통 근로소득) → 총급여에 포함" },
-    { type: "수입", name: "외부 수당·원고료", taxCode: "not-salary", note: "교육청 자료집 등 (기타소득 8.8%·사업소득 3.3%) → 총급여 아님" },
+    {
+      type: "수입",
+      name: "학교 수당",
+      taxCode: "salary",
+      note: "소속 학교에서 받는 수당 (따로 입금돼도 보통 근로소득) → 총급여에 포함"
+    },
+    {
+      type: "수입",
+      name: "외부 수당·원고료",
+      taxCode: "not-salary",
+      note: "교육청 자료집 등 (기타소득 8.8%·사업소득 3.3%) → 총급여 아님"
+    },
     { type: "수입", name: "이자·배당", taxCode: "not-salary", note: "" }
   ]
 };
 
 /** 앱 기능이 이름으로 찾는 카테고리 — 이름 바꾸기·사용 중지 대상에서 항상 뺍니다. */
 export const PROTECTED_CATEGORY_NAMES = new Set([
-  "정산받음", "캐시백", "캐시백/할인혜택", "카드정기결제", "카드선결제",
-  "대출원금상환", "대출이자", "지역화폐충전"
+  "정산받음",
+  "캐시백",
+  "캐시백/할인혜택",
+  "카드정기결제",
+  "카드선결제",
+  "대출원금상환",
+  "대출이자",
+  "지역화폐충전"
 ]);
 
 function validCodeFor(type, code) {
@@ -505,11 +601,17 @@ function validCodeFor(type, code) {
  * categories: [{ categoryId, name, type, taxCode, deleted, active }]
  * referencedCategoryIds: 고정 거래 자동 등록 등에서 쓰는 카테고리 ID (사용 중지하면 안 됨)
  */
-export function planCategoryPreset(categories, { referencedCategoryIds = new Set() } = {}, preset = CATEGORY_PRESET) {
+export function planCategoryPreset(
+  categories,
+  { referencedCategoryIds = new Set() } = {},
+  preset = CATEGORY_PRESET
+) {
   const all = categories || [];
   const live = all.filter(category => !category.deleted);
-  const find = (type, name) => live.find(category => category.type === type && category.name === name) || null;
-  const deletedExists = (type, name) => all.some(category => category.deleted && category.type === type && category.name === name);
+  const find = (type, name) =>
+    live.find(category => category.type === type && category.name === name) || null;
+  const deletedExists = (type, name) =>
+    all.some(category => category.deleted && category.type === type && category.name === name);
 
   const renames = [];
   const links = [];
@@ -520,10 +622,19 @@ export function planCategoryPreset(categories, { referencedCategoryIds = new Set
     if (!taxCode || !validCodeFor(category.type, taxCode)) return;
     if (category.taxCode === taxCode) return;
     if (category.taxCode) {
-      skipped.push({ name: category.name, reason: "다른 분류로 직접 연결해 둬서 분류는 그대로 둬요" });
+      skipped.push({
+        name: category.name,
+        reason: "다른 분류로 직접 연결해 둬서 분류는 그대로 둬요"
+      });
       return;
     }
-    links.push({ categoryId: category.categoryId, type: category.type, name: category.name, taxCode, note });
+    links.push({
+      categoryId: category.categoryId,
+      type: category.type,
+      name: category.name,
+      taxCode,
+      note
+    });
   };
 
   for (const rule of preset.rename || []) {
@@ -543,7 +654,10 @@ export function planCategoryPreset(categories, { referencedCategoryIds = new Set
         note: rule.note
       });
       if (source.taxCode && rule.taxCode && source.taxCode !== rule.taxCode) {
-        skipped.push({ name: rule.from, reason: "다른 분류로 직접 연결해 둬서 분류는 그대로 둬요" });
+        skipped.push({
+          name: rule.from,
+          reason: "다른 분류로 직접 연결해 둬서 분류는 그대로 둬요"
+        });
       }
     } else if (target) {
       pushLink(target, rule.taxCode, rule.note);
@@ -569,7 +683,12 @@ export function planCategoryPreset(categories, { referencedCategoryIds = new Set
     } else if (referencedCategoryIds.has(category.categoryId)) {
       skipped.push({ name: rule.name, reason: "고정 거래 자동 등록에서 쓰고 있어 그대로 둬요" });
     } else {
-      deactivations.push({ categoryId: category.categoryId, type: rule.type, name: rule.name, note: rule.note });
+      deactivations.push({
+        categoryId: category.categoryId,
+        type: rule.type,
+        name: rule.name,
+        note: rule.note
+      });
     }
   }
 
@@ -582,9 +701,17 @@ export function planCategoryPreset(categories, { referencedCategoryIds = new Set
         skipped.push({ name: rule.name, reason: "이미 있어요" });
       }
     } else if (deletedExists(rule.type, rule.name)) {
-      skipped.push({ name: rule.name, reason: "삭제된 같은 이름 카테고리가 있어요 (설정에서 복원하세요)" });
+      skipped.push({
+        name: rule.name,
+        reason: "삭제된 같은 이름 카테고리가 있어요 (설정에서 복원하세요)"
+      });
     } else {
-      creates.push({ type: rule.type, name: rule.name, taxCode: rule.taxCode || "", note: rule.note });
+      creates.push({
+        type: rule.type,
+        name: rule.name,
+        taxCode: rule.taxCode || "",
+        note: rule.note
+      });
     }
   }
 

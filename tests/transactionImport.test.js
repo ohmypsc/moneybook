@@ -59,11 +59,14 @@ test("AI fenced JSON response is extracted", () => {
 
 test("Cloudflare chat completion response is extracted", () => {
   const values = extractJsonValue({
-    choices: [{
-      message: {
-        content: '{"transactions":[{"merchant":"스타벅스","amount":5800},{"merchant":"GS25","amount":7200}]}'
+    choices: [
+      {
+        message: {
+          content:
+            '{"transactions":[{"merchant":"스타벅스","amount":5800},{"merchant":"GS25","amount":7200}]}'
+        }
       }
-    }]
+    ]
   });
   assert.equal(values.length, 2);
   assert.equal(values[1].merchant, "GS25");
@@ -93,17 +96,36 @@ test("historical merchant category wins over AI suggestion", () => {
 test("same amount/date/card is detected as duplicate", () => {
   const match = findDuplicateTransaction(
     { date: "2026-09-15", amount: 12500, merchant: "맘스터치" },
-    [{ transactionId: "T1", type: "지출", date: "2026-09-15", amount: 12500, paymentMethodId: "A1", description: "맘스터치", isDeleted: false }],
+    [
+      {
+        transactionId: "T1",
+        type: "지출",
+        date: "2026-09-15",
+        amount: 12500,
+        paymentMethodId: "A1",
+        description: "맘스터치",
+        isDeleted: false
+      }
+    ],
     "A1"
   );
   assert.equal(match?.transactionId, "T1");
 });
 
-
 test("same amount/date alone is not enough to mark a duplicate", () => {
   const match = findDuplicateTransaction(
     { date: "2026-09-15", amount: 5000, merchant: "카페A" },
-    [{ transactionId: "T2", type: "지출", date: "2026-09-15", amount: 5000, paymentMethodId: "A9", description: "편의점", isDeleted: false }],
+    [
+      {
+        transactionId: "T2",
+        type: "지출",
+        date: "2026-09-15",
+        amount: 5000,
+        paymentMethodId: "A9",
+        description: "편의점",
+        isDeleted: false
+      }
+    ],
     "A1"
   );
   assert.equal(match, null);
@@ -117,7 +139,10 @@ test("overlapping screenshot transactions with the same source row are deduplica
     kind: "expense",
     sourceText: "09/15 14:20 카페 5,000원"
   };
-  const values = dedupeImportedCandidates([{ ...base, candidateId: "1" }, { ...base, candidateId: "2" }]);
+  const values = dedupeImportedCandidates([
+    { ...base, candidateId: "1" },
+    { ...base, candidateId: "2" }
+  ]);
   assert.equal(values.length, 1);
 });
 
@@ -140,7 +165,13 @@ test("same merchant and amount without time are not silently collapsed when sour
 });
 
 test("same merchant, amount and minute are preserved when the recognized source rows differ", () => {
-  const base = { date: "2026-09-15", time: "12:30", amount: 5800, merchant: "스타벅스", kind: "expense" };
+  const base = {
+    date: "2026-09-15",
+    time: "12:30",
+    amount: 5800,
+    merchant: "스타벅스",
+    kind: "expense"
+  };
   const values = dedupeImportedCandidates([
     { ...base, candidateId: "1", sourceText: "12:30 스타벅스 5,800원 승인 1" },
     { ...base, candidateId: "2", sourceText: "12:30 스타벅스 5,800원 승인 2" }
@@ -162,17 +193,37 @@ test("transaction import accepts real Cloudflare choices response and keeps mult
       async run(_model, payload) {
         requestPayload = payload;
         return {
-          choices: [{
-            message: {
-              content: JSON.stringify({
-                transactions: [
-                  { date: "2026-09-15", time: "08:30", merchant: "스타벅스", amount: 5800, sourceText: "08:30 스타벅스 5,800원" },
-                  { date: "2026-09-15", time: "16:20", merchant: "스타벅스", amount: 5800, sourceText: "16:20 스타벅스 5,800원" },
-                  { date: "", time: "19:10", merchant: "GS25", amount: 7200, sourceText: "19:10 GS25 7,200원" }
-                ]
-              })
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  transactions: [
+                    {
+                      date: "2026-09-15",
+                      time: "08:30",
+                      merchant: "스타벅스",
+                      amount: 5800,
+                      sourceText: "08:30 스타벅스 5,800원"
+                    },
+                    {
+                      date: "2026-09-15",
+                      time: "16:20",
+                      merchant: "스타벅스",
+                      amount: 5800,
+                      sourceText: "16:20 스타벅스 5,800원"
+                    },
+                    {
+                      date: "",
+                      time: "19:10",
+                      merchant: "GS25",
+                      amount: 7200,
+                      sourceText: "19:10 GS25 7,200원"
+                    }
+                  ]
+                })
+              }
             }
-          }]
+          ]
         };
       }
     }
@@ -201,7 +252,8 @@ test("image import uses Moondream fast query and parses compact transactions", a
         requestModel = model;
         requestPayload = payload;
         return {
-          answer: '{"transactions":[{"d":"2026-09-15","m":"Store A","a":4100,"r":"09/15 Store A 4,100"},{"d":"2026-09-15","m":"Store B","a":8300,"r":"09/15 Store B 8,300"}]}'
+          answer:
+            '{"transactions":[{"d":"2026-09-15","m":"Store A","a":4100,"r":"09/15 Store A 4,100"},{"d":"2026-09-15","m":"Store B","a":8300,"r":"09/15 Store B 8,300"}]}'
         };
       }
     }
@@ -232,7 +284,14 @@ test("image import falls back to Gemma with the screenshot embedded in multimoda
         payloads.push(payload);
         if (models.length === 1) return { answer: "not json" };
         return {
-          choices: [{ message: { content: '{"transactions":[{"date":"2026-09-15","merchant":"Fallback Store","amount":9200}]}' } }]
+          choices: [
+            {
+              message: {
+                content:
+                  '{"transactions":[{"date":"2026-09-15","merchant":"Fallback Store","amount":9200}]}'
+              }
+            }
+          ]
         };
       }
     }
@@ -242,11 +301,8 @@ test("image import falls back to Gemma with the screenshot embedded in multimoda
     images: [image],
     today: "2026-09-16"
   });
-  assert.deepEqual(models, [
-    "@cf/moondream/moondream3.1-9B-A2B",
-    "@cf/google/gemma-4-26b-a4b-it"
-  ]);
-  const fallbackUser = payloads[1].messages.find((message) => message.role === "user");
+  assert.deepEqual(models, ["@cf/moondream/moondream3.1-9B-A2B", "@cf/google/gemma-4-26b-a4b-it"]);
+  const fallbackUser = payloads[1].messages.find(message => message.role === "user");
   assert.ok(Array.isArray(fallbackUser.content));
   assert.equal(fallbackUser.content[1].type, "image_url");
   assert.equal(fallbackUser.content[1].image_url.url, image);
@@ -262,7 +318,7 @@ test("multiple images are analyzed concurrently", async () => {
       async run(_model, payload) {
         active += 1;
         maxActive = Math.max(maxActive, active);
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise(resolve => setTimeout(resolve, 10));
         active -= 1;
         return {
           answer: JSON.stringify({
@@ -273,10 +329,7 @@ test("multiple images are analyzed concurrently", async () => {
     }
   };
   const values = await analyzeTransactionImport(env, {
-    images: [
-      "data:image/png;base64,AA==",
-      "data:image/png;base64,BB=="
-    ],
+    images: ["data:image/png;base64,AA==", "data:image/png;base64,BB=="],
     today: "2026-09-16"
   });
   assert.equal(maxActive, 2);
@@ -288,14 +341,34 @@ test("merchant normalization ignores punctuation and parenthetical text", () => 
 });
 
 test("income and transfer recognition is preserved and category history respects type", () => {
-  const income = normalizeImportedCandidate({ date: "2026-11-16", amount: 1000, merchant: "급여", kind: "income" });
-  const transfer = normalizeImportedCandidate({ d: "2026-11-16", a: 1000, m: "저축", s: "transfer" });
+  const income = normalizeImportedCandidate({
+    date: "2026-11-16",
+    amount: 1000,
+    merchant: "급여",
+    kind: "income"
+  });
+  const transfer = normalizeImportedCandidate({
+    d: "2026-11-16",
+    a: 1000,
+    m: "저축",
+    s: "transfer"
+  });
   assert.equal(income.kind, "income");
   assert.equal(transfer.kind, "transfer");
   const categories = [
     { categoryId: "E", name: "급여", type: "지출", active: true },
     { categoryId: "I", name: "급여", type: "수입", active: true }
   ];
-  assert.equal(chooseCategory({ ...income, suggestedCategoryName: "급여" }, categories, [{ description: "급여", type: "지출", categoryId: "E" }]).category.categoryId, "I");
-  assert.equal(findDuplicateTransaction(income, [{ transactionId: "E", date: income.date, amount: 1000, type: "지출", description: "급여" }]), null);
+  assert.equal(
+    chooseCategory({ ...income, suggestedCategoryName: "급여" }, categories, [
+      { description: "급여", type: "지출", categoryId: "E" }
+    ]).category.categoryId,
+    "I"
+  );
+  assert.equal(
+    findDuplicateTransaction(income, [
+      { transactionId: "E", date: income.date, amount: 1000, type: "지출", description: "급여" }
+    ]),
+    null
+  );
 });

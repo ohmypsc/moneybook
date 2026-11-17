@@ -7,7 +7,9 @@ const symbolLookupMemory = new Map();
 const symbolSearchMemory = new Map();
 
 export function normalizeInvestmentLookupCode(value) {
-  const code = String(value || "").trim().toUpperCase();
+  const code = String(value || "")
+    .trim()
+    .toUpperCase();
 
   if (!code || !/^[A-Z0-9.^_-]{1,24}$/.test(code)) {
     return "";
@@ -21,7 +23,9 @@ function inferInvestmentMarket(code) {
 }
 
 function normalizeYahooSymbol(symbol) {
-  return String(symbol || "").trim().toUpperCase();
+  return String(symbol || "")
+    .trim()
+    .toUpperCase();
 }
 
 function yahooBaseSymbol(symbol) {
@@ -29,9 +33,7 @@ function yahooBaseSymbol(symbol) {
 }
 
 function yahooQuoteName(quote) {
-  return String(
-    quote?.longname || quote?.shortname || quote?.displayName || ""
-  ).trim();
+  return String(quote?.longname || quote?.shortname || quote?.displayName || "").trim();
 }
 
 function scoreYahooQuote(quote, code) {
@@ -60,17 +62,17 @@ function scoreYahooQuote(quote, code) {
 }
 
 function chooseYahooQuote(quotes, code) {
-  return (Array.isArray(quotes) ? quotes : [])
-    .filter(quote => yahooQuoteName(quote))
-    .map(quote => ({ quote, score: scoreYahooQuote(quote, code) }))
-    .filter(item => item.score > 0)
-    .sort((a, b) => b.score - a.score)[0]?.quote || null;
+  return (
+    (Array.isArray(quotes) ? quotes : [])
+      .filter(quote => yahooQuoteName(quote))
+      .map(quote => ({ quote, score: scoreYahooQuote(quote, code) }))
+      .filter(item => item.score > 0)
+      .sort((a, b) => b.score - a.score)[0]?.quote || null
+  );
 }
 
 async function fetchYahooSymbolSearch(query) {
-  const endpoint = new URL(
-    "https://query1.finance.yahoo.com/v1/finance/search"
-  );
+  const endpoint = new URL("https://query1.finance.yahoo.com/v1/finance/search");
 
   endpoint.searchParams.set("q", query);
   endpoint.searchParams.set("quotesCount", "8");
@@ -211,7 +213,9 @@ function compactInvestmentSearchText(value) {
 }
 
 function normalizeKrxShortCode(value) {
-  const raw = String(value || "").trim().toUpperCase();
+  const raw = String(value || "")
+    .trim()
+    .toUpperCase();
   return /^A[0-9A-Z]{6}$/.test(raw) ? raw.slice(1) : raw;
 }
 
@@ -234,20 +238,17 @@ async function fetchKrxFinder(query, bld, assetType) {
 
   let response;
   try {
-    response = await fetch(
-      "https://data.krx.co.kr/comm/bldAttendant/getJsonData.cmd",
-      {
-        method: "POST",
-        headers: {
-          Accept: "application/json, text/plain, */*",
-          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-          Referer: "https://data.krx.co.kr/",
-          "User-Agent": "Mozilla/5.0 moneybook-krx-symbol-search"
-        },
-        body: body.toString(),
-        signal: controller.signal
-      }
-    );
+    response = await fetch("https://data.krx.co.kr/comm/bldAttendant/getJsonData.cmd", {
+      method: "POST",
+      headers: {
+        Accept: "application/json, text/plain, */*",
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        Referer: "https://data.krx.co.kr/",
+        "User-Agent": "Mozilla/5.0 moneybook-krx-symbol-search"
+      },
+      body: body.toString(),
+      signal: controller.signal
+    });
   } finally {
     clearTimeout(timeout);
   }
@@ -277,9 +278,7 @@ async function fetchKrxFinder(query, bld, assetType) {
         stockName,
         market: "국내",
         symbol: stockCode,
-        exchange: String(
-          row?.marketName || row?.marketEngName || row?.MKT_NM || "KRX"
-        ).trim(),
+        exchange: String(row?.marketName || row?.marketEngName || row?.MKT_NM || "KRX").trim(),
         assetType,
         source: "krx"
       };
@@ -311,8 +310,7 @@ function yahooSearchItem(quote) {
     return null;
   }
 
-  const domestic =
-    /\.(KS|KQ)$/.test(symbol) || ["KSC", "KOE"].includes(exchangeCode);
+  const domestic = /\.(KS|KQ)$/.test(symbol) || ["KSC", "KOE"].includes(exchangeCode);
   const stockCode = domestic ? yahooBaseSymbol(symbol) : symbol;
 
   return {
@@ -321,8 +319,7 @@ function yahooSearchItem(quote) {
     market: domestic ? "국내" : "해외",
     symbol,
     exchange,
-    assetType:
-      quoteType === "ETF" ? "ETF" : quoteType === "EQUITY" ? "주식" : "펀드",
+    assetType: quoteType === "ETF" ? "ETF" : quoteType === "EQUITY" ? "주식" : "펀드",
     source: "yahoo-finance"
   };
 }
@@ -334,10 +331,7 @@ export function scoreInvestmentSearchItem(item, query) {
   const name = compactInvestmentSearchText(item.stockName);
   const code = compactInvestmentSearchText(item.stockCode);
   const haystack = `${name}${code}${compactInvestmentSearchText(item.exchange || "")}${compactInvestmentSearchText(item.assetType || "")}`;
-  const tokenTerms = aliasedText
-    .split(/\s+/)
-    .map(compactInvestmentSearchText)
-    .filter(Boolean);
+  const tokenTerms = aliasedText.split(/\s+/).map(compactInvestmentSearchText).filter(Boolean);
 
   let score = 0;
 
@@ -364,10 +358,11 @@ export function scoreInvestmentSearchItem(item, query) {
 
 function buildKrxSearchQueries(query) {
   const full = applyKoreanFundAliases(query).trim();
-  const knownBrands = new Set([
-    "KODEX", "TIGER", "ACE", "RISE", "SOL", "PLUS", "TIMEFOLIO"
-  ]);
-  const tokens = full.split(/\s+/).map(token => token.trim()).filter(Boolean);
+  const knownBrands = new Set(["KODEX", "TIGER", "ACE", "RISE", "SOL", "PLUS", "TIMEFOLIO"]);
+  const tokens = full
+    .split(/\s+/)
+    .map(token => token.trim())
+    .filter(Boolean);
   const fallbackToken = tokens
     .filter(token => !knownBrands.has(token.toUpperCase()))
     .sort((a, b) => b.length - a.length)[0];
@@ -392,10 +387,7 @@ function dedupeInvestmentSearchItems(items, query) {
   return Array.from(byKey.values())
     .map(item => ({ item, score: scoreInvestmentSearchItem(item, query) }))
     .filter(entry => entry.score > 0)
-    .sort(
-      (a, b) =>
-        b.score - a.score || a.item.stockName.localeCompare(b.item.stockName, "ko")
-    )
+    .sort((a, b) => b.score - a.score || a.item.stockName.localeCompare(b.item.stockName, "ko"))
     .slice(0, 40)
     .map(entry => entry.item);
 }

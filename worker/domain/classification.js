@@ -1,1 +1,1 @@
-export { normalizeTags, normalizeRules, classifyTransaction } from '../../shared/classification.js';
+export { normalizeTags, normalizeRules, classifyTransaction } from "../../shared/classification.js";

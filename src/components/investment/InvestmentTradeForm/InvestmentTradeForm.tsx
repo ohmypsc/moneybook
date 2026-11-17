@@ -1,20 +1,8 @@
-import {
-  type FormEvent,
-  useEffect,
-  useMemo,
-  useRef,
-  useState
-} from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
-import {
-  createInvestmentTrade,
-  searchInvestmentSymbols
-} from "../../../api/investments";
+import { createInvestmentTrade, searchInvestmentSymbols } from "../../../api/investments";
 
-import type {
-  HoldingSummary,
-  InvestmentAccountSummary
-} from "../../../types/dashboard";
+import type { HoldingSummary, InvestmentAccountSummary } from "../../../types/dashboard";
 
 import type {
   CreateInvestmentTradePayload,
@@ -23,9 +11,7 @@ import type {
   Market
 } from "../../../types/investment";
 
-import {
-  getSeoulDateString
-} from "../../../utils/dateTime";
+import { getSeoulDateString } from "../../../utils/dateTime";
 
 import { Button } from "../../common/Button/Button";
 import { Card } from "../../common/Card/Card";
@@ -39,11 +25,7 @@ interface InvestmentTradeFormProps {
   onSaved: () => void | Promise<void>;
 }
 
-type SearchStatus =
-  | "idle"
-  | "loading"
-  | "done"
-  | "error";
+type SearchStatus = "idle" | "loading" | "done" | "error";
 
 type SelectedInstrument = {
   stockCode: string;
@@ -66,13 +48,8 @@ function getToday() {
   return getSeoulDateString();
 }
 
-
 function formatCurrency(value: number | null | undefined) {
-  if (
-    value === null ||
-    value === undefined ||
-    !Number.isFinite(value)
-  ) {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
     return "-";
   }
 
@@ -84,51 +61,33 @@ function normalizeMarket(value: string | null | undefined): Market {
 }
 
 function normalizeSearchText(value: string) {
-  return value
-    .trim()
-    .toUpperCase()
-    .replace(/\s+/g, "");
+  return value.trim().toUpperCase().replace(/\s+/g, "");
 }
 
 function aliasSearchText(value: string) {
   return FUND_BRAND_ALIASES.reduce(
-    (current, [pattern, replacement]) =>
-      current.replace(pattern, replacement),
+    (current, [pattern, replacement]) => current.replace(pattern, replacement),
     value
   );
 }
 
-function holdingMatchesQuery(
-  holding: HoldingSummary,
-  query: string
-) {
+function holdingMatchesQuery(holding: HoldingSummary, query: string) {
   if (!query.trim()) return true;
 
-  const haystack = normalizeSearchText(
-    `${holding.stockName} ${holding.stockCode}`
-  );
+  const haystack = normalizeSearchText(`${holding.stockName} ${holding.stockCode}`);
 
   const raw = normalizeSearchText(query);
   const aliased = normalizeSearchText(aliasSearchText(query));
 
-  return [raw, aliased]
-    .filter(Boolean)
-    .some(term => haystack.includes(term));
+  return [raw, aliased].filter(Boolean).some(term => haystack.includes(term));
 }
 
 function makeRequestId() {
-  if (
-    typeof crypto !== "undefined" &&
-    typeof crypto.randomUUID === "function"
-  ) {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
   }
 
-  return [
-    "INV",
-    Date.now(),
-    Math.random().toString(36).slice(2)
-  ].join("_");
+  return ["INV", Date.now(), Math.random().toString(36).slice(2)].join("_");
 }
 
 export default function InvestmentTradeForm({
@@ -136,24 +95,19 @@ export default function InvestmentTradeForm({
   holdings,
   onSaved
 }: InvestmentTradeFormProps) {
-  const [tradeType, setTradeType] =
-    useState<InvestmentTradeType>("매수");
+  const [tradeType, setTradeType] = useState<InvestmentTradeType>("매수");
   const [tradeDate, setTradeDate] = useState(getToday());
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchStatus, setSearchStatus] =
-    useState<SearchStatus>("idle");
-  const [remoteResults, setRemoteResults] =
-    useState<InvestmentSymbolSearchItem[]>([]);
+  const [searchStatus, setSearchStatus] = useState<SearchStatus>("idle");
+  const [remoteResults, setRemoteResults] = useState<InvestmentSymbolSearchItem[]>([]);
   const [showResults, setShowResults] = useState(false);
-  const [selectedInstrument, setSelectedInstrument] =
-    useState<SelectedInstrument | null>(null);
+  const [selectedInstrument, setSelectedInstrument] = useState<SelectedInstrument | null>(null);
 
   const [manualMode, setManualMode] = useState(false);
   const [manualStockCode, setManualStockCode] = useState("");
   const [manualStockName, setManualStockName] = useState("");
-  const [manualMarket, setManualMarket] =
-    useState<Market>("국내");
+  const [manualMarket, setManualMarket] = useState<Market>("국내");
 
   const [quantity, setQuantity] = useState("");
   const [unitPrice, setUnitPrice] = useState("");
@@ -172,45 +126,25 @@ export default function InvestmentTradeForm({
     requestId: string;
   } | null>(null);
 
-  const activeHoldings = useMemo(
-    () => holdings.filter(holding => !holding.isDeleted),
-    [holdings]
-  );
+  const activeHoldings = useMemo(() => holdings.filter(holding => !holding.isDeleted), [holdings]);
 
   const sellableHoldings = useMemo(
-    () =>
-      activeHoldings.filter(
-        holding => Number(holding.quantity) > 0
-      ),
+    () => activeHoldings.filter(holding => Number(holding.quantity) > 0),
     [activeHoldings]
   );
 
   const localMatches = useMemo(() => {
-    const source =
-      tradeType === "매도"
-        ? sellableHoldings
-        : activeHoldings;
+    const source = tradeType === "매도" ? sellableHoldings : activeHoldings;
 
-    return source.filter(holding =>
-      holdingMatchesQuery(holding, searchQuery)
-    );
-  }, [
-    activeHoldings,
-    sellableHoldings,
-    searchQuery,
-    tradeType
-  ]);
+    return source.filter(holding => holdingMatchesQuery(holding, searchQuery));
+  }, [activeHoldings, sellableHoldings, searchQuery, tradeType]);
 
   const selectedHolding = useMemo(() => {
     if (!selectedInstrument) return null;
 
     if (selectedInstrument.holdingId) {
       return (
-        activeHoldings.find(
-          holding =>
-            holding.holdingId ===
-            selectedInstrument.holdingId
-        ) ?? null
+        activeHoldings.find(holding => holding.holdingId === selectedInstrument.holdingId) ?? null
       );
     }
 
@@ -223,30 +157,16 @@ export default function InvestmentTradeForm({
     );
   }, [activeHoldings, selectedInstrument]);
 
-  const isNewHolding =
-    tradeType === "매수" &&
-    !!selectedInstrument &&
-    !selectedHolding;
+  const isNewHolding = tradeType === "매수" && !!selectedInstrument && !selectedHolding;
 
-  const effectiveMarket: Market = selectedInstrument
-    ? selectedInstrument.market
-    : "국내";
+  const effectiveMarket: Market = selectedInstrument ? selectedInstrument.market : "국내";
 
   const isForeign = effectiveMarket === "해외";
 
   const filteredRemoteResults = useMemo(() => {
-    const localCodes = new Set(
-      localMatches.map(holding =>
-        holding.stockCode.trim().toUpperCase()
-      )
-    );
+    const localCodes = new Set(localMatches.map(holding => holding.stockCode.trim().toUpperCase()));
 
-    return remoteResults.filter(
-      item =>
-        !localCodes.has(
-          item.stockCode.trim().toUpperCase()
-        )
-    );
+    return remoteResults.filter(item => !localCodes.has(item.stockCode.trim().toUpperCase()));
   }, [localMatches, remoteResults]);
 
   function resetSelection() {
@@ -289,11 +209,7 @@ export default function InvestmentTradeForm({
   }, [tradeType]);
 
   useEffect(() => {
-    if (
-      tradeType !== "매수" ||
-      selectedInstrument ||
-      manualMode
-    ) {
+    if (tradeType !== "매수" || selectedInstrument || manualMode) {
       return;
     }
 
@@ -315,9 +231,7 @@ export default function InvestmentTradeForm({
 
         if (cancelled) return;
 
-        setRemoteResults(
-          Array.isArray(result.items) ? result.items : []
-        );
+        setRemoteResults(Array.isArray(result.items) ? result.items : []);
         setSearchStatus("done");
       } catch {
         if (cancelled) return;
@@ -330,12 +244,7 @@ export default function InvestmentTradeForm({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [
-    manualMode,
-    searchQuery,
-    selectedInstrument,
-    tradeType
-  ]);
+  }, [manualMode, searchQuery, selectedInstrument, tradeType]);
 
   useEffect(() => {
     if (!isForeign) {
@@ -363,14 +272,10 @@ export default function InvestmentTradeForm({
   }, [quantity, unitPrice, fxRate, isForeign]);
 
   const parsedFeeForPreview =
-    Number.isFinite(Number(feeKrw)) && Number(feeKrw) >= 0
-      ? Number(feeKrw)
-      : 0;
+    Number.isFinite(Number(feeKrw)) && Number(feeKrw) >= 0 ? Number(feeKrw) : 0;
 
   const parsedTaxForPreview =
-    Number.isFinite(Number(taxKrw)) && Number(taxKrw) >= 0
-      ? Number(taxKrw)
-      : 0;
+    Number.isFinite(Number(taxKrw)) && Number(taxKrw) >= 0 ? Number(taxKrw) : 0;
 
   const estimatedSettlement =
     grossKrw > 0
@@ -379,7 +284,6 @@ export default function InvestmentTradeForm({
         : Math.max(0, grossKrw - parsedFeeForPreview - parsedTaxForPreview)
       : 0;
 
-
   const actualSettlement = useMemo(() => {
     if (!settlementKrw.trim()) return null;
     const value = Number(settlementKrw);
@@ -387,14 +291,10 @@ export default function InvestmentTradeForm({
   }, [settlementKrw]);
 
   const settlementForDisplay =
-    actualSettlement !== null && actualSettlement > 0
-      ? actualSettlement
-      : estimatedSettlement;
+    actualSettlement !== null && actualSettlement > 0 ? actualSettlement : estimatedSettlement;
 
   const transactionCostDifference =
-    actualSettlement !== null &&
-    actualSettlement > 0 &&
-    estimatedSettlement > 0
+    actualSettlement !== null && actualSettlement > 0 && estimatedSettlement > 0
       ? tradeType === "매수"
         ? actualSettlement - estimatedSettlement
         : estimatedSettlement - actualSettlement
@@ -427,9 +327,7 @@ export default function InvestmentTradeForm({
 
   function chooseRemote(item: InvestmentSymbolSearchItem) {
     const existing = activeHoldings.find(
-      holding =>
-        holding.stockCode.trim().toUpperCase() ===
-        item.stockCode.trim().toUpperCase()
+      holding => holding.stockCode.trim().toUpperCase() === item.stockCode.trim().toUpperCase()
     );
 
     setSelectedInstrument({
@@ -462,8 +360,7 @@ export default function InvestmentTradeForm({
     }
 
     const existing = activeHoldings.find(
-      holding =>
-        holding.stockCode.trim().toUpperCase() === code
+      holding => holding.stockCode.trim().toUpperCase() === code
     );
 
     if (existing) {
@@ -482,9 +379,7 @@ export default function InvestmentTradeForm({
     setError("");
   }
 
-  async function handleSubmit(
-    event: FormEvent<HTMLFormElement>
-  ) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (saving) return;
@@ -493,17 +388,13 @@ export default function InvestmentTradeForm({
     setSuccess("");
 
     if (!account.cashBaselineConfigured) {
-      setError(
-        "먼저 이 투자계좌의 현재 예수금을 설정해주세요."
-      );
+      setError("먼저 이 투자계좌의 현재 예수금을 설정해주세요.");
       return;
     }
 
     if (!selectedInstrument) {
       setError(
-        tradeType === "매수"
-          ? "매수한 종목을 선택해주세요."
-          : "매도한 종목을 선택해주세요."
+        tradeType === "매수" ? "매수한 종목을 선택해주세요." : "매도한 종목을 선택해주세요."
       );
       return;
     }
@@ -515,10 +406,7 @@ export default function InvestmentTradeForm({
 
     const parsedQuantity = Number(quantity);
 
-    if (
-      !Number.isFinite(parsedQuantity) ||
-      parsedQuantity <= 0
-    ) {
+    if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
       setError("수량은 0보다 커야 합니다.");
       return;
     }
@@ -528,33 +416,23 @@ export default function InvestmentTradeForm({
       selectedHolding &&
       parsedQuantity > Number(selectedHolding.quantity)
     ) {
-      setError(
-        `보유수량 ${selectedHolding.quantity}주보다 많이 기록할 수 없습니다.`
-      );
+      setError(`보유수량 ${selectedHolding.quantity}주보다 많이 기록할 수 없습니다.`);
       return;
     }
 
     const parsedUnitPrice = Number(unitPrice);
 
-    if (
-      !Number.isFinite(parsedUnitPrice) ||
-      parsedUnitPrice <= 0
-    ) {
+    if (!Number.isFinite(parsedUnitPrice) || parsedUnitPrice <= 0) {
       setError("체결단가는 0보다 커야 합니다.");
       return;
     }
 
     const parsedFxRate = isForeign ? Number(fxRate) : 1;
 
-    if (
-      isForeign &&
-      (!Number.isFinite(parsedFxRate) || parsedFxRate <= 0)
-    ) {
+    if (isForeign && (!Number.isFinite(parsedFxRate) || parsedFxRate <= 0)) {
       setError("해외주식은 체결 당시 환율을 입력해주세요.");
       return;
     }
-
-
 
     const parsedFee = feeKrw.trim() ? Number(feeKrw) : 0;
     const parsedTax = taxKrw.trim() ? Number(taxKrw) : 0;
@@ -587,12 +465,8 @@ export default function InvestmentTradeForm({
       tradeType,
       tradeDate,
       stockCode: selectedInstrument.stockCode,
-      stockName: isNewHolding
-        ? selectedInstrument.stockName
-        : undefined,
-      market: isNewHolding
-        ? selectedInstrument.market
-        : undefined,
+      stockName: isNewHolding ? selectedInstrument.stockName : undefined,
+      market: isNewHolding ? selectedInstrument.market : undefined,
       quantity: parsedQuantity,
       unitPrice: parsedUnitPrice,
       currency: isForeign ? "USD" : "KRW",
@@ -607,10 +481,7 @@ export default function InvestmentTradeForm({
           : "자동"
         : undefined,
       manualPrice:
-        isNewHolding &&
-        selectedInstrument.stockCode === "04020000"
-          ? parsedUnitPrice
-          : undefined
+        isNewHolding && selectedInstrument.stockCode === "04020000" ? parsedUnitPrice : undefined
     });
 
     const requestId =
@@ -664,22 +535,14 @@ export default function InvestmentTradeForm({
     try {
       await createInvestmentTrade(payload);
 
-      setSuccess(
-        tradeType === "매수"
-          ? "매수 내역을 저장했습니다."
-          : "매도 내역을 저장했습니다."
-      );
+      setSuccess(tradeType === "매수" ? "매수 내역을 저장했습니다." : "매도 내역을 저장했습니다.");
 
       resetTradeInputs();
       resetSelection();
 
       void Promise.resolve(onSaved()).catch(() => {});
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "투자거래 저장에 실패했습니다."
-      );
+      setError(err instanceof Error ? err.message : "투자거래 저장에 실패했습니다.");
     } finally {
       setSaving(false);
     }
@@ -691,9 +554,7 @@ export default function InvestmentTradeForm({
         <div className={styles.header}>
           <div className={styles.titleGroup}>
             <h3 className={styles.title}>매매 기록</h3>
-            <p className={styles.description}>
-              매매를 기록하려면 먼저 현재 예수금을 설정해주세요.
-            </p>
+            <p className={styles.description}>매매를 기록하려면 먼저 현재 예수금을 설정해주세요.</p>
           </div>
         </div>
       </section>
@@ -719,10 +580,7 @@ export default function InvestmentTradeForm({
       <div className={styles.tradeTabs}>
         <button
           type="button"
-          className={[
-            styles.tradeTab,
-            tradeType === "매수" ? styles.tradeTabActive : ""
-          ]
+          className={[styles.tradeTab, tradeType === "매수" ? styles.tradeTabActive : ""]
             .filter(Boolean)
             .join(" ")}
           onClick={() => setTradeType("매수")}
@@ -732,10 +590,7 @@ export default function InvestmentTradeForm({
 
         <button
           type="button"
-          className={[
-            styles.tradeTab,
-            tradeType === "매도" ? styles.tradeTabActive : ""
-          ]
+          className={[styles.tradeTab, tradeType === "매도" ? styles.tradeTabActive : ""]
             .filter(Boolean)
             .join(" ")}
           onClick={() => setTradeType("매도")}
@@ -752,9 +607,7 @@ export default function InvestmentTradeForm({
               {selectedInstrument.stockCode}
               {" · "}
               {selectedInstrument.market}
-              {selectedHolding
-                ? ` · ${selectedHolding.quantity}주 보유`
-                : " · 신규 종목"}
+              {selectedHolding ? ` · ${selectedHolding.quantity}주 보유` : " · 신규 종목"}
             </span>
           </div>
 
@@ -793,9 +646,7 @@ export default function InvestmentTradeForm({
                 className={styles.input}
                 type="text"
                 value={manualStockName}
-                onChange={event =>
-                  setManualStockName(event.target.value)
-                }
+                onChange={event => setManualStockName(event.target.value)}
                 placeholder="예: 삼성전자"
               />
             </label>
@@ -806,11 +657,7 @@ export default function InvestmentTradeForm({
                 className={styles.input}
                 type="text"
                 value={manualStockCode}
-                onChange={event =>
-                  setManualStockCode(
-                    event.target.value.toUpperCase()
-                  )
-                }
+                onChange={event => setManualStockCode(event.target.value.toUpperCase())}
                 placeholder="예: 005930 / AAPL"
                 autoCapitalize="characters"
               />
@@ -822,19 +669,14 @@ export default function InvestmentTradeForm({
             <select
               className={styles.select}
               value={manualMarket}
-              onChange={event =>
-                setManualMarket(event.target.value as Market)
-              }
+              onChange={event => setManualMarket(event.target.value as Market)}
             >
               <option value="국내">국내</option>
               <option value="해외">해외</option>
             </select>
           </label>
 
-          <Button
-            variant="secondary"
-            onClick={confirmManualInstrument}
-          >
+          <Button variant="secondary" onClick={confirmManualInstrument}>
             이 종목 사용
           </Button>
         </div>
@@ -842,9 +684,7 @@ export default function InvestmentTradeForm({
         <div className={styles.searchSection}>
           <label className={styles.field}>
             <span className={styles.label}>
-              {tradeType === "매수"
-                ? "매수한 종목"
-                : "매도한 종목"}
+              {tradeType === "매수" ? "매수한 종목" : "매도한 종목"}
             </span>
 
             <div className={styles.searchInputWrap}>
@@ -862,11 +702,7 @@ export default function InvestmentTradeForm({
                   setSuccess("");
                   setError("");
                 }}
-                placeholder={
-                  tradeType === "매수"
-                    ? "종목이름 검색"
-                    : "보유종목 이름 검색"
-                }
+                placeholder={tradeType === "매수" ? "종목이름 검색" : "보유종목 이름 검색"}
                 autoComplete="off"
               />
             </div>
@@ -883,9 +719,7 @@ export default function InvestmentTradeForm({
               {localMatches.length > 0 && (
                 <div className={styles.resultGroup}>
                   <div className={styles.resultGroupTitle}>
-                    {tradeType === "매수"
-                      ? "보유 중"
-                      : "보유종목"}
+                    {tradeType === "매수" ? "보유 중" : "보유종목"}
                   </div>
 
                   {localMatches.map(holding => (
@@ -912,9 +746,7 @@ export default function InvestmentTradeForm({
 
               {tradeType === "매수" && searchQuery.trim() && (
                 <div className={styles.resultGroup}>
-                  <div className={styles.resultGroupTitle}>
-                    종목 검색
-                  </div>
+                  <div className={styles.resultGroupTitle}>종목 검색</div>
 
                   {searchStatus === "loading" && (
                     <div className={styles.searchState}>
@@ -930,16 +762,12 @@ export default function InvestmentTradeForm({
                       className={styles.resultItem}
                       onClick={() => chooseRemote(item)}
                     >
-                      <span className={styles.resultName}>
-                        {item.stockName || item.stockCode}
-                      </span>
+                      <span className={styles.resultName}>{item.stockName || item.stockCode}</span>
                       <span className={styles.resultMeta}>
                         {item.stockCode}
                         {" · "}
                         {item.market}
-                        {item.assetType
-                          ? ` · ${item.assetType}`
-                          : ""}
+                        {item.assetType ? ` · ${item.assetType}` : ""}
                       </span>
                     </button>
                   ))}
@@ -947,15 +775,11 @@ export default function InvestmentTradeForm({
                   {searchStatus === "done" &&
                     filteredRemoteResults.length === 0 &&
                     localMatches.length === 0 && (
-                      <div className={styles.searchState}>
-                        검색 결과가 없습니다.
-                      </div>
+                      <div className={styles.searchState}>검색 결과가 없습니다.</div>
                     )}
 
                   {searchStatus === "error" && (
-                    <div className={styles.searchState}>
-                      종목 검색 서버에 연결하지 못했습니다.
-                    </div>
+                    <div className={styles.searchState}>종목 검색 서버에 연결하지 못했습니다.</div>
                   )}
                 </div>
               )}
@@ -989,9 +813,7 @@ export default function InvestmentTradeForm({
       <div className={styles.grid}>
         <label className={styles.field}>
           <span className={styles.label}>
-            {tradeType === "매수"
-              ? "실제 매수수량"
-              : "실제 매도수량"}
+            {tradeType === "매수" ? "실제 매수수량" : "실제 매도수량"}
           </span>
 
           <input
@@ -1122,7 +944,8 @@ export default function InvestmentTradeForm({
           </div>
 
           <p className={styles.detailsHelp}>
-            거래할 때 비용을 모르면 비워두세요. 나중에 거래내역에서 수량·단가·수수료·세금을 수정할 수 있습니다.
+            거래할 때 비용을 모르면 비워두세요. 나중에 거래내역에서 수량·단가·수수료·세금을 수정할
+            수 있습니다.
           </p>
 
           <label className={styles.field}>
@@ -1138,23 +961,17 @@ export default function InvestmentTradeForm({
               min="0"
               step="1"
               value={settlementKrw}
-              onChange={event =>
-                setSettlementKrw(event.target.value)
-              }
-              placeholder={
-                tradeType === "매수"
-                  ? "실제 출금액"
-                  : "실제 입금액"
-              }
+              onChange={event => setSettlementKrw(event.target.value)}
+              placeholder={tradeType === "매수" ? "실제 출금액" : "실제 입금액"}
             />
 
             <span className={styles.fieldHint}>
-              증권사 거래내역에 찍힌 실제 금액을 알고 있을 때만 입력하세요. 비워두면 수량 × 체결단가 × 환율로 계산합니다.
+              증권사 거래내역에 찍힌 실제 금액을 알고 있을 때만 입력하세요. 비워두면 수량 × 체결단가
+              × 환율로 계산합니다.
             </span>
           </label>
 
-          {transactionCostDifference !== null &&
-            Math.abs(transactionCostDifference) >= 0.5 && (
+          {transactionCostDifference !== null && Math.abs(transactionCostDifference) >= 0.5 && (
             <div className={styles.settlementSubRow}>
               <span>입력한 비용 외 차이</span>
               <span>{formatCurrency(transactionCostDifference)}</span>
@@ -1186,10 +1003,7 @@ export default function InvestmentTradeForm({
         size="lg"
         loading={saving}
         loadingLabel="저장 중..."
-        disabled={
-          !selectedInstrument ||
-          (tradeType === "매도" && sellableHoldings.length === 0)
-        }
+        disabled={!selectedInstrument || (tradeType === "매도" && sellableHoldings.length === 0)}
       >
         {tradeType === "매수" ? "매수 내역 저장" : "매도 내역 저장"}
       </Button>

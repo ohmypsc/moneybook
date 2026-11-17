@@ -12,11 +12,7 @@ export function markLedgerChanged() {
   ledgerChangeVersion += 1;
 
   if (typeof window !== "undefined") {
-    window.dispatchEvent(
-      new Event(
-        LEDGER_CHANGED_EVENT
-      )
-    );
+    window.dispatchEvent(new Event(LEDGER_CHANGED_EVENT));
   }
 }
 
@@ -32,9 +28,7 @@ export function getLedgerChangeVersion() {
   return ledgerChangeVersion;
 }
 
-export function subscribeLedgerChanges(
-  listener: () => void
-) {
+export function subscribeLedgerChanges(listener: () => void) {
   if (typeof window === "undefined") {
     return () => {};
   }
@@ -43,15 +37,9 @@ export function subscribeLedgerChanges(
     listener();
   };
 
-  window.addEventListener(
-    LEDGER_CHANGED_EVENT,
-    handler
-  );
+  window.addEventListener(LEDGER_CHANGED_EVENT, handler);
 
   return () => {
-    window.removeEventListener(
-      LEDGER_CHANGED_EVENT,
-      handler
-    );
+    window.removeEventListener(LEDGER_CHANGED_EVENT, handler);
   };
 }

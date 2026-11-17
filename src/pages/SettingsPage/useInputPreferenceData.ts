@@ -1,7 +1,4 @@
-import {
-  useEffect,
-  useState
-} from "react";
+import { useEffect, useState } from "react";
 
 import { apiRequest } from "../../api/client";
 import { getBootstrap } from "../../api/bootstrap";
@@ -18,10 +15,7 @@ import type {
   SharedInputPreferencesState
 } from "../../utils/inputPreferences";
 
-import type {
-  BootstrapData,
-  BootstrapResponse
-} from "../../types/bootstrap";
+import type { BootstrapData, BootstrapResponse } from "../../types/bootstrap";
 
 import { getErrorMessage } from "./settingsShared";
 
@@ -58,10 +52,8 @@ interface SaveInputPreferenceOptions {
 }
 
 export function useInputPreferenceData() {
-  const [bootstrap, setBootstrap] =
-    useState<BootstrapData | null>(null);
-  const [preferences, setPreferences] =
-    useState<InputPreferences | null>(null);
+  const [bootstrap, setBootstrap] = useState<BootstrapData | null>(null);
+  const [preferences, setPreferences] = useState<InputPreferences | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState("");
@@ -79,32 +71,20 @@ export function useInputPreferenceData() {
         const response = await getBootstrap<BootstrapResponse>();
 
         if (!response.success || !response.data) {
-          throw new Error(
-            response.error?.message ||
-            "입력 화면 설정을 불러오지 못했습니다."
-          );
+          throw new Error(response.error?.message || "입력 화면 설정을 불러오지 못했습니다.");
         }
 
         if (!active) return;
 
         const data = response.data;
         const sharedPreferences =
-          data.inputPreferences?.configured === true &&
-          data.inputPreferences.preferences
+          data.inputPreferences?.configured === true && data.inputPreferences.preferences
             ? data.inputPreferences.preferences
             : null;
 
         const nextPreferences = sharedPreferences
-          ? normalizeInputPreferences(
-              sharedPreferences,
-              data.categories,
-              data.accounts
-            )
-          : getInputPreferences(
-              data.categories,
-              data.accounts,
-              data.userName || ""
-            );
+          ? normalizeInputPreferences(sharedPreferences, data.categories, data.accounts)
+          : getInputPreferences(data.categories, data.accounts, data.userName || "");
 
         if (sharedPreferences) {
           saveInputPreferences(nextPreferences, data.userName || "");
@@ -114,12 +94,7 @@ export function useInputPreferenceData() {
         setPreferences(nextPreferences);
       } catch (loadError) {
         if (active) {
-          setError(
-            getErrorMessage(
-              loadError,
-              "입력 화면 설정을 불러오지 못했습니다."
-            )
-          );
+          setError(getErrorMessage(loadError, "입력 화면 설정을 불러오지 못했습니다."));
         }
       } finally {
         if (active) {
@@ -148,19 +123,10 @@ export function useInputPreferenceData() {
       return false;
     }
 
-    const categorySource =
-      options.categories ||
-      bootstrap.categories;
-    const accountSource =
-      options.accounts ||
-      bootstrap.accounts;
+    const categorySource = options.categories || bootstrap.categories;
+    const accountSource = options.accounts || bootstrap.accounts;
 
-    const normalized =
-      normalizeInputPreferences(
-        nextPreferences,
-        categorySource,
-        accountSource
-      );
+    const normalized = normalizeInputPreferences(nextPreferences, categorySource, accountSource);
 
     saveInputPreferences(normalized, bootstrap.userName || "");
     setPreferences(normalized);
@@ -184,10 +150,7 @@ export function useInputPreferenceData() {
         response.data.configured !== true ||
         !response.data.preferences
       ) {
-        throw new Error(
-          response.error?.message ||
-          "내 입력 설정을 저장하지 못했습니다."
-        );
+        throw new Error(response.error?.message || "내 입력 설정을 저장하지 못했습니다.");
       }
 
       const saved = normalizeInputPreferences(

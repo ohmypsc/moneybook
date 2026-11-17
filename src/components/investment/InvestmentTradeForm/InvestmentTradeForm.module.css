@@ -6,11 +6,8 @@
   margin-top: var(--space-5);
   padding-top: var(--space-5);
 
-  border-top:
-    1px solid
-    var(--color-border);
+  border-top: 1px solid var(--color-border);
 }
-
 
 /* =========================================================
    상단
@@ -23,11 +20,9 @@
   gap: var(--space-3);
 }
 
-
 .titleGroup {
   min-width: 0;
 }
-
 
 .title {
   margin: 0;
@@ -36,20 +31,14 @@
   line-height: 1.4;
 }
 
-
 .description {
-  margin:
-    var(--space-1)
-    0
-    0;
+  margin: var(--space-1) 0 0;
 
-  color:
-    var(--color-text-secondary);
+  color: var(--color-text-secondary);
 
   font-size: 13px;
   line-height: 1.5;
 }
-
 
 .cash {
   flex-shrink: 0;
@@ -57,21 +46,17 @@
   display: grid;
   gap: 2px;
 
-  color:
-    var(--color-text-secondary);
+  color: var(--color-text-secondary);
 
   font-size: 12px;
   text-align: right;
 }
 
-
 .cash strong {
-  color:
-    var(--color-text-primary);
+  color: var(--color-text-primary);
 
   font-size: 14px;
 }
-
 
 /* =========================================================
    매수 / 매도 탭
@@ -79,48 +64,31 @@
 
 .tradeTabs {
   display: grid;
-  grid-template-columns:
-    repeat(
-      2,
-      minmax(0, 1fr)
-    );
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 
   gap: 4px;
 
   padding: 4px;
 
-  background:
-    var(--color-surface-soft);
+  background: var(--color-surface-soft);
 
-  border:
-    1px solid
-    var(--color-border);
+  border: 1px solid var(--color-border);
 
-  border-radius:
-    var(--radius-md);
+  border-radius: var(--radius-md);
 }
-
 
 .tradeTab {
   min-height: 42px;
 
-  padding:
-    0
-    12px;
+  padding: 0 12px;
 
   border: 0;
 
-  border-radius:
-    calc(
-      var(--radius-md) -
-      4px
-    );
+  border-radius: calc(var(--radius-md) - 4px);
 
-  background:
-    transparent;
+  background: transparent;
 
-  color:
-    var(--color-text-secondary);
+  color: var(--color-text-secondary);
 
   font: inherit;
   font-size: 14px;
@@ -128,28 +96,20 @@
 
   cursor: pointer;
 
-  -webkit-tap-highlight-color:
-    transparent;
+  -webkit-tap-highlight-color: transparent;
 }
-
 
 .tradeTab:active {
-  transform:
-    scale(0.98);
+  transform: scale(0.98);
 }
-
 
 .tradeTabActive {
-  background:
-    var(--color-surface);
+  background: var(--color-surface);
 
-  color:
-    var(--color-text-primary);
+  color: var(--color-text-primary);
 
-  box-shadow:
-    var(--shadow-card);
+  box-shadow: var(--shadow-card);
 }
-
 
 /* =========================================================
    입력
@@ -157,15 +117,10 @@
 
 .grid {
   display: grid;
-  grid-template-columns:
-    repeat(
-      2,
-      minmax(0, 1fr)
-    );
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 
   gap: var(--space-3);
 }
-
 
 .field {
   display: flex;
@@ -175,28 +130,23 @@
   min-width: 0;
 }
 
-
 .label {
   display: flex;
   align-items: center;
   gap: 6px;
 
-  color:
-    var(--color-text-primary);
+  color: var(--color-text-primary);
 
   font-size: 13px;
   font-weight: 700;
 }
 
-
 .optional {
-  color:
-    var(--color-text-secondary);
+  color: var(--color-text-secondary);
 
   font-size: 11px;
   font-weight: 600;
 }
-
 
 .input,
 .select {
@@ -206,22 +156,15 @@
 
   box-sizing: border-box;
 
-  padding:
-    0
-    12px;
+  padding: 0 12px;
 
-  border:
-    1px solid
-    var(--color-border);
+  border: 1px solid var(--color-border);
 
-  border-radius:
-    var(--radius-md);
+  border-radius: var(--radius-md);
 
-  background:
-    var(--color-surface);
+  background: var(--color-surface);
 
-  color:
-    var(--color-text-primary);
+  color: var(--color-text-primary);
 
   font: inherit;
   font-size: 16px /* iOS는 16px 미만 입력칸에 포커스하면 화면을 확대합니다 */;
@@ -229,28 +172,22 @@
   outline: none;
 }
 
-
 .input:focus,
 .select:focus {
-  border-color:
-    var(--color-primary);
+  border-color: var(--color-primary);
 }
-
 
 .input:disabled,
 .select:disabled {
   opacity: 0.6;
 }
 
-
 .fieldHint {
-  color:
-    var(--color-text-secondary);
+  color: var(--color-text-secondary);
 
   font-size: 12px;
   line-height: 1.45;
 }
-
 
 /* =========================================================
    신규 종목
@@ -267,17 +204,12 @@
 .details {
   overflow: hidden;
 
-  border:
-    1px solid
-    var(--color-border);
+  border: 1px solid var(--color-border);
 
-  border-radius:
-    var(--radius-md);
+  border-radius: var(--radius-md);
 
-  background:
-    var(--color-surface);
+  background: var(--color-surface);
 }
-
 
 .detailsSummary {
   display: flex;
@@ -285,8 +217,7 @@
   justify-content: space-between;
   gap: var(--space-2);
 
-  padding:
-    12px;
+  padding: 12px;
 
   font-size: 13px;
   font-weight: 700;
@@ -296,38 +227,29 @@
   user-select: none;
 }
 
-
 .detailsSummary span {
-  color:
-    var(--color-text-secondary);
+  color: var(--color-text-secondary);
 
   font-size: 12px;
   font-weight: 600;
 }
-
 
 .detailsContent {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
 
-  padding:
-    0
-    12px
-    12px;
+  padding: 0 12px 12px;
 }
-
 
 .detailsHelp {
   margin: 0;
 
-  color:
-    var(--color-text-secondary);
+  color: var(--color-text-secondary);
 
   font-size: 12px;
   line-height: 1.5;
 }
-
 
 /* =========================================================
    예상 결제금액
@@ -338,21 +260,14 @@
   flex-direction: column;
   gap: 7px;
 
-  padding:
-    13px
-    14px;
+  padding: 13px 14px;
 
-  background:
-    var(--color-surface-soft);
+  background: var(--color-surface-soft);
 
-  border:
-    1px solid
-    var(--color-border);
+  border: 1px solid var(--color-border);
 
-  border-radius:
-    var(--radius-md);
+  border-radius: var(--radius-md);
 }
-
 
 .settlementRow,
 .settlementSubRow {
@@ -362,27 +277,21 @@
   gap: var(--space-3);
 }
 
-
 .settlementRow {
   font-size: 14px;
 }
 
-
 .settlementRow strong {
-  color:
-    var(--color-primary);
+  color: var(--color-primary);
 
   font-size: 17px;
 }
 
-
 .settlementSubRow {
-  color:
-    var(--color-text-secondary);
+  color: var(--color-text-secondary);
 
   font-size: 12px;
 }
-
 
 /* =========================================================
    상태
@@ -392,35 +301,25 @@
 .success {
   margin: 0;
 
-  padding:
-    10px
-    12px;
+  padding: 10px 12px;
 
-  border-radius:
-    var(--radius-md);
+  border-radius: var(--radius-md);
 
   font-size: 13px;
   line-height: 1.5;
 }
 
-
 .error {
-  color:
-    var(--color-error);
+  color: var(--color-error);
 
-  background:
-    var(--color-surface-soft);
+  background: var(--color-surface-soft);
 }
-
 
 .success {
-  color:
-    var(--color-primary);
+  color: var(--color-primary);
 
-  background:
-    var(--color-surface-soft);
+  background: var(--color-surface-soft);
 }
-
 
 /* =========================================================
    저장 버튼
@@ -430,14 +329,10 @@
    작은 화면
    ========================================================= */
 
-@media (
-  max-width:
-    520px
-) {
+@media (max-width: 520px) {
   .header {
     flex-direction: column;
   }
-
 
   .cash {
     width: 100%;
@@ -451,15 +346,12 @@
     text-align: left;
   }
 
-
   .cash strong {
     text-align: right;
   }
 
-
   .grid {
-    grid-template-columns:
-      minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -471,16 +363,11 @@
   width: 14px;
   height: 14px;
 
-  border:
-    2px solid
-    var(--color-border);
-  border-top-color:
-    var(--color-primary);
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-primary);
   border-radius: 999px;
 
-  animation:
-    investmentLookupSpin
-    0.8s linear infinite;
+  animation: investmentLookupSpin 0.8s linear infinite;
 }
 
 @keyframes investmentLookupSpin {

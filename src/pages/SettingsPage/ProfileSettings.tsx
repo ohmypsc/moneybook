@@ -16,258 +16,140 @@ import { Card } from "../../components/common/Card/Card";
 import styles from "./SettingsPage.module.css";
 
 export function ProfileSettings() {
-    const [
-        userName,
-        setUserName
-    ] =
-        useState("");
+  const [userName, setUserName] = useState("");
 
-    const [
-        loading,
-        setLoading
-    ] =
-        useState(
-            true
-        );
+  const [loading, setLoading] = useState(true);
 
-    const [
-        loggingOut,
-        setLoggingOut
-    ] =
-        useState(
-            false
-        );
+  const [loggingOut, setLoggingOut] = useState(false);
 
+  useEffect(() => {
+    let active = true;
 
-    useEffect(
-        () => {
-            let active =
-                true;
+    async function loadSession() {
+      try {
+        const session = await getSession();
 
-            async function loadSession() {
-                try {
-                    const session =
-                        await getSession();
-
-                    if (
-                        active &&
-                        session.loggedIn &&
-                        session.user
-                    ) {
-                        setUserName(
-                            session.user.name
-                        );
-                    }
-                } finally {
-                    if (
-                        active
-                    ) {
-                        setLoading(
-                            false
-                        );
-                    }
-                }
-            }
-
-            void loadSession();
-
-            return () => {
-                active =
-                    false;
-            };
-        },
-        []
-    );
-
-
-    async function handleLogout() {
-        // 아직 서버에 저장되지 않은 거래가 있으면 로그아웃 전에 알려 줍니다.
-        const pendingCount =
-            userName
-                ? getPendingTransactions(userName).length
-                : 0;
-
-        if (
-            !(await confirmAction(
-                pendingCount > 0
-                    ? {
-                        title:
-                            "아직 저장되지 않은 거래가 있어요",
-                        message:
-                            `서버 저장이 완료되지 않은 거래가 ${pendingCount}건 있습니다. 로그아웃해도 이 기기에 남지만, 서버 저장을 마치려면 같은 계정으로 다시 로그인해야 합니다. 로그아웃할까요?`,
-                        confirmLabel:
-                            "로그아웃",
-                        cancelLabel:
-                            "계속 사용하기"
-                    }
-                    : {
-                        title:
-                            "로그아웃",
-                        message:
-                            "현재 계정에서 로그아웃할까요?",
-                        confirmLabel:
-                            "로그아웃"
-                    }
-            ))
-        ) {
-            return;
+        if (active && session.loggedIn && session.user) {
+          setUserName(session.user.name);
         }
-
-        setLoggingOut(
-            true
-        );
-
-        // 로그아웃한 휴대폰으로 계속 알림이 가지 않도록 이 기기의 알림 구독을 먼저 해지합니다.
-        try {
-            await disablePushOnThisDevice();
-        } catch {
-            /* 알림 해지에 실패해도 로그아웃은 계속합니다. */
+      } finally {
+        if (active) {
+          setLoading(false);
         }
-
-        try {
-            await logout();
-        } finally {
-            invalidateDashboardCache();
-            clearDashboardPersistentSnapshot();
-            clearBootstrapMemoryCache();
-            clearInvestmentPrefetchCache();
-            clearManagedSettingsCache();
-
-            saveLastAuthenticatedUser(
-                null
-            );
-
-            setLoggingOut(
-                false
-            );
-            window.location.reload();
-        }
+      }
     }
 
+    void loadSession();
 
-    return (
-        <div
-            className={
-                styles.settingsBody
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function handleLogout() {
+    // 아직 서버에 저장되지 않은 거래가 있으면 로그아웃 전에 알려 줍니다.
+    const pendingCount = userName ? getPendingTransactions(userName).length : 0;
+
+    if (
+      !(await confirmAction(
+        pendingCount > 0
+          ? {
+              title: "아직 저장되지 않은 거래가 있어요",
+              message: `서버 저장이 완료되지 않은 거래가 ${pendingCount}건 있습니다. 로그아웃해도 이 기기에 남지만, 서버 저장을 마치려면 같은 계정으로 다시 로그인해야 합니다. 로그아웃할까요?`,
+              confirmLabel: "로그아웃",
+              cancelLabel: "계속 사용하기"
             }
-        >
-            <Card as="section">
-                <div
-                    className={
-                        styles.profileRow
-                    }
-                >
-                    <span
-                        className={
-                            styles.avatar
-                        }
-                    >
-                        {
-                            (
-                                userName ||
-                                "내"
-                            ).slice(
-                                0,
-                                1
-                            )
-                        }
-                    </span>
+          : {
+              title: "로그아웃",
+              message: "현재 계정에서 로그아웃할까요?",
+              confirmLabel: "로그아웃"
+            }
+      ))
+    ) {
+      return;
+    }
 
-                    <span
-                        className={
-                            styles.itemTextGroup
-                        }
-                    >
-                        <strong>
-                            {
-                                loading
-                                    ? "확인 중..."
-                                    : userName ||
-                                        "로그인 사용자"
-                            }
-                        </strong>
+    setLoggingOut(true);
 
-                        <span>
-                            현재 로그인한 사용자
-                        </span>
-                    </span>
-                </div>
-            </Card>
+    // 로그아웃한 휴대폰으로 계속 알림이 가지 않도록 이 기기의 알림 구독을 먼저 해지합니다.
+    try {
+      await disablePushOnThisDevice();
+    } catch {
+      /* 알림 해지에 실패해도 로그아웃은 계속합니다. */
+    }
 
-            <Card as="section">
-                <div
-                    className={
-                        styles.sectionHeading
-                    }
-                >
-                    <h2>
-                        우리 가계부
-                    </h2>
+    try {
+      await logout();
+    } finally {
+      invalidateDashboardCache();
+      clearDashboardPersistentSnapshot();
+      clearBootstrapMemoryCache();
+      clearInvestmentPrefetchCache();
+      clearManagedSettingsCache();
 
-                    <p>
-                        미영·승철 두 사람이 함께 사용하는
-                        부부 공유 가계부입니다.
-                    </p>
-                </div>
+      saveLastAuthenticatedUser(null);
 
-                <dl
-                    className={
-                        styles.infoList
-                    }
-                >
-                    <div>
-                        <dt>
-                            로그인 유지
-                        </dt>
+      setLoggingOut(false);
+      window.location.reload();
+    }
+  }
 
-                        <dd>
-                            접속할 때마다 최대 400일로 연장
-                        </dd>
-                    </div>
+  return (
+    <div className={styles.settingsBody}>
+      <Card as="section">
+        <div className={styles.profileRow}>
+          <span className={styles.avatar}>{(userName || "내").slice(0, 1)}</span>
 
-                    <div>
-                        <dt>
-                            기본 저장소
-                        </dt>
+          <span className={styles.itemTextGroup}>
+            <strong>{loading ? "확인 중..." : userName || "로그인 사용자"}</strong>
 
-                        <dd>
-                            Cloudflare D1
-                        </dd>
-                    </div>
-
-                    <div>
-                        <dt>
-                            설정 공유
-                        </dt>
-
-                        <dd>
-                            부부 공통 설정은 두 계정에 동일 적용
-                        </dd>
-                    </div>
-                </dl>
-            </Card>
-
-            <PartnerPushSettings userName={userName} />
-
-            <PwaInstallPrompt />
-
-            <Button
-                variant="dangerSoft"
-                fullWidth
-                loading={loggingOut}
-                loadingLabel="로그아웃 중..."
-                disabled={
-                    loggingOut
-                }
-                onClick={
-                    () =>
-                        void handleLogout()
-                }
-            >
-                로그아웃
-            </Button>
+            <span>현재 로그인한 사용자</span>
+          </span>
         </div>
-    );
+      </Card>
+
+      <Card as="section">
+        <div className={styles.sectionHeading}>
+          <h2>우리 가계부</h2>
+
+          <p>미영·승철 두 사람이 함께 사용하는 부부 공유 가계부입니다.</p>
+        </div>
+
+        <dl className={styles.infoList}>
+          <div>
+            <dt>로그인 유지</dt>
+
+            <dd>접속할 때마다 최대 400일로 연장</dd>
+          </div>
+
+          <div>
+            <dt>기본 저장소</dt>
+
+            <dd>Cloudflare D1</dd>
+          </div>
+
+          <div>
+            <dt>설정 공유</dt>
+
+            <dd>부부 공통 설정은 두 계정에 동일 적용</dd>
+          </div>
+        </dl>
+      </Card>
+
+      <PartnerPushSettings userName={userName} />
+
+      <PwaInstallPrompt />
+
+      <Button
+        variant="dangerSoft"
+        fullWidth
+        loading={loggingOut}
+        loadingLabel="로그아웃 중..."
+        disabled={loggingOut}
+        onClick={() => void handleLogout()}
+      >
+        로그아웃
+      </Button>
+    </div>
+  );
 }
-
-

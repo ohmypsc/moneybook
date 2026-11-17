@@ -1,6 +1,5 @@
 export type AppShortcut =
-  | { navigation: "input"; mode: "expense" | "income" | "transfer" }
-  | { navigation: "calendar" };
+  { navigation: "input"; mode: "expense" | "income" | "transfer" } | { navigation: "calendar" };
 
 export function parseAppShortcut(search: string): AppShortcut | null {
   const params = new URLSearchParams(search);

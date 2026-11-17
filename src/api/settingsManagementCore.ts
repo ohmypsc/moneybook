@@ -1,27 +1,15 @@
-import {
-  apiRequest
-} from "./client";
+import { apiRequest } from "./client";
 
-import {
-  unwrapEnvelope
-} from "./envelope";
+import { unwrapEnvelope } from "./envelope";
 
-import type {
-  ApiEnvelope
-} from "./envelope";
+import type { ApiEnvelope } from "./envelope";
 
-
-export type LedgerCategoryType =
-  | "지출"
-  | "수입"
-  | "이체";
-
+export type LedgerCategoryType = "지출" | "수입" | "이체";
 
 export interface ManagedCategory {
   categoryId: string;
 
-  type:
-    LedgerCategoryType;
+  type: LedgerCategoryType;
 
   name: string;
 
@@ -38,7 +26,6 @@ export interface ManagedCategory {
   row: number;
 }
 
-
 export interface ManagedAccount {
   accountId: string;
 
@@ -54,78 +41,54 @@ export interface ManagedAccount {
 
   openingBalance: number;
 
-  billingCutoffDay:
-    number |
-    null;
+  billingCutoffDay: number | null;
 
-  paymentDay:
-    number |
-    null;
+  paymentDay: number | null;
 
-  startYear:
-    number |
-    null;
+  startYear: number | null;
 
-  endYear:
-    number |
-    null;
+  endYear: number | null;
 
   active: boolean;
 
   balanceMethod: string;
 
-  paymentAccountId:
-    string |
-    null;
+  paymentAccountId: string | null;
 
-  paymentAccountName:
-    string |
-    null;
+  paymentAccountName: string | null;
 
   assetAttribution: string;
 
   currentBalance?: number;
 
-  investmentCashConfigured?:
-    boolean;
+  investmentCashConfigured?: boolean;
 
-  investmentCashKrw?:
-    number;
+  investmentCashKrw?: number;
 
-  securitiesValueKrw?:
-    number;
+  securitiesValueKrw?: number;
 
-  realizedPnlKrw?:
-    number;
+  realizedPnlKrw?: number;
 
   isDeleted: boolean;
 
   row: number;
 }
 
-
 export interface CategoryListResponse {
   total: number;
 
-  items:
-    ManagedCategory[];
+  items: ManagedCategory[];
 }
-
 
 export interface AccountListResponse {
   total: number;
 
-  items:
-    ManagedAccount[];
+  items: ManagedAccount[];
 }
-
 
 export interface LedgerConfig {
-  ledgerStartDate:
-    string |
-    null;
+  ledgerStartDate: string | null;
 }
-
 
 export interface SaveAccountInput {
   accountName: string;
@@ -138,31 +101,20 @@ export interface SaveAccountInput {
 
   openingBalance?: number;
 
-  billingCutoffDay?:
-    number |
-    null;
+  billingCutoffDay?: number | null;
 
-  paymentDay?:
-    number |
-    null;
+  paymentDay?: number | null;
 
-  startYear?:
-    number |
-    null;
+  startYear?: number | null;
 
-  endYear?:
-    number |
-    null;
+  endYear?: number | null;
 
   balanceMethod?: string;
 
-  paymentAccountId?:
-    string |
-    null;
+  paymentAccountId?: string | null;
 
   assetAttribution?: string;
 }
-
 
 interface CategoryMutationResponse {
   created?: boolean;
@@ -175,10 +127,8 @@ interface CategoryMutationResponse {
 
   categoryId?: string;
 
-  category?:
-    ManagedCategory;
+  category?: ManagedCategory;
 }
-
 
 interface AccountMutationResponse {
   created?: boolean;
@@ -191,53 +141,30 @@ interface AccountMutationResponse {
 
   accountId?: string;
 
-  account?:
-    ManagedAccount;
+  account?: ManagedAccount;
 }
-
 
 interface SaveLedgerStartDateResponse {
   updated?: boolean;
 
   cleared?: boolean;
 
-  ledgerStartDate:
-    string |
-    null;
+  ledgerStartDate: string | null;
 }
-
 
 async function postMutation<T>(
   path: string,
 
-  payload:
-    Record<
-      string,
-      unknown
-    >
+  payload: Record<string, unknown>
 ) {
-  const raw =
-    await apiRequest<
-      | ApiEnvelope<T>
-      | T
-    >(
-      path,
-      {
-        method:
-          "POST",
+  const raw = await apiRequest<ApiEnvelope<T> | T>(path, {
+    method: "POST",
 
-        body:
-          JSON.stringify(
-            payload
-          )
-      }
-    );
+    body: JSON.stringify(payload)
+  });
 
-  return unwrapEnvelope<T>(
-    raw
-  );
+  return unwrapEnvelope<T>(raw);
 }
-
 
 /*
  * =========================================================
@@ -247,65 +174,29 @@ async function postMutation<T>(
 
 export async function getManagedCategories(
   params: {
-    type?:
-      LedgerCategoryType;
+    type?: LedgerCategoryType;
 
-    includeDeleted?:
-      boolean;
+    includeDeleted?: boolean;
   } = {}
 ) {
-  const searchParams =
-    new URLSearchParams();
+  const searchParams = new URLSearchParams();
 
-
-  if (
-    params.type
-  ) {
-    searchParams.set(
-      "type",
-      params.type
-    );
+  if (params.type) {
+    searchParams.set("type", params.type);
   }
 
-
-  if (
-    params.includeDeleted
-  ) {
-    searchParams.set(
-      "includeDeleted",
-      "true"
-    );
+  if (params.includeDeleted) {
+    searchParams.set("includeDeleted", "true");
   }
 
+  const query = searchParams.toString();
 
-  const query =
-    searchParams.toString();
+  const url = query ? `/api/categories?${query}` : "/api/categories";
 
+  const raw = await apiRequest<ApiEnvelope<CategoryListResponse> | CategoryListResponse>(url);
 
-  const url =
-    query
-      ? `/api/categories?${query}`
-      : "/api/categories";
-
-
-  const raw =
-    await apiRequest<
-      | ApiEnvelope<
-          CategoryListResponse
-        >
-      | CategoryListResponse
-    >(
-      url
-    );
-
-
-  return unwrapEnvelope<
-    CategoryListResponse
-  >(
-    raw
-  );
+  return unwrapEnvelope<CategoryListResponse>(raw);
 }
-
 
 /*
  * =========================================================
@@ -313,26 +204,17 @@ export async function getManagedCategories(
  * =========================================================
  */
 
-export async function createManagedCategory(
-  input: {
-    type:
-      LedgerCategoryType;
+export async function createManagedCategory(input: {
+  type: LedgerCategoryType;
 
-    name: string;
+  name: string;
 
-    active?: boolean;
-  }
-) {
-  return postMutation<
-    CategoryMutationResponse
-  >(
-    "/api/categories",
-    {
-      ...input
-    }
-  );
+  active?: boolean;
+}) {
+  return postMutation<CategoryMutationResponse>("/api/categories", {
+    ...input
+  });
 }
-
 
 /*
  * =========================================================
@@ -340,25 +222,17 @@ export async function createManagedCategory(
  * =========================================================
  */
 
-export async function updateManagedCategory(
-  input: {
-    categoryId: string;
+export async function updateManagedCategory(input: {
+  categoryId: string;
 
-    name?: string;
+  name?: string;
 
-    active?: boolean;
-  }
-) {
-  return postMutation<
-    CategoryMutationResponse
-  >(
-    "/api/categories/update",
-    {
-      ...input
-    }
-  );
+  active?: boolean;
+}) {
+  return postMutation<CategoryMutationResponse>("/api/categories/update", {
+    ...input
+  });
 }
-
 
 /*
  * =========================================================
@@ -366,20 +240,11 @@ export async function updateManagedCategory(
  * =========================================================
  */
 
-export async function deleteManagedCategory(
-  categoryId:
-    string
-) {
-  return postMutation<
-    CategoryMutationResponse
-  >(
-    "/api/categories/delete",
-    {
-      categoryId
-    }
-  );
+export async function deleteManagedCategory(categoryId: string) {
+  return postMutation<CategoryMutationResponse>("/api/categories/delete", {
+    categoryId
+  });
 }
-
 
 /*
  * =========================================================
@@ -387,20 +252,11 @@ export async function deleteManagedCategory(
  * =========================================================
  */
 
-export async function restoreManagedCategory(
-  categoryId:
-    string
-) {
-  return postMutation<
-    CategoryMutationResponse
-  >(
-    "/api/categories/restore",
-    {
-      categoryId
-    }
-  );
+export async function restoreManagedCategory(categoryId: string) {
+  return postMutation<CategoryMutationResponse>("/api/categories/restore", {
+    categoryId
+  });
 }
-
 
 /*
  * =========================================================
@@ -416,82 +272,35 @@ export async function getManagedAccounts(
 
     subType?: string;
 
-    includeDeleted?:
-      boolean;
+    includeDeleted?: boolean;
   } = {}
 ) {
-  const searchParams =
-    new URLSearchParams();
+  const searchParams = new URLSearchParams();
 
-
-  if (
-    params.owner
-  ) {
-    searchParams.set(
-      "owner",
-      params.owner
-    );
+  if (params.owner) {
+    searchParams.set("owner", params.owner);
   }
 
-
-  if (
-    params.accountType
-  ) {
-    searchParams.set(
-      "accountType",
-      params.accountType
-    );
+  if (params.accountType) {
+    searchParams.set("accountType", params.accountType);
   }
 
-
-  if (
-    params.subType
-  ) {
-    searchParams.set(
-      "subType",
-      params.subType
-    );
+  if (params.subType) {
+    searchParams.set("subType", params.subType);
   }
 
-
-  if (
-    params.includeDeleted
-  ) {
-    searchParams.set(
-      "includeDeleted",
-      "true"
-    );
+  if (params.includeDeleted) {
+    searchParams.set("includeDeleted", "true");
   }
 
+  const query = searchParams.toString();
 
-  const query =
-    searchParams.toString();
+  const url = query ? `/api/accounts?${query}` : "/api/accounts";
 
+  const raw = await apiRequest<ApiEnvelope<AccountListResponse> | AccountListResponse>(url);
 
-  const url =
-    query
-      ? `/api/accounts?${query}`
-      : "/api/accounts";
-
-
-  const raw =
-    await apiRequest<
-      | ApiEnvelope<
-          AccountListResponse
-        >
-      | AccountListResponse
-    >(
-      url
-    );
-
-
-  return unwrapEnvelope<
-    AccountListResponse
-  >(
-    raw
-  );
+  return unwrapEnvelope<AccountListResponse>(raw);
 }
-
 
 /*
  * =========================================================
@@ -499,20 +308,11 @@ export async function getManagedAccounts(
  * =========================================================
  */
 
-export async function createManagedAccount(
-  input:
-    SaveAccountInput
-) {
-  return postMutation<
-    AccountMutationResponse
-  >(
-    "/api/accounts",
-    {
-      ...input
-    }
-  );
+export async function createManagedAccount(input: SaveAccountInput) {
+  return postMutation<AccountMutationResponse>("/api/accounts", {
+    ...input
+  });
 }
-
 
 /*
  * =========================================================
@@ -521,23 +321,14 @@ export async function createManagedAccount(
  */
 
 export async function updateManagedAccount(
-  input:
-    Partial<
-      SaveAccountInput
-    > & {
-      accountId: string;
-    }
+  input: Partial<SaveAccountInput> & {
+    accountId: string;
+  }
 ) {
-  return postMutation<
-    AccountMutationResponse
-  >(
-    "/api/accounts/update",
-    {
-      ...input
-    }
-  );
+  return postMutation<AccountMutationResponse>("/api/accounts/update", {
+    ...input
+  });
 }
-
 
 /*
  * =========================================================
@@ -545,20 +336,11 @@ export async function updateManagedAccount(
  * =========================================================
  */
 
-export async function deleteManagedAccount(
-  accountId:
-    string
-) {
-  return postMutation<
-    AccountMutationResponse
-  >(
-    "/api/accounts/delete",
-    {
-      accountId
-    }
-  );
+export async function deleteManagedAccount(accountId: string) {
+  return postMutation<AccountMutationResponse>("/api/accounts/delete", {
+    accountId
+  });
 }
-
 
 /*
  * =========================================================
@@ -566,20 +348,11 @@ export async function deleteManagedAccount(
  * =========================================================
  */
 
-export async function restoreManagedAccount(
-  accountId:
-    string
-) {
-  return postMutation<
-    AccountMutationResponse
-  >(
-    "/api/accounts/restore",
-    {
-      accountId
-    }
-  );
+export async function restoreManagedAccount(accountId: string) {
+  return postMutation<AccountMutationResponse>("/api/accounts/restore", {
+    accountId
+  });
 }
-
 
 /*
  * =========================================================
@@ -588,24 +361,12 @@ export async function restoreManagedAccount(
  */
 
 export async function getLedgerConfig() {
-  const raw =
-    await apiRequest<
-      | ApiEnvelope<
-          LedgerConfig
-        >
-      | LedgerConfig
-    >(
-      "/api/settings/ledger-config"
-    );
-
-
-  return unwrapEnvelope<
-    LedgerConfig
-  >(
-    raw
+  const raw = await apiRequest<ApiEnvelope<LedgerConfig> | LedgerConfig>(
+    "/api/settings/ledger-config"
   );
-}
 
+  return unwrapEnvelope<LedgerConfig>(raw);
+}
 
 /*
  * =========================================================
@@ -613,20 +374,11 @@ export async function getLedgerConfig() {
  * =========================================================
  */
 
-export async function setLedgerStartDate(
-  ledgerStartDate:
-    string
-) {
-  return postMutation<
-    SaveLedgerStartDateResponse
-  >(
-    "/api/settings/ledger-start-date",
-    {
-      ledgerStartDate
-    }
-  );
+export async function setLedgerStartDate(ledgerStartDate: string) {
+  return postMutation<SaveLedgerStartDateResponse>("/api/settings/ledger-start-date", {
+    ledgerStartDate
+  });
 }
-
 
 /*
  * =========================================================
@@ -635,10 +387,5 @@ export async function setLedgerStartDate(
  */
 
 export async function clearLedgerStartDate() {
-  return postMutation<
-    SaveLedgerStartDateResponse
-  >(
-    "/api/settings/ledger-start-date/clear",
-    {}
-  );
+  return postMutation<SaveLedgerStartDateResponse>("/api/settings/ledger-start-date/clear", {});
 }

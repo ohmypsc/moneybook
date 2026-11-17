@@ -115,21 +115,24 @@ export function PartnerPushSettings({ userName }: { userName: string }) {
     }
   }
 
-  if (!allowed) return (
-    <Card as="section"><div className={styles.sectionHeading}>
-      <h2>거래 알림</h2>
-      <p>알림은 미영님이 알림을 켠 기기에만 전송합니다. 승철님 기기에는 보내지 않습니다.</p>
-      <p>가계부 내역과 최근 변경 사항은 두 분 모두 확인할 수 있습니다.</p>
-    </div></Card>
-  );
+  if (!allowed)
+    return (
+      <Card as="section">
+        <div className={styles.sectionHeading}>
+          <h2>거래 알림</h2>
+          <p>알림은 미영님이 알림을 켠 기기에만 전송합니다. 승철님 기기에는 보내지 않습니다.</p>
+          <p>가계부 내역과 최근 변경 사항은 두 분 모두 확인할 수 있습니다.</p>
+        </div>
+      </Card>
+    );
 
   return (
     <Card as="section">
       <div className={styles.sectionHeading}>
         <h2>{partner} 입력 알림</h2>
         <p>
-          이 휴대폰에서 켜 두면 {partner}이 지출·수입·이체를 입력할 때 알림이 와요.
-          내가 입력한 거래는 나에게 알리지 않고, 알림은 켠 휴대폰에만 가요.
+          이 휴대폰에서 켜 두면 {partner}이 지출·수입·이체를 입력할 때 알림이 와요. 내가 입력한
+          거래는 나에게 알리지 않고, 알림은 켠 휴대폰에만 가요.
         </p>
       </div>
 
@@ -138,7 +141,10 @@ export function PartnerPushSettings({ userName }: { userName: string }) {
       ) : (
         <>
           <p className={styles.pushStatus}>
-            이 휴대폰: <strong>{status === "checking" ? "확인 중..." : status === "on" ? "알림 켜짐" : "알림 꺼짐"}</strong>
+            이 휴대폰:{" "}
+            <strong>
+              {status === "checking" ? "확인 중..." : status === "on" ? "알림 켜짐" : "알림 꺼짐"}
+            </strong>
           </p>
 
           <div className={styles.pushActions}>

@@ -1,11 +1,6 @@
-import InvestmentTradeForm
-  from "../../components/investment/InvestmentTradeForm/InvestmentTradeForm";
-import InvestmentTradeHistory
-  from "../../components/investment/InvestmentTradeHistory/InvestmentTradeHistory";
-import type {
-  HoldingSummary,
-  InvestmentAccountSummary
-} from "../../types/dashboard";
+import InvestmentTradeForm from "../../components/investment/InvestmentTradeForm/InvestmentTradeForm";
+import InvestmentTradeHistory from "../../components/investment/InvestmentTradeHistory/InvestmentTradeHistory";
+import type { HoldingSummary, InvestmentAccountSummary } from "../../types/dashboard";
 import styles from "./InputPage.module.css";
 
 interface InvestmentInputSectionProps {
@@ -48,28 +43,23 @@ export function InvestmentInputSection({
               disabled={loading || accounts.length === 0}
               onClick={onPickAccount}
             >
-              <span
-                className={
-                  selectedAccount
-                    ? styles.pickerValue
-                    : styles.pickerPlaceholder
-                }
-              >
+              <span className={selectedAccount ? styles.pickerValue : styles.pickerPlaceholder}>
                 {selectedAccount
                   ? `${selectedAccount.accountName}${
-                      selectedAccount.owner
-                        ? `(${selectedAccount.owner})`
-                        : ""
+                      selectedAccount.owner ? `(${selectedAccount.owner})` : ""
                     }`
                   : loading
                     ? "투자계좌 불러오는 중"
                     : "선택하세요"}
               </span>
-              <span className={styles.pickerChevron} aria-hidden="true">⌄</span>
+              <span className={styles.pickerChevron} aria-hidden="true">
+                ⌄
+              </span>
             </button>
 
             <p className={styles.helper}>
-              주식·ETF·금처럼 실제 보유종목의 매수·매도만 기록합니다. 예수금이나 CMA 발행어음처럼 현금으로 관리할 금액은 종목으로 입력하지 말고 이체·예수금으로 관리하세요.
+              주식·ETF·금처럼 실제 보유종목의 매수·매도만 기록합니다. 예수금이나 CMA 발행어음처럼
+              현금으로 관리할 금액은 종목으로 입력하지 말고 이체·예수금으로 관리하세요.
             </p>
           </label>
         </div>

@@ -22,7 +22,10 @@ test("monthly bills add up to the purchase and the remainder goes to the first m
   assert.deepEqual(installmentSchedule(1_200_000, 12), Array(12).fill(100_000));
   const odd = installmentSchedule(100_000, 3);
   assert.deepEqual(odd, [33_334, 33_333, 33_333]);
-  assert.equal(odd.reduce((a, b) => a + b, 0), 100_000);
+  assert.equal(
+    odd.reduce((a, b) => a + b, 0),
+    100_000
+  );
   assert.deepEqual(installmentSchedule(-100_000, 3), [-33_334, -33_333, -33_333]);
   assert.deepEqual(installmentSchedule(5_000, 1), [5_000]);
 });

@@ -39,8 +39,7 @@ export function hideLaunchSplashNow() {
 }
 
 export async function waitForMinimumSplash() {
-  const startedAt =
-    (window as SplashWindow).__moneybookSplashStartedAt ?? Date.now();
+  const startedAt = (window as SplashWindow).__moneybookSplashStartedAt ?? Date.now();
   const remaining = SPLASH_MINIMUM_MS - (Date.now() - startedAt);
 
   if (remaining > 0) {

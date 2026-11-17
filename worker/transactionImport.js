@@ -19,8 +19,8 @@ function getOutputText(response) {
   if (typeof choiceContent === "string") return choiceContent;
   if (Array.isArray(choiceContent)) {
     const joined = choiceContent
-      .map((part) => typeof part === "string" ? part : part?.text)
-      .filter((part) => typeof part === "string")
+      .map(part => (typeof part === "string" ? part : part?.text))
+      .filter(part => typeof part === "string")
       .join("\n");
     if (joined) return joined;
   }
@@ -41,7 +41,7 @@ Classify salary/interest/received income as income, purchases as expense, and ex
 
 function isUsefulTransactionList(values) {
   if (!Array.isArray(values) || values.length === 0) return false;
-  return values.some((item) => {
+  return values.some(item => {
     if (!item || typeof item !== "object") return false;
     const date = item.d ?? item.date;
     const amount = Number(String(item.a ?? item.amount ?? "").replace(/[^0-9.-]/g, ""));
@@ -86,7 +86,10 @@ async function runImageFallback(env, prompt, image) {
       {
         role: "user",
         content: [
-          { type: "text", text: "Inspect this screenshot closely. Extract every visible transaction row and return only the requested JSON." },
+          {
+            type: "text",
+            text: "Inspect this screenshot closely. Extract every visible transaction row and return only the requested JSON."
+          },
           { type: "image_url", image_url: { url: image } }
         ]
       }
@@ -112,7 +115,9 @@ async function runImage(env, prompt, image) {
     if (isUsefulTransactionList(values)) return values;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error || "");
-    const terminal = error?.status === 429 || /(?:429|quota|rate.?limit|neuron|usage.?limit|too many requests)/i.test(message);
+    const terminal =
+      error?.status === 429 ||
+      /(?:429|quota|rate.?limit|neuron|usage.?limit|too many requests)/i.test(message);
     if (terminal) throw error;
   }
   return runImageFallback(env, prompt, image);
@@ -140,7 +145,12 @@ export async function analyzeTransactionImport(env, input) {
 
   const prompt = buildPrompt({
     today: input.today,
-    sourceLabel: text && images.length ? "provided text and screenshot(s)" : text ? "provided text" : "screenshot"
+    sourceLabel:
+      text && images.length
+        ? "provided text and screenshot(s)"
+        : text
+          ? "provided text"
+          : "screenshot"
   });
   const validImages = [];
   for (const image of images) {
@@ -158,7 +168,9 @@ export async function analyzeTransactionImport(env, input) {
   if (text) jobs.push(() => runText(env, prompt, text));
   for (const image of validImages) jobs.push(() => runImage(env, prompt, image));
 
-  const groups = await mapWithConcurrency(jobs, MAX_AI_CONCURRENCY, (job) => job());
+  const groups = await mapWithConcurrency(jobs, MAX_AI_CONCURRENCY, job => job());
   const raw = groups.flat();
-  return dedupeImportedCandidates(raw.map((item, index) => normalizeImportedCandidate(item, index)));
+  return dedupeImportedCandidates(
+    raw.map((item, index) => normalizeImportedCandidate(item, index))
+  );
 }

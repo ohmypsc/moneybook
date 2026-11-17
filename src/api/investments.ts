@@ -1,14 +1,8 @@
-import {
-  apiRequest
-} from "./client";
+import { apiRequest } from "./client";
 
-import {
-  unwrapEnvelope
-} from "./envelope";
+import { unwrapEnvelope } from "./envelope";
 
-import type {
-  ApiEnvelope
-} from "./envelope";
+import type { ApiEnvelope } from "./envelope";
 
 import type {
   InvestmentTrade,
@@ -19,316 +13,152 @@ import type {
   CreateInvestmentTradePayload
 } from "../types/investment";
 
-
-type MutationResponse =
-  Record<
-    string,
-    unknown
-  >;
-
+type MutationResponse = Record<string, unknown>;
 
 type InvestmentTradeQuery = {
-  accountId?:
-    string;
+  accountId?: string;
 
-  holdingId?:
-    string;
+  holdingId?: string;
 
-  tradeType?:
-    string;
+  tradeType?: string;
 
-  includeDeleted?:
-    boolean;
+  includeDeleted?: boolean;
 };
-
 
 type TradeCacheEntry = {
-  data:
-    InvestmentTradesResponse;
+  data: InvestmentTradesResponse;
 
-  fetchedAt:
-    number;
+  fetchedAt: number;
 };
 
+const TRADE_CACHE_TTL_MS = 30 * 1000;
 
-const TRADE_CACHE_TTL_MS =
-  30 * 1000;
+let allActiveTradesCache: TradeCacheEntry | null = null;
 
-
-let allActiveTradesCache:
-  TradeCacheEntry |
-  null =
-    null;
-
-
-let allActiveTradesRequest:
-  Promise<InvestmentTradesResponse> |
-  null =
-    null;
-
+let allActiveTradesRequest: Promise<InvestmentTradesResponse> | null = null;
 
 function isAllTradesCacheFresh() {
   return !!(
-    allActiveTradesCache &&
-    Date.now() -
-      allActiveTradesCache.fetchedAt <=
-      TRADE_CACHE_TTL_MS
+    allActiveTradesCache && Date.now() - allActiveTradesCache.fetchedAt <= TRADE_CACHE_TTL_MS
   );
 }
 
-
 function filterTrades(
-  data:
-    InvestmentTradesResponse,
+  data: InvestmentTradesResponse,
 
-  params:
-    InvestmentTradeQuery
+  params: InvestmentTradeQuery
 ): InvestmentTradesResponse {
-  let items:
-    InvestmentTrade[] =
-      Array.isArray(
-        data.items
-      )
-        ? data.items
-        : [];
+  let items: InvestmentTrade[] = Array.isArray(data.items) ? data.items : [];
 
-
-  if (
-    params.accountId
-  ) {
-    items =
-      items.filter(
-        trade =>
-          trade.accountId ===
-          params.accountId
-      );
+  if (params.accountId) {
+    items = items.filter(trade => trade.accountId === params.accountId);
   }
 
-
-  if (
-    params.holdingId
-  ) {
-    items =
-      items.filter(
-        trade =>
-          trade.holdingId ===
-          params.holdingId
-      );
+  if (params.holdingId) {
+    items = items.filter(trade => trade.holdingId === params.holdingId);
   }
 
-
-  if (
-    params.tradeType
-  ) {
-    items =
-      items.filter(
-        trade =>
-          trade.tradeType ===
-          params.tradeType
-      );
+  if (params.tradeType) {
+    items = items.filter(trade => trade.tradeType === params.tradeType);
   }
-
 
   return {
-    total:
-      items.length,
+    total: items.length,
 
     items
   };
 }
 
+function buildTradesUrl(params: InvestmentTradeQuery = {}) {
+  const searchParams = new URLSearchParams();
 
-function buildTradesUrl(
-  params:
-    InvestmentTradeQuery = {}
-) {
-  const searchParams =
-    new URLSearchParams();
-
-
-  if (
-    params.accountId
-  ) {
-    searchParams.set(
-      "accountId",
-      params.accountId
-    );
+  if (params.accountId) {
+    searchParams.set("accountId", params.accountId);
   }
 
-
-  if (
-    params.holdingId
-  ) {
-    searchParams.set(
-      "holdingId",
-      params.holdingId
-    );
+  if (params.holdingId) {
+    searchParams.set("holdingId", params.holdingId);
   }
 
-
-  if (
-    params.tradeType
-  ) {
-    searchParams.set(
-      "tradeType",
-      params.tradeType
-    );
+  if (params.tradeType) {
+    searchParams.set("tradeType", params.tradeType);
   }
 
-
-  if (
-    params.includeDeleted
-  ) {
-    searchParams.set(
-      "includeDeleted",
-      "true"
-    );
+  if (params.includeDeleted) {
+    searchParams.set("includeDeleted", "true");
   }
 
+  const query = searchParams.toString();
 
-  const query =
-    searchParams.toString();
-
-
-  return query
-    ? `/api/investments/trades?${query}`
-    : "/api/investments/trades";
+  return query ? `/api/investments/trades?${query}` : "/api/investments/trades";
 }
 
-
-async function requestInvestmentTrades(
-  params:
-    InvestmentTradeQuery = {}
-) {
-  const raw =
-    await apiRequest<
-      | ApiEnvelope<InvestmentTradesResponse>
-      | InvestmentTradesResponse
-    >(
-      buildTradesUrl(
-        params
-      )
-    );
-
-
-  return unwrapEnvelope<
-    InvestmentTradesResponse
-  >(
-    raw
+async function requestInvestmentTrades(params: InvestmentTradeQuery = {}) {
+  const raw = await apiRequest<ApiEnvelope<InvestmentTradesResponse> | InvestmentTradesResponse>(
+    buildTradesUrl(params)
   );
-}
 
+  return unwrapEnvelope<InvestmentTradesResponse>(raw);
+}
 
 export function clearInvestmentPrefetchCache() {
-  allActiveTradesCache =
-    null;
+  allActiveTradesCache = null;
 
-  allActiveTradesRequest =
-    null;
+  allActiveTradesRequest = null;
 }
 
-
 export async function prefetchInvestmentTrades() {
-  if (
-    isAllTradesCacheFresh()
-  ) {
-    return allActiveTradesCache!
-      .data;
+  if (isAllTradesCacheFresh()) {
+    return allActiveTradesCache!.data;
   }
 
-
-  if (
-    allActiveTradesRequest
-  ) {
+  if (allActiveTradesRequest) {
     return allActiveTradesRequest;
   }
 
+  let request: Promise<InvestmentTradesResponse>;
 
-  let request:
-    Promise<InvestmentTradesResponse>;
+  request = requestInvestmentTrades()
+    .then(data => {
+      allActiveTradesCache = {
+        data,
+        fetchedAt: Date.now()
+      };
 
+      return data;
+    })
+    .finally(() => {
+      if (allActiveTradesRequest === request) {
+        allActiveTradesRequest = null;
+      }
+    });
 
-  request =
-    requestInvestmentTrades()
-      .then(
-        data => {
-          allActiveTradesCache = {
-            data,
-            fetchedAt:
-              Date.now()
-          };
-
-          return data;
-        }
-      )
-      .finally(
-        () => {
-          if (
-            allActiveTradesRequest ===
-            request
-          ) {
-            allActiveTradesRequest =
-              null;
-          }
-        }
-      );
-
-
-  allActiveTradesRequest =
-    request;
-
+  allActiveTradesRequest = request;
 
   return request;
 }
 
-
 async function postInvestmentMutation(
-  path:
-    string,
+  path: string,
 
-  payload:
-    Record<
-      string,
-      unknown
-    >
+  payload: Record<string, unknown>
 ) {
-  const raw =
-    await apiRequest<
-      | ApiEnvelope<MutationResponse>
-      | MutationResponse
-    >(
-      path,
-      {
-        method:
-          "POST",
+  const raw = await apiRequest<ApiEnvelope<MutationResponse> | MutationResponse>(path, {
+    method: "POST",
 
-        headers: {
-          "Content-Type":
-            "application/json"
-        },
+    headers: {
+      "Content-Type": "application/json"
+    },
 
-        body:
-          JSON.stringify(
-            payload
-          )
-      }
-    );
+    body: JSON.stringify(payload)
+  });
 
-
-  const result =
-    unwrapEnvelope<
-      MutationResponse
-    >(
-      raw
-    );
-
+  const result = unwrapEnvelope<MutationResponse>(raw);
 
   clearInvestmentPrefetchCache();
 
-
   return result;
 }
-
 
 /*
  * =========================================================
@@ -336,18 +166,11 @@ async function postInvestmentMutation(
  * =========================================================
  */
 
-export async function setInvestmentCashBaseline(
-  payload:
-    SetInvestmentCashBaselinePayload
-) {
-  return postInvestmentMutation(
-    "/api/investments/cash-baseline",
-    {
-      ...payload
-    }
-  );
+export async function setInvestmentCashBaseline(payload: SetInvestmentCashBaselinePayload) {
+  return postInvestmentMutation("/api/investments/cash-baseline", {
+    ...payload
+  });
 }
-
 
 /*
  * =========================================================
@@ -355,33 +178,21 @@ export async function setInvestmentCashBaseline(
  * =========================================================
  */
 
-export async function updateHoldingManualPrice(
-  input: {
-    holdingId:
-      string;
+export async function updateHoldingManualPrice(input: {
+  holdingId: string;
 
-    manualPrice:
-      number;
+  manualPrice: number;
 
-    lastUpdated:
-      string;
-  }
-) {
-  return postInvestmentMutation(
-    "/api/investments/holdings/update",
-    {
-      holdingId:
-        input.holdingId,
+  lastUpdated: string;
+}) {
+  return postInvestmentMutation("/api/investments/holdings/update", {
+    holdingId: input.holdingId,
 
-      manualPrice:
-        input.manualPrice,
+    manualPrice: input.manualPrice,
 
-      lastUpdated:
-        input.lastUpdated
-    }
-  );
+    lastUpdated: input.lastUpdated
+  });
 }
-
 
 /*
  * =========================================================
@@ -389,43 +200,21 @@ export async function updateHoldingManualPrice(
  * =========================================================
  */
 
-export async function getInvestmentTrades(
-  params:
-    InvestmentTradeQuery = {}
-) {
-  if (
-    !params.includeDeleted
-  ) {
-    if (
-      isAllTradesCacheFresh() &&
-      allActiveTradesCache
-    ) {
-      return filterTrades(
-        allActiveTradesCache.data,
-        params
-      );
+export async function getInvestmentTrades(params: InvestmentTradeQuery = {}) {
+  if (!params.includeDeleted) {
+    if (isAllTradesCacheFresh() && allActiveTradesCache) {
+      return filterTrades(allActiveTradesCache.data, params);
     }
 
+    if (allActiveTradesRequest) {
+      const data = await allActiveTradesRequest;
 
-    if (
-      allActiveTradesRequest
-    ) {
-      const data =
-        await allActiveTradesRequest;
-
-      return filterTrades(
-        data,
-        params
-      );
+      return filterTrades(data, params);
     }
   }
 
-
-  return requestInvestmentTrades(
-    params
-  );
+  return requestInvestmentTrades(params);
 }
-
 
 /*
  * =========================================================
@@ -433,22 +222,13 @@ export async function getInvestmentTrades(
  * =========================================================
  */
 
-export async function lookupInvestmentSymbol(
-  stockCode: string
-) {
-  const raw =
-    await apiRequest<
-      | ApiEnvelope<InvestmentSymbolLookupResult>
-      | InvestmentSymbolLookupResult
-    >(
-      `/api/investments/symbol-lookup?code=${encodeURIComponent(stockCode)}`
-    );
+export async function lookupInvestmentSymbol(stockCode: string) {
+  const raw = await apiRequest<
+    ApiEnvelope<InvestmentSymbolLookupResult> | InvestmentSymbolLookupResult
+  >(`/api/investments/symbol-lookup?code=${encodeURIComponent(stockCode)}`);
 
-  return unwrapEnvelope<InvestmentSymbolLookupResult>(
-    raw
-  );
+  return unwrapEnvelope<InvestmentSymbolLookupResult>(raw);
 }
-
 
 /*
  * =========================================================
@@ -458,22 +238,13 @@ export async function lookupInvestmentSymbol(
  * =========================================================
  */
 
-export async function searchInvestmentSymbols(
-  query: string
-) {
-  const raw =
-    await apiRequest<
-      | ApiEnvelope<InvestmentSymbolSearchResponse>
-      | InvestmentSymbolSearchResponse
-    >(
-      `/api/investments/symbol-search?q=${encodeURIComponent(query)}`
-    );
+export async function searchInvestmentSymbols(query: string) {
+  const raw = await apiRequest<
+    ApiEnvelope<InvestmentSymbolSearchResponse> | InvestmentSymbolSearchResponse
+  >(`/api/investments/symbol-search?q=${encodeURIComponent(query)}`);
 
-  return unwrapEnvelope<InvestmentSymbolSearchResponse>(
-    raw
-  );
+  return unwrapEnvelope<InvestmentSymbolSearchResponse>(raw);
 }
-
 
 /*
  * =========================================================
@@ -481,18 +252,11 @@ export async function searchInvestmentSymbols(
  * =========================================================
  */
 
-export async function createInvestmentTrade(
-  payload:
-    CreateInvestmentTradePayload
-) {
-  return postInvestmentMutation(
-    "/api/investments/trades",
-    {
-      ...payload
-    }
-  );
+export async function createInvestmentTrade(payload: CreateInvestmentTradePayload) {
+  return postInvestmentMutation("/api/investments/trades", {
+    ...payload
+  });
 }
-
 
 /*
  * =========================================================
@@ -500,51 +264,33 @@ export async function createInvestmentTrade(
  * =========================================================
  */
 
-export async function updateInvestmentTrade(
-  input: {
-    investmentTradeId:
-      string;
+export async function updateInvestmentTrade(input: {
+  investmentTradeId: string;
 
-    expectedUpdatedAtMs:
-      number |
-      null;
+  expectedUpdatedAtMs: number | null;
 
-    date?:
-      string;
+  date?: string;
 
-    quantity?:
-      number;
+  quantity?: number;
 
-    unitPrice?:
-      number;
+  unitPrice?: number;
 
-    currency?:
-      string;
+  currency?: string;
 
-    fxRate?:
-      number;
+  fxRate?: number;
 
-    feeKrw?:
-      number;
+  feeKrw?: number;
 
-    taxKrw?:
-      number;
+  taxKrw?: number;
 
-    settlementKrw?:
-      number;
+  settlementKrw?: number;
 
-    memo?:
-      string;
-  }
-) {
-  return postInvestmentMutation(
-    "/api/investments/trades/update",
-    {
-      ...input
-    }
-  );
+  memo?: string;
+}) {
+  return postInvestmentMutation("/api/investments/trades/update", {
+    ...input
+  });
 }
-
 
 /*
  * =========================================================
@@ -552,18 +298,11 @@ export async function updateInvestmentTrade(
  * =========================================================
  */
 
-export async function deleteInvestmentTrade(
-  investmentTradeId:
-    string
-) {
-  return postInvestmentMutation(
-    "/api/investments/trades/delete",
-    {
-      investmentTradeId
-    }
-  );
+export async function deleteInvestmentTrade(investmentTradeId: string) {
+  return postInvestmentMutation("/api/investments/trades/delete", {
+    investmentTradeId
+  });
 }
-
 
 /*
  * =========================================================
@@ -571,14 +310,8 @@ export async function deleteInvestmentTrade(
  * =========================================================
  */
 
-export async function restoreInvestmentTrade(
-  investmentTradeId:
-    string
-) {
-  return postInvestmentMutation(
-    "/api/investments/trades/restore",
-    {
-      investmentTradeId
-    }
-  );
+export async function restoreInvestmentTrade(investmentTradeId: string) {
+  return postInvestmentMutation("/api/investments/trades/restore", {
+    investmentTradeId
+  });
 }

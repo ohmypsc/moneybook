@@ -23,8 +23,7 @@ import styles from "./App.module.css";
  */
 export default function App() {
   const navigation = useAppNavigation();
-  const { status, user, loginLoading, loginError, handleLogin } =
-    useAuthSession(navigation.goHome);
+  const { status, user, loginLoading, loginError, handleLogin } = useAuthSession(navigation.goHome);
 
   useNavigationHistorySync(status, user, navigation);
   const pendingTransactionSummary = usePendingTransactionSummary(status, user);
@@ -42,13 +41,7 @@ export default function App() {
   }
 
   if (status === "guest" || !user) {
-    return (
-      <LoginPage
-        loading={loginLoading}
-        errorMessage={loginError}
-        onLogin={handleLogin}
-      />
-    );
+    return <LoginPage loading={loginLoading} errorMessage={loginError} onLogin={handleLogin} />;
   }
 
   const { activeNavigation, inputInitialDate, inputPreset, navigateTo } = navigation;
@@ -86,10 +79,7 @@ export default function App() {
     );
   } else if (activeNavigation === "assets") {
     pageContent = (
-      <AssetsPage
-        userName={user.name}
-        onOpenInput={preset => navigateTo("input", null, preset)}
-      />
+      <AssetsPage userName={user.name} onOpenInput={preset => navigateTo("input", null, preset)} />
     );
   } else {
     pageContent = <SettingsPage refreshRevision={remoteRevision} />;

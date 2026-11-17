@@ -48,11 +48,26 @@
   padding: 18px 18px calc(110px + env(safe-area-inset-bottom));
 }
 
-.header { margin-bottom: 16px; }
-.header h1 { margin: 0; font-size: 24px; letter-spacing: -0.03em; }
-.header p { margin: 6px 0 0; color: var(--color-text-secondary); font-size: 12px; line-height: 1.55; }
+.header {
+  margin-bottom: 16px;
+}
+.header h1 {
+  margin: 0;
+  font-size: 24px;
+  letter-spacing: -0.03em;
+}
+.header p {
+  margin: 6px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.55;
+}
 
-.searchRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.searchRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
 .searchRow input {
   min-width: 0;
   min-height: 44px;
@@ -64,65 +79,251 @@
   font: inherit;
 }
 
-.filterRow { display: flex; gap: 6px; margin-top: 10px; overflow-x: auto; }
-.filterRow button { flex: 0 0 auto; min-height: 34px; padding: 0 12px; border-radius: 999px; background: var(--color-surface-soft); font-size: 12px; }
-.filterRow .filterActive { background: var(--color-primary); color: var(--color-primary-text); }
+.filterRow {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  overflow-x: auto;
+}
+.filterRow button {
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--color-surface-soft);
+  font-size: 12px;
+}
+.filterRow .filterActive {
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+}
 
-.resultHeader { display: flex; justify-content: space-between; gap: 12px; margin: 18px 2px 8px; }
-.resultHeader strong { font-size: 13px; }
-.resultHeader span { color: var(--color-text-secondary); font-size: 11px; }
+.resultHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 18px 2px 8px;
+}
+.resultHeader strong {
+  font-size: 13px;
+}
+.resultHeader span {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
 
-.listCard { overflow: hidden; }
-.transactionRow { min-height: 72px; display: flex; align-items: center; gap: 12px; padding: 13px 15px; border-bottom: 1px solid rgba(220,229,229,.72); }
-.transactionRow:last-child { border-bottom: 0; }
-.transactionMain { min-width: 0; flex: 1; display: grid; gap: 3px; }
-.transactionMain strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
-.transactionMain span { overflow: hidden; color: var(--color-text-secondary); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-.transactionDate { font-variant-numeric: tabular-nums; }
-.transactionActions { flex: 0 0 auto; display: flex; align-items: flex-end; gap: 4px; }
-.transactionActions > strong { flex: 0 0 auto; font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.income { color: var(--color-income); }
-.expense { color: var(--color-expense); }
-.transfer { color: var(--color-text-secondary); }
+.listCard {
+  overflow: hidden;
+}
+.transactionRow {
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 15px;
+  border-bottom: 1px solid rgba(220, 229, 229, 0.72);
+}
+.transactionRow:last-child {
+  border-bottom: 0;
+}
+.transactionMain {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 3px;
+}
+.transactionMain strong {
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.transactionMain span {
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.transactionDate {
+  font-variant-numeric: tabular-nums;
+}
+.transactionActions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+}
+.transactionActions > strong {
+  flex: 0 0 auto;
+  font-size: 13px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.income {
+  color: var(--color-income);
+}
+.expense {
+  color: var(--color-expense);
+}
+.transfer {
+  color: var(--color-text-secondary);
+}
 
-.monthControl { display: grid; grid-template-columns: 44px minmax(0,1fr) 44px; align-items: center; margin-bottom: 14px; }
-.monthControl strong { text-align: center; font-size: 17px; }
-.monthControl button { font-size: 24px; }
+.monthControl {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.monthControl strong {
+  text-align: center;
+  font-size: 17px;
+}
+.monthControl button {
+  font-size: 24px;
+}
 
-.reportSummary { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); overflow: hidden; }
-.reportSummary div { min-width: 0; padding: 16px 12px; border-right: 1px solid var(--color-border); text-align: center; }
-.reportSummary div:last-child { border-right: 0; }
-.reportSummary span { display: block; color: var(--color-text-secondary); font-size: 11px; font-weight: 700; }
-.reportSummary strong { display: block; margin-top: 6px; font-size: 14px; white-space: nowrap; }
+.reportSummary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  overflow: hidden;
+}
+.reportSummary div {
+  min-width: 0;
+  padding: 16px 12px;
+  border-right: 1px solid var(--color-border);
+  text-align: center;
+}
+.reportSummary div:last-child {
+  border-right: 0;
+}
+.reportSummary span {
+  display: block;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+}
+.reportSummary strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 14px;
+  white-space: nowrap;
+}
 
-.reportSection { margin-top: 24px; }
-.sectionTitle { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0 2px 9px; }
-.sectionTitle h2 { margin: 0; font-size: 17px; }
-.sectionTitle span { color: var(--color-text-secondary); font-size: 11px; }
-.rankList { overflow: hidden; }
-.rankRow { min-height: 54px; display: grid; grid-template-columns: 26px minmax(0,1fr) auto; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--color-border); }
-.rankRow:last-child { border-bottom: 0; }
-.rankRow > span { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; background: var(--color-surface-soft); color: var(--color-primary); font-size: 11px; font-weight: 800; }
-.rankRow strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
-.rankRow b { font-size: 12px; white-space: nowrap; }
+.reportSection {
+  margin-top: 24px;
+}
+.sectionTitle {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 2px 9px;
+}
+.sectionTitle h2 {
+  margin: 0;
+  font-size: 17px;
+}
+.sectionTitle span {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
+.rankList {
+  overflow: hidden;
+}
+.rankRow {
+  min-height: 54px;
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--color-border);
+}
+.rankRow:last-child {
+  border-bottom: 0;
+}
+.rankRow > span {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--color-surface-soft);
+  color: var(--color-primary);
+  font-size: 11px;
+  font-weight: 800;
+}
+.rankRow strong {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rankRow b {
+  font-size: 12px;
+  white-space: nowrap;
+}
 
-.targetGrid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); padding: 14px; gap: 10px; }
-.targetGrid button { min-width: 0; padding: 12px 8px; border-radius: var(--radius-md); background: var(--color-surface-soft); text-align: center; }
-.targetGrid span { display: block; color: var(--color-text-secondary); font-size: 11px; }
-.targetGrid strong { display: block; margin-top: 4px; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.targetGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 14px;
+  gap: 10px;
+}
+.targetGrid button {
+  min-width: 0;
+  padding: 12px 8px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+  text-align: center;
+}
+.targetGrid span {
+  display: block;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
+.targetGrid strong {
+  display: block;
+  margin-top: 4px;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .empty,
 .state,
-.error { margin: 0; padding: 18px 14px; color: var(--color-text-secondary); font-size: 12px; line-height: 1.55; text-align: center; }
-.error { color: var(--color-error); }
-
-@media (max-width: 390px) {
-  .toolbarWrap, .page { padding-right: 14px; padding-left: 14px; }
-  .reportSummary strong { font-size: 12.5px; }
-  .targetGrid { grid-template-columns: 1fr; }
+.error {
+  margin: 0;
+  padding: 18px 14px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.55;
+  text-align: center;
+}
+.error {
+  color: var(--color-error);
 }
 
-.snapshotCard { overflow: hidden; }
+@media (max-width: 390px) {
+  .toolbarWrap,
+  .page {
+    padding-right: 14px;
+    padding-left: 14px;
+  }
+  .reportSummary strong {
+    font-size: 12.5px;
+  }
+  .targetGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.snapshotCard {
+  overflow: hidden;
+}
 
 .snapshotCurrent {
   padding: 16px;
@@ -161,8 +362,6 @@
   border-top: 1px solid var(--color-border);
   background: var(--color-surface-soft);
 }
-
-
 
 .feedback {
   margin: 0;
@@ -428,13 +627,22 @@
 }
 
 @media (max-width: 520px) {
-  .transactionRow { align-items: flex-start; }
-  .transactionActions { align-items: flex-end; flex-direction: column; }
+  .transactionRow {
+    align-items: flex-start;
+  }
+  .transactionActions {
+    align-items: flex-end;
+    flex-direction: column;
+  }
 }
 
 /* 목록 보기: 날짜별 묶음 */
-.dayGroup { margin-top: 14px; }
-.dayGroup:first-of-type { margin-top: 0; }
+.dayGroup {
+  margin-top: 14px;
+}
+.dayGroup:first-of-type {
+  margin-top: 0;
+}
 .dayHeader {
   margin: 0 2px 6px;
   color: var(--color-text-secondary);
@@ -472,7 +680,9 @@
   font-weight: 600;
 }
 
-.searchActions { gap: 6px; }
+.searchActions {
+  gap: 6px;
+}
 
 /* 목록 행: 행을 누르면 수정, 오른쪽에는 금액과 작은 복사 버튼 */
 button.transactionMain {
@@ -490,7 +700,10 @@ button.transactionMain {
   align-items: flex-end;
   gap: 2px;
 }
-.transactionRow { min-height: 60px; padding: 11px 15px; }
+.transactionRow {
+  min-height: 60px;
+  padding: 11px 15px;
+}
 .copyButton {
   min-height: 28px;
   padding: 0 8px;
@@ -502,13 +715,55 @@ button.transactionMain {
   font-weight: 600;
 }
 
-button.rankRow { width: 100%; border-top: 0; border-left: 0; border-right: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-.targetGrid button { border: 0; color: inherit; font: inherit; cursor: pointer; min-height: 64px; }
-button.rankRow:hover, .targetGrid button:hover { background: var(--color-surface-soft); }
-button.rankRow:focus-visible, .targetGrid button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
-button.rankRow:disabled, .targetGrid button:disabled { opacity: .55; cursor: wait; }
-.reportDetailHint { margin: 8px 0; color: var(--color-text-secondary); font-size: 12px; line-height: 1.6; }
+button.rankRow {
+  width: 100%;
+  border-top: 0;
+  border-left: 0;
+  border-right: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.targetGrid button {
+  border: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  min-height: 64px;
+}
+button.rankRow:hover,
+.targetGrid button:hover {
+  background: var(--color-surface-soft);
+}
+button.rankRow:focus-visible,
+.targetGrid button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+button.rankRow:disabled,
+.targetGrid button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+.reportDetailHint {
+  margin: 8px 0;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
 
-.expenseBreakdown { display: grid; gap: 3px; text-align: right; color: var(--color-text-secondary); font-size: 11px; line-height: 1.4; }
+.expenseBreakdown {
+  display: grid;
+  gap: 3px;
+  text-align: right;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  line-height: 1.4;
+}
 
-.reportTransactionActions { flex-direction: column; align-items: flex-end; }
+.reportTransactionActions {
+  flex-direction: column;
+  align-items: flex-end;
+}

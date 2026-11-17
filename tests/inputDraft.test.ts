@@ -41,7 +41,12 @@ test("meaningful draft ignores date/billing month alone but keeps real user inpu
 });
 
 test("draft preserves installments and disabled benefit accrual, and reads legacy drafts", () => {
-  const draft = parseInputDraft({ ...emptyDraft(), amount: "360000", installmentMonths: 12, benefitEnabled: false });
+  const draft = parseInputDraft({
+    ...emptyDraft(),
+    amount: "360000",
+    installmentMonths: 12,
+    benefitEnabled: false
+  });
   assert.equal(draft?.installmentMonths, 12);
   assert.equal(draft?.benefitEnabled, false);
   assert.equal(parseInputDraft(emptyDraft())?.installmentMonths, 1);
@@ -50,8 +55,13 @@ test("draft preserves installments and disabled benefit accrual, and reads legac
 });
 
 test("draft preserves transaction tags and manual/automatic category choice", () => {
- const draft=parseInputDraft({...emptyDraft(),tagsText:"제주여행, 가족",categorySource:"auto"});
- assert.equal(draft?.tagsText,"제주여행, 가족");assert.equal(draft?.categorySource,"auto");
- assert.equal(hasMeaningfulInputDraft(draft!),true);
- assert.equal(parseInputDraft({...emptyDraft(),categoryId:"C1"})?.categorySource,"manual");
+  const draft = parseInputDraft({
+    ...emptyDraft(),
+    tagsText: "제주여행, 가족",
+    categorySource: "auto"
+  });
+  assert.equal(draft?.tagsText, "제주여행, 가족");
+  assert.equal(draft?.categorySource, "auto");
+  assert.equal(hasMeaningfulInputDraft(draft!), true);
+  assert.equal(parseInputDraft({ ...emptyDraft(), categoryId: "C1" })?.categorySource, "manual");
 });

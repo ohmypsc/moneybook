@@ -1,8 +1,25 @@
 // 자동화 설정(혜택·정기거래 규칙)과 정기 거래 생성
-import { recurringOccurrenceDate as mbD1RecurringOccurrenceDate, recurringPayload as mbD1RecurringPayload, recurringRuleActiveForMonth as mbD1RecurringRuleActiveForMonth } from "../domain/automation.js";
+import {
+  recurringOccurrenceDate as mbD1RecurringOccurrenceDate,
+  recurringPayload as mbD1RecurringPayload,
+  recurringRuleActiveForMonth as mbD1RecurringRuleActiveForMonth
+} from "../domain/automation.js";
 import { dateOnly as mbD1DateOnly, monthOnly as mbD1MonthOnly } from "../domain/date.js";
 import { isObject } from "../http.js";
-import { MB_D1_HOUSEHOLD_ID, mbD1Bool, mbD1CurrentDateSeoul, mbD1CurrentMonthSeoul, mbD1Fail, mbD1First, mbD1Id, mbD1InsertChange, mbD1Now, mbD1NullableNumber, mbD1Number, mbD1Text } from "./core.js";
+import {
+  MB_D1_HOUSEHOLD_ID,
+  mbD1Bool,
+  mbD1CurrentDateSeoul,
+  mbD1CurrentMonthSeoul,
+  mbD1Fail,
+  mbD1First,
+  mbD1Id,
+  mbD1InsertChange,
+  mbD1Now,
+  mbD1NullableNumber,
+  mbD1Number,
+  mbD1Text
+} from "./core.js";
 import { mbD1HandleTransactionMutation } from "./transactions.js";
 
 export const MB_D1_AUTOMATION_PREF_ID = "PREF_AUTOMATION_SHARED";
@@ -105,29 +122,53 @@ export async function mbD1AutomationSettingsData(env) {
 export function mbD1ValidateAutomationSettings(settings) {
   const recurringIds = new Set();
   for (const rule of settings.recurringRules) {
-    if (!rule.id || recurringIds.has(rule.id)) mbD1Fail("AUTOMATION_RULE_ID_DUPLICATE", "고정 거래 규칙 ID가 중복되었습니다.");
+    if (!rule.id || recurringIds.has(rule.id))
+      mbD1Fail("AUTOMATION_RULE_ID_DUPLICATE", "고정 거래 규칙 ID가 중복되었습니다.");
     recurringIds.add(rule.id);
     if (!rule.name) mbD1Fail("AUTOMATION_RULE_NAME_REQUIRED", "고정 거래 이름이 필요합니다.");
-    if (!rule.categoryId) mbD1Fail("AUTOMATION_CATEGORY_REQUIRED", `${rule.name}의 카테고리를 선택해주세요.`);
-    if (!Number.isFinite(rule.amount) || rule.amount <= 0) mbD1Fail("AUTOMATION_AMOUNT_REQUIRED", `${rule.name}의 금액을 입력해주세요.`);
-    if (rule.startMonth && rule.endMonth && rule.startMonth > rule.endMonth) mbD1Fail("AUTOMATION_MONTH_RANGE_INVALID", `${rule.name}의 시작월이 종료월보다 늦습니다.`);
-    if (rule.type === "지출" && (!rule.paymentMethodId || !rule.spendingTarget)) mbD1Fail("AUTOMATION_EXPENSE_FIELDS_REQUIRED", `${rule.name}의 결제수단과 지출대상을 선택해주세요.`);
-    if (rule.type === "수입" && !rule.toAccountId) mbD1Fail("AUTOMATION_INCOME_ACCOUNT_REQUIRED", `${rule.name}의 입금수단을 선택해주세요.`);
-    if (rule.type === "이체" && (!rule.fromAccountId || !rule.toAccountId || rule.fromAccountId === rule.toAccountId)) mbD1Fail("AUTOMATION_TRANSFER_ACCOUNT_REQUIRED", `${rule.name}의 보내는 수단과 받는 수단을 확인해주세요.`);
+    if (!rule.categoryId)
+      mbD1Fail("AUTOMATION_CATEGORY_REQUIRED", `${rule.name}의 카테고리를 선택해주세요.`);
+    if (!Number.isFinite(rule.amount) || rule.amount <= 0)
+      mbD1Fail("AUTOMATION_AMOUNT_REQUIRED", `${rule.name}의 금액을 입력해주세요.`);
+    if (rule.startMonth && rule.endMonth && rule.startMonth > rule.endMonth)
+      mbD1Fail("AUTOMATION_MONTH_RANGE_INVALID", `${rule.name}의 시작월이 종료월보다 늦습니다.`);
+    if (rule.type === "지출" && (!rule.paymentMethodId || !rule.spendingTarget))
+      mbD1Fail(
+        "AUTOMATION_EXPENSE_FIELDS_REQUIRED",
+        `${rule.name}의 결제수단과 지출대상을 선택해주세요.`
+      );
+    if (rule.type === "수입" && !rule.toAccountId)
+      mbD1Fail("AUTOMATION_INCOME_ACCOUNT_REQUIRED", `${rule.name}의 입금수단을 선택해주세요.`);
+    if (
+      rule.type === "이체" &&
+      (!rule.fromAccountId || !rule.toAccountId || rule.fromAccountId === rule.toAccountId)
+    )
+      mbD1Fail(
+        "AUTOMATION_TRANSFER_ACCOUNT_REQUIRED",
+        `${rule.name}의 보내는 수단과 받는 수단을 확인해주세요.`
+      );
   }
   const benefitAccounts = new Set();
   for (const rule of settings.benefitRules) {
     if (!rule.accountId) mbD1Fail("BENEFIT_ACCOUNT_REQUIRED", "혜택을 적용할 계좌를 선택해주세요.");
-    if (benefitAccounts.has(rule.accountId)) mbD1Fail("BENEFIT_ACCOUNT_DUPLICATE", "한 계좌에는 하나의 현재 혜택 규칙만 설정할 수 있습니다.");
+    if (benefitAccounts.has(rule.accountId))
+      mbD1Fail(
+        "BENEFIT_ACCOUNT_DUPLICATE",
+        "한 계좌에는 하나의 현재 혜택 규칙만 설정할 수 있습니다."
+      );
     benefitAccounts.add(rule.accountId);
-    if (rule.kind !== "none" && (!Number.isFinite(rule.ratePercent) || rule.ratePercent <= 0)) mbD1Fail("BENEFIT_RATE_REQUIRED", "혜택률은 0보다 커야 합니다.");
-    if (!Number.isFinite(rule.rewardOpeningBalance) || rule.rewardOpeningBalance < 0) mbD1Fail("BENEFIT_OPENING_BALANCE_INVALID", "시작 잔액 중 캐시백은 0원 이상이어야 합니다.");
-    if (rule.validFrom && rule.validTo && rule.validFrom > rule.validTo) mbD1Fail("BENEFIT_DATE_RANGE_INVALID", "혜택 적용 시작일이 종료일보다 늦습니다.");
+    if (rule.kind !== "none" && (!Number.isFinite(rule.ratePercent) || rule.ratePercent <= 0))
+      mbD1Fail("BENEFIT_RATE_REQUIRED", "혜택률은 0보다 커야 합니다.");
+    if (!Number.isFinite(rule.rewardOpeningBalance) || rule.rewardOpeningBalance < 0)
+      mbD1Fail("BENEFIT_OPENING_BALANCE_INVALID", "시작 잔액 중 캐시백은 0원 이상이어야 합니다.");
+    if (rule.validFrom && rule.validTo && rule.validFrom > rule.validTo)
+      mbD1Fail("BENEFIT_DATE_RANGE_INVALID", "혜택 적용 시작일이 종료일보다 늦습니다.");
   }
 }
 
 export async function mbD1HandleAutomationSettings(body, session, env) {
-  if (!isObject(body.settings)) mbD1Fail("INVALID_AUTOMATION_SETTINGS", "자동화 설정 형식이 올바르지 않습니다.");
+  if (!isObject(body.settings))
+    mbD1Fail("INVALID_AUTOMATION_SETTINGS", "자동화 설정 형식이 올바르지 않습니다.");
   const settings = mbD1NormalizeAutomationSettings(body.settings);
   mbD1ValidateAutomationSettings(settings);
   const now = mbD1Now();
@@ -145,7 +186,14 @@ export async function mbD1HandleAutomationSettings(body, session, env) {
     now,
     now
   );
-  const change = await mbD1InsertChange(env, "automation_settings", "shared", "updated", 1, session);
+  const change = await mbD1InsertChange(
+    env,
+    "automation_settings",
+    "shared",
+    "updated",
+    1,
+    session
+  );
   await env.DB.batch([update, change]);
   return { settings, updatedAt: now, updatedBy: session.name };
 }

@@ -50,7 +50,7 @@ export function netMonthStats(transactions, month) {
     if (tx.type === "수입") {
       incomeGross += amount;
       const reversed = linked
-        .filter((item) => item.type === "지출" && !isBenefitTransaction(item))
+        .filter(item => item.type === "지출" && !isBenefitTransaction(item))
         .reduce((sum, item) => sum + number(item.amount), 0);
       incomeReversals += reversed;
       continue;
@@ -60,7 +60,7 @@ export function netMonthStats(transactions, month) {
 
     expenseGross += amount;
     const reversed = linked
-      .filter((item) => item.type === "수입" && !isBenefitTransaction(item))
+      .filter(item => item.type === "수입" && !isBenefitTransaction(item))
       .reduce((sum, item) => sum + number(item.amount), 0);
     expenseRefunds += reversed;
 
@@ -73,12 +73,12 @@ export function netMonthStats(transactions, month) {
 
   const categoryExpense = Array.from(categoryNet.entries())
     .map(([name, amount]) => ({ name, amount: round(amount) }))
-    .filter((item) => Math.abs(item.amount) > 0.0001)
+    .filter(item => Math.abs(item.amount) > 0.0001)
     .sort((a, b) => b.amount - a.amount);
 
   const targetExpense = Array.from(targetNet.entries())
     .map(([name, amount]) => ({ name, amount: round(amount) }))
-    .filter((item) => Math.abs(item.amount) > 0.0001)
+    .filter(item => Math.abs(item.amount) > 0.0001)
     .sort((a, b) => b.amount - a.amount);
 
   const income = incomeGross - incomeReversals;

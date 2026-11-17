@@ -79,7 +79,9 @@ function formatUpdated(value: string | null) {
 
 function formatArea(value: number) {
   if (!Number.isFinite(value)) return "-";
-  return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+  return Number.isInteger(value)
+    ? String(value)
+    : value.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
 }
 
 export function RealEstatePanel({ userName, owners, onChanged }: RealEstatePanelProps) {
@@ -103,7 +105,9 @@ export function RealEstatePanel({ userName, owners, onChanged }: RealEstatePanel
       const data = await getRealEstateAssets();
       setItems(data.items || []);
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "우리집 정보를 불러오지 못했습니다.");
+      setError(
+        nextError instanceof Error ? nextError.message : "우리집 정보를 불러오지 못했습니다."
+      );
     } finally {
       setLoading(false);
     }
@@ -169,13 +173,19 @@ export function RealEstatePanel({ userName, owners, onChanged }: RealEstatePanel
           markLedgerChanged();
           onChanged?.();
         } catch (refreshError) {
-          setMessage(refreshError instanceof Error ? refreshError.message : "등록은 완료됐지만 실거래 시세 갱신에 실패했습니다.");
+          setMessage(
+            refreshError instanceof Error
+              ? refreshError.message
+              : "등록은 완료됐지만 실거래 시세 갱신에 실패했습니다."
+          );
         } finally {
           setRefreshingId("");
         }
       }
     } catch (nextError) {
-      setMessage(nextError instanceof Error ? nextError.message : "우리집 정보를 저장하지 못했습니다.");
+      setMessage(
+        nextError instanceof Error ? nextError.message : "우리집 정보를 저장하지 못했습니다."
+      );
     } finally {
       setSaving(false);
     }
@@ -190,7 +200,9 @@ export function RealEstatePanel({ userName, owners, onChanged }: RealEstatePanel
       markLedgerChanged();
       onChanged?.();
     } catch (nextError) {
-      setMessage(nextError instanceof Error ? nextError.message : "실거래 시세를 갱신하지 못했습니다.");
+      setMessage(
+        nextError instanceof Error ? nextError.message : "실거래 시세를 갱신하지 못했습니다."
+      );
     } finally {
       setRefreshingId("");
     }
@@ -210,11 +222,15 @@ export function RealEstatePanel({ userName, owners, onChanged }: RealEstatePanel
       markLedgerChanged();
       onChanged?.();
     } catch (nextError) {
-      setMessage(nextError instanceof Error ? nextError.message : "우리집 정보를 삭제하지 못했습니다.");
+      setMessage(
+        nextError instanceof Error ? nextError.message : "우리집 정보를 삭제하지 못했습니다."
+      );
     }
   }
 
-  const editingItem = form?.propertyId ? items.find(item => item.propertyId === form.propertyId) : undefined;
+  const editingItem = form?.propertyId
+    ? items.find(item => item.propertyId === form.propertyId)
+    : undefined;
 
   return (
     <section className={styles.section}>
@@ -231,12 +247,19 @@ export function RealEstatePanel({ userName, owners, onChanged }: RealEstatePanel
 
       {!loading && items.length === 0 && !form && (
         <Card as="section" padding="lg" tone="soft" className={styles.emptyCard}>
-          <div className={styles.homeIcon} aria-hidden="true">⌂</div>
+          <div className={styles.homeIcon} aria-hidden="true">
+            ⌂
+          </div>
           <div className={styles.emptyCopy}>
             <strong>내 집 한 채만 등록해두세요.</strong>
             <p>아파트명과 전용면적을 저장하면 이후에는 이 화면에서 시세만 확인하면 됩니다.</p>
           </div>
-          <Button onClick={() => { setForm(emptyForm(userName)); setMessage(""); }}>
+          <Button
+            onClick={() => {
+              setForm(emptyForm(userName));
+              setMessage("");
+            }}
+          >
             내 집 등록
           </Button>
         </Card>
@@ -244,9 +267,10 @@ export function RealEstatePanel({ userName, owners, onChanged }: RealEstatePanel
 
       <div className={styles.list}>
         {items.map(item => {
-          const purchaseDelta = item.purchasePriceKrw > 0 && item.currentValueKrw > 0
-            ? item.currentValueKrw - item.purchasePriceKrw
-            : null;
+          const purchaseDelta =
+            item.purchasePriceKrw > 0 && item.currentValueKrw > 0
+              ? item.currentValueKrw - item.purchasePriceKrw
+              : null;
 
           return (
             <Card key={item.propertyId} padding="lg" className={styles.assetCard}>
@@ -255,24 +279,33 @@ export function RealEstatePanel({ userName, owners, onChanged }: RealEstatePanel
                   <span className={styles.homeBadge}>우리집</span>
                   <strong className={styles.assetName}>{item.apartmentName}</strong>
                   <span className={styles.assetMeta}>
-                    {item.address} · {formatArea(item.exclusiveAreaSqm)}㎡{item.floor !== null ? ` · ${item.floor}층` : ""}
+                    {item.address} · {formatArea(item.exclusiveAreaSqm)}㎡
+                    {item.floor !== null ? ` · ${item.floor}층` : ""}
                   </span>
                 </div>
                 <div className={styles.priceBlock}>
                   <span>현재 {item.valuationMode === "manual" ? "평가액" : "추정가"}</span>
-                  <strong className={styles.value}><Money amount={item.currentValueKrw} absolute /></strong>
+                  <strong className={styles.value}>
+                    <Money amount={item.currentValueKrw} absolute />
+                  </strong>
                 </div>
               </div>
 
               <div className={styles.summaryGrid}>
                 <div>
                   <span className={styles.summaryLabel}>평가 기준</span>
-                  <strong>{item.valuationMode === "manual" ? "직접 입력" : `최근 실거래 ${item.estimateTradeCount}건`}</strong>
+                  <strong>
+                    {item.valuationMode === "manual"
+                      ? "직접 입력"
+                      : `최근 실거래 ${item.estimateTradeCount}건`}
+                  </strong>
                 </div>
                 {item.valuationMode === "auto" && item.estimateTradeCount > 0 && (
                   <div>
                     <span className={styles.summaryLabel}>최근 거래 범위</span>
-                    <strong>{formatMoney(item.estimateLowKrw)} ~ {formatMoney(item.estimateHighKrw)}</strong>
+                    <strong>
+                      {formatMoney(item.estimateLowKrw)} ~ {formatMoney(item.estimateHighKrw)}
+                    </strong>
                   </div>
                 )}
                 {purchaseDelta !== null && (
@@ -293,7 +326,10 @@ export function RealEstatePanel({ userName, owners, onChanged }: RealEstatePanel
                 <div className={styles.trades}>
                   <span className={styles.tradeTitle}>최근 실거래</span>
                   {item.recentTrades.slice(0, 3).map((trade, index) => (
-                    <div key={`${trade.date}-${trade.amountKrw}-${index}`} className={styles.tradeRow}>
+                    <div
+                      key={`${trade.date}-${trade.amountKrw}-${index}`}
+                      className={styles.tradeRow}
+                    >
                       <span>{trade.date}</span>
                       <strong>{formatMoney(trade.amountKrw)}</strong>
                       <span>{trade.floor ?? "-"}층</span>
@@ -304,11 +340,23 @@ export function RealEstatePanel({ userName, owners, onChanged }: RealEstatePanel
 
               <div className={styles.actions}>
                 {item.valuationMode === "auto" && (
-                  <Button variant="secondary" size="sm" loading={refreshingId === item.propertyId} onClick={() => void handleRefresh(item)}>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    loading={refreshingId === item.propertyId}
+                    onClick={() => void handleRefresh(item)}
+                  >
                     시세 새로고침
                   </Button>
                 )}
-                <Button variant="secondary" size="sm" onClick={() => { setForm(toForm(item)); setMessage(""); }}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    setForm(toForm(item));
+                    setMessage("");
+                  }}
+                >
                   정보 수정
                 </Button>
               </div>
@@ -324,7 +372,9 @@ export function RealEstatePanel({ userName, owners, onChanged }: RealEstatePanel
               <h3>{form.propertyId ? "우리집 정보 수정" : "내 집 등록"}</h3>
               <p>처음 한 번만 입력하면 됩니다.</p>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => setForm(null)}>닫기</Button>
+            <Button variant="ghost" size="sm" onClick={() => setForm(null)}>
+              닫기
+            </Button>
           </div>
 
           <div className={styles.coreFields}>
@@ -364,34 +414,68 @@ export function RealEstatePanel({ userName, owners, onChanged }: RealEstatePanel
                   inputMode="numeric"
                   maxLength={5}
                   value={form.lawdCode}
-                  onChange={event => setForm({ ...form, lawdCode: event.target.value.replace(/\D/g, "").slice(0, 5) })}
+                  onChange={event =>
+                    setForm({
+                      ...form,
+                      lawdCode: event.target.value.replace(/\D/g, "").slice(0, 5)
+                    })
+                  }
                   placeholder="5자리"
                 />
-                <small>실거래 조회에 필요한 시·군·구 코드입니다. 한 번 저장하면 다시 입력하지 않습니다.</small>
+                <small>
+                  실거래 조회에 필요한 시·군·구 코드입니다. 한 번 저장하면 다시 입력하지 않습니다.
+                </small>
               </label>
             )}
           </div>
 
           <details className={styles.optionalDetails}>
-            <summary>추가 정보 <span>선택</span></summary>
+            <summary>
+              추가 정보 <span>선택</span>
+            </summary>
             <div className={styles.formGrid}>
               <label>
                 <span>층</span>
-                <input inputMode="numeric" value={form.floor} onChange={event => setForm({ ...form, floor: event.target.value })} />
+                <input
+                  inputMode="numeric"
+                  value={form.floor}
+                  onChange={event => setForm({ ...form, floor: event.target.value })}
+                />
               </label>
               <label>
                 <span>명의</span>
-                <select value={form.owner} onChange={event => setForm({ ...form, owner: event.target.value })}>
-                  {ownerOptions.map(owner => <option key={owner} value={owner}>{owner}</option>)}
+                <select
+                  value={form.owner}
+                  onChange={event => setForm({ ...form, owner: event.target.value })}
+                >
+                  {ownerOptions.map(owner => (
+                    <option key={owner} value={owner}>
+                      {owner}
+                    </option>
+                  ))}
                 </select>
               </label>
               <label>
                 <span>취득가(원)</span>
-                <input inputMode="numeric" value={form.purchasePriceKrw} onChange={event => setForm({ ...form, purchasePriceKrw: event.target.value.replace(/[^0-9]/g, "") })} />
+                <input
+                  inputMode="numeric"
+                  value={form.purchasePriceKrw}
+                  onChange={event =>
+                    setForm({
+                      ...form,
+                      purchasePriceKrw: event.target.value.replace(/[^0-9]/g, "")
+                    })
+                  }
+                />
               </label>
               <label>
                 <span>평가 방식</span>
-                <select value={form.valuationMode} onChange={event => setForm({ ...form, valuationMode: event.target.value as "auto" | "manual" })}>
+                <select
+                  value={form.valuationMode}
+                  onChange={event =>
+                    setForm({ ...form, valuationMode: event.target.value as "auto" | "manual" })
+                  }
+                >
                   <option value="auto">실거래 자동 추정</option>
                   <option value="manual">직접 평가액 입력</option>
                 </select>
@@ -399,7 +483,16 @@ export function RealEstatePanel({ userName, owners, onChanged }: RealEstatePanel
               {form.valuationMode === "manual" && (
                 <label className={styles.full}>
                   <span>현재 평가액(원)</span>
-                  <input inputMode="numeric" value={form.manualValueKrw} onChange={event => setForm({ ...form, manualValueKrw: event.target.value.replace(/[^0-9]/g, "") })} />
+                  <input
+                    inputMode="numeric"
+                    value={form.manualValueKrw}
+                    onChange={event =>
+                      setForm({
+                        ...form,
+                        manualValueKrw: event.target.value.replace(/[^0-9]/g, "")
+                      })
+                    }
+                  />
                 </label>
               )}
             </div>
@@ -412,8 +505,12 @@ export function RealEstatePanel({ userName, owners, onChanged }: RealEstatePanel
               </Button>
             )}
             <span className={styles.actionSpacer} />
-            <Button variant="secondary" onClick={() => setForm(null)}>취소</Button>
-            <Button loading={saving} onClick={() => void handleSave()}>저장</Button>
+            <Button variant="secondary" onClick={() => setForm(null)}>
+              취소
+            </Button>
+            <Button loading={saving} onClick={() => void handleSave()}>
+              저장
+            </Button>
           </div>
         </Card>
       )}

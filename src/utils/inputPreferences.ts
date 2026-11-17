@@ -1,7 +1,4 @@
-export type PreferenceTransactionType =
-  | "지출"
-  | "수입"
-  | "이체";
+export type PreferenceTransactionType = "지출" | "수입" | "이체";
 
 export interface PreferenceCategoryLike {
   categoryId: string;
@@ -32,27 +29,50 @@ export interface QuickEntry {
 export function parseQuickEntries(value: unknown): QuickEntry[] {
   if (!Array.isArray(value)) return [];
   const ids = new Set<string>();
-  return value.filter((item): item is QuickEntry => {
-    if (!item || typeof item !== "object" || !["expense", "income", "transfer"].includes(item.mode)) return false;
-    if (!["id", "name", "categoryId", "paymentMethodId", "spendingTarget", "fromAccountId", "toAccountId", "description"].every(key => typeof item[key] === "string")) return false;
-    if (!item.id || !item.name.trim() || ids.has(item.id)) return false;
-    ids.add(item.id);
-    return true;
-  }).slice(0, 5).map(item => ({
-    id: item.id.slice(0, 100), name: item.name.trim().slice(0, 24), mode: item.mode,
-    categoryId: item.categoryId, paymentMethodId: item.paymentMethodId, spendingTarget: item.spendingTarget,
-    fromAccountId: item.fromAccountId, toAccountId: item.toAccountId, description: item.description.slice(0, 160)
-  }));
+  return value
+    .filter((item): item is QuickEntry => {
+      if (
+        !item ||
+        typeof item !== "object" ||
+        !["expense", "income", "transfer"].includes(item.mode)
+      )
+        return false;
+      if (
+        ![
+          "id",
+          "name",
+          "categoryId",
+          "paymentMethodId",
+          "spendingTarget",
+          "fromAccountId",
+          "toAccountId",
+          "description"
+        ].every(key => typeof item[key] === "string")
+      )
+        return false;
+      if (!item.id || !item.name.trim() || ids.has(item.id)) return false;
+      ids.add(item.id);
+      return true;
+    })
+    .slice(0, 5)
+    .map(item => ({
+      id: item.id.slice(0, 100),
+      name: item.name.trim().slice(0, 24),
+      mode: item.mode,
+      categoryId: item.categoryId,
+      paymentMethodId: item.paymentMethodId,
+      spendingTarget: item.spendingTarget,
+      fromAccountId: item.fromAccountId,
+      toAccountId: item.toAccountId,
+      description: item.description.slice(0, 160)
+    }));
 }
 
 export interface InputPreferences {
   quickEntries?: QuickEntry[];
   version: 1;
 
-  categoryOrder: Record<
-    PreferenceTransactionType,
-    string[]
-  >;
+  categoryOrder: Record<PreferenceTransactionType, string[]>;
 
   accountOrder: string[];
 
@@ -68,20 +88,13 @@ export interface SharedInputPreferencesState {
   updatedBy: string | null;
 }
 
-const STORAGE_KEY =
-  "moneybook.inputPreferences.v1";
+const STORAGE_KEY = "moneybook.inputPreferences.v1";
 
 function storageKey(userName = "") {
   return userName ? `${STORAGE_KEY}:${encodeURIComponent(userName)}` : STORAGE_KEY;
 }
 
-const TRANSACTION_TYPES:
-  PreferenceTransactionType[] = [
-    "지출",
-    "수입",
-    "이체"
-  ];
-
+const TRANSACTION_TYPES: PreferenceTransactionType[] = ["지출", "수입", "이체"];
 
 /**
  * =========================================================
@@ -94,127 +107,65 @@ const TRANSACTION_TYPES:
  *
  * 설정 화면에서 사용자가 직접 다시 켤 수 있습니다.
  */
-export function isDefaultInputAccountVisible(
-  account: PreferenceAccountLike
-) {
-  const accountType =
-    String(
-      account.accountType || ""
-    ).trim();
+export function isDefaultInputAccountVisible(account: PreferenceAccountLike) {
+  const accountType = String(account.accountType || "").trim();
 
-  const subType =
-    String(
-      account.subType || ""
-    ).trim();
+  const subType = String(account.subType || "").trim();
 
-  if (
-    accountType === "투자"
-  ) {
+  if (accountType === "투자") {
     return false;
   }
 
-  const hiddenKeywords = [
-    "주식",
-    "대출",
-    "예적금",
-    "예금",
-    "적금"
-  ];
+  const hiddenKeywords = ["주식", "대출", "예적금", "예금", "적금"];
 
-  if (
-    hiddenKeywords.some(
-      keyword =>
-        subType.includes(
-          keyword
-        )
-    )
-  ) {
+  if (hiddenKeywords.some(keyword => subType.includes(keyword))) {
     return false;
   }
 
   return true;
 }
 
-
 /**
  * 저장된 순서에 아직 존재하는 ID만 유지하고,
  * 새로 생긴 항목은 뒤에 붙입니다.
  */
-function mergeOrder(
-  savedOrder: string[],
-  currentIds: string[]
-) {
-  const currentSet =
-    new Set(
-      currentIds
-    );
+function mergeOrder(savedOrder: string[], currentIds: string[]) {
+  const currentSet = new Set(currentIds);
 
-  const result =
-    savedOrder.filter(
-      id =>
-        currentSet.has(id)
-    );
+  const result = savedOrder.filter(id => currentSet.has(id));
 
-  const resultSet =
-    new Set(
-      result
-    );
+  const resultSet = new Set(result);
 
-  currentIds.forEach(
-    id => {
-      if (
-        !resultSet.has(id)
-      ) {
-        result.push(id);
-        resultSet.add(id);
-      }
+  currentIds.forEach(id => {
+    if (!resultSet.has(id)) {
+      result.push(id);
+      resultSet.add(id);
     }
-  );
+  });
 
   return result;
 }
 
-
-function isRecord(
-  value: unknown
-): value is Record<string, unknown> {
-  return (
-    value !== null &&
-    typeof value === "object" &&
-    !Array.isArray(value)
-  );
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-
-function readStringArray(
-  value: unknown
-): string[] | null {
+function readStringArray(value: unknown): string[] | null {
   if (!Array.isArray(value)) {
     return null;
   }
 
   const result: string[] = [];
-  const seen =
-    new Set<string>();
+  const seen = new Set<string>();
 
-  for (
-    const item
-    of value
-  ) {
-    if (
-      typeof item !==
-      "string"
-    ) {
+  for (const item of value) {
+    if (typeof item !== "string") {
       return null;
     }
 
-    const text =
-      item.trim();
+    const text = item.trim();
 
-    if (
-      text &&
-      !seen.has(text)
-    ) {
+    if (text && !seen.has(text)) {
       seen.add(text);
       result.push(text);
     }
@@ -223,66 +174,34 @@ function readStringArray(
   return result;
 }
 
-
 /**
  * 서버/localStorage에서 읽은 값을
  * 현재 앱이 이해할 수 있는 v1 설정인지 검사합니다.
  */
-export function parseInputPreferences(
-  value: unknown
-): InputPreferences | null {
-  if (
-    !isRecord(value)
-  ) {
+export function parseInputPreferences(value: unknown): InputPreferences | null {
+  if (!isRecord(value)) {
     return null;
   }
 
-  if (
-    value.version !== 1
-  ) {
+  if (value.version !== 1) {
     return null;
   }
 
-  if (
-    !isRecord(
-      value.categoryOrder
-    )
-  ) {
+  if (!isRecord(value.categoryOrder)) {
     return null;
   }
 
-  const expenseOrder =
-    readStringArray(
-      value.categoryOrder.지출
-    );
+  const expenseOrder = readStringArray(value.categoryOrder.지출);
 
-  const incomeOrder =
-    readStringArray(
-      value.categoryOrder.수입
-    );
+  const incomeOrder = readStringArray(value.categoryOrder.수입);
 
-  const transferOrder =
-    readStringArray(
-      value.categoryOrder.이체
-    );
+  const transferOrder = readStringArray(value.categoryOrder.이체);
 
-  const accountOrder =
-    readStringArray(
-      value.accountOrder
-    );
+  const accountOrder = readStringArray(value.accountOrder);
 
-  const hiddenAccountIds =
-    readStringArray(
-      value.hiddenAccountIds
-    );
+  const hiddenAccountIds = readStringArray(value.hiddenAccountIds);
 
-  if (
-    !expenseOrder ||
-    !incomeOrder ||
-    !transferOrder ||
-    !accountOrder ||
-    !hiddenAccountIds
-  ) {
+  if (!expenseOrder || !incomeOrder || !transferOrder || !accountOrder || !hiddenAccountIds) {
     return null;
   }
 
@@ -302,206 +221,95 @@ export function parseInputPreferences(
   };
 }
 
-
-function safeReadStoredPreferences(userName = ""):
-  InputPreferences | null {
-  if (
-    typeof window ===
-    "undefined"
-  ) {
+function safeReadStoredPreferences(userName = ""): InputPreferences | null {
+  if (typeof window === "undefined") {
     return null;
   }
 
   try {
-    const raw =
-      window.localStorage.getItem(
-        storageKey(userName)
-      );
+    const raw = window.localStorage.getItem(storageKey(userName));
 
     if (!raw) {
       return null;
     }
 
-    return parseInputPreferences(
-      JSON.parse(raw) as unknown
-    );
+    return parseInputPreferences(JSON.parse(raw) as unknown);
   } catch {
     return null;
   }
 }
 
-
 export function createDefaultInputPreferences(
-  categories:
-    PreferenceCategoryLike[],
-  accounts:
-    PreferenceAccountLike[]
+  categories: PreferenceCategoryLike[],
+  accounts: PreferenceAccountLike[]
 ): InputPreferences {
   return {
     version: 1,
 
     categoryOrder: {
-      지출:
-        categories
-          .filter(
-            category =>
-              category.type ===
-              "지출"
-          )
-          .map(
-            category =>
-              category.categoryId
-          ),
+      지출: categories
+        .filter(category => category.type === "지출")
+        .map(category => category.categoryId),
 
-      수입:
-        categories
-          .filter(
-            category =>
-              category.type ===
-              "수입"
-          )
-          .map(
-            category =>
-              category.categoryId
-          ),
+      수입: categories
+        .filter(category => category.type === "수입")
+        .map(category => category.categoryId),
 
-      이체:
-        categories
-          .filter(
-            category =>
-              category.type ===
-              "이체"
-          )
-          .map(
-            category =>
-              category.categoryId
-          )
+      이체: categories
+        .filter(category => category.type === "이체")
+        .map(category => category.categoryId)
     },
 
-    accountOrder:
-      accounts.map(
-        account =>
-          account.accountId
-      ),
+    accountOrder: accounts.map(account => account.accountId),
 
-    hiddenAccountIds:
-      accounts
-        .filter(
-          account =>
-            !isDefaultInputAccountVisible(
-              account
-            )
-        )
-        .map(
-          account =>
-            account.accountId
-        )
+    hiddenAccountIds: accounts
+      .filter(account => !isDefaultInputAccountVisible(account))
+      .map(account => account.accountId)
   };
 }
 
-
 export function normalizeInputPreferences(
-  stored:
-    InputPreferences | null,
-  categories:
-    PreferenceCategoryLike[],
-  accounts:
-    PreferenceAccountLike[]
+  stored: InputPreferences | null,
+  categories: PreferenceCategoryLike[],
+  accounts: PreferenceAccountLike[]
 ): InputPreferences {
   if (!stored) {
-    return createDefaultInputPreferences(
-      categories,
-      accounts
-    );
+    return createDefaultInputPreferences(categories, accounts);
   }
 
-  const categoryOrder =
-    {} as Record<
-      PreferenceTransactionType,
-      string[]
-    >;
+  const categoryOrder = {} as Record<PreferenceTransactionType, string[]>;
 
-  TRANSACTION_TYPES.forEach(
-    type => {
-      const ids =
-        categories
-          .filter(
-            category =>
-              category.type ===
-              type
-          )
-          .map(
-            category =>
-              category.categoryId
-          );
+  TRANSACTION_TYPES.forEach(type => {
+    const ids = categories
+      .filter(category => category.type === type)
+      .map(category => category.categoryId);
 
-      categoryOrder[type] =
-        mergeOrder(
-          stored
-            .categoryOrder[type] ||
-            [],
-          ids
-        );
-    }
-  );
+    categoryOrder[type] = mergeOrder(stored.categoryOrder[type] || [], ids);
+  });
 
-  const currentAccountIds =
-    accounts.map(
-      account =>
-        account.accountId
-    );
+  const currentAccountIds = accounts.map(account => account.accountId);
 
-  const originallyKnown =
-    new Set(
-      stored.accountOrder
-    );
+  const originallyKnown = new Set(stored.accountOrder);
 
-  const accountOrder =
-    mergeOrder(
-      stored.accountOrder,
-      currentAccountIds
-    );
+  const accountOrder = mergeOrder(stored.accountOrder, currentAccountIds);
 
-  const currentAccountSet =
-    new Set(
-      currentAccountIds
-    );
+  const currentAccountSet = new Set(currentAccountIds);
 
-  const hiddenSet =
-    new Set(
-      stored.hiddenAccountIds.filter(
-        id =>
-          currentAccountSet.has(
-            id
-          )
-      )
-    );
+  const hiddenSet = new Set(stored.hiddenAccountIds.filter(id => currentAccountSet.has(id)));
 
   /*
    * 설정 저장 이후 새 계좌가 생긴 경우에는
    * 새 계좌의 종류에 따라 기본 표시 여부를 결정합니다.
    */
-  accounts.forEach(
-    account => {
-      if (
-        originallyKnown.has(
-          account.accountId
-        )
-      ) {
-        return;
-      }
-
-      if (
-        !isDefaultInputAccountVisible(
-          account
-        )
-      ) {
-        hiddenSet.add(
-          account.accountId
-        );
-      }
+  accounts.forEach(account => {
+    if (originallyKnown.has(account.accountId)) {
+      return;
     }
-  );
+
+    if (!isDefaultInputAccountVisible(account)) {
+      hiddenSet.add(account.accountId);
+    }
+  });
 
   return {
     version: 1,
@@ -511,76 +319,41 @@ export function normalizeInputPreferences(
 
     accountOrder,
 
-    hiddenAccountIds:
-      Array.from(
-        hiddenSet
-      )
+    hiddenAccountIds: Array.from(hiddenSet)
   };
 }
 
-
 export function getInputPreferences(
-  categories:
-    PreferenceCategoryLike[],
-  accounts:
-    PreferenceAccountLike[],
+  categories: PreferenceCategoryLike[],
+  accounts: PreferenceAccountLike[],
   userName = ""
 ) {
-  return normalizeInputPreferences(
-    safeReadStoredPreferences(userName),
-    categories,
-    accounts
-  );
+  return normalizeInputPreferences(safeReadStoredPreferences(userName), categories, accounts);
 }
-
 
 /**
  * localStorage는 사용자별 서버 설정의 로컬 백업입니다.
  * 서버가 잠시 응답하지 않아도 입력 화면은 이 값을 사용합니다.
  */
-export function saveInputPreferences(
-  preferences:
-    InputPreferences,
-  userName = ""
-) {
-  if (
-    typeof window ===
-    "undefined"
-  ) {
+export function saveInputPreferences(preferences: InputPreferences, userName = "") {
+  if (typeof window === "undefined") {
     return;
   }
 
-  window.localStorage.setItem(
-    storageKey(userName),
-    JSON.stringify(
-      preferences
-    )
-  );
+  window.localStorage.setItem(storageKey(userName), JSON.stringify(preferences));
 }
-
 
 export function resetInputPreferences(
-  categories:
-    PreferenceCategoryLike[],
-  accounts:
-    PreferenceAccountLike[],
+  categories: PreferenceCategoryLike[],
+  accounts: PreferenceAccountLike[],
   userName = ""
 ) {
-  if (
-    typeof window !==
-    "undefined"
-  ) {
-    window.localStorage.removeItem(
-      storageKey(userName)
-    );
+  if (typeof window !== "undefined") {
+    window.localStorage.removeItem(storageKey(userName));
   }
 
-  return createDefaultInputPreferences(
-    categories,
-    accounts
-  );
+  return createDefaultInputPreferences(categories, accounts);
 }
-
 
 /**
  * bootstrap에 포함된 사용자별 설정을
@@ -590,43 +363,22 @@ export function resetInputPreferences(
  * 지우지 않습니다. 최초 저장 시 현재 브라우저 설정이
  * 개인 서버 설정이 됩니다.
  */
-export function syncInputPreferencesFromBootstrapPayload(
-  payload: unknown
-) {
-  if (
-    typeof window ===
-    "undefined" ||
-    !isRecord(payload)
-  ) {
+export function syncInputPreferencesFromBootstrapPayload(payload: unknown) {
+  if (typeof window === "undefined" || !isRecord(payload)) {
     return false;
   }
 
-  const data =
-    isRecord(payload.data)
-      ? payload.data
-      : payload;
+  const data = isRecord(payload.data) ? payload.data : payload;
 
-  if (
-    !isRecord(
-      data.inputPreferences
-    )
-  ) {
+  if (!isRecord(data.inputPreferences)) {
     return false;
   }
 
-  if (
-    data.inputPreferences
-      .configured !==
-    true
-  ) {
+  if (data.inputPreferences.configured !== true) {
     return false;
   }
 
-  const parsed =
-    parseInputPreferences(
-      data.inputPreferences
-        .preferences
-    );
+  const parsed = parseInputPreferences(data.inputPreferences.preferences);
 
   if (!parsed) {
     return false;
@@ -634,139 +386,72 @@ export function syncInputPreferencesFromBootstrapPayload(
 
   saveInputPreferences(
     parsed,
-    typeof data.userName === "string" ? data.userName : typeof data.inputPreferences.ownerName === "string" ? data.inputPreferences.ownerName : ""
+    typeof data.userName === "string"
+      ? data.userName
+      : typeof data.inputPreferences.ownerName === "string"
+        ? data.inputPreferences.ownerName
+        : ""
   );
 
   return true;
 }
 
+function getOrderIndex(order: string[], id: string) {
+  const index = order.indexOf(id);
 
-
-function getOrderIndex(
-  order: string[],
-  id: string
-) {
-  const index =
-    order.indexOf(id);
-
-  return index >= 0
-    ? index
-    : Number.MAX_SAFE_INTEGER;
+  return index >= 0 ? index : Number.MAX_SAFE_INTEGER;
 }
 
-
-export function applyCategoryPreferences<
-  T extends PreferenceCategoryLike
->(
+export function applyCategoryPreferences<T extends PreferenceCategoryLike>(
   categories: T[],
-  type:
-    PreferenceTransactionType,
-  preferences:
-    InputPreferences
+  type: PreferenceTransactionType,
+  preferences: InputPreferences
 ): T[] {
-  const order =
-    preferences
-      .categoryOrder[type];
+  const order = preferences.categoryOrder[type];
 
   return categories
-    .filter(
-      category =>
-        category.type === type
-    )
+    .filter(category => category.type === type)
     .slice()
-    .sort(
-      (a, b) => {
-        const orderDifference =
-          getOrderIndex(
-            order,
-            a.categoryId
-          ) -
-          getOrderIndex(
-            order,
-            b.categoryId
-          );
+    .sort((a, b) => {
+      const orderDifference =
+        getOrderIndex(order, a.categoryId) - getOrderIndex(order, b.categoryId);
 
-        if (
-          orderDifference !== 0
-        ) {
-          return orderDifference;
-        }
-
-        return a.name.localeCompare(
-          b.name,
-          "ko"
-        );
+      if (orderDifference !== 0) {
+        return orderDifference;
       }
-    );
+
+      return a.name.localeCompare(b.name, "ko");
+    });
 }
 
-
-export function sortAccountsByPreferences<
-  T extends PreferenceAccountLike
->(
+export function sortAccountsByPreferences<T extends PreferenceAccountLike>(
   accounts: T[],
-  preferences:
-    InputPreferences
+  preferences: InputPreferences
 ): T[] {
-  const order =
-    preferences.accountOrder;
+  const order = preferences.accountOrder;
 
-  return accounts
-    .slice()
-    .sort(
-      (a, b) => {
-        const orderDifference =
-          getOrderIndex(
-            order,
-            a.accountId
-          ) -
-          getOrderIndex(
-            order,
-            b.accountId
-          );
+  return accounts.slice().sort((a, b) => {
+    const orderDifference = getOrderIndex(order, a.accountId) - getOrderIndex(order, b.accountId);
 
-        if (
-          orderDifference !== 0
-        ) {
-          return orderDifference;
-        }
+    if (orderDifference !== 0) {
+      return orderDifference;
+    }
 
-        return (
-          a.displayName ||
-          a.accountName ||
-          a.accountId
-        ).localeCompare(
-          b.displayName ||
-            b.accountName ||
-            b.accountId,
-          "ko"
-        );
-      }
+    return (a.displayName || a.accountName || a.accountId).localeCompare(
+      b.displayName || b.accountName || b.accountId,
+      "ko"
     );
+  });
 }
 
-
-export function applyAccountPreferences<
-  T extends PreferenceAccountLike
->(
+export function applyAccountPreferences<T extends PreferenceAccountLike>(
   accounts: T[],
-  preferences:
-    InputPreferences
+  preferences: InputPreferences
 ): T[] {
-  const hiddenSet =
-    new Set(
-      preferences
-        .hiddenAccountIds
-    );
+  const hiddenSet = new Set(preferences.hiddenAccountIds);
 
   return sortAccountsByPreferences(
-    accounts.filter(
-      account =>
-        !hiddenSet.has(
-          account.accountId
-        )
-    ),
+    accounts.filter(account => !hiddenSet.has(account.accountId)),
     preferences
   );
 }
-

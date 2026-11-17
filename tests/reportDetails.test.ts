@@ -1,14 +1,25 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { reportExpenseAmounts, reloadTransactionWindow } from "../src/pages/HistoryPage/reportDetails.ts";
+import {
+  reportExpenseAmounts,
+  reloadTransactionWindow
+} from "../src/pages/HistoryPage/reportDetails.ts";
 
 test("report details show original, deductions and actual expense, including full refunds", () => {
-  assert.deepEqual(reportExpenseAmounts({ amount: 50000, reversalAmount: 20000, netAmount: 30000 }),
-    { original: 50000, actual: 30000, deducted: 20000 });
-  assert.deepEqual(reportExpenseAmounts({ amount: 50000, reversalAmount: 50000, netAmount: 0 }),
-    { original: 50000, actual: 0, deducted: 50000 });
-  assert.deepEqual(reportExpenseAmounts({ amount: 50000 }),
-    { original: 50000, actual: 50000, deducted: 0 });
+  assert.deepEqual(
+    reportExpenseAmounts({ amount: 50000, reversalAmount: 20000, netAmount: 30000 }),
+    { original: 50000, actual: 30000, deducted: 20000 }
+  );
+  assert.deepEqual(reportExpenseAmounts({ amount: 50000, reversalAmount: 50000, netAmount: 0 }), {
+    original: 50000,
+    actual: 0,
+    deducted: 50000
+  });
+  assert.deepEqual(reportExpenseAmounts({ amount: 50000 }), {
+    original: 50000,
+    actual: 50000,
+    deducted: 0
+  });
   assert.equal(reportExpenseAmounts({ amount: 50000, reversalAmount: 10000 }).actual, 40000);
 });
 
@@ -19,7 +30,10 @@ test("returning to an edited list reloads all loaded rows beyond a server page",
     calls.push([offset, limit]);
     return { items: rows.slice(offset, offset + limit), total: rows.length };
   }, 1200);
-  assert.deepEqual(calls, [[0,1000],[1000,200]]);
+  assert.deepEqual(calls, [
+    [0, 1000],
+    [1000, 200]
+  ]);
   assert.equal(result?.items.length, 1200);
   assert.equal(result?.items[1100].memo, "수정됨");
   assert.equal(result?.total, 1500);
@@ -37,10 +51,14 @@ test("returning after an edit that leaves the filter handles a smaller result se
 
 test("a stale reload stops without replacing the newly selected list", async () => {
   let calls = 0;
-  const result = await reloadTransactionWindow(async () => {
-    calls++;
-    return { items: Array.from({length: 1000}, (_, id) => id), total: 2000 };
-  }, 1500, () => false);
+  const result = await reloadTransactionWindow(
+    async () => {
+      calls++;
+      return { items: Array.from({ length: 1000 }, (_, id) => id), total: 2000 };
+    },
+    1500,
+    () => false
+  );
   assert.equal(result, null);
   assert.equal(calls, 1);
 });

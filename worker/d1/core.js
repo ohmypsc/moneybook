@@ -78,10 +78,12 @@ export function mbD1TimestampMs(value) {
 }
 
 export function mbD1CurrentYearSeoul() {
-  return Number(new Intl.DateTimeFormat("en", {
-    timeZone: "Asia/Seoul",
-    year: "numeric"
-  }).format(new Date()));
+  return Number(
+    new Intl.DateTimeFormat("en", {
+      timeZone: "Asia/Seoul",
+      year: "numeric"
+    }).format(new Date())
+  );
 }
 
 export function mbD1CurrentDateSeoul() {
@@ -91,7 +93,7 @@ export function mbD1CurrentDateSeoul() {
     month: "2-digit",
     day: "2-digit"
   }).formatToParts(new Date());
-  const get = (type) => parts.find((part) => part.type === type)?.value || "";
+  const get = type => parts.find(part => part.type === type)?.value || "";
   return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
@@ -102,16 +104,15 @@ export function mbD1CurrentMonthSeoul() {
 export function mbD1DisplayName(name, owner) {
   const cleanName = mbD1Text(name);
   const cleanOwner = mbD1Text(owner);
-  return cleanOwner && cleanOwner !== "공동"
-    ? `${cleanName}(${cleanOwner})`
-    : cleanName;
+  return cleanOwner && cleanOwner !== "공동" ? `${cleanName}(${cleanOwner})` : cleanName;
 }
 
 export function mbD1IsInvestmentAccount(account) {
-  return Boolean(account) && (
-    account.balanceMethod === "평가입력" ||
-    account.subType === "주식" ||
-    account.accountType === "투자"
+  return (
+    Boolean(account) &&
+    (account.balanceMethod === "평가입력" ||
+      account.subType === "주식" ||
+      account.accountType === "투자")
   );
 }
 
@@ -191,7 +192,15 @@ export async function mbD1ValidateLedgerDate(env, dateValue) {
   return date;
 }
 
-export async function mbD1InsertChange(env, entityType, entityId, action, version, session, payload = null) {
+export async function mbD1InsertChange(
+  env,
+  entityType,
+  entityId,
+  action,
+  version,
+  session,
+  payload = null
+) {
   const memberId = await mbD1MemberIdByName(env, session?.name);
   return env.DB.prepare(
     "INSERT INTO change_log (household_id,entity_type,entity_id,action,entity_version,changed_by_member_id,payload_json,changed_at) VALUES (?,?,?,?,?,?,?,?)"
@@ -222,6 +231,5 @@ export async function mbD1RealtimePoke(env, detail = {}) {
         ...detail
       })
     });
-  } catch {
-  }
+  } catch {}
 }

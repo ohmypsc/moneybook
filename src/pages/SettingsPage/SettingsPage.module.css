@@ -6,51 +6,36 @@
 
   margin: 0 auto;
 
-  padding:
-    24px
-    18px
-    110px;
+  padding: 24px 18px 110px;
 }
-
 
 .pageHeader,
 .detailHeader {
-  margin-bottom:
-    var(--space-5);
+  margin-bottom: var(--space-5);
 }
-
 
 .pageTitle,
 .detailTitle {
   margin: 0;
 
-  color:
-    var(--color-text-primary);
+  color: var(--color-text-primary);
 
   font-size: 26px;
   line-height: 1.3;
 }
 
-
 .detailDescription {
-  margin:
-    var(--space-2)
-    0
-    0;
+  margin: var(--space-2) 0 0;
 
-  color:
-    var(--color-text-secondary);
+  color: var(--color-text-secondary);
 
   font-size: 14px;
   line-height: 1.6;
 }
 
-
 .backButton {
   margin: 0 0 var(--space-3);
 }
-
-
 
 .backButton span {
   font-size: 22px;
@@ -58,35 +43,24 @@
   line-height: 1;
 }
 
-
 .menuSection {
-  margin-bottom:
-    var(--space-5);
+  margin-bottom: var(--space-5);
 }
 
-
 .menuSectionTitle {
-  margin:
-    0
-    0
-    var(--space-2);
+  margin: 0 0 var(--space-2);
 
-  padding:
-    0
-    4px;
+  padding: 0 4px;
 
-  color:
-    var(--color-text-secondary);
+  color: var(--color-text-secondary);
 
   font-size: 12px;
   font-weight: 800;
 }
 
-
 .menuCard {
   overflow: hidden;
 }
-
 
 .menuRow {
   width: 100%;
@@ -98,24 +72,17 @@
   align-items: center;
   justify-content: space-between;
 
-  gap:
-    var(--space-3);
+  gap: var(--space-3);
 
-  padding:
-    14px
-    16px;
+  padding: 14px 16px;
 
   border: 0;
 
-  border-top:
-    1px solid
-    var(--color-border);
+  border-top: 1px solid var(--color-border);
 
-  background:
-    transparent;
+  background: transparent;
 
-  color:
-    var(--color-text-primary);
+  color: var(--color-text-primary);
 
   font: inherit;
 
@@ -124,17 +91,13 @@
   cursor: pointer;
 }
 
-
 .menuRow:first-child {
   border-top: 0;
 }
 
-
 .menuRow:hover {
-  background:
-    var(--color-surface-soft);
+  background: var(--color-surface-soft);
 }
-
 
 .menuText {
   min-width: 0;
@@ -144,122 +107,89 @@
   gap: 4px;
 }
 
-
 .menuText strong {
   font-size: 15px;
   line-height: 1.35;
 }
 
-
 .menuText span {
-  color:
-    var(--color-text-secondary);
+  color: var(--color-text-secondary);
 
   font-size: 12px;
   line-height: 1.45;
 }
 
-
 .chevron {
   flex: 0 0 auto;
 
-  color:
-    var(--color-text-secondary);
+  color: var(--color-text-secondary);
 
   font-size: 25px;
   font-weight: 400;
   line-height: 1;
 }
 
-
 .settingsBody {
   display: grid;
 
-  gap:
-    var(--space-4);
+  gap: var(--space-4);
 }
-
-
-
 
 .sectionHeading {
-  margin-bottom:
-    var(--space-3);
+  margin-bottom: var(--space-3);
 }
-
 
 .sectionHeading h2,
 .formHeader h2 {
   margin: 0;
 
-  color:
-    var(--color-text-primary);
+  color: var(--color-text-primary);
 
   font-size: 17px;
   line-height: 1.4;
 }
 
-
 .sectionHeading p,
 .formHeader p {
-  margin:
-    5px
-    0
-    0;
+  margin: 5px 0 0;
 
-  color:
-    var(--color-text-secondary);
+  color: var(--color-text-secondary);
 
   font-size: 12px;
   line-height: 1.55;
 }
-
 
 .error,
 .feedback {
   margin: 0;
 
-  padding:
-    11px
-    13px;
+  padding: 11px 13px;
 
-  border:
-    1px solid
-    var(--color-border);
+  border: 1px solid var(--color-border);
 
-  border-radius:
-    var(--radius-md);
+  border-radius: var(--radius-md);
 
-  background:
-    var(--color-surface-soft);
+  background: var(--color-surface-soft);
 
   font-size: 12px;
   line-height: 1.55;
 }
 
-
 .feedback {
-  color:
-    var(--color-text-primary);
+  color: var(--color-text-primary);
 }
-
 
 .error {
-  color:
-    var(--color-error);
+  color: var(--color-error);
 }
-
 
 .state,
 .emptyState {
   margin: 0;
 
-  padding:
-    18px
-    8px;
+  padding: 18px 8px;
 
-  color:
-    var(--color-text-secondary);
+  color: var(--color-text-secondary);
 
   font-size: 13px;
   line-height: 1.55;
@@ -267,59 +197,37 @@
   text-align: center;
 }
 
-
 .segmentedControl {
   display: grid;
 
-  grid-template-columns:
-    repeat(
-      3,
-      minmax(
-        0,
-        1fr
-      )
-    );
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 
   gap: 4px;
 
-  margin-bottom:
-    var(--space-3);
+  margin-bottom: var(--space-3);
 
   padding: 4px;
 
-  border:
-    1px solid
-    var(--color-border);
+  border: 1px solid var(--color-border);
 
-  border-radius:
-    var(--radius-md);
+  border-radius: var(--radius-md);
 
-  background:
-    var(--color-surface-soft);
+  background: var(--color-surface-soft);
 }
-
 
 .segmentButton,
 .segmentButtonActive {
   min-height: 38px;
 
-  padding:
-    0
-    10px;
+  padding: 0 10px;
 
   border: 0;
 
-  border-radius:
-    calc(
-      var(--radius-md) -
-      4px
-    );
+  border-radius: calc(var(--radius-md) - 4px);
 
-  background:
-    transparent;
+  background: transparent;
 
-  color:
-    var(--color-text-secondary);
+  color: var(--color-text-secondary);
 
   font: inherit;
 
@@ -329,18 +237,13 @@
   cursor: pointer;
 }
 
-
 .segmentButtonActive {
-  background:
-    var(--color-surface);
+  background: var(--color-surface);
 
-  color:
-    var(--color-text-primary);
+  color: var(--color-text-primary);
 
-  box-shadow:
-    var(--shadow-card);
+  box-shadow: var(--shadow-card);
 }
-
 
 .segmentButton:disabled,
 .segmentButtonActive:disabled {
@@ -349,19 +252,16 @@
   cursor: default;
 }
 
-
 .itemList {
   display: grid;
 
-  gap:
-    var(--space-2);
+  gap: var(--space-2);
 
   margin: 0;
   padding: 0;
 
   list-style: none;
 }
-
 
 .orderRow,
 .managementRow,
@@ -373,27 +273,20 @@
   align-items: center;
   justify-content: space-between;
 
-  gap:
-    var(--space-3);
+  gap: var(--space-3);
 
   padding: 12px;
 
-  border:
-    1px solid
-    var(--color-border);
+  border: 1px solid var(--color-border);
 
-  border-radius:
-    var(--radius-md);
+  border-radius: var(--radius-md);
 
-  background:
-    var(--color-surface-soft);
+  background: var(--color-surface-soft);
 }
-
 
 .mutedRow {
   opacity: 0.63;
 }
-
 
 .orderNumber {
   flex: 0 0 auto;
@@ -407,16 +300,13 @@
 
   border-radius: 50%;
 
-  background:
-    var(--color-surface);
+  background: var(--color-surface);
 
-  color:
-    var(--color-text-secondary);
+  color: var(--color-text-secondary);
 
   font-size: 10px;
   font-weight: 800;
 }
-
 
 .primaryItemText {
   min-width: 0;
@@ -425,19 +315,15 @@
 
   overflow: hidden;
 
-  color:
-    var(--color-text-primary);
+  color: var(--color-text-primary);
 
   font-size: 13px;
   font-weight: 800;
 
-  text-overflow:
-    ellipsis;
+  text-overflow: ellipsis;
 
-  white-space:
-    nowrap;
+  white-space: nowrap;
 }
-
 
 .itemTextGroup {
   min-width: 0;
@@ -449,40 +335,31 @@
   gap: 3px;
 }
 
-
 .itemTextGroup strong {
   overflow: hidden;
 
-  color:
-    var(--color-text-primary);
+  color: var(--color-text-primary);
 
   font-size: 13px;
   line-height: 1.4;
 
-  text-overflow:
-    ellipsis;
+  text-overflow: ellipsis;
 
-  white-space:
-    nowrap;
+  white-space: nowrap;
 }
-
 
 .itemTextGroup span {
   overflow: hidden;
 
-  color:
-    var(--color-text-secondary);
+  color: var(--color-text-secondary);
 
   font-size: 11px;
   line-height: 1.4;
 
-  text-overflow:
-    ellipsis;
+  text-overflow: ellipsis;
 
-  white-space:
-    nowrap;
+  white-space: nowrap;
 }
-
 
 .rowActions,
 .formActions {
@@ -496,26 +373,19 @@
   gap: 6px;
 }
 
-
 .createRow {
   display: grid;
 
   grid-template-columns:
-    minmax(
-      0,
-      1fr
-    )
+    minmax(0, 1fr)
     auto;
 
   align-items: end;
 
-  gap:
-    var(--space-2);
+  gap: var(--space-2);
 
-  margin-bottom:
-    var(--space-3);
+  margin-bottom: var(--space-3);
 }
-
 
 .field {
   min-width: 0;
@@ -524,134 +394,91 @@
 
   gap: 6px;
 
-  color:
-    var(--color-text-primary);
+  color: var(--color-text-primary);
 
   font-size: 11px;
   font-weight: 800;
 }
-
 
 .field input,
 .field select,
 .inlineEdit input {
   width: 100%;
 
-  box-sizing:
-    border-box;
+  box-sizing: border-box;
 
   min-height: 42px;
 
-  padding:
-    8px
-    11px;
+  padding: 8px 11px;
 
-  border:
-    1px solid
-    var(--color-border);
+  border: 1px solid var(--color-border);
 
-  border-radius:
-    var(--radius-md);
+  border-radius: var(--radius-md);
 
-  background-color:
-    var(--color-surface);
+  background-color: var(--color-surface);
 
-  color:
-    var(--color-text-primary);
+  color: var(--color-text-primary);
 
   font: inherit;
 
   font-size: 13px;
 }
 
-
 .field select {
-  -webkit-appearance:
-    none;
+  -webkit-appearance: none;
 
-  appearance:
-    none;
+  appearance: none;
 
-  padding-right:
-    38px;
+  padding-right: 38px;
 
   background-image:
-    linear-gradient(
-      45deg,
-      transparent 50%,
-      var(--color-text-secondary) 50%
-    ),
-    linear-gradient(
-      135deg,
-      var(--color-text-secondary) 50%,
-      transparent 50%
-    );
+    linear-gradient(45deg, transparent 50%, var(--color-text-secondary) 50%),
+    linear-gradient(135deg, var(--color-text-secondary) 50%, transparent 50%);
 
   background-position:
-    calc(100% - 17px)
-    50%,
-    calc(100% - 12px)
-    50%;
+    calc(100% - 17px) 50%,
+    calc(100% - 12px) 50%;
 
   background-size:
-    5px
-    5px,
-    5px
-    5px;
+    5px 5px,
+    5px 5px;
 
-  background-repeat:
-    no-repeat;
+  background-repeat: no-repeat;
 
-  cursor:
-    pointer;
+  cursor: pointer;
 }
-
 
 .field select option {
-  background:
-    var(--color-surface);
+  background: var(--color-surface);
 
-  color:
-    var(--color-text-primary);
+  color: var(--color-text-primary);
 }
-
 
 .field input:focus,
 .field select:focus,
 .inlineEdit input:focus {
-  outline:
-    2px solid
-    var(--color-primary);
+  outline: 2px solid var(--color-primary);
 
-  outline-offset:
-    1px;
+  outline-offset: 1px;
 }
-
 
 .field input:disabled,
 .field select:disabled,
 .inlineEdit input:disabled {
-  opacity:
-    0.6;
+  opacity: 0.6;
 
-  cursor:
-    default;
+  cursor: default;
 }
 
 .fieldHelp {
-  color:
-    var(--color-text-secondary);
+  color: var(--color-text-secondary);
 
-  font-size:
-    11px;
+  font-size: 11px;
 
-  font-weight:
-    500;
+  font-weight: 500;
 
-  line-height:
-    1.5;
+  line-height: 1.5;
 }
-
 
 .inlineEdit {
   width: 100%;
@@ -659,29 +486,20 @@
   display: grid;
 
   grid-template-columns:
-    minmax(
-      0,
-      1fr
-    )
+    minmax(0, 1fr)
     auto
     auto;
 
   gap: 6px;
 }
 
-
 .deletedSection {
-  margin-top:
-    var(--space-3);
+  margin-top: var(--space-3);
 
-  padding-top:
-    var(--space-3);
+  padding-top: var(--space-3);
 
-  border-top:
-    1px solid
-    var(--color-border);
+  border-top: 1px solid var(--color-border);
 }
-
 
 .deletedSection summary {
   min-height: 40px;
@@ -692,8 +510,7 @@
 
   gap: 7px;
 
-  color:
-    var(--color-text-primary);
+  color: var(--color-text-primary);
 
   font-size: 12px;
   font-weight: 800;
@@ -703,76 +520,52 @@
   list-style: none;
 }
 
-
 .deletedSection summary::-webkit-details-marker {
   display: none;
 }
-
 
 .deletedSection summary::after {
   content: "⌄";
 
   margin-left: auto;
 
-  color:
-    var(--color-text-secondary);
+  color: var(--color-text-secondary);
 
   font-size: 15px;
 
-  transition:
-    transform
-    0.15s
-    ease;
+  transition: transform 0.15s ease;
 }
 
-
-.deletedSection[open]
-summary::after {
-  transform:
-    rotate(
-      180deg
-    );
+.deletedSection[open] summary::after {
+  transform: rotate(180deg);
 }
-
 
 .deletedSection summary span {
   min-width: 20px;
 
-  padding:
-    2px
-    6px;
+  padding: 2px 6px;
 
-  border-radius:
-    999px;
+  border-radius: 999px;
 
-  background:
-    var(--color-surface-soft);
+  background: var(--color-surface-soft);
 
-  color:
-    var(--color-text-secondary);
+  color: var(--color-text-secondary);
 
   font-size: 10px;
 
   text-align: center;
 }
 
-
-.deletedSection >
-.itemList,
-.deletedSection >
-.emptyState {
-  margin-top:
-    var(--space-2);
+.deletedSection > .itemList,
+.deletedSection > .emptyState {
+  margin-top: var(--space-2);
 }
 
-
 .deletedRow {
-  color:
-    var(--color-text-secondary);
+  color: var(--color-text-secondary);
 
   font-size: 12px;
 }
-
 
 .topActionRow {
   display: flex;
@@ -780,33 +573,25 @@ summary::after {
   align-items: center;
   justify-content: space-between;
 
-  gap:
-    var(--space-3);
+  gap: var(--space-3);
 
   padding: 14px;
 
-  border:
-    1px solid
-    var(--color-border);
+  border: 1px solid var(--color-border);
 
-  border-radius:
-    var(--radius-lg);
+  border-radius: var(--radius-lg);
 
-  background:
-    var(--color-surface-soft);
+  background: var(--color-surface-soft);
 }
-
 
 .topActionRow p {
   margin: 0;
 
-  color:
-    var(--color-text-secondary);
+  color: var(--color-text-secondary);
 
   font-size: 12px;
   line-height: 1.5;
 }
-
 
 .formHeader {
   display: flex;
@@ -814,70 +599,46 @@ summary::after {
   align-items: flex-start;
   justify-content: space-between;
 
-  gap:
-    var(--space-3);
+  gap: var(--space-3);
 
-  margin-bottom:
-    var(--space-4);
+  margin-bottom: var(--space-4);
 }
-
 
 .formGrid {
   display: grid;
 
-  grid-template-columns:
-    repeat(
-      2,
-      minmax(
-        0,
-        1fr
-      )
-    );
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 
-  gap:
-    var(--space-3);
+  gap: var(--space-3);
 }
-
 
 .fullField {
-  grid-column:
-    1 /
-    -1;
+  grid-column: 1 / -1;
 }
-
 
 .formActions {
-  margin-top:
-    var(--space-4);
+  margin-top: var(--space-4);
 }
-
 
 .dateSettingRow {
   display: grid;
 
   grid-template-columns:
-    minmax(
-      0,
-      1fr
-    )
+    minmax(0, 1fr)
     auto;
 
   align-items: end;
 
-  gap:
-    var(--space-3);
+  gap: var(--space-3);
 }
-
 
 .profileRow {
   display: flex;
 
   align-items: center;
 
-  gap:
-    var(--space-3);
+  gap: var(--space-3);
 }
-
 
 .avatar {
   flex: 0 0 auto;
@@ -891,16 +652,13 @@ summary::after {
 
   border-radius: 50%;
 
-  background:
-    var(--color-primary);
+  background: var(--color-primary);
 
-  color:
-    var(--color-primary-text);
+  color: var(--color-primary-text);
 
   font-size: 17px;
   font-weight: 900;
 }
-
 
 .infoList {
   display: grid;
@@ -910,49 +668,35 @@ summary::after {
   margin: 0;
 }
 
-
 .infoList div {
   display: grid;
 
   grid-template-columns:
     110px
-    minmax(
-      0,
-      1fr
-    );
+    minmax(0, 1fr);
 
-  gap:
-    var(--space-3);
+  gap: var(--space-3);
 
-  padding:
-    12px
-    0;
+  padding: 12px 0;
 
-  border-top:
-    1px solid
-    var(--color-border);
+  border-top: 1px solid var(--color-border);
 }
-
 
 .infoList div:first-child {
   border-top: 0;
 }
 
-
 .infoList dt {
-  color:
-    var(--color-text-secondary);
+  color: var(--color-text-secondary);
 
   font-size: 12px;
   font-weight: 700;
 }
 
-
 .infoList dd {
   margin: 0;
 
-  color:
-    var(--color-text-primary);
+  color: var(--color-text-primary);
 
   font-size: 12px;
   line-height: 1.5;
@@ -960,101 +704,64 @@ summary::after {
   text-align: right;
 }
 
-
-@media (
-  max-width:
-    560px
-) {
+@media (max-width: 560px) {
   .page {
-    padding:
-      20px
-      12px
-      106px;
+    padding: 20px 12px 106px;
   }
-
 
   .pageTitle,
   .detailTitle {
     font-size: 24px;
   }
 
-
   .orderRow,
   .managementRow {
-    align-items:
-      flex-start;
+    align-items: flex-start;
   }
-
 
   .managementRow {
-    flex-direction:
-      column;
+    flex-direction: column;
   }
 
-
-  .managementRow
-  .rowActions {
+  .managementRow .rowActions {
     width: 100%;
   }
 
-
-  .managementRow
-  .rowActions
-  button {
-    flex:
-      1
-      1
-      0;
+  .managementRow .rowActions button {
+    flex: 1 1 0;
   }
 
-
-.inlineEdit {
+  .inlineEdit {
     grid-template-columns:
       1fr
       1fr;
   }
 
-
   .inlineEdit input {
-    grid-column:
-      1 /
-      -1;
+    grid-column: 1 / -1;
   }
-
 
   .topActionRow {
-    align-items:
-      stretch;
+    align-items: stretch;
 
-    flex-direction:
-      column;
+    flex-direction: column;
   }
 
+  .topActionRow .dateSettingRow {
+    align-items: stretch;
 
-  .topActionRow
-.dateSettingRow {
-    align-items:
-      stretch;
-
-    grid-template-columns:
-      1fr;
+    grid-template-columns: 1fr;
   }
-
 
   .formGrid {
-    grid-template-columns:
-      1fr;
+    grid-template-columns: 1fr;
   }
-
 
   .fullField {
-    grid-column:
-      auto;
+    grid-column: auto;
   }
 
-
-  .dateSettingRow
-  .rowActions {
+  .dateSettingRow .rowActions {
     display: grid;
 
     grid-template-columns:
@@ -1062,20 +769,16 @@ summary::after {
       1fr;
   }
 
-
   .infoList div {
-    grid-template-columns:
-      1fr;
+    grid-template-columns: 1fr;
 
     gap: 4px;
   }
-
 
   .infoList dd {
     text-align: left;
   }
 }
-
 
 /* =========================================================
    모바일 터치 최적화
@@ -1103,7 +806,6 @@ summary::after {
   .deletedSection summary {
     min-height: 44px;
   }
-
 }
 
 /* v2.2.13 - drag reorder + inline account editor */
@@ -1164,7 +866,6 @@ summary::after {
 .pageHeader {
   margin-bottom: 18px;
 }
-
 
 .pageTitle,
 .detailTitle {
@@ -1551,7 +1252,9 @@ summary::after {
   color: var(--color-text-secondary);
   font-size: 13px;
 }
-.pushStatus strong { color: var(--color-text); }
+.pushStatus strong {
+  color: var(--color-text);
+}
 .pushActions {
   display: flex;
   flex-wrap: wrap;

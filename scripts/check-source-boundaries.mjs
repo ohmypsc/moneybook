@@ -4,12 +4,7 @@ import path from "node:path";
 const ROOT = process.cwd();
 const SRC = path.join(ROOT, "src");
 const ALLOWED_FETCH_FILE = path.normalize("src/api/client.ts");
-const ROOT_DUPLICATES = [
-  "App.tsx",
-  "App.module.css",
-  "main.tsx",
-  "vite-env.d.ts"
-];
+const ROOT_DUPLICATES = ["App.tsx", "App.module.css", "main.tsx", "vite-env.d.ts"];
 
 async function walk(directory) {
   const entries = await fs.readdir(directory, { withFileTypes: true });
@@ -18,7 +13,7 @@ async function walk(directory) {
   for (const entry of entries) {
     const full = path.join(directory, entry.name);
     if (entry.isDirectory()) {
-      files.push(...await walk(full));
+      files.push(...(await walk(full)));
     } else if (/\.(ts|tsx)$/.test(entry.name)) {
       files.push(full);
     }
@@ -50,10 +45,7 @@ for (const file of await walk(SRC)) {
     errors.push(`${relative}: 전역 fetch monkey patch는 허용하지 않습니다.`);
   }
 
-  if (
-    relative !== ALLOWED_FETCH_FILE &&
-    /(^|[^.\w])fetch\s*\(/m.test(source)
-  ) {
+  if (relative !== ALLOWED_FETCH_FILE && /(^|[^.\w])fetch\s*\(/m.test(source)) {
     errors.push(`${relative}: 직접 fetch 대신 apiRequest를 사용하세요.`);
   }
 }

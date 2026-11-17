@@ -15,10 +15,7 @@ export function InputModeTabs({ value, onChange }: InputModeTabsProps) {
           <button
             type="button"
             key={option.value}
-            className={[
-              styles.typeButton,
-              active ? styles.typeButtonActive : ""
-            ].join(" ")}
+            className={[styles.typeButton, active ? styles.typeButtonActive : ""].join(" ")}
             aria-pressed={active}
             onClick={() => onChange(option.value)}
           >

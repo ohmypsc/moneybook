@@ -24,7 +24,9 @@ export function bytesToBase64Url(bytes) {
 }
 
 export function base64UrlToBytes(value) {
-  let text = String(value || "").replace(/-/g, "+").replace(/_/g, "/");
+  let text = String(value || "")
+    .replace(/-/g, "+")
+    .replace(/_/g, "/");
   text += "=".repeat((4 - (text.length % 4)) % 4);
   const binary = atob(text);
   return Uint8Array.from(binary, character => character.charCodeAt(0));
@@ -60,7 +62,9 @@ export function isAllowedPushEndpoint(endpoint) {
   }
   if (url.protocol !== "https:") return false;
   const host = url.hostname.toLowerCase();
-  return ALLOWED_PUSH_HOST_SUFFIXES.some(suffix => host.endsWith(suffix) || host === suffix.slice(1));
+  return ALLOWED_PUSH_HOST_SUFFIXES.some(
+    suffix => host.endsWith(suffix) || host === suffix.slice(1)
+  );
 }
 
 /**
@@ -90,11 +94,10 @@ export function normalizePushSubscription(value) {
  * VAPID 키 쌍을 새로 만듭니다. 공개키는 브라우저 구독에, 개인키(JWK)는 서명에 씁니다.
  */
 export async function generateVapidKeys() {
-  const pair = await crypto.subtle.generateKey(
-    { name: "ECDSA", namedCurve: "P-256" },
-    true,
-    ["sign", "verify"]
-  );
+  const pair = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, [
+    "sign",
+    "verify"
+  ]);
   const publicRaw = new Uint8Array(await crypto.subtle.exportKey("raw", pair.publicKey));
   const privateJwk = await crypto.subtle.exportKey("jwk", pair.privateKey);
   return {
@@ -106,14 +109,24 @@ export async function generateVapidKeys() {
 /**
  * 푸시 서비스에 보낼 VAPID Authorization 헤더 값을 만듭니다.
  */
-export async function createVapidAuthorization({ endpoint, subject, publicKey, privateJwk, now = Date.now() }) {
+export async function createVapidAuthorization({
+  endpoint,
+  subject,
+  publicKey,
+  privateJwk,
+  now = Date.now()
+}) {
   const audience = new URL(endpoint).origin;
   const header = bytesToBase64Url(encoder.encode(JSON.stringify({ typ: "JWT", alg: "ES256" })));
-  const claims = bytesToBase64Url(encoder.encode(JSON.stringify({
-    aud: audience,
-    exp: Math.floor(now / 1000) + 12 * 60 * 60,
-    sub: subject
-  })));
+  const claims = bytesToBase64Url(
+    encoder.encode(
+      JSON.stringify({
+        aud: audience,
+        exp: Math.floor(now / 1000) + 12 * 60 * 60,
+        sub: subject
+      })
+    )
+  );
   const unsigned = `${header}.${claims}`;
   const key = await crypto.subtle.importKey(
     "jwk",
@@ -149,11 +162,9 @@ export async function encryptPushPayload({ payload, p256dh, auth, salt, localKey
     []
   );
 
-  const local = localKeyPair || await crypto.subtle.generateKey(
-    { name: "ECDH", namedCurve: "P-256" },
-    true,
-    ["deriveBits"]
-  );
+  const local =
+    localKeyPair ||
+    (await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]));
   const localPublicRaw = new Uint8Array(await crypto.subtle.exportKey("raw", local.publicKey));
   const sharedSecret = new Uint8Array(
     await crypto.subtle.deriveBits({ name: "ECDH", public: receiverPublic }, local.privateKey, 256)
@@ -163,7 +174,12 @@ export async function encryptPushPayload({ payload, p256dh, auth, salt, localKey
   const ikm = await hkdf(authSecret, sharedSecret, keyInfo, 32);
 
   const recordSalt = salt || crypto.getRandomValues(new Uint8Array(16));
-  const contentKey = await hkdf(recordSalt, ikm, encoder.encode("Content-Encoding: aes128gcm\0"), 16);
+  const contentKey = await hkdf(
+    recordSalt,
+    ikm,
+    encoder.encode("Content-Encoding: aes128gcm\0"),
+    16
+  );
   const nonce = await hkdf(recordSalt, ikm, encoder.encode("Content-Encoding: nonce\0"), 12);
 
   const aesKey = await crypto.subtle.importKey("raw", contentKey, "AES-GCM", false, ["encrypt"]);
@@ -186,7 +202,14 @@ export async function encryptPushPayload({ payload, p256dh, auth, salt, localKey
  * 한 기기(구독)에 알림 하나를 보냅니다.
  * 결과의 gone=true는 구독이 만료·해지되어 지워야 한다는 뜻입니다.
  */
-export async function sendWebPush({ subscription, payload, vapid, subject, fetchImpl = fetch, ttlSeconds = 24 * 60 * 60 }) {
+export async function sendWebPush({
+  subscription,
+  payload,
+  vapid,
+  subject,
+  fetchImpl = fetch,
+  ttlSeconds = 24 * 60 * 60
+}) {
   const body = await encryptPushPayload({
     payload: JSON.stringify(payload),
     p256dh: subscription.p256dh,
@@ -311,16 +334,21 @@ export function buildBatchNotification(transactions, actorName) {
   const list = Array.isArray(transactions) ? transactions : [];
   if (list.length <= 1) return buildTransactionNotification(list[0], actorName);
 
-  const shown = list.slice(0, 3).map(item =>
-    `${String(item?.description || item?.category || item?.type || "거래").trim()} ${formatKrw(item?.amount)}`
-  );
+  const shown = list
+    .slice(0, 3)
+    .map(
+      item =>
+        `${String(item?.description || item?.category || item?.type || "거래").trim()} ${formatKrw(item?.amount)}`
+    );
   const rest = list.length - shown.length;
 
   const totals = [];
   for (const type of ["지출", "수입", "이체"]) {
     const items = list.filter(item => item?.type === type);
     if (items.length) {
-      totals.push(`${type} ${formatKrw(items.reduce((sum, item) => sum + (Number(item?.amount) || 0), 0))}`);
+      totals.push(
+        `${type} ${formatKrw(items.reduce((sum, item) => sum + (Number(item?.amount) || 0), 0))}`
+      );
     }
   }
 

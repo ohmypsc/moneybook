@@ -9,10 +9,7 @@ import {
   type BackupRestorePreview
 } from "../../api/dataRestore";
 import { clearBootstrapMemoryCache } from "../../api/bootstrapCache";
-import {
-  clearDashboardPersistentSnapshot,
-  invalidateDashboardCache
-} from "../../api/dashboard";
+import { clearDashboardPersistentSnapshot, invalidateDashboardCache } from "../../api/dashboard";
 import { clearInvestmentPrefetchCache } from "../../api/investments";
 import { clearManagedSettingsCache } from "../../api/settingsManagement";
 import { Button } from "../../components/common/Button/Button";
@@ -28,14 +25,10 @@ function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
 }
 
-function downloadBackup(
-  backup: MoneybookBackupDocument,
-  filenamePrefix: string
-) {
-  const blob = new Blob(
-    [JSON.stringify(backup, null, 2)],
-    { type: "application/json;charset=utf-8" }
-  );
+function downloadBackup(backup: MoneybookBackupDocument, filenamePrefix: string) {
+  const blob = new Blob([JSON.stringify(backup, null, 2)], {
+    type: "application/json;charset=utf-8"
+  });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -187,8 +180,8 @@ export function BackupRestorePanel() {
       <div className={styles.sectionHeading}>
         <h2>전체 백업 · 복원</h2>
         <p>
-          JSON 백업은 계좌·카테고리·거래·투자·부동산·설정·카드 혜택 사용 누계까지 보관합니다.
-          같은 ID는 백업 값으로 갱신합니다. 저장 중 오류가 발생하면 복원 변경 전체를 취소합니다.
+          JSON 백업은 계좌·카테고리·거래·투자·부동산·설정·카드 혜택 사용 누계까지 보관합니다. 같은
+          ID는 백업 값으로 갱신합니다. 저장 중 오류가 발생하면 복원 변경 전체를 취소합니다.
         </p>
       </div>
 
@@ -246,7 +239,8 @@ export function BackupRestorePanel() {
                   <strong>{total.toLocaleString("ko-KR")}</strong>
                   {previewKey && total > 0 && (
                     <small>
-                      기존 {existing.toLocaleString("ko-KR")} · 신규 {additions.toLocaleString("ko-KR")}
+                      기존 {existing.toLocaleString("ko-KR")} · 신규{" "}
+                      {additions.toLocaleString("ko-KR")}
                     </small>
                   )}
                 </div>
@@ -256,12 +250,16 @@ export function BackupRestorePanel() {
 
           {preview.warnings.length > 0 && (
             <div className={styles.restoreWarning}>
-              {preview.warnings.map(warning => <p key={warning}>{warning}</p>)}
+              {preview.warnings.map(warning => (
+                <p key={warning}>{warning}</p>
+              ))}
             </div>
           )}
 
           <ul className={styles.restoreNotes}>
-            {preview.notes.map(note => <li key={note}>{note}</li>)}
+            {preview.notes.map(note => (
+              <li key={note}>{note}</li>
+            ))}
           </ul>
 
           <Button

@@ -32,11 +32,5 @@ test("transaction search binds account filters to all three account columns", ()
   assert.match(result.whereSql, /from_account_id=\?/);
   assert.match(result.whereSql, /payment_method_id=\?/);
   assert.match(result.whereSql, /LIKE \? ESCAPE/);
-  assert.deepEqual(result.binds, [
-    "HH_MAIN",
-    "A1",
-    "A1",
-    "A1",
-    "%카페\\%%"
-  ]);
+  assert.deepEqual(result.binds, ["HH_MAIN", "A1", "A1", "A1", "%카페\\%%"]);
 });

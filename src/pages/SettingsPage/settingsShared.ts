@@ -1,17 +1,8 @@
-export function getErrorMessage(
-  error: unknown,
-  fallback: string
-) {
-  return error instanceof Error
-    ? error.message
-    : fallback;
+export function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
 }
 
-function moveItemToIndex(
-  items: string[],
-  fromIndex: number,
-  toIndex: number
-) {
+function moveItemToIndex(items: string[], fromIndex: number, toIndex: number) {
   if (
     fromIndex === toIndex ||
     fromIndex < 0 ||
@@ -34,11 +25,7 @@ export function moveSubsetToIndex(
   fromIndex: number,
   toIndex: number
 ) {
-  const movedSubset = moveItemToIndex(
-    subsetIds,
-    fromIndex,
-    toIndex
-  );
+  const movedSubset = moveItemToIndex(subsetIds, fromIndex, toIndex);
 
   if (movedSubset === subsetIds) {
     return allOrder;
@@ -58,26 +45,18 @@ export function moveSubsetToIndex(
   });
 }
 
-export function autoScrollForPointer(
-  clientY: number
-) {
+export function autoScrollForPointer(clientY: number) {
   const edge = 84;
   const step = 24;
 
   if (clientY < edge) {
     window.scrollBy(0, -step);
-  } else if (
-    clientY >
-    window.innerHeight - edge
-  ) {
+  } else if (clientY > window.innerHeight - edge) {
     window.scrollBy(0, step);
   }
 }
 
-export function buildOwnerTabs(
-  members: string[],
-  accountOwners: string[] = []
-) {
+export function buildOwnerTabs(members: string[], accountOwners: string[] = []) {
   const unique = new Set<string>();
 
   for (const owner of [...members, ...accountOwners]) {

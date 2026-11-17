@@ -27,13 +27,17 @@ test("동일 단지/면적 최근 거래 중앙값으로 시세 추정", () => {
   const trades = [670, 685, 700].map((million, index) => ({
     apartmentName: "두루마을 1단지",
     normalizedName: "두루마을1단지",
-    date: `2026-0${9-index}-01`,
+    date: `2026-0${9 - index}-01`,
     amountKrw: million * 1000000,
     exclusiveAreaSqm: 84.95,
     floor: 10 + index,
     canceled: false
   }));
-  const result = estimateApartmentValue(trades, { apartmentName: "두루마을1단지아파트", exclusiveAreaSqm: 84.9, floor: 11 });
+  const result = estimateApartmentValue(trades, {
+    apartmentName: "두루마을1단지아파트",
+    exclusiveAreaSqm: 84.9,
+    floor: 11
+  });
   assert.equal(result.tradeCount, 3);
   assert.equal(result.estimatedValueKrw, 685000000);
   assert.equal(result.lowKrw, 670000000);
@@ -41,5 +45,12 @@ test("동일 단지/면적 최근 거래 중앙값으로 시세 추정", () => {
 });
 
 test("수동 평가액은 자동 추정가보다 우선", () => {
-  assert.equal(getRealEstateCurrentValue({ valuationMode: "manual", manualValueKrw: 700000000, estimatedValueKrw: 680000000 }), 700000000);
+  assert.equal(
+    getRealEstateCurrentValue({
+      valuationMode: "manual",
+      manualValueKrw: 700000000,
+      estimatedValueKrw: 680000000
+    }),
+    700000000
+  );
 });

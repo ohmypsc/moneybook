@@ -68,9 +68,7 @@ function median(values) {
   const sorted = values.slice().sort((a, b) => a - b);
   if (!sorted.length) return 0;
   const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2
-    ? sorted[middle]
-    : Math.round((sorted[middle - 1] + sorted[middle]) / 2);
+  return sorted.length % 2 ? sorted[middle] : Math.round((sorted[middle - 1] + sorted[middle]) / 2);
 }
 
 export function estimateApartmentValue(trades, asset) {
@@ -78,16 +76,21 @@ export function estimateApartmentValue(trades, asset) {
   const area = Number(asset?.exclusiveAreaSqm || 0);
   const floor = Number(asset?.floor || 0);
   const same = (trades || [])
-    .filter((trade) => !trade.canceled)
-    .filter((trade) => {
+    .filter(trade => !trade.canceled)
+    .filter(trade => {
       if (!targetName || !trade.normalizedName) return false;
-      if (!(trade.normalizedName === targetName || trade.normalizedName.includes(targetName) || targetName.includes(trade.normalizedName))) return false;
+      if (!(
+        trade.normalizedName === targetName ||
+        trade.normalizedName.includes(targetName) ||
+        targetName.includes(trade.normalizedName)
+      ))
+        return false;
       return Math.abs(Number(trade.exclusiveAreaSqm || 0) - area) <= 0.6;
     })
     .sort((a, b) => String(b.date).localeCompare(String(a.date)));
 
   const floorMatched = floor
-    ? same.filter((trade) => trade.floor !== null && Math.abs(Number(trade.floor) - floor) <= 5)
+    ? same.filter(trade => trade.floor !== null && Math.abs(Number(trade.floor) - floor) <= 5)
     : [];
   const chosen = (floorMatched.length >= 3 ? floorMatched : same).slice(0, 12);
   if (!chosen.length) {
@@ -100,14 +103,14 @@ export function estimateApartmentValue(trades, asset) {
       recentTrades: []
     };
   }
-  const amounts = chosen.map((trade) => trade.amountKrw).filter((value) => value > 0);
+  const amounts = chosen.map(trade => trade.amountKrw).filter(value => value > 0);
   return {
     estimatedValueKrw: median(amounts),
     lowKrw: Math.min(...amounts),
     highKrw: Math.max(...amounts),
     tradeCount: chosen.length,
     lastTradeDate: chosen[0]?.date || null,
-    recentTrades: chosen.map((trade) => ({
+    recentTrades: chosen.map(trade => ({
       date: trade.date,
       amountKrw: trade.amountKrw,
       floor: trade.floor,

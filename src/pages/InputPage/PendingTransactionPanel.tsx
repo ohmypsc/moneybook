@@ -27,10 +27,12 @@ export function PendingTransactionPanel({
   const [showAll, setShowAll] = useState(false);
   return (
     <>
-      {waitingCount > 0 && <div className={styles.queueStatus} role="status">
-        <strong>기기에 보관됨 · {waitingCount}건</strong>
-        <span>서버 전송을 기다리고 있어요. 오프라인이면 연결 후 자동으로 저장합니다.</span>
-      </div>}
+      {waitingCount > 0 && (
+        <div className={styles.queueStatus} role="status">
+          <strong>기기에 보관됨 · {waitingCount}건</strong>
+          <span>서버 전송을 기다리고 있어요. 오프라인이면 연결 후 자동으로 저장합니다.</span>
+        </div>
+      )}
       {savingCount > 0 && (
         <div className={styles.queueStatus} role="status">
           <strong>저장 중 · {savingCount}건</strong>
@@ -54,9 +56,11 @@ export function PendingTransactionPanel({
             )}
           </div>
 
-          {failedTransactions.length > 3 && <Button variant="secondary" size="sm" onClick={() => setShowAll(value => !value)}>
-            {showAll ? "접기" : `실패 내역 전체 ${failedTransactions.length}건 보기`}
-          </Button>}
+          {failedTransactions.length > 3 && (
+            <Button variant="secondary" size="sm" onClick={() => setShowAll(value => !value)}>
+              {showAll ? "접기" : `실패 내역 전체 ${failedTransactions.length}건 보기`}
+            </Button>
+          )}
           {(showAll ? failedTransactions : failedTransactions.slice(0, 3)).map(item => (
             <div key={item.id} className={styles.queueFailureItem}>
               <div>
@@ -70,11 +74,7 @@ export function PendingTransactionPanel({
 
               <div className={styles.queueFailureActions}>
                 {item.failureKind !== "network" && (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => void onEditFailed(item)}
-                  >
+                  <Button variant="secondary" size="sm" onClick={() => void onEditFailed(item)}>
                     수정
                   </Button>
                 )}

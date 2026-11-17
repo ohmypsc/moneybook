@@ -42,10 +42,7 @@ export interface AnalyzeTransactionImportResult {
   items: ImportedTransactionCandidate[];
 }
 
-export async function analyzeTransactionImport(input: {
-  text?: string;
-  images?: string[];
-}) {
+export async function analyzeTransactionImport(input: { text?: string; images?: string[] }) {
   const raw = await apiRequest<ApiEnvelope<AnalyzeTransactionImportResult>>(
     "/api/import/transactions/analyze",
     {
