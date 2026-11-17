@@ -6,6 +6,8 @@ import { clearDashboardPersistentSnapshot, invalidateDashboardCache } from "../.
 import { clearInvestmentPrefetchCache } from "../../api/investments";
 import { clearManagedSettingsCache } from "../../api/settingsManagement";
 import { confirmAction } from "../../utils/confirmAction";
+import { getPendingTransactions } from "../../utils/pendingTransactionQueue";
+import { saveLastAuthenticatedUser } from "../../app/lastAuthenticatedUser";
 import PwaInstallPrompt from "../../components/pwa/PwaInstallPrompt/PwaInstallPrompt";
 import { disablePushOnThisDevice } from "../../utils/pushNotifications";
 import { PartnerPushSettings } from "./PartnerPushSettings";
@@ -79,15 +81,34 @@ export function ProfileSettings() {
 
 
     async function handleLogout() {
+        // 아직 서버에 저장되지 않은 거래가 있으면 로그아웃 전에 알려 줍니다.
+        const pendingCount =
+            userName
+                ? getPendingTransactions(userName).length
+                : 0;
+
         if (
-            !(await confirmAction({
-                title:
-                    "로그아웃",
-                message:
-                    "현재 계정에서 로그아웃할까요?",
-                confirmLabel:
-                    "로그아웃"
-            }))
+            !(await confirmAction(
+                pendingCount > 0
+                    ? {
+                        title:
+                            "아직 저장되지 않은 거래가 있어요",
+                        message:
+                            `서버 저장이 완료되지 않은 거래가 ${pendingCount}건 있습니다. 로그아웃해도 이 기기에 남지만, 서버 저장을 마치려면 같은 계정으로 다시 로그인해야 합니다. 로그아웃할까요?`,
+                        confirmLabel:
+                            "로그아웃",
+                        cancelLabel:
+                            "계속 사용하기"
+                    }
+                    : {
+                        title:
+                            "로그아웃",
+                        message:
+                            "현재 계정에서 로그아웃할까요?",
+                        confirmLabel:
+                            "로그아웃"
+                    }
+            ))
         ) {
             return;
         }
@@ -112,13 +133,9 @@ export function ProfileSettings() {
             clearInvestmentPrefetchCache();
             clearManagedSettingsCache();
 
-            try {
-                window.localStorage.removeItem(
-                    "moneybook:last-authenticated-user:v1"
-                );
-            } catch {
-                /* 저장소 사용 불가 환경에서는 서버 세션만 종료합니다. */
-            }
+            saveLastAuthenticatedUser(
+                null
+            );
 
             setLoggingOut(
                 false
