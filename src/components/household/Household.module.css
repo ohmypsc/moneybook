@@ -14,19 +14,6 @@
   align-items: center;
   justify-content: space-between;
 }
-.panelCompact {
-  gap: 0;
-  padding: 12px 12px 12px 16px;
-}
-.headingText {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-.headingText .hint {
-  font-size: var(--font-size-xs);
-  line-height: 1.4;
-}
 .heading h2 {
   margin: 0;
   font-size: var(--font-size-xl);

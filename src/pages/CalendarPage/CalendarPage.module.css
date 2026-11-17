@@ -419,7 +419,7 @@
 }
 
 .transactionTypeIncome {
-  color: var(--color-primary);
+  color: var(--color-income);
 }
 
 .transactionTypeTransfer {
@@ -445,7 +445,7 @@
 }
 
 .amountIncome {
-  color: var(--color-primary);
+  color: var(--color-income);
 }
 
 .amountTransfer {

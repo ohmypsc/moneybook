@@ -5,7 +5,7 @@ import { BottomSheet } from "../../components/common/BottomSheet/BottomSheet";
 import {
   getFrequentCategoryIds,
   matchesCategorySearch,
-  readCategoryUsage
+  sortByKoreanLabel
 } from "../../utils/categoryUsage";
 import {
   isAccountPickerKind,
@@ -167,7 +167,6 @@ export function InputPickerSheet({
       <CategoryChipPicker
         items={getPickerItems(kind, { ...accountContext, mode, categories, spendingTargets })}
         selectedValue={selectedValue}
-        userName={userName}
         onPick={value => onSelect(kind, value)}
       />
     );
@@ -193,7 +192,6 @@ const FREQUENT_THRESHOLD = 8;
 interface CategoryChipPickerProps {
   items: PickerItem[];
   selectedValue: string;
-  userName: string;
   onPick: (value: string) => void;
 }
 
@@ -201,25 +199,27 @@ interface CategoryChipPickerProps {
  * 카테고리는 수십 개까지 늘어날 수 있어 한 줄에 하나씩 쌓지 않고 글자 칩으로 촘촘하게 보여 줍니다.
  * 위쪽에는 자주 쓰는 것을 따로 모으고, 많을 때는 검색(초성 포함)을 붙입니다.
  */
-function CategoryChipPicker({ items, selectedValue, userName, onPick }: CategoryChipPickerProps) {
+function CategoryChipPicker({ items, selectedValue, onPick }: CategoryChipPickerProps) {
   const [query, setQuery] = useState("");
+
+  const sortedItems = useMemo(() => sortByKoreanLabel(items), [items]);
 
   const frequentItems = useMemo(() => {
     if (items.length <= FREQUENT_THRESHOLD) return [];
-    const recent = (getDashboardSnapshot()?.recentTransactions || []).map(tx => tx.categoryId);
+    const dashboard = getDashboardSnapshot();
     const ids = getFrequentCategoryIds(
       items.map(item => item.value),
-      readCategoryUsage(userName),
-      recent
+      dashboard?.categoryUsage,
+      (dashboard?.recentTransactions || []).map(tx => tx.categoryId)
     );
     const byId = new Map(items.map(item => [item.value, item]));
     return ids.map(id => byId.get(id)).filter((item): item is PickerItem => Boolean(item));
-  }, [items, userName]);
+  }, [items]);
 
   const trimmedQuery = query.trim();
   const visibleItems = trimmedQuery
-    ? items.filter(item => matchesCategorySearch(item.label, trimmedQuery))
-    : items;
+    ? sortedItems.filter(item => matchesCategorySearch(item.label, trimmedQuery))
+    : sortedItems;
 
   function renderChip(item: PickerItem, frequent = false) {
     const selected = selectedValue === item.value;

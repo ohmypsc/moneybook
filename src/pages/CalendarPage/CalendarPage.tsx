@@ -170,14 +170,7 @@ function formatCurrency(value: number | null | undefined) {
   return formatMoney(value);
 }
 
-// 달력 칸은 폭이 좁아 100만 원 이상은 만 원 단위로 줄여 씁니다. (예: 4,200,000 → 420만)
-function formatCalendarAmount(value: number) {
-  const amount = Math.round(Math.abs(value));
-  if (amount >= 1_000_000) {
-    return `${Math.round(amount / 10_000).toLocaleString("ko-KR")}만`;
-  }
-  return amount.toLocaleString("ko-KR");
-}
+import { formatCalendarAmount } from "./calendarAmount";
 
 // 날짜를 누르면 아래 상세가 화면 안에 들어오도록 스크롤합니다. (이미 보이면 그대로 둡니다)
 function revealDetailSection(element: HTMLElement | null) {

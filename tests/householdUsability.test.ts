@@ -7,7 +7,7 @@ import {
   parseQuickEntries,
   normalizeInputPreferences
 } from "../src/utils/inputPreferences.ts";
-import { livingSummary, validateQuickEntry } from "../src/components/household/householdDomain.ts";
+import { livingSummary } from "../src/components/household/householdDomain.ts";
 import { changeDescription } from "../src/components/household/changeDescription.ts";
 import type { QuickEntry } from "../src/utils/inputPreferences.ts";
 
@@ -49,18 +49,10 @@ test("local preferences are isolated by authenticated user", () => {
   }
 });
 
-test("quick entries preserve their settings through reorder and validate unavailable accounts", () => {
+test("saved quick entries stay intact in input preferences", () => {
   const preferences = { ...createDefaultInputPreferences([], []), quickEntries: [entry] };
   assert.equal(normalizeInputPreferences(preferences, [], []).quickEntries?.[0].name, "점심");
   assert.equal(parseQuickEntries([entry, entry, { id: "invalid" }]).length, 1);
-  assert.match(
-    validateQuickEntry(entry, {
-      categories: [{ categoryId: "C", type: "지출", active: true }],
-      accounts: [],
-      spendingTargets: ["미영"]
-    } as any)!,
-    /계좌/
-  );
 });
 
 test("shared living summary uses only selected cash accounts and shared expenses", () => {

@@ -4,6 +4,7 @@ import {
   estimateBillingMonth as mbD1EstimateBilling,
   monthOnly as mbD1MonthOnly
 } from "../domain/date.js";
+import { categoryUsageCounts } from "../domain/categoryUsage.js";
 import { installmentAmountForMonth, installmentRemainingAfter } from "../domain/installment.js";
 import { netMonthStats as mbD1NetMonthStats } from "../domain/monthStats.js";
 import { listRealEstateAssets, realEstateSummary } from "../realEstate.js";
@@ -13,6 +14,7 @@ import {
   MB_D1_API_VERSION,
   MB_D1_HOUSEHOLD_ID,
   mbD1All,
+  mbD1CurrentDateSeoul,
   mbD1CurrentMonthSeoul,
   mbD1Fail,
   mbD1GetLedgerConfigData,
@@ -314,6 +316,7 @@ export async function mbD1BuildDashboard(env, monthValue = "") {
     cards,
     monthlyTrend: trend,
     recentTransactions,
+    categoryUsage: categoryUsageCounts(transactions, mbD1CurrentDateSeoul()),
     realEstate,
     investments: {
       totalAccountValue: mbD1Round(
