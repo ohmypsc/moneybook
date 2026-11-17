@@ -1,27 +1,42 @@
-/* 나눔스퀘어라운드 (OFL-1.1, 네이버). 앱 안에 파일을 함께 넣어 오프라인에서도 같은 글꼴로 보입니다.
-   제공 굵기가 R(400)·B(700)·EB(800)뿐이라 500은 R, 600은 B로 이어 줍니다. */
+/* 페이퍼로지 (OFL-1.1, 이주임). 앱 안에 파일을 함께 넣어 오프라인에서도 같은 글꼴로 보입니다. */
 @font-face {
-  font-family: "NanumSquareRound";
-  font-weight: 400 500;
+  font-family: "Paperlogy";
+  font-weight: 400;
   font-style: normal;
   font-display: swap;
-  src: url("../assets/fonts/NanumSquareRoundR.woff2") format("woff2");
+  src: url("../assets/fonts/Paperlogy-4Regular.woff2") format("woff2");
 }
 
 @font-face {
-  font-family: "NanumSquareRound";
-  font-weight: 600 700;
+  font-family: "Paperlogy";
+  font-weight: 500;
   font-style: normal;
   font-display: swap;
-  src: url("../assets/fonts/NanumSquareRoundB.woff2") format("woff2");
+  src: url("../assets/fonts/Paperlogy-5Medium.woff2") format("woff2");
 }
 
 @font-face {
-  font-family: "NanumSquareRound";
+  font-family: "Paperlogy";
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+  src: url("../assets/fonts/Paperlogy-6SemiBold.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Paperlogy";
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  src: url("../assets/fonts/Paperlogy-7Bold.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Paperlogy";
   font-weight: 800 900;
   font-style: normal;
   font-display: swap;
-  src: url("../assets/fonts/NanumSquareRoundEB.woff2") format("woff2");
+  src: url("../assets/fonts/Paperlogy-8ExtraBold.woff2") format("woff2");
 }
 
 * {
