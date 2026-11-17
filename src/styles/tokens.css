@@ -13,31 +13,31 @@
   color-scheme: light;
 
   /* 배경·면 */
-  --color-bg: #fff7f9;
-  --color-bg-glow: rgba(255, 214, 224, 0.32);
+  --color-bg: #f8f7f6;
+  --color-bg-glow: rgba(236, 233, 229, 0.5);
   --color-surface: #ffffff;
-  --color-surface-soft: #fcf0f4;
-  --color-surface-subtle: #fff9fb;
-  --color-surface-tint: #f7f3fc;
+  --color-surface-soft: #f3f2f0;
+  --color-surface-subtle: #fafaf9;
+  --color-surface-tint: #f5f4f2;
   --color-surface-blue: #eee8fb;
   --color-surface-sage: #e3f5ee;
-  --color-surface-hover: #f9e6ed;
-  --color-surface-raised: #fffcfd;
+  --color-surface-hover: #ecebe8;
+  --color-surface-raised: #fcfcfb;
   --color-surface-glass: rgba(255, 255, 255, 0.94);
   --color-surface-frost: rgba(255, 255, 255, 0.7);
-  --color-surface-soft-glass: rgba(252, 240, 244, 0.86);
-  --color-hero-from: #fff0f4;
-  --color-hero-to: #ffe1e9;
-  --color-hero-border: rgba(245, 190, 206, 0.8);
+  --color-surface-soft-glass: rgba(243, 242, 240, 0.86);
+  --color-hero-from: #fff4f7;
+  --color-hero-to: #ffe4eb;
+  --color-hero-border: rgba(245, 198, 211, 0.8);
   --color-hero-glow: rgba(255, 236, 170, 0.3);
 
   /* 글자 */
-  --color-text: #3a2c33;
-  --color-text-primary: #3a2c33;
-  --color-text-secondary: #6a5761;
-  --color-text-tertiary: #85717b;
-  --color-text-subtle: #85717b;
-  --color-text-muted: #6a5761;
+  --color-text: #33302f;
+  --color-text-primary: #33302f;
+  --color-text-secondary: #66605e;
+  --color-text-tertiary: #7c7774;
+  --color-text-subtle: #7c7774;
+  --color-text-muted: #66605e;
 
   /* 브랜드 */
   --color-primary: #a8325a;
@@ -68,15 +68,15 @@
   --color-danger-text: #ffffff;
 
   /* 선 */
-  --color-border: #f0dfe6;
-  --color-border-strong: #e5cbd5;
-  --color-divider: rgba(240, 223, 230, 0.8);
-  --color-divider-strong: rgba(214, 180, 194, 0.6);
-  --color-handle: #e3cdd6;
+  --color-border: #e8e5e2;
+  --color-border-strong: #dad6d2;
+  --color-divider: rgba(232, 229, 226, 0.8);
+  --color-divider-strong: rgba(200, 194, 189, 0.6);
+  --color-handle: #d6d2ce;
 
   /* 겹침 */
-  --color-overlay: rgba(58, 30, 44, 0.3);
-  --color-overlay-strong: rgba(40, 20, 30, 0.4);
+  --color-overlay: rgba(30, 28, 27, 0.3);
+  --color-overlay-strong: rgba(20, 18, 17, 0.4);
 
   /* 모서리 */
   --radius-sm: 9px;
@@ -125,11 +125,11 @@
 
   --content-width: 640px;
 
-  --shadow-card: 0 8px 24px rgba(120, 60, 85, 0.06);
-  --shadow-soft: 0 4px 12px rgba(120, 60, 85, 0.07);
-  --shadow-raised: 0 6px 18px rgba(120, 60, 85, 0.13);
-  --shadow-lg: 0 20px 60px rgba(40, 20, 30, 0.2);
-  --shadow-sheet: 0 -16px 48px rgba(80, 40, 60, 0.16);
+  --shadow-card: 0 8px 24px rgba(40, 35, 32, 0.055);
+  --shadow-soft: 0 4px 12px rgba(40, 35, 32, 0.06);
+  --shadow-raised: 0 6px 18px rgba(40, 35, 32, 0.12);
+  --shadow-lg: 0 20px 60px rgba(20, 18, 17, 0.2);
+  --shadow-sheet: 0 -16px 48px rgba(40, 35, 32, 0.16);
 }
 
 /* 다크 팔레트: 기기 설정이 다크이고 사용자가 라이트를 고르지 않은 경우 */
@@ -137,30 +137,30 @@
   :root:not([data-theme="light"]) {
     color-scheme: dark;
 
-    --color-bg: #1b1619;
-    --color-bg-glow: rgba(168, 50, 90, 0.14);
-    --color-surface: #251e23;
-    --color-surface-soft: #2e262c;
-    --color-surface-subtle: #221b20;
-    --color-surface-tint: #282330;
+    --color-bg: #171615;
+    --color-bg-glow: rgba(255, 255, 255, 0.03);
+    --color-surface: #211f1e;
+    --color-surface-soft: #2a2826;
+    --color-surface-subtle: #1d1c1b;
+    --color-surface-tint: #252330;
     --color-surface-blue: #2c2740;
     --color-surface-sage: #1f3029;
-    --color-surface-hover: #352c33;
-    --color-surface-raised: #29222a;
-    --color-surface-glass: rgba(37, 30, 35, 0.94);
-    --color-surface-frost: rgba(37, 30, 35, 0.7);
-    --color-surface-soft-glass: rgba(46, 38, 44, 0.86);
-    --color-hero-from: #33242c;
-    --color-hero-to: #2a1f26;
+    --color-surface-hover: #312f2d;
+    --color-surface-raised: #252322;
+    --color-surface-glass: rgba(33, 31, 30, 0.94);
+    --color-surface-frost: rgba(33, 31, 30, 0.7);
+    --color-surface-soft-glass: rgba(42, 40, 38, 0.86);
+    --color-hero-from: #2f2328;
+    --color-hero-to: #262023;
     --color-hero-border: rgba(110, 70, 88, 0.6);
     --color-hero-glow: rgba(240, 163, 188, 0.1);
 
-    --color-text: #f4e9ee;
-    --color-text-primary: #f4e9ee;
-    --color-text-secondary: #c4b2bc;
-    --color-text-tertiary: #a2909a;
-    --color-text-subtle: #a2909a;
-    --color-text-muted: #c4b2bc;
+    --color-text: #efecea;
+    --color-text-primary: #efecea;
+    --color-text-secondary: #bdb7b3;
+    --color-text-tertiary: #9b9591;
+    --color-text-subtle: #9b9591;
+    --color-text-muted: #bdb7b3;
 
     --color-primary: #f0a3bc;
     --color-primary-hover: #f5b8cb;
@@ -188,11 +188,11 @@
     --color-danger-soft: #3a2229;
     --color-danger-text: #2a1214;
 
-    --color-border: #3a2f36;
-    --color-border-strong: #4a3d45;
-    --color-divider: rgba(74, 61, 69, 0.7);
-    --color-divider-strong: rgba(92, 76, 86, 0.7);
-    --color-handle: #5a4a53;
+    --color-border: #353230;
+    --color-border-strong: #45413e;
+    --color-divider: rgba(69, 65, 62, 0.7);
+    --color-divider-strong: rgba(88, 83, 79, 0.7);
+    --color-handle: #57524e;
 
     --color-overlay: rgba(0, 0, 0, 0.5);
     --color-overlay-strong: rgba(0, 0, 0, 0.6);
@@ -209,30 +209,30 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --color-bg: #1b1619;
-  --color-bg-glow: rgba(168, 50, 90, 0.14);
-  --color-surface: #251e23;
-  --color-surface-soft: #2e262c;
-  --color-surface-subtle: #221b20;
-  --color-surface-tint: #282330;
+  --color-bg: #171615;
+  --color-bg-glow: rgba(255, 255, 255, 0.03);
+  --color-surface: #211f1e;
+  --color-surface-soft: #2a2826;
+  --color-surface-subtle: #1d1c1b;
+  --color-surface-tint: #252330;
   --color-surface-blue: #2c2740;
   --color-surface-sage: #1f3029;
-  --color-surface-hover: #352c33;
-  --color-surface-raised: #29222a;
-  --color-surface-glass: rgba(37, 30, 35, 0.94);
-  --color-surface-frost: rgba(37, 30, 35, 0.7);
-  --color-surface-soft-glass: rgba(46, 38, 44, 0.86);
-  --color-hero-from: #33242c;
-  --color-hero-to: #2a1f26;
+  --color-surface-hover: #312f2d;
+  --color-surface-raised: #252322;
+  --color-surface-glass: rgba(33, 31, 30, 0.94);
+  --color-surface-frost: rgba(33, 31, 30, 0.7);
+  --color-surface-soft-glass: rgba(42, 40, 38, 0.86);
+  --color-hero-from: #2f2328;
+  --color-hero-to: #262023;
   --color-hero-border: rgba(110, 70, 88, 0.6);
   --color-hero-glow: rgba(240, 163, 188, 0.1);
 
-  --color-text: #f4e9ee;
-  --color-text-primary: #f4e9ee;
-  --color-text-secondary: #c4b2bc;
-  --color-text-tertiary: #a2909a;
-  --color-text-subtle: #a2909a;
-  --color-text-muted: #c4b2bc;
+  --color-text: #efecea;
+  --color-text-primary: #efecea;
+  --color-text-secondary: #bdb7b3;
+  --color-text-tertiary: #9b9591;
+  --color-text-subtle: #9b9591;
+  --color-text-muted: #bdb7b3;
 
   --color-primary: #f0a3bc;
   --color-primary-hover: #f5b8cb;
@@ -260,11 +260,11 @@
   --color-danger-soft: #3a2229;
   --color-danger-text: #2a1214;
 
-  --color-border: #3a2f36;
-  --color-border-strong: #4a3d45;
-  --color-divider: rgba(74, 61, 69, 0.7);
-  --color-divider-strong: rgba(92, 76, 86, 0.7);
-  --color-handle: #5a4a53;
+  --color-border: #353230;
+  --color-border-strong: #45413e;
+  --color-divider: rgba(69, 65, 62, 0.7);
+  --color-divider-strong: rgba(88, 83, 79, 0.7);
+  --color-handle: #57524e;
 
   --color-overlay: rgba(0, 0, 0, 0.5);
   --color-overlay-strong: rgba(0, 0, 0, 0.6);
