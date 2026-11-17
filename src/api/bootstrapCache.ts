@@ -1,6 +1,7 @@
 import { markLedgerChanged } from "../utils/ledgerEvents.ts";
 
 import { syncInputPreferencesFromBootstrapPayload } from "../utils/inputPreferences.ts";
+import { rememberPersistedBootstrapSnapshot } from "./bootstrapPersistence.ts";
 
 interface CachedBootstrapResponse {
   body: string;
@@ -120,6 +121,7 @@ export function rememberBootstrapPayload(payload: unknown, requestGeneration: nu
     };
 
     syncInputPreferencesFromBootstrapPayload(payload);
+    rememberPersistedBootstrapSnapshot(payload);
   } catch {
     /*
      * 캐시 저장 또는 로컬 백업 동기화 실패가

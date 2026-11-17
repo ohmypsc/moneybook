@@ -31,6 +31,8 @@ export interface BootstrapData {
 export interface BootstrapResponse {
   success: boolean;
   apiVersion?: string;
+  /** 인터넷 연결 없이 기기에 저장된 목록을 쓴 경우, 그 목록을 받은 시각(ms) */
+  offlineSnapshotAt?: number;
   data?: BootstrapData;
   error?: {
     code?: string;

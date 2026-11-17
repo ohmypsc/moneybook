@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { clearPersistedBootstrapSnapshot } from "../../api/bootstrapPersistence";
 
 import { createMoneybookBackup } from "../../api/dataBackup";
 import type { MoneybookBackupDocument } from "../../api/dataBackupFormat";
@@ -59,6 +60,7 @@ function invalidateAfterRestoreAttempt() {
   clearInvestmentPrefetchCache();
   invalidateDashboardCache();
   clearDashboardPersistentSnapshot();
+  clearPersistedBootstrapSnapshot();
   markLedgerChanged();
 }
 

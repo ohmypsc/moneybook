@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { clearPersistedBootstrapSnapshot } from "../../api/bootstrapPersistence";
 
 import { getSession, logout } from "../../api/auth";
 import { clearBootstrapMemoryCache } from "../../api/bootstrapCache";
@@ -83,6 +84,7 @@ export function ProfileSettings() {
     } finally {
       invalidateDashboardCache();
       clearDashboardPersistentSnapshot();
+      clearPersistedBootstrapSnapshot();
       clearBootstrapMemoryCache();
       clearInvestmentPrefetchCache();
       clearManagedSettingsCache();

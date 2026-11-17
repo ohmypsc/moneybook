@@ -13,6 +13,7 @@ import { createTransaction, getTransactions } from "../../api/transactions";
 import { getDashboard, getDashboardSnapshot } from "../../api/dashboard";
 import { Button } from "../../components/common/Button/Button";
 import { PendingTransactionPanel } from "./PendingTransactionPanel";
+import { DataFreshnessNotice } from "../../components/common/DataFreshnessNotice/DataFreshnessNotice";
 import { InputPickerSheet } from "./InputPickerSheet";
 import { InputModeTabs } from "./InputModeTabs";
 import { PickerFieldButton } from "./PickerFieldButton";
@@ -156,6 +157,8 @@ let bootstrapPromise: Promise<BootstrapData> | null = null;
 let bootstrapPromiseGeneration = -1;
 let bootstrapSnapshot: BootstrapData | null = null;
 let bootstrapSnapshotGeneration = -1;
+/** 인터넷 없이 기기에 저장된 목록을 쓰고 있으면 그 목록을 받은 시각, 아니면 null */
+let bootstrapOfflineSnapshotAt: number | null = null;
 
 function getInitialBootstrapSnapshot() {
   const generation = getBootstrapCacheGeneration();
@@ -195,6 +198,14 @@ async function loadBootstrap(): Promise<BootstrapData> {
           return loadBootstrap();
         }
 
+        if (response.offlineSnapshotAt) {
+          // 오프라인 저장본은 화면 모듈에 기억하지 않아, 다음에 열 때 서버에서 다시 받습니다.
+          bootstrapOfflineSnapshotAt = response.offlineSnapshotAt;
+          bootstrapPromise = null;
+          return response.data;
+        }
+
+        bootstrapOfflineSnapshotAt = null;
         bootstrapSnapshot = response.data;
         bootstrapSnapshotGeneration = requestGeneration;
         return response.data;
@@ -294,6 +305,7 @@ export default function InputPage({
   );
 
   const [bootstrapError, setBootstrapError] = useState("");
+  const [offlineSnapshotAt, setOfflineSnapshotAt] = useState<number | null>(null);
 
   const [freshHouseholdAccounts, setFreshHouseholdAccounts] = useState<Account[]>([]);
 
@@ -591,6 +603,32 @@ export default function InputPage({
 
   const backendType = getBackendType(mode);
 
+  // 오프라인 저장본으로 열린 상태에서 인터넷이 다시 연결되면 최신 목록으로 바꿉니다.
+  useEffect(() => {
+    if (!offlineSnapshotAt) {
+      return;
+    }
+
+    let active = true;
+
+    const refreshWhenOnline = () => {
+      void loadBootstrap()
+        .then(data => {
+          if (!active) return;
+          setBootstrap(data);
+          setOfflineSnapshotAt(bootstrapOfflineSnapshotAt);
+        })
+        .catch(() => {});
+    };
+
+    window.addEventListener("online", refreshWhenOnline);
+
+    return () => {
+      active = false;
+      window.removeEventListener("online", refreshWhenOnline);
+    };
+  }, [offlineSnapshotAt]);
+
   useEffect(() => {
     let active = true;
 
@@ -601,6 +639,7 @@ export default function InputPage({
         }
 
         setBootstrap(data);
+        setOfflineSnapshotAt(bootstrapOfflineSnapshotAt);
 
         setBootstrapError("");
       })
@@ -637,6 +676,7 @@ export default function InputPage({
           if (!active) return null;
 
           setBootstrap(data);
+          setOfflineSnapshotAt(bootstrapOfflineSnapshotAt);
           setBootstrapError("");
 
           return apiRequest<AccountsResponse>(
@@ -2098,6 +2138,7 @@ export default function InputPage({
 
   return (
     <main className={styles.page}>
+      {offlineSnapshotAt && <DataFreshnessNotice fetchedAt={offlineSnapshotAt} />}
       <header className={styles.header}>
         <h1 className={styles.title}>거래 입력</h1>
         <Button
