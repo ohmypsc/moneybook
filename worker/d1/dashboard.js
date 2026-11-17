@@ -5,6 +5,7 @@ import {
   monthOnly as mbD1MonthOnly
 } from "../domain/date.js";
 import { categoryUsageCounts } from "../domain/categoryUsage.js";
+import { merchantUsageCounts } from "../../shared/merchantUsage.js";
 import { installmentAmountForMonth, installmentRemainingAfter } from "../domain/installment.js";
 import { netMonthStats as mbD1NetMonthStats } from "../domain/monthStats.js";
 import { listRealEstateAssets, realEstateSummary } from "../realEstate.js";
@@ -317,6 +318,8 @@ export async function mbD1BuildDashboard(env, monthValue = "") {
     monthlyTrend: trend,
     recentTransactions,
     categoryUsage: categoryUsageCounts(transactions, mbD1CurrentDateSeoul()),
+    // 가맹점별로 쓴 카테고리 (입력 화면 추천 칩용, 예전 서버 응답에는 없을 수 있음)
+    merchantUsage: merchantUsageCounts(transactions, mbD1CurrentDateSeoul()),
     realEstate,
     investments: {
       totalAccountValue: mbD1Round(

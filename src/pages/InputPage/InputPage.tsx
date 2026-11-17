@@ -2894,6 +2894,7 @@ export default function InputPage({
             investmentAccountId: selectedInvestmentAccountId
           }}
           onSelect={applyPickerValue}
+          merchant={description}
           onClose={() => setActivePicker(null)}
         />
       )}

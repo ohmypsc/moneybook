@@ -18,6 +18,8 @@ export interface EditableCandidate extends ImportedTransactionCandidate {
   matchedRules?: string[];
   requestId: string;
   queued?: boolean;
+  /** 한 건씩 확인 화면에서 사용자가 직접 확인한 거래 */
+  reviewed?: boolean;
 }
 
 export function changeImportKind(item: EditableCandidate, kind: ImportKind): EditableCandidate {

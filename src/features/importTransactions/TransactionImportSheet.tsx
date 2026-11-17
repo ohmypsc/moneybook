@@ -1,6 +1,26 @@
 import { TagsInput, TagChips } from "../../components/classification/TagsInput";
 import { applyImportClassification } from "./importReview";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { getDashboardSnapshot } from "../../api/dashboard";
+import { InputPickerSheet } from "../../pages/InputPage/InputPickerSheet";
+import type { PickerKind } from "../../pages/InputPage/inputDomain";
+import { getCategorySuggestions } from "../../utils/categoryUsage";
+import {
+  applyAccountPreferences,
+  applyCategoryPreferences,
+  getInputPreferences,
+  sortAccountsByPreferences
+} from "../../utils/inputPreferences";
+import { ImportReviewList } from "./ImportReviewList";
+import { ImportStepReview, type StepChoices, type StepPickerKind } from "./ImportStepReview";
+import {
+  confirmReviewedItem,
+  findSameMerchantItems,
+  needsReview,
+  suggestAccountIds
+} from "./importSuggestions";
+import reviewStyles from "./ImportReview.module.css";
 import { analyzeTransactionImport } from "../../api/transactionImport";
 import type { BootstrapData } from "../../types/bootstrap";
 import { BottomSheet } from "../../components/common/BottomSheet/BottomSheet";
@@ -61,7 +81,18 @@ export function TransactionImportSheet({
       : ""
   );
   const [stage, setStage] = useState<"source" | "review">(restored?.stage || "source");
-  const [expandedCandidateId, setExpandedCandidateId] = useState<string | null>(null);
+  const [reviewMode, setReviewMode] = useState<"list" | "step">("list");
+  const [stepIds, setStepIds] = useState<string[]>([]);
+  const [stepIndex, setStepIndex] = useState(0);
+  const [stepError, setStepError] = useState("");
+  const [samePrompt, setSamePrompt] = useState<{
+    ids: string[];
+    categoryId: string;
+    categoryName: string;
+  } | null>(null);
+  const [picker, setPicker] = useState<StepPickerKind | null>(null);
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
 
   const [draftSaved, setDraftSaved] = useState(true);
   const closeInProgress = useRef(false);
@@ -123,7 +154,8 @@ export function TransactionImportSheet({
     setText("");
     setFiles([]);
     setStage("source");
-    setExpandedCandidateId(null);
+    resetStep();
+    setReviewMode("list");
     setError("");
     setFeedback("");
     setDraftSaved(
@@ -190,6 +222,142 @@ export function TransactionImportSheet({
       {account.displayName}
     </option>
   ));
+  /* ---------- 추천 칩 재료 ---------- */
+
+  const dashboard = useMemo(() => getDashboardSnapshot(), []);
+  const recentTransactions = useMemo(() => dashboard?.recentTransactions || [], [dashboard]);
+  const preferences = useMemo(
+    () => getInputPreferences(bootstrap.categories, bootstrap.accounts, userName),
+    [bootstrap, userName]
+  );
+  const accountById = useMemo(
+    () => new Map(bootstrap.accounts.map(account => [account.accountId, account])),
+    [bootstrap]
+  );
+  function accountLabel(accountId: string) {
+    return accountById.get(accountId)?.displayName || "";
+  }
+  const stepItem =
+    reviewMode === "step"
+      ? items.find(item => item.candidateId === stepIds[stepIndex]) || null
+      : null;
+  const stepType = stepItem ? IMPORT_TYPE_LABELS[stepItem.kind] : "지출";
+  const pickerCategories = useMemo(
+    () =>
+      applyCategoryPreferences(
+        categories,
+        stepType === "수입" || stepType === "이체" ? stepType : "지출",
+        preferences
+      ),
+    [categories, stepType, preferences]
+  );
+
+  const stepChoices = useMemo<StepChoices>(() => {
+    const item = stepItem;
+    const categoryById = new Map(pickerCategories.map(row => [row.categoryId, row]));
+    const suggestion = getCategorySuggestions({
+      merchant: item?.merchant || "",
+      type: stepType,
+      availableIds: pickerCategories.map(row => row.categoryId),
+      merchantUsage: dashboard?.merchantUsage,
+      usage: dashboard?.categoryUsage,
+      recentCategoryIds: recentTransactions.map(tx => tx.categoryId),
+      limit: 4
+    });
+    const fromMerchantName = suggestion.fromMerchant[0]
+      ? categoryById.get(suggestion.fromMerchant[0])?.name
+      : "";
+    const paymentIds = paymentMethods.map(account => account.accountId);
+    const transferIds = transferAccounts.map(account => account.accountId);
+    const toAccountOptions = (ids: string[]) =>
+      ids.map(id => ({ value: id, label: accountLabel(id) }));
+    return {
+      category: suggestion.ids.map(id => ({
+        value: id,
+        label: categoryById.get(id)?.name || "",
+        suggested: suggestion.fromMerchant.includes(id)
+      })),
+      categoryHint:
+        fromMerchantName && item?.merchant.trim()
+          ? `${item.merchant.trim()}: 지난번에 ${fromMerchantName}`
+          : "",
+      paymentMethod: toAccountOptions(
+        suggestAccountIds(
+          paymentIds,
+          item?.paymentMethodId,
+          recentTransactions.filter(tx => tx.type === "지출").map(tx => tx.paymentMethodId)
+        )
+      ),
+      paymentHint: item?.cardName ? `캡처: ${item.cardName}` : "",
+      fromAccount: toAccountOptions(
+        suggestAccountIds(
+          transferIds,
+          item?.fromAccountId,
+          recentTransactions.filter(tx => tx.type === "이체").map(tx => tx.fromAccountId)
+        )
+      ),
+      toAccount: toAccountOptions(
+        suggestAccountIds(
+          transferIds,
+          item?.toAccountId,
+          recentTransactions
+            .filter(tx => tx.type === (item?.kind === "income" ? "수입" : "이체"))
+            .map(tx => tx.toAccountId)
+        )
+      ),
+      spendingTargets: bootstrap.spendingTargets,
+      labelOf: (kind, value) =>
+        kind === "category" ? categoryById.get(value)?.name || "" : accountLabel(value)
+    };
+  }, [
+    stepItem,
+    stepType,
+    pickerCategories,
+    dashboard,
+    recentTransactions,
+    paymentMethods,
+    transferAccounts,
+    accountById,
+    bootstrap.spendingTargets
+  ]);
+
+  // [전체] 선택창은 일반 입력 화면과 같은 것을 씁니다.
+  const pickerAccounts = useMemo(() => {
+    const active = bootstrap.accounts.filter(account => account.active && !account.isDeleted);
+    const visible = prioritizeAccountsForUser(
+      applyAccountPreferences(active, preferences),
+      userName
+    );
+    return {
+      ordered: sortAccountsByPreferences(active, preferences),
+      visible,
+      visibleIds: new Set(visible.map(account => account.accountId)),
+      creditCards: visible.filter(account => account.subType === "신용카드")
+    };
+  }, [bootstrap, preferences, userName]);
+
+  function describeItem(item: EditableCandidate) {
+    const account =
+      item.kind === "expense"
+        ? item.paymentMethodName
+        : item.toAccountId
+          ? accountLabel(item.toAccountId)
+          : "";
+    return [item.categoryName || "카테고리 확인", account].filter(Boolean).join(" · ");
+  }
+
+  // 다음 거래로 넘어가거나 목록으로 돌아오면 맨 위부터 보이게 합니다.
+  const reviewTopRef = useRef<HTMLSpanElement | null>(null);
+  useEffect(() => {
+    reviewTopRef.current?.scrollIntoView({ block: "start" });
+  }, [reviewMode, stepIndex]);
+
+  useEffect(() => {
+    const urls = files.map(file => URL.createObjectURL(file));
+    setImageUrls(urls);
+    return () => urls.forEach(url => URL.revokeObjectURL(url));
+  }, [files]);
+
   const selectedKinds = new Set(
     items
       .filter(item => item.selected && !item.queued && item.kind !== "refund")
@@ -202,8 +370,6 @@ export function TransactionImportSheet({
   const selectedCount = items.filter(
     item => item.selected && !item.queued && item.kind !== "refund"
   ).length;
-  const duplicateCount = items.filter(item => item.duplicate).length;
-  const reviewCount = items.filter(item => item.reviewReasons.length > 0).length;
 
   function patchItem(candidateId: string, patch: Partial<EditableCandidate>) {
     setItems(current =>
@@ -340,9 +506,8 @@ export function TransactionImportSheet({
         return { ...candidate, reviewReasons: deriveReviewReasons(candidate) };
       });
       setItems(mappedItems);
-      setExpandedCandidateId(
-        mappedItems.find(item => item.reviewReasons.length > 0)?.candidateId || null
-      );
+      resetStep();
+      setReviewMode("list");
       setStage("review");
       if (result.items.length === 0) {
         setFeedback("인식된 거래가 없습니다. 다른 캡처나 텍스트로 다시 시도해주세요.");
@@ -385,8 +550,146 @@ export function TransactionImportSheet({
     };
     item.reviewReasons = deriveReviewReasons(item);
     setItems(current => [...current, item]);
-    setExpandedCandidateId(requestId);
     setStage("review");
+    openStep([requestId], 0);
+  }
+
+  /* ---------- 한 건씩 확인 ---------- */
+
+  function resetStep() {
+    setStepIds([]);
+    setStepIndex(0);
+    setStepError("");
+    setSamePrompt(null);
+    setPicker(null);
+  }
+
+  function openStep(ids: string[], index: number) {
+    if (!ids.length) return;
+    setStepIds(ids);
+    setStepIndex(Math.min(Math.max(index, 0), ids.length - 1));
+    setStepError("");
+    setSamePrompt(null);
+    setReviewMode("step");
+    setError("");
+    setFeedback("");
+  }
+
+  function startReview() {
+    openStep(
+      items.filter(needsReview).map(item => item.candidateId),
+      0
+    );
+  }
+
+  function openItem(candidateId: string) {
+    const pendingIds = items.filter(needsReview).map(item => item.candidateId);
+    const index = pendingIds.indexOf(candidateId);
+    if (index >= 0) openStep(pendingIds, index);
+    else openStep([candidateId], 0);
+  }
+
+  function backToList() {
+    resetStep();
+    setReviewMode("list");
+  }
+
+  function goToNextStep() {
+    // '모두 적용' 등으로 이미 해결된 거래는 건너뜁니다.
+    const nextIndex = stepIds.findIndex((candidateId, index) => {
+      if (index <= stepIndex) return false;
+      const next = items.find(item => item.candidateId === candidateId);
+      return Boolean(next && needsReview(next));
+    });
+    if (nextIndex >= 0) {
+      setStepIndex(nextIndex);
+      setStepError("");
+      setSamePrompt(null);
+      return;
+    }
+    backToList();
+    const ready = items.filter(item => item.selected && !item.queued).length;
+    setFeedback(
+      ready > 0
+        ? `확인을 마쳤어요. [선택 ${ready}건 저장]을 눌러 저장해주세요.`
+        : "확인을 마쳤어요."
+    );
+  }
+
+  async function confirmStep(item: EditableCandidate) {
+    const result = confirmReviewedItem(item);
+    if (!result.ok) {
+      setStepError(result.error);
+      return;
+    }
+    if (
+      result.duplicate &&
+      !(await confirmAction({
+        title: "중복 의심 거래",
+        message: "이미 입력된 거래와 비슷합니다. 그래도 저장할 목록에 넣을까요?",
+        confirmLabel: "넣기",
+        cancelLabel: "다시 보기"
+      }))
+    )
+      return;
+    setItems(current =>
+      current.map(row => (row.candidateId === item.candidateId ? result.item : row))
+    );
+    goToNextStep();
+  }
+
+  function handleStepPatch(item: EditableCandidate, patch: Partial<EditableCandidate>) {
+    setStepError("");
+    patchItem(item.candidateId, patch);
+    if (patch.kind && patch.kind !== item.kind) setSamePrompt(null);
+    if (patch.categoryId) {
+      const others = findSameMerchantItems(items, { ...item, ...patch } as EditableCandidate);
+      setSamePrompt(
+        others.length
+          ? {
+              ids: others.map(other => other.candidateId),
+              categoryId: patch.categoryId,
+              categoryName: patch.categoryName || ""
+            }
+          : null
+      );
+    }
+  }
+
+  function applySameMerchant() {
+    if (!samePrompt) return;
+    for (const candidateId of samePrompt.ids) {
+      patchItem(candidateId, {
+        categoryId: samePrompt.categoryId,
+        categoryName: samePrompt.categoryName
+      });
+    }
+    setFeedback("");
+    setSamePrompt(null);
+  }
+
+  function selectFromPicker(kind: PickerKind, value: string) {
+    const item = stepItem;
+    setPicker(null);
+    if (!item) return;
+    if (kind === "category") {
+      const category = pickerCategories.find(row => row.categoryId === value);
+      if (!category) {
+        setStepError("대출 상환은 일반 입력 화면에서 입력해주세요.");
+        return;
+      }
+      handleStepPatch(item, { categoryId: category.categoryId, categoryName: category.name });
+      return;
+    }
+    if (kind === "paymentMethod") {
+      handleStepPatch(item, {
+        paymentMethodId: value,
+        paymentMethodName: accountLabel(value)
+      });
+      return;
+    }
+    if (kind === "fromAccount") handleStepPatch(item, { fromAccountId: value });
+    else handleStepPatch(item, { toAccountId: value });
   }
 
   async function handleSave() {
@@ -446,12 +749,16 @@ export function TransactionImportSheet({
       size="large"
     >
       <fieldset disabled={saving || analyzing} className={styles.formFields}>
-        <p className={draftSaved ? styles.notice : styles.error} role="status">
-          {draftSaved
-            ? "작성 내용은 이 기기에 자동 임시저장됩니다. 원본 이미지는 보관하지 않습니다."
-            : "임시저장에 실패했습니다. 화면을 닫기 전에 거래를 저장해주세요."}
-        </p>
-        {(items.length > 0 || text || files.length > 0) && (
+        <span ref={reviewTopRef} aria-hidden="true" />
+        {/* 한 건씩 확인할 때는 화면을 넓게 쓰도록 안내와 새로 시작 버튼을 숨깁니다. */}
+        {(reviewMode !== "step" || !draftSaved) && (
+          <p className={draftSaved ? styles.notice : styles.error} role="status">
+            {draftSaved
+              ? "작성 내용은 이 기기에 자동 임시저장됩니다. 원본 이미지는 보관하지 않습니다."
+              : "임시저장에 실패했습니다. 화면을 닫기 전에 거래를 저장해주세요."}
+          </p>
+        )}
+        {reviewMode !== "step" && (items.length > 0 || text || files.length > 0) && (
           <Button variant="secondary" onClick={() => void discardDraft()}>
             새로 시작
           </Button>
@@ -607,430 +914,226 @@ export function TransactionImportSheet({
               </Button>
             </div>
           </div>
+        ) : reviewMode === "step" && stepItem ? (
+          <ImportStepReview
+            item={stepItem}
+            position={stepIndex + 1}
+            total={stepIds.length}
+            choices={stepChoices}
+            hasImages={imageUrls.length > 0}
+            sameMerchant={
+              samePrompt
+                ? { count: samePrompt.ids.length, categoryName: samePrompt.categoryName }
+                : null
+            }
+            error={stepError}
+            disabled={saving}
+            onShowImages={() => setViewerOpen(true)}
+            onPatch={patch => handleStepPatch(stepItem, patch)}
+            onOpenPicker={setPicker}
+            onApplySameMerchant={applySameMerchant}
+            onDismissSameMerchant={() => setSamePrompt(null)}
+            onConfirm={() => void confirmStep(stepItem)}
+            onSkip={goToNextStep}
+            onBack={backToList}
+          />
         ) : (
-          <div className={styles.reviewList}>
-            <div className={styles.summary}>
-              <span className={styles.pill}>인식 {items.length}건</span>
-              <span className={styles.pill}>선택 {selectedCount}건</span>
-              {duplicateCount > 0 && (
-                <span className={styles.pill}>중복 의심 {duplicateCount}건</span>
-              )}
-              {reviewCount > 0 && <span className={styles.pill}>확인 필요 {reviewCount}건</span>}
-            </div>
-
-            {items.length > 1 && (
-              <div className={styles.bulkEdit}>
-                <div>
-                  <strong>선택 항목 일괄 수정</strong>
-                  <span>
-                    {selectedCount > 0
-                      ? `${selectedCount}건에 바로 적용됩니다.`
-                      : "먼저 저장할 거래를 선택해주세요."}
-                  </span>
-                </div>
-                <div className={styles.bulkControls}>
-                  <select
-                    className={styles.bulkSelect}
-                    value=""
-                    disabled={!selectedCount}
-                    aria-label="선택 항목 유형 일괄 변경"
-                    onChange={event => patchSelected({ kind: event.target.value as ImportKind })}
-                  >
-                    <option value="">거래 유형 일괄 변경</option>
-                    <option value="expense">지출</option>
-                    <option value="income">수입</option>
-                    <option value="transfer">이체</option>
-                  </select>
-                  <select
-                    className={styles.bulkSelect}
-                    value=""
-                    disabled={!selectedCount || !bulkKind}
-                    aria-label="선택 항목 카테고리 일괄 변경"
-                    onChange={event => {
-                      const category = bulkCategories.find(
-                        row => row.categoryId === event.target.value
-                      );
-                      if (category)
-                        patchSelected({
-                          categoryId: category.categoryId,
-                          categoryName: category.name
-                        });
-                    }}
-                  >
-                    <option value="">
-                      {bulkKind ? "카테고리 일괄 변경" : "같은 유형끼리 선택해주세요"}
-                    </option>
-                    {bulkCategories.map(category => (
-                      <option key={category.categoryId} value={category.categoryId}>
-                        {category.name}
-                      </option>
-                    ))}
-                  </select>
-                  {bulkKind === "expense" && (
-                    <>
-                      <select
-                        className={styles.bulkSelect}
-                        value=""
-                        aria-label="선택 항목 결제수단 일괄 변경"
-                        onChange={event => {
-                          const account = paymentMethods.find(
-                            row => row.accountId === event.target.value
-                          );
-                          if (account)
-                            patchSelected({
-                              paymentMethodId: account.accountId,
-                              paymentMethodName: account.displayName
-                            });
-                        }}
-                      >
-                        <option value="">결제수단 일괄 변경</option>
-                        {paymentMethodOptions}
-                      </select>
-                      <select
-                        className={styles.bulkSelect}
-                        value=""
-                        aria-label="선택 항목 지출대상 일괄 변경"
-                        onChange={event => patchSelected({ spendingTarget: event.target.value })}
-                      >
-                        <option value="">지출대상 일괄 변경</option>
-                        {bootstrap.spendingTargets.map(target => (
-                          <option key={target}>{target}</option>
-                        ))}
-                      </select>
-                    </>
-                  )}
-                  {bulkKind === "transfer" && (
-                    <select
-                      className={styles.bulkSelect}
-                      value=""
-                      aria-label="선택 항목 출금계좌 일괄 변경"
-                      onChange={event => patchSelected({ fromAccountId: event.target.value })}
-                    >
-                      <option value="">출금계좌 일괄 변경</option>
-                      {accountOptions}
-                    </select>
-                  )}
-                  {(bulkKind === "income" || bulkKind === "transfer") && (
-                    <select
-                      className={styles.bulkSelect}
-                      value=""
-                      aria-label="선택 항목 입금계좌 일괄 변경"
-                      onChange={event => patchSelected({ toAccountId: event.target.value })}
-                    >
-                      <option value="">입금계좌 일괄 변경</option>
-                      {accountOptions}
-                    </select>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {items.map(item => (
-              <article
-                key={item.candidateId}
-                className={[
-                  styles.candidate,
-                  item.duplicate ? styles.candidateDuplicate : "",
-                  item.reviewReasons.length > 0 && !item.duplicate ? styles.candidateWarning : ""
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-              >
-                <div className={styles.candidateCompactHeader}>
-                  <input
-                    type="checkbox"
-                    checked={item.selected}
-                    disabled={item.kind === "refund" || item.queued}
-                    aria-label={`${item.merchant || "거래"} 저장 선택`}
-                    onChange={event =>
-                      patchItem(item.candidateId, { selected: event.target.checked })
-                    }
-                  />
-                  <button
-                    type="button"
-                    className={styles.candidateToggle}
-                    aria-expanded={expandedCandidateId === item.candidateId}
-                    onClick={() =>
-                      setExpandedCandidateId(current =>
-                        current === item.candidateId ? null : item.candidateId
-                      )
-                    }
-                  >
-                    <div className={styles.candidateTitle}>
-                      <strong>
-                        {item.queued ? "대기열 추가됨 · " : `${IMPORT_TYPE_LABELS[item.kind]} · `}
-                        {item.merchant || "거래 내용 확인 필요"}
-                      </strong>
-                      <p>
-                        {[
-                          item.date || "날짜 확인",
-                          item.time,
-                          item.categoryName || "카테고리 확인",
-                          item.kind === "expense"
-                            ? item.paymentMethodName
-                            : transferAccounts.find(
-                                account => account.accountId === item.toAccountId
-                              )?.displayName
-                        ]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </p>
-                      {item.reviewReasons.length > 0 && (
-                        <span className={styles.compactWarning}>
-                          {item.reviewReasons[0]}
-                          {item.reviewReasons.length > 1
-                            ? ` 외 ${item.reviewReasons.length - 1}`
-                            : ""}
-                        </span>
-                      )}
-                    </div>
-                    <div className={styles.candidateSummaryAmount}>
-                      <strong>{formatMoney(item.amount)}</strong>
-                      <span aria-hidden="true">
-                        {expandedCandidateId === item.candidateId ? "⌃" : "⌄"}
+          <ImportReviewList
+            items={items}
+            imageUrls={imageUrls}
+            selectedCount={selectedCount}
+            saving={saving}
+            describe={describeItem}
+            onShowImages={() => setViewerOpen(true)}
+            onStartReview={startReview}
+            onOpenItem={openItem}
+            onToggle={(candidateId, selected) => patchItem(candidateId, { selected })}
+            onAdd={addManualItem}
+            onReanalyze={() => {
+              setStage("source");
+              setError("");
+            }}
+            onSave={handleSave}
+            message={
+              <>
+                {error && <p className={styles.error}>{error}</p>}
+                {feedback && <p className={styles.feedback}>{feedback}</p>}
+              </>
+            }
+            bulkEdit={
+              <>
+                {items.length > 1 && (
+                  <details className={reviewStyles.bulk}>
+                    <summary>체크한 거래 한 번에 바꾸기</summary>
+                    <div className={reviewStyles.bulkBody}>
+                      <span>
+                        {selectedCount > 0
+                          ? `체크한 ${selectedCount}건에 바로 적용됩니다.`
+                          : "먼저 목록에서 거래를 체크해주세요."}
                       </span>
-                    </div>
-                  </button>
-                </div>
-
-                {expandedCandidateId === item.candidateId && (
-                  <fieldset
-                    disabled={item.queued}
-                    className={[styles.formFields, styles.candidateDetails].join(" ")}
-                  >
-                    {item.reviewReasons.length > 0 && (
-                      <ul className={styles.reasonList}>
-                        {item.reviewReasons.map(reason => (
-                          <li key={reason}>{reason}</li>
-                        ))}
-                      </ul>
-                    )}
-                    {item.duplicate && (
-                      <p className={styles.notice}>
-                        기존 거래: {item.duplicate.date} ·{" "}
-                        {item.duplicate.description || item.duplicate.category} ·{" "}
-                        {formatMoney(item.duplicate.amount)}
-                      </p>
-                    )}
-
-                    <label className={styles.field}>
-                      <span>거래 유형</span>
                       <select
-                        className={styles.select}
-                        value={item.kind}
-                        disabled={item.kind === "refund"}
+                        className={styles.bulkSelect}
+                        value=""
+                        disabled={!selectedCount}
+                        aria-label="선택 항목 유형 일괄 변경"
                         onChange={event =>
-                          patchItem(item.candidateId, { kind: event.target.value as ImportKind })
+                          patchSelected({ kind: event.target.value as ImportKind })
                         }
                       >
+                        <option value="">거래 유형 일괄 변경</option>
                         <option value="expense">지출</option>
                         <option value="income">수입</option>
                         <option value="transfer">이체</option>
-                        {item.kind === "refund" && (
-                          <option value="refund">취소/환불 · 원거래 연결 필요</option>
-                        )}
                       </select>
-                    </label>
-                    <div className={styles.grid2}>
-                      <label className={styles.field}>
-                        <span>날짜</span>
-                        <input
-                          className={styles.input}
-                          type="date"
-                          value={item.date}
-                          onChange={event =>
-                            patchItem(item.candidateId, { date: event.target.value })
-                          }
-                        />
-                      </label>
-                      <label className={styles.field}>
-                        <span>승인 시간</span>
-                        <input
-                          className={styles.input}
-                          type="time"
-                          value={item.time}
-                          onChange={event =>
-                            patchItem(item.candidateId, { time: event.target.value })
-                          }
-                        />
-                      </label>
-                    </div>
-
-                    <div className={styles.grid2}>
-                      <label className={styles.field}>
-                        <span>금액</span>
-                        <input
-                          className={styles.input}
-                          inputMode="numeric"
-                          value={item.amount || ""}
-                          onChange={event =>
-                            patchItem(item.candidateId, {
-                              amount: Number(event.target.value.replace(/[^0-9]/g, "")) || 0
-                            })
-                          }
-                        />
-                      </label>
-                      <label className={styles.field}>
-                        <span>거래 내용·가맹점</span>
-                        <input
-                          className={styles.input}
-                          value={item.merchant}
-                          onChange={event =>
-                            patchItem(item.candidateId, { merchant: event.target.value })
-                          }
-                        />
-                      </label>
-                    </div>
-
-                    <div className={styles.grid2}>
-                      <label className={styles.field}>
-                        <span>카테고리</span>
-                        <select
-                          className={styles.select}
-                          value={item.categoryId || ""}
-                          onChange={event => {
-                            const category = categories.find(
-                              categoryItem => categoryItem.categoryId === event.target.value
-                            );
-                            patchItem(item.candidateId, {
-                              categoryId: event.target.value || null,
-                              categoryName: category?.name || ""
+                      <select
+                        className={styles.bulkSelect}
+                        value=""
+                        disabled={!selectedCount || !bulkKind}
+                        aria-label="선택 항목 카테고리 일괄 변경"
+                        onChange={event => {
+                          const category = bulkCategories.find(
+                            row => row.categoryId === event.target.value
+                          );
+                          if (category)
+                            patchSelected({
+                              categoryId: category.categoryId,
+                              categoryName: category.name
                             });
-                          }}
-                        >
-                          <option value="">선택</option>
-                          {categories
-                            .filter(category => category.type === IMPORT_TYPE_LABELS[item.kind])
-                            .map(category => (
-                              <option key={category.categoryId} value={category.categoryId}>
-                                {category.name}
-                              </option>
-                            ))}
-                        </select>
-                      </label>
-                      {item.kind === "expense" && (
-                        <label className={styles.field}>
-                          <span>결제수단</span>
+                        }}
+                      >
+                        <option value="">
+                          {bulkKind ? "카테고리 일괄 변경" : "같은 유형끼리 선택해주세요"}
+                        </option>
+                        {bulkCategories.map(category => (
+                          <option key={category.categoryId} value={category.categoryId}>
+                            {category.name}
+                          </option>
+                        ))}
+                      </select>
+                      {bulkKind === "expense" && (
+                        <>
                           <select
-                            className={styles.select}
-                            value={item.paymentMethodId || ""}
+                            className={styles.bulkSelect}
+                            value=""
+                            aria-label="선택 항목 결제수단 일괄 변경"
                             onChange={event => {
                               const account = paymentMethods.find(
-                                accountItem => accountItem.accountId === event.target.value
+                                row => row.accountId === event.target.value
                               );
-                              patchItem(item.candidateId, {
-                                paymentMethodId: event.target.value || null,
-                                paymentMethodName: account?.displayName || ""
-                              });
+                              if (account)
+                                patchSelected({
+                                  paymentMethodId: account.accountId,
+                                  paymentMethodName: account.displayName
+                                });
                             }}
                           >
-                            <option value="">선택</option>
+                            <option value="">결제수단 일괄 변경</option>
                             {paymentMethodOptions}
                           </select>
-                        </label>
+                          <select
+                            className={styles.bulkSelect}
+                            value=""
+                            aria-label="선택 항목 지출대상 일괄 변경"
+                            onChange={event =>
+                              patchSelected({ spendingTarget: event.target.value })
+                            }
+                          >
+                            <option value="">지출대상 일괄 변경</option>
+                            {bootstrap.spendingTargets.map(target => (
+                              <option key={target}>{target}</option>
+                            ))}
+                          </select>
+                        </>
+                      )}
+                      {bulkKind === "transfer" && (
+                        <select
+                          className={styles.bulkSelect}
+                          value=""
+                          aria-label="선택 항목 출금계좌 일괄 변경"
+                          onChange={event => patchSelected({ fromAccountId: event.target.value })}
+                        >
+                          <option value="">출금계좌 일괄 변경</option>
+                          {accountOptions}
+                        </select>
+                      )}
+                      {(bulkKind === "income" || bulkKind === "transfer") && (
+                        <select
+                          className={styles.bulkSelect}
+                          value=""
+                          aria-label="선택 항목 입금계좌 일괄 변경"
+                          onChange={event => patchSelected({ toAccountId: event.target.value })}
+                        >
+                          <option value="">입금계좌 일괄 변경</option>
+                          {accountOptions}
+                        </select>
                       )}
                     </div>
-
-                    {item.kind === "expense" && (
-                      <label className={styles.field}>
-                        <span>지출대상</span>
-                        <select
-                          className={styles.select}
-                          value={item.spendingTarget}
-                          onChange={event =>
-                            patchItem(item.candidateId, { spendingTarget: event.target.value })
-                          }
-                        >
-                          <option value="">선택</option>
-                          {bootstrap.spendingTargets.map(target => (
-                            <option key={target} value={target}>
-                              {target}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    )}
-                    {item.kind === "transfer" && (
-                      <label className={styles.field}>
-                        <span>출금계좌</span>
-                        <select
-                          className={styles.select}
-                          value={item.fromAccountId || ""}
-                          onChange={event =>
-                            patchItem(item.candidateId, { fromAccountId: event.target.value })
-                          }
-                        >
-                          <option value="">선택</option>
-                          {accountOptions}
-                        </select>
-                      </label>
-                    )}
-                    {(item.kind === "income" || item.kind === "transfer") && (
-                      <label className={styles.field}>
-                        <span>입금계좌</span>
-                        <select
-                          className={styles.select}
-                          value={item.toAccountId || ""}
-                          onChange={event =>
-                            patchItem(item.candidateId, { toAccountId: event.target.value })
-                          }
-                        >
-                          <option value="">선택</option>
-                          {accountOptions}
-                        </select>
-                      </label>
-                    )}
-                    <TagsInput
-                      value={item.tagsText || ""}
-                      onChange={value => patchItem(item.candidateId, { tagsText: value })}
-                      disabled={saving || item.queued}
-                    />
-                    <TagChips tags={item.automaticTags} />
-                    {!!item.matchedRules?.length && (
-                      <p>일치 규칙: {item.matchedRules.join(" · ")}</p>
-                    )}
-                    <label className={styles.field}>
-                      <span>메모</span>
-                      <input
-                        className={styles.input}
-                        value={item.memo}
-                        onChange={event =>
-                          patchItem(item.candidateId, { memo: event.target.value })
-                        }
-                      />
-                    </label>
-                  </fieldset>
+                  </details>
                 )}
-              </article>
-            ))}
-
-            {error && <p className={styles.error}>{error}</p>}
-            {feedback && <p className={styles.feedback}>{feedback}</p>}
-            <div className={styles.actions}>
-              <Button variant="secondary" onClick={addManualItem}>
-                거래 추가
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setStage("source");
-                  setError("");
-                }}
-              >
-                다시 분석
-              </Button>
-              <Button
-                loading={saving}
-                loadingLabel="추가 중..."
-                disabled={selectedCount === 0}
-                onClick={handleSave}
-              >
-                선택 {selectedCount}건 저장
-              </Button>
-            </div>
-          </div>
+              </>
+            }
+          />
         )}
       </fieldset>
+      {picker &&
+        stepItem &&
+        createPortal(
+          // 아래 선택창의 Esc·Tab 키가 바깥 가져오기 창까지 올라가 닫히지 않게 막습니다.
+          <div onKeyDown={event => event.stopPropagation()}>
+            <InputPickerSheet
+              kind={picker === "toAccount" && stepItem.kind === "income" ? "incomeAccount" : picker}
+              mode={stepItem.kind === "refund" ? "expense" : stepItem.kind}
+              userName={userName}
+              orderedAllAccounts={pickerAccounts.ordered}
+              visibleAccounts={pickerAccounts.visible}
+              creditCards={pickerAccounts.creditCards}
+              cardSourceAccounts={[]}
+              visibleAccountIds={pickerAccounts.visibleIds}
+              investmentAccountIds={new Set()}
+              categories={pickerCategories}
+              spendingTargets={bootstrap.spendingTargets}
+              selection={{
+                categoryId: stepItem.categoryId || "",
+                paymentMethodId: stepItem.paymentMethodId || "",
+                spendingTarget: stepItem.spendingTarget,
+                fromAccountId: stepItem.fromAccountId || "",
+                toAccountId: stepItem.toAccountId || "",
+                investmentAccountId: ""
+              }}
+              merchant={stepItem.merchant}
+              onSelect={selectFromPicker}
+              onClose={() => setPicker(null)}
+            />
+          </div>,
+          document.body
+        )}
+      {viewerOpen &&
+        imageUrls.length > 0 &&
+        createPortal(
+          <div
+            className={reviewStyles.viewer}
+            role="dialog"
+            aria-modal="true"
+            aria-label="원본 캡처"
+            onKeyDown={event => {
+              event.stopPropagation();
+              if (event.key === "Escape") setViewerOpen(false);
+            }}
+          >
+            <div className={reviewStyles.viewerHead}>
+              <span>원본 캡처 {imageUrls.length}장</span>
+              <button type="button" autoFocus onClick={() => setViewerOpen(false)}>
+                닫기
+              </button>
+            </div>
+            <div className={reviewStyles.viewerBody}>
+              {imageUrls.map((url, index) => (
+                <img key={url} src={url} alt={`원본 캡처 ${index + 1}`} />
+              ))}
+            </div>
+          </div>,
+          document.body
+        )}
     </BottomSheet>
   );
 }
