@@ -2,87 +2,14 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { deflateSync } from "node:zlib";
 
-// 분위기를 바꾸고 싶으면 이 값만 변경.
-// 빌드 시 환경변수로도 덮어쓸 수 있음.
-// 예: MONEYBOOK_ICON_THEME=spring npm run build
-const DEFAULT_THEME = "cozy";
-const ICON_THEME = process.env.MONEYBOOK_ICON_THEME || DEFAULT_THEME;
-
-const THEMES = {
-  cozy: {
-    background: "#FFF7E8",
-    panel: "#FFFDF7",
-    border: "#B9E0D0",
-    roof: "#79C7B6",
-    roofDark: "#4A9B8D",
-    navy: "#233D5B",
-    coral: "#FF8778",
-    gold: "#F2BF4D",
-    goldDark: "#D89A25",
-    green: "#95C989",
-    page: "#FFF3D5",
-    shadow: "#18354A"
-  },
-
-  spring: {
-    background: "#F8FFF8",
-    panel: "#FFFDF8",
-    border: "#BDE8CC",
-    roof: "#83D4AC",
-    roofDark: "#55A984",
-    navy: "#375A64",
-    coral: "#FFA0AA",
-    gold: "#F5CF67",
-    goldDark: "#D7AA39",
-    green: "#A9D990",
-    page: "#FFF7DC",
-    shadow: "#33555D"
-  },
-
-  peach: {
-    background: "#FFF6F1",
-    panel: "#FFFCF9",
-    border: "#F4C7BA",
-    roof: "#EFA995",
-    roofDark: "#CF806D",
-    navy: "#4B4054",
-    coral: "#FF7F73",
-    gold: "#F3C55A",
-    goldDark: "#D7A232",
-    green: "#A9C994",
-    page: "#FFF0DA",
-    shadow: "#493B4C"
-  },
-
-  blue: {
-    background: "#F3FAFF",
-    panel: "#FCFEFF",
-    border: "#BDDDF1",
-    roof: "#80C8E7",
-    roofDark: "#4A9FC3",
-    navy: "#244767",
-    coral: "#FF8B8E",
-    gold: "#F1C45E",
-    goldDark: "#D6A33A",
-    green: "#91CDB6",
-    page: "#FFF5DD",
-    shadow: "#1E405C"
-  },
-
-  night: {
-    background: "#1D2940",
-    panel: "#27354F",
-    border: "#607CA5",
-    roof: "#6FB6AA",
-    roofDark: "#4B8E86",
-    navy: "#152238",
-    coral: "#FF8D91",
-    gold: "#F2C969",
-    goldDark: "#D6A644",
-    green: "#7FB997",
-    page: "#EEDFBF",
-    shadow: "#0D1626"
-  }
+// 시안 A "두 개의 동전": 두 사람의 돈(라벤더·핑크 원)이 겹치는 자리에 하트.
+// 색은 src/styles/tokens.css 의 라벤더·핑크 계열에 맞춤.
+const PALETTE = {
+  background: "#FBEAF0",
+  left: "#A99BD9",
+  right: "#F49AB3",
+  overlap: "#6E5BB8",
+  heart: "#FFFFFF"
 };
 
 const OUTPUTS = [
@@ -91,14 +18,6 @@ const OUTPUTS = [
   ["public/icon-512.png", 512, false],
   ["public/maskable-512.png", 512, true]
 ];
-
-const theme = THEMES[ICON_THEME];
-
-if (!theme) {
-  throw new Error(
-    `Unknown MONEYBOOK_ICON_THEME: ${ICON_THEME}. Choose one of: ${Object.keys(THEMES).join(", ")}`
-  );
-}
 
 function hex(value, alpha = 255) {
   const clean = value.replace("#", "");
@@ -111,7 +30,7 @@ function hex(value, alpha = 255) {
   ];
 }
 
-const C = Object.fromEntries(Object.entries(theme).map(([key, value]) => [key, hex(value)]));
+const C = Object.fromEntries(Object.entries(PALETTE).map(([key, value]) => [key, hex(value)]));
 
 const crcTable = (() => {
   const table = new Uint32Array(256);
@@ -217,22 +136,6 @@ function fillCircle(buffer, size, cx, cy, radius, rgba) {
   }
 }
 
-function fillRoundedRect(buffer, size, left, top, right, bottom, radius, rgba) {
-  const r = Math.max(0, Math.min(radius, (right - left) / 2, (bottom - top) / 2));
-
-  fillRect(buffer, size, left + r, top, right - r, bottom, rgba);
-
-  fillRect(buffer, size, left, top + r, right, bottom - r, rgba);
-
-  fillCircle(buffer, size, left + r, top + r, r, rgba);
-
-  fillCircle(buffer, size, right - r, top + r, r, rgba);
-
-  fillCircle(buffer, size, left + r, bottom - r, r, rgba);
-
-  fillCircle(buffer, size, right - r, bottom - r, r, rgba);
-}
-
 function fillPolygon(buffer, size, points, rgba) {
   const ys = points.map(([, y]) => y);
 
@@ -290,128 +193,53 @@ function drawHeart(buffer, size, cx, cy, scale, rgba) {
   );
 }
 
-function drawCoin(buffer, size, cx, cy, radius) {
-  fillCircle(buffer, size, cx, cy, radius, C.goldDark);
-
-  fillCircle(buffer, size, cx, cy, radius * 0.84, C.gold);
-
-  drawHeart(buffer, size, cx, cy + radius * 0.02, radius * 0.58, C.panel);
-}
-
 function createIconPixels(size, maskable) {
-  const supersample = size <= 192 ? 3 : 2;
+  const supersample = size <= 192 ? 4 : 3;
 
-  const renderSize = size * supersample;
+  const s = size * supersample;
 
-  const pixels = Buffer.alloc(renderSize * renderSize * 4);
+  const pixels = Buffer.alloc(s * s * 4);
 
-  const s = renderSize;
+  // 기준 좌표는 100x100. maskable 은 안드로이드가 가장자리를 잘라내므로
+  // 그림을 가운데로 조금 줄여서(안전 영역 안에) 그림.
+  const scale = maskable ? 0.86 : 1;
 
-  const u = value => value * s;
+  const u = value => ((value - 50) * scale + 50) * (s / 100);
+
+  const r = 22 * scale * (s / 100);
+
+  const left = [u(39), u(50)];
+
+  const right = [u(61), u(50)];
 
   fillRect(pixels, s, 0, 0, s, s, C.background);
 
-  const safeInset = maskable ? u(0.105) : u(0.045);
+  fillCircle(pixels, s, left[0], left[1], r, C.left);
 
-  const shadow = [...C.shadow];
+  fillCircle(pixels, s, right[0], right[1], r, C.right);
 
-  shadow[3] = ICON_THEME === "night" ? 75 : 35;
+  // 두 원이 겹치는 부분.
+  const r2 = r * r;
 
-  fillRoundedRect(
-    pixels,
-    s,
-    safeInset + u(0.012),
-    safeInset + u(0.018),
-    s - safeInset + u(0.012),
-    s - safeInset + u(0.018),
-    u(0.105),
-    shadow
-  );
+  for (let y = Math.floor(left[1] - r); y <= Math.ceil(left[1] + r); y += 1) {
+    for (let x = Math.floor(right[0] - r); x <= Math.ceil(left[0] + r); x += 1) {
+      const px = x + 0.5;
 
-  fillRoundedRect(
-    pixels,
-    s,
-    safeInset,
-    safeInset,
-    s - safeInset,
-    s - safeInset,
-    u(0.105),
-    C.border
-  );
+      const py = y + 0.5;
 
-  fillRoundedRect(
-    pixels,
-    s,
-    safeInset + u(0.012),
-    safeInset + u(0.012),
-    s - safeInset - u(0.012),
-    s - safeInset - u(0.012),
-    u(0.095),
-    C.panel
-  );
+      const inLeft = (px - left[0]) ** 2 + (py - left[1]) ** 2 <= r2;
 
-  // 한 지붕 아래 함께 사는 집.
-  fillRoundedRect(pixels, s, u(0.275), u(0.3), u(0.725), u(0.57), u(0.035), C.page);
+      const inRight = (px - right[0]) ** 2 + (py - right[1]) ** 2 <= r2;
 
-  fillPolygon(
-    pixels,
-    s,
-    [
-      [u(0.205), u(0.35)],
-      [u(0.5), u(0.165)],
-      [u(0.795), u(0.35)],
-      [u(0.748), u(0.39)],
-      [u(0.5), u(0.235)],
-      [u(0.252), u(0.39)]
-    ],
-    C.roofDark
-  );
+      if (inLeft && inRight) {
+        blendPixel(pixels, s, x, y, C.overlap);
+      }
+    }
+  }
 
-  fillPolygon(
-    pixels,
-    s,
-    [
-      [u(0.218), u(0.334)],
-      [u(0.5), u(0.17)],
-      [u(0.782), u(0.334)],
-      [u(0.748), u(0.365)],
-      [u(0.5), u(0.218)],
-      [u(0.252), u(0.365)]
-    ],
-    C.roof
-  );
+  drawHeart(pixels, s, u(50), u(51.2), 15 * scale * (s / 100), C.heart);
 
-  // 두 개의 하트 = 우리 둘.
-  drawHeart(pixels, s, u(0.435), u(0.42), u(0.095), C.coral);
-
-  drawHeart(pixels, s, u(0.565), u(0.42), u(0.095), C.roofDark);
-
-  // 함께 쓰는 지갑 / 가계부.
-  fillRoundedRect(pixels, s, u(0.205), u(0.535), u(0.795), u(0.82), u(0.06), C.navy);
-
-  fillRoundedRect(pixels, s, u(0.225), u(0.56), u(0.775), u(0.69), u(0.032), C.page);
-
-  // 카드.
-  fillRoundedRect(pixels, s, u(0.255), u(0.61), u(0.42), u(0.7), u(0.022), C.coral);
-
-  fillRoundedRect(pixels, s, u(0.278), u(0.628), u(0.315), u(0.66), u(0.007), C.panel);
-
-  // 지폐.
-  const bill = [...C.green];
-
-  bill[3] = 220;
-
-  fillRoundedRect(pixels, s, u(0.565), u(0.6), u(0.715), u(0.695), u(0.018), bill);
-
-  fillCircle(pixels, s, u(0.64), u(0.647), u(0.022), C.panel);
-
-  // 가운데 하트.
-  drawHeart(pixels, s, u(0.5), u(0.71), u(0.115), C.coral);
-
-  // 동전.
-  drawCoin(pixels, s, u(0.68), u(0.735), u(0.062));
-
-  return supersample === 1 ? pixels : downsample(pixels, renderSize, size, supersample);
+  return downsample(pixels, s, size, supersample);
 }
 
 function downsample(source, sourceSize, targetSize, scale) {
@@ -489,5 +317,5 @@ for (const [relativePath, size, maskable] of OUTPUTS) {
 
   await writeFile(outputPath, encodePng(size, createIconPixels(size, maskable)));
 
-  console.log(`generated ${relativePath} (${size}x${size}) theme=${ICON_THEME}`);
+  console.log(`generated ${relativePath} (${size}x${size})`);
 }
