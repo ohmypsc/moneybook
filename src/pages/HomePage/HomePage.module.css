@@ -51,7 +51,7 @@
 
 .togetherValue {
   margin: 4px 0 5px;
-  color: var(--color-primary);
+  color: var(--color-tone-pink-text);
   font-size: clamp(32px, 9vw, 42px);
   line-height: 1;
   letter-spacing: -0.045em;
@@ -142,7 +142,13 @@
   gap: 4px;
   padding: 9px 10px;
   border-radius: var(--radius-md);
-  background: var(--color-surface-soft);
+  background: var(--color-tone-mint-bg);
+}
+.assetComposition > div:nth-child(2) {
+  background: var(--color-tone-lemon-bg);
+}
+.assetComposition > div:nth-child(3) {
+  background: var(--color-tone-pink-bg);
 }
 .assetComposition span {
   color: var(--color-text-secondary);
@@ -233,8 +239,8 @@
   place-items: center;
   flex: 0 0 34px;
   border-radius: 50%;
-  background: var(--color-surface-blue);
-  color: var(--color-primary);
+  background: var(--color-tone-lavender-bg);
+  color: var(--color-tone-lavender-text);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-heavy);
 }
@@ -329,13 +335,13 @@
 }
 
 .upcomingIconCard {
-  background: var(--color-surface-blue);
-  color: var(--color-primary);
+  background: var(--color-tone-lavender-bg);
+  color: var(--color-tone-lavender-text);
 }
 
 .upcomingIconRecurring {
-  background: var(--color-surface-soft);
-  color: var(--color-text-secondary);
+  background: var(--color-tone-mint-bg);
+  color: var(--color-tone-mint-text);
 }
 
 .upcomingCopy {
@@ -378,10 +384,18 @@
   place-items: center;
   flex: 0 0 26px;
   border-radius: 50%;
-  background: var(--color-surface-soft);
-  color: var(--color-primary);
+  background: var(--color-tone-lemon-bg);
+  color: var(--color-tone-lemon-text);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-heavy);
+}
+.rankRow:nth-child(2) .rankNumber {
+  background: var(--color-tone-mint-bg);
+  color: var(--color-tone-mint-text);
+}
+.rankRow:nth-child(3) .rankNumber {
+  background: var(--color-tone-lavender-bg);
+  color: var(--color-tone-lavender-text);
 }
 .rankName {
   min-width: 0;
