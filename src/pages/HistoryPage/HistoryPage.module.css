@@ -696,6 +696,8 @@
 
 /* 목록 행: 행을 누르면 수정, 오른쪽에는 금액과 작은 복사 버튼 */
 button.transactionMain {
+  -webkit-touch-callout: none;
+  user-select: none;
   padding: 0;
   border: 0;
   background: none;
@@ -714,6 +716,24 @@ button.transactionMain {
   min-height: 60px;
   padding: 11px 15px;
 }
+/* 복사는 줄을 길게 눌러서 합니다. 버튼은 키보드로 이동할 때만 보입니다. */
+.copyButton:not(:focus-visible) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.resultHint {
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
 .copyButton {
   min-height: 28px;
   padding: 0 8px;

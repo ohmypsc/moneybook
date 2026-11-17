@@ -64,11 +64,12 @@
 
 .inputItem {
   color: var(--color-primary);
-  font-weight: var(--font-weight-heavy);
 }
 
+/* 동그라미가 다른 아이콘(22px)보다 12px 커서, 그만큼 위로 띄워 글자 줄을 다른 탭과 맞춥니다. */
 .inputIconWrap {
   position: relative;
+  margin-top: -12px;
   width: 34px;
   height: 34px;
   display: grid;

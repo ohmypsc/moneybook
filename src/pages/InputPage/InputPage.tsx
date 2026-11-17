@@ -10,6 +10,7 @@ import { previewBenefit } from "../../api/automation";
 import type { AutomationSettings, BenefitPreview } from "../../api/automation";
 import { getBootstrapCacheGeneration, getCachedBootstrapPayload } from "../../api/bootstrapCache";
 import { createTransaction, getTransactions } from "../../api/transactions";
+import { recordCategoryUsage } from "../../utils/categoryUsage";
 import { getDashboard, getDashboardSnapshot } from "../../api/dashboard";
 import { Button } from "../../components/common/Button/Button";
 import { PendingTransactionPanel } from "./PendingTransactionPanel";
@@ -467,6 +468,9 @@ export default function InputPage({
   const [error, setError] = useState("");
 
   const [success, setSuccess] = useState("");
+  // 태그·메모는 자주 쓰지 않아 접어 둡니다. 값이 들어 있으면(초안·실패 복구 등) 펼쳐서 보여 줍니다.
+  const [showExtraFields, setShowExtraFields] = useState(false);
+  const extraFieldsOpen = showExtraFields || Boolean(tagsText.trim() || memo.trim());
 
   const [investmentDashboard, setInvestmentDashboard] = useState<DashboardData | null>(() =>
     getDashboardSnapshot()
@@ -2073,6 +2077,7 @@ export default function InputPage({
        * 사용자가 같은 내용을 한 번 더 입력하지 않도록 초안은 즉시 지웁니다.
        */
       clearInputDraft(userName);
+      recordCategoryUsage(userName, categoryId);
 
       setAmount("");
       setCategoryId("");
@@ -2235,20 +2240,6 @@ export default function InputPage({
               </label>
             )}
 
-            <label className={styles.field}>
-              <span className={styles.fieldLabel}>
-                날짜 <span className={styles.required}>*</span>
-              </span>
-
-              <input
-                type="date"
-                className={styles.input}
-                value={date}
-                disabled={submitting}
-                onChange={event => handleDateChange(event.target.value)}
-              />
-            </label>
-
             {mode !== "transfer" && (
               <label className={styles.field}>
                 <span className={styles.fieldLabel}>
@@ -2288,9 +2279,9 @@ export default function InputPage({
             )}
 
             {mode === "expense" && (
-              <div className={styles.conditionalSection}>
-                <h2 className={styles.sectionTitle}>지출 정보</h2>
-
+              <div
+                className={[styles.conditionalSection, styles.conditionalSectionPlain].join(" ")}
+              >
                 <label className={styles.field}>
                   <span className={styles.fieldLabel}>
                     결제수단 <span className={styles.required}>*</span>
@@ -2301,8 +2292,6 @@ export default function InputPage({
                     onClick={() => setActivePicker("paymentMethod")}
                     disabled={submitting}
                   />
-
-                  <p className={styles.helper}>체크카드는 연결된 통장에서 자동 출금됩니다.</p>
                 </label>
 
                 {canUseInstallment && (
@@ -2455,9 +2444,9 @@ export default function InputPage({
             )}
 
             {mode === "income" && (
-              <div className={styles.conditionalSection}>
-                <h2 className={styles.sectionTitle}>수입 정보</h2>
-
+              <div
+                className={[styles.conditionalSection, styles.conditionalSectionPlain].join(" ")}
+              >
                 <label className={styles.field}>
                   <span className={styles.fieldLabel}>
                     입금수단 <span className={styles.required}>*</span>
@@ -2809,14 +2798,40 @@ export default function InputPage({
               </div>
             )}
 
-            <TagsInput
-              value={tagsText}
-              onChange={value => {
-                setTagsText(value);
-                requestMemory.current = null;
-              }}
-              disabled={submitting}
-            />
+            {!isCardTransfer && (
+              <label className={styles.field}>
+                <span className={styles.fieldLabel}>내용</span>
+
+                <input
+                  className={styles.input}
+                  type="text"
+                  placeholder="예: 스타벅스, 주유, 급여"
+                  value={description}
+                  disabled={submitting}
+                  onChange={event => {
+                    setDescription(event.target.value);
+                    requestMemory.current = null;
+                    clearFeedback();
+                  }}
+                />
+              </label>
+            )}
+
+            {/* 날짜는 기본값이 오늘이라 한 줄로 작게 둡니다. */}
+            <label className={styles.dateRow}>
+              <span className={styles.fieldLabel}>
+                날짜 <span className={styles.required}>*</span>
+              </span>
+
+              <input
+                type="date"
+                className={styles.dateInput}
+                value={date}
+                disabled={submitting}
+                onChange={event => handleDateChange(event.target.value)}
+              />
+            </label>
+
             {classification.matchedNames.length > 0 && (
               <div>
                 <p className={styles.helper}>
@@ -2833,47 +2848,47 @@ export default function InputPage({
                 카테고리 자동 분류로 전환
               </button>
             )}
-            {!isCardTransfer && (
+            {extraFieldsOpen ? (
               <>
-                <label className={styles.field}>
-                  <span className={styles.fieldLabel}>내용</span>
+                <TagsInput
+                  value={tagsText}
+                  onChange={value => {
+                    setTagsText(value);
+                    requestMemory.current = null;
+                  }}
+                  disabled={submitting}
+                />
 
-                  <input
-                    className={styles.input}
-                    type="text"
-                    placeholder="예: 스타벅스, 주유, 급여"
-                    value={description}
-                    disabled={submitting}
-                    onChange={event => {
-                      setDescription(event.target.value);
-                      requestMemory.current = null;
-                      clearFeedback();
-                    }}
-                  />
+                {!isCardTransfer && (
+                  <label className={styles.field}>
+                    <span className={styles.fieldLabel}>메모</span>
 
-                  <p className={styles.helper}>
-                    내역에서 한눈에 알아볼 짧은 내용을 적어주세요. 비워도 됩니다.
-                  </p>
-                </label>
+                    <textarea
+                      className={styles.textarea}
+                      placeholder="추가로 남길 메모가 있다면 적어주세요."
+                      value={memo}
+                      disabled={submitting}
+                      onChange={event => {
+                        setMemo(event.target.value);
 
-                <label className={styles.field}>
-                  <span className={styles.fieldLabel}>메모</span>
+                        requestMemory.current = null;
 
-                  <textarea
-                    className={styles.textarea}
-                    placeholder="추가로 남길 메모가 있다면 적어주세요."
-                    value={memo}
-                    disabled={submitting}
-                    onChange={event => {
-                      setMemo(event.target.value);
-
-                      requestMemory.current = null;
-
-                      clearFeedback();
-                    }}
-                  />
-                </label>
+                        clearFeedback();
+                      }}
+                    />
+                  </label>
+                )}
               </>
+            ) : (
+              <button
+                type="button"
+                className={styles.moreFieldsButton}
+                aria-expanded={false}
+                disabled={submitting}
+                onClick={() => setShowExtraFields(true)}
+              >
+                ＋ {isCardTransfer ? "태그" : "태그·메모"} 더 입력하기
+              </button>
             )}
 
             <PendingTransactionPanel

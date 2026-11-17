@@ -170,8 +170,26 @@ function formatCurrency(value: number | null | undefined) {
   return formatMoney(value);
 }
 
+// 달력 칸은 폭이 좁아 100만 원 이상은 만 원 단위로 줄여 씁니다. (예: 4,200,000 → 420만)
 function formatCalendarAmount(value: number) {
-  return Math.round(Math.abs(value)).toLocaleString("ko-KR");
+  const amount = Math.round(Math.abs(value));
+  if (amount >= 1_000_000) {
+    return `${Math.round(amount / 10_000).toLocaleString("ko-KR")}만`;
+  }
+  return amount.toLocaleString("ko-KR");
+}
+
+// 날짜를 누르면 아래 상세가 화면 안에 들어오도록 스크롤합니다. (이미 보이면 그대로 둡니다)
+function revealDetailSection(element: HTMLElement | null) {
+  if (!element || typeof window === "undefined") return;
+  const viewportHeight = window.innerHeight;
+  const top = element.getBoundingClientRect().top;
+  if (top < viewportHeight * 0.6) return;
+  const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  window.scrollTo({
+    top: window.scrollY + top - viewportHeight * 0.4,
+    behavior: reduceMotion ? "auto" : "smooth"
+  });
 }
 
 function buildCalendarCells(month: string): CalendarCell[] {
@@ -413,6 +431,7 @@ export default function CalendarPage({
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const externalEditHandledRef = useRef<string | null>(null);
+  const detailSectionRef = useRef<HTMLElement | null>(null);
 
   const [editForm, setEditForm] = useState<EditForm | null>(null);
 
@@ -1662,7 +1681,12 @@ export default function CalendarPage({
                     ]
                       .filter(Boolean)
                       .join(" ")}
-                    onClick={() => setSelectedDate(cell.date as string)}
+                    onClick={() => {
+                      setSelectedDate(cell.date as string);
+                      window.requestAnimationFrame(() =>
+                        revealDetailSection(detailSectionRef.current)
+                      );
+                    }}
                     aria-label={`${cell.day}일, 거래 ${dayItems.length}건`}
                   >
                     <div className={styles.dayNumberRow}>
@@ -1692,7 +1716,7 @@ export default function CalendarPage({
             </div>
           </Card>
 
-          <section className={styles.detailSection}>
+          <section ref={detailSectionRef} className={styles.detailSection}>
             <div className={styles.detailHeader}>
               <div className={styles.detailTitleGroup}>
                 <p className={styles.detailEyebrow}>선택한 날짜</p>
@@ -1711,31 +1735,36 @@ export default function CalendarPage({
               </div>
             </div>
 
-            <div className={styles.daySummary}>
-              <div className={styles.daySummaryItem}>
-                <span className={styles.daySummaryLabel}>수입</span>
+            {(selectedIncome !== 0 || selectedExpense !== 0 || selectedTransfer !== 0) && (
+              <div className={styles.daySummary}>
+                {selectedIncome !== 0 && (
+                  <div className={styles.daySummaryItem}>
+                    <span className={styles.daySummaryLabel}>수입</span>
+                    <strong className={[styles.daySummaryValue, styles.summaryIncome].join(" ")}>
+                      {formatCurrency(selectedIncome)}
+                    </strong>
+                  </div>
+                )}
 
-                <strong className={[styles.daySummaryValue, styles.summaryIncome].join(" ")}>
-                  {formatCurrency(selectedIncome)}
-                </strong>
+                {selectedExpense !== 0 && (
+                  <div className={styles.daySummaryItem}>
+                    <span className={styles.daySummaryLabel}>지출</span>
+                    <strong className={[styles.daySummaryValue, styles.summaryExpense].join(" ")}>
+                      {formatCurrency(selectedExpense)}
+                    </strong>
+                  </div>
+                )}
+
+                {selectedTransfer !== 0 && (
+                  <div className={styles.daySummaryItem}>
+                    <span className={styles.daySummaryLabel}>이체</span>
+                    <strong className={styles.daySummaryValue}>
+                      {formatCurrency(selectedTransfer)}
+                    </strong>
+                  </div>
+                )}
               </div>
-
-              <div className={styles.daySummaryItem}>
-                <span className={styles.daySummaryLabel}>지출</span>
-
-                <strong className={[styles.daySummaryValue, styles.summaryExpense].join(" ")}>
-                  {formatCurrency(selectedExpense)}
-                </strong>
-              </div>
-
-              <div className={styles.daySummaryItem}>
-                <span className={styles.daySummaryLabel}>이체</span>
-
-                <strong className={styles.daySummaryValue}>
-                  {formatCurrency(selectedTransfer)}
-                </strong>
-              </div>
-            </div>
+            )}
 
             {actionError && (
               <p className={styles.actionError} role="alert">
@@ -1750,7 +1779,9 @@ export default function CalendarPage({
             )}
 
             {selectedTransactions.length === 0 && (
-              <p className={styles.emptyState}>이 날짜에는 표시할 거래가 없습니다.</p>
+              <p className={styles.dayEmpty}>
+                거래 없음{onAddTransaction ? " · 오른쪽 위 + 추가로 바로 입력" : ""}
+              </p>
             )}
 
             {selectedTransactions.length > 0 && (

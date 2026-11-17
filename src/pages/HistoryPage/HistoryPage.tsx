@@ -146,6 +146,8 @@ function getTransactionMeta(transaction: Transaction) {
     .join(" · ");
 }
 
+const LONG_PRESS_MS = 500;
+
 export default function HistoryPage({ onAddTransaction, onCopyTransaction }: HistoryPageProps) {
   // 마지막으로 본 화면(캘린더/목록/리포트)을 기억해 다음에 그대로 엽니다.
   const [view, setViewState] = useState<HistoryView>(readStoredHistoryView);
@@ -173,6 +175,27 @@ export default function HistoryPage({ onAddTransaction, onCopyTransaction }: His
     month: string;
   } | null>(null);
   const searchRequest = useRef(0);
+  // 목록 줄을 길게 누르면 복사해서 새로 입력합니다. (짧게 누르면 수정)
+  const longPress = useRef<{ timer: number | null; fired: boolean }>({ timer: null, fired: false });
+
+  function cancelLongPress() {
+    if (longPress.current.timer !== null) {
+      window.clearTimeout(longPress.current.timer);
+      longPress.current.timer = null;
+    }
+  }
+
+  function startLongPress(transaction: Transaction) {
+    if (!onCopyTransaction) return;
+    cancelLongPress();
+    longPress.current.fired = false;
+    longPress.current.timer = window.setTimeout(() => {
+      longPress.current.timer = null;
+      longPress.current.fired = true;
+      navigator.vibrate?.(15);
+      onCopyTransaction(transaction);
+    }, LONG_PRESS_MS);
+  }
   const reportRequest = useRef(0);
   const listReturn = useRef<{ scrollY: number; count: number } | null>(null);
   const restoreListScroll = useRef(false);
@@ -578,7 +601,7 @@ export default function HistoryPage({ onAddTransaction, onCopyTransaction }: His
           {browsingMonth ? (
             <div className={styles.monthControl}>
               <Button
-                variant="ghost"
+                variant="secondary"
                 size="sm"
                 iconOnly
                 aria-label="이전 달"
@@ -588,7 +611,7 @@ export default function HistoryPage({ onAddTransaction, onCopyTransaction }: His
               </Button>
               <strong>{formatMonthLabel(listMonth)}</strong>
               <Button
-                variant="ghost"
+                variant="secondary"
                 size="sm"
                 iconOnly
                 aria-label="다음 달"
@@ -765,7 +788,12 @@ export default function HistoryPage({ onAddTransaction, onCopyTransaction }: His
           )}
 
           <div className={styles.resultHeader}>
-            <strong>{searchTotal.toLocaleString("ko-KR")}건</strong>
+            <strong>
+              {searchTotal.toLocaleString("ko-KR")}건
+              {onCopyTransaction && searchTotal > 0 && (
+                <span className={styles.resultHint}> · 길게 누르면 복사</span>
+              )}
+            </strong>
             {searchItems.length < searchTotal && (
               <span>{searchItems.length.toLocaleString("ko-KR")}건 표시 중</span>
             )}
@@ -798,7 +826,20 @@ export default function HistoryPage({ onAddTransaction, onCopyTransaction }: His
                         <button
                           type="button"
                           className={styles.transactionMain}
-                          onClick={() => openSearchResultForEdit(transaction)}
+                          onPointerDown={() => startLongPress(transaction)}
+                          onPointerUp={cancelLongPress}
+                          onPointerLeave={cancelLongPress}
+                          onPointerCancel={cancelLongPress}
+                          onContextMenu={event => {
+                            if (onCopyTransaction) event.preventDefault();
+                          }}
+                          onClick={() => {
+                            if (longPress.current.fired) {
+                              longPress.current.fired = false;
+                              return;
+                            }
+                            openSearchResultForEdit(transaction);
+                          }}
                           aria-label={`${getTransactionTitle(transaction)} 수정`}
                         >
                           <strong>{getTransactionTitle(transaction)}</strong>
@@ -860,6 +901,7 @@ export default function HistoryPage({ onAddTransaction, onCopyTransaction }: His
                             <button
                               type="button"
                               className={styles.copyButton}
+                              title="줄을 길게 눌러도 복사할 수 있어요"
                               onClick={() => onCopyTransaction(transaction)}
                               aria-label={`${getTransactionTitle(transaction)} 복사해서 새로 입력`}
                             >
@@ -903,7 +945,7 @@ export default function HistoryPage({ onAddTransaction, onCopyTransaction }: His
 
           <div className={styles.monthControl}>
             <Button
-              variant="ghost"
+              variant="secondary"
               size="sm"
               iconOnly
               aria-label="이전 달"
@@ -913,7 +955,7 @@ export default function HistoryPage({ onAddTransaction, onCopyTransaction }: His
             </Button>
             <strong>{formatMonthLabel(reportMonth)}</strong>
             <Button
-              variant="ghost"
+              variant="secondary"
               size="sm"
               iconOnly
               aria-label="다음 달"
