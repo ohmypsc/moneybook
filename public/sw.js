@@ -15,10 +15,10 @@ const PRECACHE_URLS = [
   "/splash-photo.jpg",
   "/splash-thumb.jpg",
   "/manifest.webmanifest",
-  "/apple-touch-icon.png",
-  "/icon-192.png",
-  "/icon-512.png",
-  "/maskable-512.png"
+  "/apple-touch-icon.png?v=2",
+  "/icon-192.png?v=2",
+  "/icon-512.png?v=2",
+  "/maskable-512.png?v=2"
 ];
 
 
