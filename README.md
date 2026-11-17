@@ -48,7 +48,6 @@ tests/                  Node 기본 테스트 러너 기반 테스트
 
 - `LOGIN_USERS`: 로그인 사용자 JSON
 - `SESSION_SECRET`: 세션 HMAC 서명 키
-- `LEDGER_API_SECRET`, `APPS_SCRIPT_URL`: (선택) 예전 Google Sheets → D1 이전 관리 도구에서만 사용합니다. 일반 운영에는 필요하지 않습니다.
 - `DATA_GO_KR_SERVICE_KEY`: 아파트 주소 검색·국토부 실거래가 자동 시세용 공공데이터포털 서비스키(부동산 자동평가를 쓸 때만 필요)
 
 비밀값은 저장소에 직접 커밋하지 않습니다.
