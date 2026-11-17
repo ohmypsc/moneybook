@@ -8,54 +8,50 @@
 }
 
 .header {
-  position: relative;
-  min-height: 138px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 16px;
-  margin-bottom: 16px;
-  padding: 24px 22px 20px;
-  overflow: hidden;
-  border: 1px solid var(--color-hero-border);
-  border-radius: var(--radius-xl);
-  background: linear-gradient(145deg, var(--color-hero-from) 0%, var(--color-hero-to) 100%);
+  justify-content: space-between;
+  gap: 12px;
+  margin: 2px 0 14px;
 }
 
-.togetherBlock {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 24px;
+.headerText {
   min-width: 0;
 }
 
-.homePhoto {
-  width: 72px;
-  height: 72px;
-  flex: 0 0 72px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-lg);
-  object-fit: cover;
-  box-shadow: var(--shadow-raised);
-}
-
-.togetherLabel,
-.togetherDate {
+.headerTitle {
   margin: 0;
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-3xl);
+  letter-spacing: -0.02em;
 }
 
-.togetherValue {
-  margin: 4px 0 5px;
+/* 함께한 날: 작은 배지 */
+.togetherBadge {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 7px;
+  padding: 4px 12px 4px 4px;
+  border-radius: var(--radius-full);
+  background: var(--color-tone-pink-bg);
   color: var(--color-tone-pink-text);
-  font-size: clamp(32px, 9vw, 42px);
-  line-height: 1;
-  letter-spacing: -0.045em;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  white-space: nowrap;
+}
+
+.togetherBadge strong {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-heavy);
   font-variant-numeric: tabular-nums;
+}
+
+.homePhoto {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border-radius: 50%;
+  object-fit: cover;
 }
 
 .summaryCard {
@@ -414,6 +410,17 @@
   font-variant-numeric: tabular-nums;
 }
 
+.emptyBadge {
+  flex: 0 0 auto;
+  padding: 5px 10px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-soft);
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  white-space: nowrap;
+}
+
 .emptyText {
   margin: 0;
   padding: 20px 16px;
@@ -466,28 +473,15 @@
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-bold);
 }
-.header h1:not(.togetherValue) {
+.header h1 {
   margin: 0;
-  font-size: var(--font-size-4xl);
+  font-size: var(--font-size-3xl);
 }
 
 @media (max-width: 390px) {
   .page {
     padding-right: 14px;
     padding-left: 14px;
-  }
-  .header {
-    min-height: 126px;
-    padding: 20px 16px 18px;
-  }
-  .togetherBlock {
-    gap: 20px;
-  }
-  .homePhoto {
-    width: 68px;
-    height: 68px;
-    flex-basis: 68px;
-    border-radius: var(--radius-lg);
   }
   .summaryCard {
     padding: 16px;

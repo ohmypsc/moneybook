@@ -184,6 +184,14 @@ interface HomePageProps {
 
 const TOGETHER_START = "2026-07-11";
 
+const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+
+function getTodayLabel() {
+  const [year, month, day] = getSeoulDateString().split("-").map(Number);
+  const weekday = WEEKDAYS[new Date(Date.UTC(year, month - 1, day)).getUTCDay()];
+  return `${month}월 ${day}일 ${weekday}요일`;
+}
+
 function getTogetherDays() {
   const today = getSeoulDateString();
   const [todayYear, todayMonth, todayDay] = today.split("-").map(Number);
@@ -588,15 +596,13 @@ export default function HomePage({ onCopyTransaction }: HomePageProps) {
   return (
     <main className={styles.page}>
       <header className={styles.header}>
-        <div className={styles.togetherBlock}>
+        <div className={styles.headerText}>
+          <p className={styles.monthLabel}>{getTodayLabel()}</p>
+          <h1 className={styles.headerTitle}>우리 집 한눈에</h1>
+        </div>
+        <div className={styles.togetherBadge} title={`${TOGETHER_START.replaceAll("-", ".")}부터`}>
           <img src="/splash-thumb.jpg" alt="" className={styles.homePhoto} aria-hidden="true" />
-          <div>
-            <p className={styles.togetherLabel}>함께한 지</p>
-            <h1 className={styles.togetherValue}>
-              {new Intl.NumberFormat("ko-KR").format(togetherDays)}일
-            </h1>
-            <p className={styles.togetherDate}>2026.07.11 ~ 오늘</p>
-          </div>
+          함께한 지 <strong>{new Intl.NumberFormat("ko-KR").format(togetherDays)}일</strong>
         </div>
       </header>
 
@@ -604,11 +610,12 @@ export default function HomePage({ onCopyTransaction }: HomePageProps) {
 
       <Card as="section" className={styles.summaryCard}>
         <div className={styles.summaryHeader}>
-          <h2>우리 집 한눈에</h2>
-          <div className={styles.summaryMeta}>
-            <span>{formatMonth(dashboard.month)}</span>
-            {lastUpdatedLabel && <small>갱신 {lastUpdatedLabel}</small>}
-          </div>
+          <h2>{formatMonth(dashboard.month)} 현황</h2>
+          {lastUpdatedLabel && (
+            <div className={styles.summaryMeta}>
+              <small>갱신 {lastUpdatedLabel}</small>
+            </div>
+          )}
         </div>
 
         <div className={styles.summaryRows}>
@@ -636,7 +643,7 @@ export default function HomePage({ onCopyTransaction }: HomePageProps) {
             <div>
               <span>부채</span>
               <strong className={liabilities > 0 ? styles.negativeAmount : undefined}>
-                <Money amount={-liabilities} />
+                <Money amount={liabilities} absolute />
               </strong>
             </div>
           </div>
@@ -708,14 +715,20 @@ export default function HomePage({ onCopyTransaction }: HomePageProps) {
             <h2>카드 결제 예정</h2>
             <span className={styles.sectionHint}>입력 내역 기준 · 결제계좌 잔액과 부족액 확인</span>
           </div>
-          <strong className={styles.sectionTotal}>
-            <Money amount={cardSummary.total} absolute />
-          </strong>
+          {cardSummary.cards.length > 0 ? (
+            <strong className={styles.sectionTotal}>
+              <Money amount={cardSummary.total} absolute />
+            </strong>
+          ) : (
+            <span className={styles.emptyBadge}>
+              {cardSummary.registeredCount > 0 ? "이번 결제 없음" : "등록된 카드 없음"}
+            </span>
+          )}
         </div>
 
-        <Card padding="none" className={styles.cardList}>
-          {cardSummary.cards.length > 0 ? (
-            cardSummary.cards.map(card => (
+        {cardSummary.cards.length > 0 && (
+          <Card padding="none" className={styles.cardList}>
+            {cardSummary.cards.map(card => (
               <div key={card.accountId} className={styles.cardRow}>
                 <div className={styles.cardName}>
                   <span className={styles.cardIcon} aria-hidden="true">
@@ -769,15 +782,9 @@ export default function HomePage({ onCopyTransaction }: HomePageProps) {
                   )}
                 </div>
               </div>
-            ))
-          ) : (
-            <p className={styles.emptyText}>
-              {cardSummary.registeredCount > 0
-                ? "이번 결제 예정이 없습니다."
-                : "등록된 신용카드가 없습니다."}
-            </p>
-          )}
-        </Card>
+            ))}
+          </Card>
+        )}
       </section>
 
       <section className={styles.section}>
@@ -786,14 +793,18 @@ export default function HomePage({ onCopyTransaction }: HomePageProps) {
             <h2>앞으로 나갈 돈</h2>
             <span className={styles.sectionHint}>7일 안에 예정된 카드대금·정기 지출</span>
           </div>
-          <strong className={styles.sectionTotal}>
-            <Money amount={upcomingOutflows.total} absolute />
-          </strong>
+          {upcomingOutflows.items.length > 0 ? (
+            <strong className={styles.sectionTotal}>
+              <Money amount={upcomingOutflows.total} absolute />
+            </strong>
+          ) : (
+            <span className={styles.emptyBadge}>예정 없음</span>
+          )}
         </div>
 
-        <Card padding="none" className={styles.upcomingList}>
-          {upcomingOutflows.items.length > 0 ? (
-            upcomingOutflows.items.map(item => (
+        {upcomingOutflows.items.length > 0 && (
+          <Card padding="none" className={styles.upcomingList}>
+            {upcomingOutflows.items.map(item => (
               <div key={item.id} className={styles.upcomingRow}>
                 <span
                   className={[
@@ -817,14 +828,14 @@ export default function HomePage({ onCopyTransaction }: HomePageProps) {
                   <Money amount={item.amount} absolute />
                 </strong>
               </div>
-            ))
-          ) : (
-            <p className={styles.emptyText}>7일 안에 예정된 출금이 없습니다.</p>
-          )}
-        </Card>
+            ))}
+          </Card>
+        )}
       </section>
 
-      <PwaInstallPrompt />
+      <div className={styles.section}>
+        <PwaInstallPrompt />
+      </div>
 
       {detailType && (
         <div

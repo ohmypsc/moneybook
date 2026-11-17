@@ -533,12 +533,14 @@
     margin: 0;
     padding: 10px;
 
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
+    border: 0;
+    border-radius: 0;
 
-    background: var(--color-surface);
+    /* 박스 없이 버튼만 띄우고, 뒤 내용은 아래로 갈수록 바탕색으로 덮습니다. */
+    padding: 18px 0 8px;
+    background: linear-gradient(to bottom, transparent, var(--color-bg) 45%);
 
-    box-shadow: var(--shadow-card);
+    box-shadow: none;
 
     transform: translateX(-50%);
   }
@@ -840,6 +842,100 @@
   white-space: nowrap;
 }
 
+/* 카테고리 선택: 글자 칩 */
+.categoryPicker {
+  padding: 2px 0 6px;
+}
+
+/* 검색으로 결과가 줄어도 시트 높이가 출렁이지 않게 둡니다. */
+.categoryPickerSearchable {
+  min-height: min(52dvh, 440px);
+}
+
+.categorySearch {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 10px 0 4px;
+  background: var(--color-surface);
+}
+
+.categorySearchInput {
+  width: 100%;
+  min-height: var(--control-height-md);
+  padding: 0 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-subtle);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--font-size-lg);
+}
+
+.categorySearchInput:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-focus-ring);
+}
+
+.categoryGroupLabel {
+  margin: 14px 0 8px;
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+}
+
+.categoryChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.categoryPicker > .categoryChips:first-child {
+  margin-top: 12px;
+}
+
+.categoryChip {
+  min-height: 40px;
+  max-width: 100%;
+  padding: 0 14px;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-soft);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.categoryChip:active {
+  transform: scale(0.97);
+}
+
+.categoryChipFrequent {
+  background: var(--color-tone-lavender-bg);
+  color: var(--color-tone-lavender-text);
+  font-weight: var(--font-weight-heavy);
+}
+
+.categoryChipSelected {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+}
+
+.categoryEmpty {
+  margin: 18px 0;
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-md);
+  text-align: center;
+}
+
 .sheetCheck {
   width: 26px;
   height: 26px;
@@ -1118,4 +1214,50 @@
   .header {
     align-items: flex-start;
   }
+}
+
+/* 지출·수입: 필수 항목을 위 칸들과 한 덩어리로 (소제목·구분선 없이) */
+.conditionalSection.conditionalSectionPlain {
+  padding-top: 0;
+  border-top: 0;
+}
+
+/* 날짜: 기본값이 오늘이라 한 줄로 작게 */
+.dateRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+}
+
+.dateInput {
+  min-height: 40px;
+  padding: 4px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-subtle);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+}
+
+.dateInput:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-focus-ring);
+}
+
+/* 태그·메모 펼치기 */
+.moreFieldsButton {
+  min-height: var(--control-height-md);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
 }

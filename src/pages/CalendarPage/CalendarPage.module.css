@@ -74,7 +74,7 @@
 }
 
 .summaryIncome {
-  color: var(--color-primary);
+  color: var(--color-income);
 }
 
 .summaryExpense {
@@ -251,7 +251,7 @@
 }
 
 .dayIncome {
-  color: var(--color-primary);
+  color: var(--color-income);
 }
 
 .dayExpense {
@@ -282,6 +282,14 @@
 .loading,
 .emptyState {
   color: var(--color-text-secondary);
+}
+
+.dayEmpty {
+  margin: 4px 0 0;
+  padding: 12px 2px;
+  border-top: 1px solid var(--color-divider);
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-md);
 }
 
 .error {
@@ -1027,7 +1035,7 @@
 }
 
 .summaryCard:nth-child(2) {
-  background: var(--color-tone-lemon-bg);
+  background: var(--color-tone-pink-bg);
 }
 
 .summaryCard:nth-child(3) {
