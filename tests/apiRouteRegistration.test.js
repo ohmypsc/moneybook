@@ -3,11 +3,16 @@ import fs from "node:fs";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-const workerPath = fileURLToPath(new URL("../worker/index.js", import.meta.url));
-const source = fs.readFileSync(workerPath, "utf8");
+const workerDir = fileURLToPath(new URL("../worker/", import.meta.url));
+const routerSource = fs.readFileSync(`${workerDir}d1/router.js`, "utf8");
+// change_log 기록은 여러 d1 모듈에 흩어져 있으므로 Worker 소스 전체를 모아서 검사합니다.
+const source = fs.readdirSync(workerDir, { recursive: true })
+  .filter(file => String(file).endsWith(".js"))
+  .map(file => fs.readFileSync(`${workerDir}${file}`, "utf8"))
+  .join("\n");
 
 function routeBlock(name) {
-  const match = new RegExp(`const ${name} = new Set\\(\\[([\\s\\S]*?)\\]\\);`).exec(source);
+  const match = new RegExp(`const ${name} = new Set\\(\\[([\\s\\S]*?)\\]\\);`).exec(routerSource);
   assert.ok(match, `${name} block should exist`);
   return match[1];
 }

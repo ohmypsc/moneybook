@@ -5,11 +5,15 @@ import { DatabaseSync } from "node:sqlite";
 
 // Run the actual Worker domain functions against SQLite without production credentials.
 // The adapter implements D1's atomic batch contract and asynchronous read boundaries.
-const workerUrl = new URL("../worker/index.js", import.meta.url);
-const source = readFileSync(workerUrl, "utf8")
-  .replace('import { DurableObject } from "cloudflare:workers";', 'class DurableObject {}')
-  .replace(/from "(\.\/[^\"]+)"/g, (_match, path) => `from ${JSON.stringify(new URL(path, workerUrl).href)}`);
-const worker = await import(`data:text/javascript;base64,${Buffer.from(source + '\nexport { mbSaveClassification, mbClassificationPreview, mbApplyClassification, mbD1ProductionRoute, mbD1GetTransactionsData, mbD1HandleTransactionMutation, mbD1RestoreBackupMerge, mbD1HandleInputPreferences, mbD1InputPreferencesData, mbD1SaveHouseholdOverview, mbD1HouseholdOverviewData, mbD1GetChangesData, mbD1BuildBackupDocument };').toString("base64")}`);
+// Worker 모듈을 직접 불러옵니다. (Durable Object 진입점은 Cloudflare 런타임 전용이라 제외)
+const worker = {
+  ...await import("../worker/d1/classification.js"),
+  ...await import("../worker/d1/router.js"),
+  ...await import("../worker/d1/queries.js"),
+  ...await import("../worker/d1/transactions.js"),
+  ...await import("../worker/d1/backup.js"),
+  ...await import("../worker/d1/settings.js")
+};
 
 function database() {
   const sqlite = new DatabaseSync(":memory:");
