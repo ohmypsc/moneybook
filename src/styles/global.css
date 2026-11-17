@@ -1,3 +1,29 @@
+/* 나눔스퀘어라운드 (OFL-1.1, 네이버 나눔글꼴). 앱 안에 파일을 함께 넣어 오프라인에서도 같은 글꼴로 보입니다.
+ * 500은 Regular, 600은 Bold로 표시됩니다(파일이 없는 굵기는 브라우저가 가까운 굵기를 고릅니다). */
+@font-face {
+  font-family: "NanumSquareRound";
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url("../assets/fonts/NanumSquareRoundR.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "NanumSquareRound";
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  src: url("../assets/fonts/NanumSquareRoundB.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "NanumSquareRound";
+  font-weight: 800 900;
+  font-style: normal;
+  font-display: swap;
+  src: url("../assets/fonts/NanumSquareRoundEB.woff2") format("woff2");
+}
+
 * {
   box-sizing: border-box;
 }
@@ -13,7 +39,7 @@ body {
   min-height: 100vh;
   background: linear-gradient(180deg, var(--color-bg-glow) 0, transparent 190px), var(--color-bg);
   color: var(--color-text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif;
+  font-family: var(--font-family-base);
   -webkit-font-smoothing: antialiased;
 }
 
