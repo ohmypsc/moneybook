@@ -861,8 +861,8 @@
   position: relative;
   overflow: hidden;
   padding: 0;
-  border-color: var(--color-hero-border);
-  background: linear-gradient(145deg, var(--color-hero-from) 0%, var(--color-hero-to) 100%);
+  border-color: transparent;
+  background: var(--color-tone-mint-bg);
 }
 
 .summaryCard::after {
@@ -894,7 +894,7 @@
   display: block;
   max-width: 100%;
   margin-top: 5px;
-  color: var(--color-primary);
+  color: var(--color-tone-mint-text);
   font-size: clamp(27px, 8.4vw, 40px);
   line-height: 1;
   letter-spacing: -0.055em;
