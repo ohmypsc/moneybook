@@ -28,7 +28,7 @@
 .title {
   margin: 0;
 
-  font-size: 26px;
+  font-size: var(--font-size-4xl);
   line-height: 1.3;
 }
 
@@ -39,13 +39,13 @@
 .summaryLabel {
   color: var(--color-text-secondary);
 
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
 }
 
 .summaryValue {
-  font-size: 17px;
-  font-weight: 800;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-heavy);
 }
 
 .tabs {
@@ -79,8 +79,8 @@
 
   font: inherit;
 
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
 
   cursor: pointer;
 }
@@ -111,14 +111,14 @@
 .sectionTitle {
   margin: 0;
 
-  font-size: 18px;
+  font-size: var(--font-size-xl);
 }
 
 .sectionCount {
   color: var(--color-text-secondary);
 
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
 }
 
 .cashSummary {
@@ -181,7 +181,7 @@
 .cashAccountName {
   overflow: hidden;
 
-  font-size: 14px;
+  font-size: var(--font-size-md);
 
   text-overflow: ellipsis;
 
@@ -191,13 +191,13 @@
 .cashAccountMeta {
   color: var(--color-text-secondary);
 
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 }
 
 .cashAccountValue {
   flex-shrink: 0;
 
-  font-size: 14px;
+  font-size: var(--font-size-md);
 }
 
 /*
@@ -225,8 +225,8 @@
 
   margin-top: 4px;
 
-  font-size: 20px;
-  font-weight: 800;
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-heavy);
 }
 
 .investmentSummarySub {
@@ -238,13 +238,13 @@
 
   color: var(--color-text-secondary);
 
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 }
 
 .investmentSummarySub strong {
   color: var(--color-text-primary);
 
-  font-weight: 800;
+  font-weight: var(--font-weight-heavy);
 }
 
 /*
@@ -313,8 +313,8 @@
 .accountName {
   overflow: hidden;
 
-  font-size: 15px;
-  font-weight: 800;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-heavy);
 
   text-overflow: ellipsis;
 
@@ -324,7 +324,7 @@
 .accountSub {
   color: var(--color-text-secondary);
 
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 }
 
 .accountTotal {
@@ -338,13 +338,13 @@
 }
 
 .accountTotal strong {
-  font-size: 15px;
+  font-size: var(--font-size-base);
 }
 
 .accountTotal span {
   color: var(--color-text-secondary);
 
-  font-size: 10px;
+  font-size: var(--font-size-2xs);
 }
 
 .accountMetrics {
@@ -371,7 +371,7 @@
 
   color: var(--color-text-secondary);
 
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
 }
 
 .accountMetric strong {
@@ -379,7 +379,7 @@
 
   color: var(--color-text-primary);
 
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 
   text-overflow: ellipsis;
 
@@ -420,20 +420,20 @@
 
   color: var(--color-text-secondary);
 
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-bold);
 }
 
 .detailTitle {
   margin: 0;
 
-  font-size: 17px;
+  font-size: var(--font-size-xl);
 }
 
 .detailTotal {
   flex-shrink: 0;
 
-  font-size: 16px;
+  font-size: var(--font-size-lg);
 }
 
 .detailMetrics {
@@ -463,14 +463,14 @@
 .detailMetric span {
   color: var(--color-text-secondary);
 
-  font-size: 10px;
-  font-weight: 700;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-bold);
 }
 
 .detailMetric strong {
   overflow: hidden;
 
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 
   text-overflow: ellipsis;
 
@@ -504,13 +504,13 @@
 }
 
 .cashSetupHeading strong {
-  font-size: 13px;
+  font-size: var(--font-size-sm);
 }
 
 .cashSetupHeading span {
   color: var(--color-text-secondary);
 
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
 
   line-height: 1.5;
 }
@@ -566,8 +566,8 @@
 
   color: var(--color-text-secondary);
 
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
 
   cursor: pointer;
 }
@@ -594,14 +594,14 @@
 .holdingsTitle {
   margin: 0;
 
-  font-size: 15px;
+  font-size: var(--font-size-base);
 }
 
 .holdingsCount {
   color: var(--color-text-secondary);
 
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-bold);
 }
 
 .investmentHoldingList {
@@ -659,8 +659,8 @@
 
   overflow: hidden;
 
-  font-size: 14px;
-  font-weight: 800;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-heavy);
 
   text-overflow: ellipsis;
 
@@ -674,20 +674,20 @@
 
   border: 1px solid var(--color-border);
 
-  border-radius: 999px;
+  border-radius: var(--radius-full);
 
   background: var(--color-surface-soft);
 
   color: var(--color-text-secondary);
 
-  font-size: 9px;
-  font-weight: 800;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-heavy);
 }
 
 .holdingMeta {
   color: var(--color-text-secondary);
 
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
 
   line-height: 1.4;
 }
@@ -703,13 +703,13 @@
 }
 
 .holdingValue {
-  font-size: 14px;
-  font-weight: 800;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-heavy);
 }
 
 .holdingReturn {
-  font-size: 11px;
-  font-weight: 800;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-heavy);
 }
 
 .holdingDetails {
@@ -735,14 +735,14 @@
 .holdingDetailItem span {
   color: var(--color-text-secondary);
 
-  font-size: 9px;
-  font-weight: 700;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-bold);
 }
 
 .holdingDetailItem strong {
   overflow: hidden;
 
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
 
   text-overflow: ellipsis;
 
@@ -754,7 +754,7 @@
 
   color: var(--color-text-secondary);
 
-  font-size: 10px;
+  font-size: var(--font-size-2xs);
 }
 
 /*
@@ -766,7 +766,7 @@
 .helperText {
   color: var(--color-text-secondary);
 
-  font-size: 13px;
+  font-size: var(--font-size-sm);
 
   line-height: 1.5;
 }
@@ -780,7 +780,7 @@
 
   color: var(--color-error);
 
-  font-size: 13px;
+  font-size: var(--font-size-sm);
 
   line-height: 1.5;
 }
@@ -795,7 +795,7 @@
   }
 
   .summaryValue {
-    font-size: 15px;
+    font-size: var(--font-size-base);
   }
 
   .accountCard {
@@ -819,7 +819,7 @@
   }
 
   .detailMetric strong {
-    font-size: 11px;
+    font-size: var(--font-size-2xs);
   }
 
   .investmentHoldingTop {
@@ -853,7 +853,7 @@
 }
 
 .title {
-  font-size: 24px;
+  font-size: var(--font-size-3xl);
   letter-spacing: -0.035em;
 }
 
@@ -861,8 +861,8 @@
   position: relative;
   overflow: hidden;
   padding: 0;
-  border-color: rgba(207, 222, 220, 0.9);
-  background: linear-gradient(145deg, #f7fbfa 0%, #e8f2ef 100%);
+  border-color: var(--color-hero-border);
+  background: linear-gradient(145deg, var(--color-hero-from) 0%, var(--color-hero-to) 100%);
 }
 
 .summaryCard::after {
@@ -873,7 +873,7 @@
   width: 124px;
   height: 124px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(142, 169, 151, 0.16), rgba(142, 169, 151, 0));
+  background: radial-gradient(circle, var(--color-hero-glow), transparent);
   pointer-events: none;
 }
 
@@ -886,8 +886,8 @@
 .summaryHeroLabel {
   display: block;
   color: var(--color-text-secondary);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
 }
 
 .summaryHeroValue {
@@ -912,7 +912,7 @@
   gap: 0;
   margin-top: 20px;
   padding-top: 14px;
-  border-top: 1px solid rgba(181, 201, 197, 0.6);
+  border-top: 1px solid var(--color-divider-strong);
 }
 
 .summarySecondary > div {
@@ -925,13 +925,13 @@
 .summarySecondary > div + div {
   padding-right: 0;
   padding-left: 14px;
-  border-left: 1px solid rgba(181, 201, 197, 0.6);
+  border-left: 1px solid var(--color-divider-strong);
 }
 
 .summarySecondary span {
   color: var(--color-text-secondary);
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-bold);
 }
 
 .summarySecondary strong {
@@ -943,13 +943,13 @@
 
 .tabs {
   border-color: var(--color-border);
-  background: rgba(237, 243, 241, 0.86);
+  background: var(--color-surface-soft-glass);
 }
 
 .tabButtonActive {
   background: var(--color-surface);
   color: var(--color-primary);
-  box-shadow: 0 4px 12px rgba(46, 70, 82, 0.06);
+  box-shadow: var(--shadow-soft);
 }
 
 .cashSummary,
@@ -977,11 +977,11 @@
   }
 
   .summaryHeroValue {
-    font-size: 28px;
+    font-size: var(--font-size-4xl);
   }
 
   .summarySecondary strong {
-    font-size: 12.5px;
+    font-size: var(--font-size-xs);
   }
 }
 
@@ -996,7 +996,7 @@
 .headerHint {
   margin: 4px 0 0;
   color: var(--color-text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
   line-height: 1.4;
 }
 
@@ -1043,12 +1043,12 @@
 
 .cashDetailHeader span {
   color: var(--color-text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
 }
 
 .cashDetailHeader strong {
   overflow: hidden;
-  font-size: 16px;
+  font-size: var(--font-size-lg);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1076,13 +1076,13 @@
 
 .cashDetailMetrics span {
   color: var(--color-text-secondary);
-  font-size: 10px;
-  font-weight: 700;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-bold);
 }
 
 .cashDetailMetrics strong {
   overflow: hidden;
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1104,7 +1104,7 @@
 .reconcilePanel label > span,
 .reconcilePanel small {
   color: var(--color-text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
   line-height: 1.45;
 }
 
@@ -1116,13 +1116,13 @@
   background: var(--color-surface);
   color: var(--color-text-primary);
   font: inherit;
-  font-size: 16px;
+  font-size: var(--font-size-lg);
 }
 
 .reconcilePanel p {
   margin: 0;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
 }
 
 .reconcileActions {
@@ -1139,7 +1139,7 @@
   align-items: flex-end;
   justify-content: center;
   padding: 18px 12px calc(18px + env(safe-area-inset-bottom));
-  background: rgba(20, 30, 34, 0.34);
+  background: var(--color-overlay-strong);
 }
 
 .editorSheet {
@@ -1150,7 +1150,7 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl) var(--radius-xl) var(--radius-lg) var(--radius-lg);
   background: var(--color-bg);
-  box-shadow: 0 20px 60px rgba(20, 30, 34, 0.2);
+  box-shadow: var(--shadow-lg);
 }
 
 .ownerFilter {
@@ -1171,12 +1171,12 @@
   min-height: 34px;
   padding: 0 13px;
   border: 1px solid var(--color-border);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--color-surface);
   color: var(--color-text-secondary);
   font: inherit;
-  font-size: 12px;
-  font-weight: 800;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-heavy);
   cursor: pointer;
 }
 
@@ -1196,7 +1196,7 @@
   justify-content: center;
   box-sizing: border-box;
   padding: 16px;
-  background: rgb(0 0 0 / 0.38);
+  background: var(--color-overlay-strong);
 }
 
 .cashDetailCard,
@@ -1207,7 +1207,7 @@
   box-sizing: border-box;
   margin: 0;
   border-radius: 20px 20px 16px 16px;
-  box-shadow: 0 20px 60px rgb(0 0 0 / 0.22);
+  box-shadow: var(--shadow-lg);
 }
 
 .modalHeaderActions {
@@ -1217,8 +1217,8 @@
 }
 
 .modalCloseButton {
-  font-size: 23px;
-  font-weight: 500;
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-medium);
 }
 
 @media (min-width: 720px) {
@@ -1229,7 +1229,7 @@
 
   .cashDetailCard,
   .detailCard {
-    border-radius: 20px;
+    border-radius: var(--radius-lg);
   }
 }
 
@@ -1268,13 +1268,13 @@
 }
 
 .investmentWarningRow strong {
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 }
 
 .investmentWarningRow span {
   overflow: hidden;
   color: var(--color-text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
   line-height: 1.45;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1310,11 +1310,11 @@
 }
 
 .liabilityPrimaryAction strong {
-  font-size: 14px;
+  font-size: var(--font-size-md);
 }
 
 .liabilityPrimaryAction span {
   color: var(--color-text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
   line-height: 1.5;
 }

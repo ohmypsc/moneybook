@@ -6,7 +6,7 @@
   align-items: flex-end;
   justify-content: center;
   padding: 0;
-  background: rgba(34, 51, 60, 0.28);
+  background: var(--color-overlay);
   backdrop-filter: blur(2px);
 }
 
@@ -47,8 +47,8 @@
   height: 4px;
   flex: 0 0 auto;
   margin: 0 auto 5px;
-  border-radius: 999px;
-  background: #cdd7d8;
+  border-radius: var(--radius-full);
+  background: var(--color-handle);
 }
 
 .header {
@@ -62,19 +62,19 @@
 
 .header h2 {
   margin: 0;
-  font-size: 17px;
+  font-size: var(--font-size-xl);
 }
 
 .close {
-  font-size: 22px;
-  font-weight: 500;
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-medium);
 }
 
 .content {
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  border-top: 1px solid rgba(220, 229, 229, 0.76);
+  border-top: 1px solid var(--color-divider);
 }
 
 @media (prefers-reduced-motion: reduce) {

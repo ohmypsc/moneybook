@@ -18,8 +18,8 @@
 
   color: var(--color-text-primary);
 
-  font-size: 15px;
-  font-weight: 800;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-heavy);
 
   cursor: pointer;
 
@@ -39,7 +39,7 @@
 
   color: var(--color-text-secondary);
 
-  font-size: 16px;
+  font-size: var(--font-size-lg);
   line-height: 1;
 
   transition: transform 0.15s ease;
@@ -58,8 +58,8 @@
 
   color: var(--color-text-secondary);
 
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
 }
 
 .body {
@@ -107,8 +107,8 @@
 
   font: inherit;
 
-  font-size: 12px;
-  font-weight: 800;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-heavy);
 
   cursor: pointer;
 }
@@ -132,8 +132,8 @@
 
   color: var(--color-text-secondary);
 
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
 
   cursor: pointer;
 }
@@ -154,7 +154,7 @@
 
   color: var(--color-text-secondary);
 
-  font-size: 13px;
+  font-size: var(--font-size-sm);
 
   line-height: 1.5;
 }
@@ -170,8 +170,8 @@
 
   color: var(--color-error);
 
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
 
   line-height: 1.5;
 }
@@ -227,7 +227,7 @@
 
   color: var(--color-text-primary);
 
-  font-size: 14px;
+  font-size: var(--font-size-md);
 
   text-overflow: ellipsis;
 
@@ -241,12 +241,12 @@
 
   border: 1px solid var(--color-border);
 
-  border-radius: 999px;
+  border-radius: var(--radius-full);
 
   background: var(--color-surface-soft);
 
-  font-size: 11px;
-  font-weight: 800;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-heavy);
 }
 
 .buy {
@@ -264,14 +264,14 @@
 
   border: 1px solid var(--color-border);
 
-  border-radius: 999px;
+  border-radius: var(--radius-full);
 
   background: var(--color-surface-soft);
 
   color: var(--color-text-secondary);
 
-  font-size: 10px;
-  font-weight: 800;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-heavy);
 }
 
 .settlement {
@@ -279,7 +279,7 @@
 
   color: var(--color-text-primary);
 
-  font-size: 14px;
+  font-size: var(--font-size-md);
 
   text-align: right;
 }
@@ -289,7 +289,7 @@
 
   color: var(--color-text-secondary);
 
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 
   line-height: 1.5;
 }
@@ -299,8 +299,8 @@
 
   color: var(--color-text-primary);
 
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
 }
 
 .memo {
@@ -314,7 +314,7 @@
 
   color: var(--color-text-secondary);
 
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 
   line-height: 1.5;
 }
@@ -355,8 +355,8 @@
 .editLabel {
   color: var(--color-text-primary);
 
-  font-size: 12px;
-  font-weight: 800;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-heavy);
 }
 
 .optional {
@@ -364,8 +364,8 @@
 
   color: var(--color-text-secondary);
 
-  font-size: 10px;
-  font-weight: 700;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-bold);
 }
 
 .input,
@@ -384,7 +384,7 @@
 
   font: inherit;
 
-  font-size: 16px /* iOS는 16px 미만 입력칸에 포커스하면 화면을 확대합니다 */;
+  font-size: var(--font-size-lg) /* iOS는 16px 미만 입력칸에 포커스하면 화면을 확대합니다 */;
 }
 
 .input {
@@ -411,7 +411,7 @@
 
   color: var(--color-text-secondary);
 
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
 
   line-height: 1.5;
 }
@@ -434,7 +434,7 @@
   }
 
   .settlement {
-    font-size: 13px;
+    font-size: var(--font-size-sm);
   }
 
   .editGrid {

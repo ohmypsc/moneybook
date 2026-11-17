@@ -137,9 +137,9 @@ export default function SettingsPage({ refreshRevision = 0 }: SettingsPageProps)
     },
 
     profile: {
-      title: "알림·내 계정",
+      title: "화면·알림·내 계정",
 
-      description: "배우자 입력 알림을 켜고, 로그인 정보를 확인합니다."
+      description: "화면 테마와 배우자 입력 알림을 정하고, 로그인 정보를 확인합니다."
     }
   } as const;
 

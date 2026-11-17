@@ -70,8 +70,8 @@ export function SettingsHome({ onOpen }: { onOpen: (view: SettingsView) => void 
         <Card padding="none" className={styles.menuCard}>
           <button type="button" className={styles.menuRow} onClick={() => onOpen("profile")}>
             <span className={styles.menuText}>
-              <strong>알림·내 계정</strong>
-              <span>배우자 입력 알림, 현재 사용자, 로그아웃</span>
+              <strong>화면·알림·내 계정</strong>
+              <span>다크 모드, 배우자 입력 알림, 로그아웃</span>
             </span>
 
             <span className={styles.chevron} aria-hidden="true">

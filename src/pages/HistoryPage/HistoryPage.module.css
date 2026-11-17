@@ -1,3 +1,13 @@
+.pageTitle {
+  width: 100%;
+  max-width: var(--content-width);
+  margin: 0 auto;
+  padding: 18px 18px 2px;
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-heavy);
+  letter-spacing: -0.03em;
+}
+
 .toolbarWrap {
   position: sticky;
   top: 0;
@@ -25,7 +35,7 @@
   background: transparent;
   color: var(--color-text-secondary);
   font: inherit;
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   cursor: pointer;
 }
 
@@ -53,13 +63,13 @@
 }
 .header h1 {
   margin: 0;
-  font-size: 24px;
+  font-size: var(--font-size-3xl);
   letter-spacing: -0.03em;
 }
 .header p {
   margin: 6px 0 0;
   color: var(--color-text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   line-height: 1.55;
 }
 
@@ -89,9 +99,9 @@
   flex: 0 0 auto;
   min-height: 34px;
   padding: 0 12px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--color-surface-soft);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 }
 .filterRow .filterActive {
   background: var(--color-primary);
@@ -105,11 +115,11 @@
   margin: 18px 2px 8px;
 }
 .resultHeader strong {
-  font-size: 13px;
+  font-size: var(--font-size-sm);
 }
 .resultHeader span {
   color: var(--color-text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
 }
 
 .listCard {
@@ -121,7 +131,7 @@
   align-items: center;
   gap: 12px;
   padding: 13px 15px;
-  border-bottom: 1px solid rgba(220, 229, 229, 0.72);
+  border-bottom: 1px solid var(--color-divider);
 }
 .transactionRow:last-child {
   border-bottom: 0;
@@ -134,14 +144,14 @@
 }
 .transactionMain strong {
   overflow: hidden;
-  font-size: 14px;
+  font-size: var(--font-size-md);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .transactionMain span {
   overflow: hidden;
   color: var(--color-text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -156,7 +166,7 @@
 }
 .transactionActions > strong {
   flex: 0 0 auto;
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
@@ -178,10 +188,10 @@
 }
 .monthControl strong {
   text-align: center;
-  font-size: 17px;
+  font-size: var(--font-size-xl);
 }
 .monthControl button {
-  font-size: 24px;
+  font-size: var(--font-size-3xl);
 }
 
 .reportSummary {
@@ -201,13 +211,13 @@
 .reportSummary span {
   display: block;
   color: var(--color-text-secondary);
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-bold);
 }
 .reportSummary strong {
   display: block;
   margin-top: 6px;
-  font-size: 14px;
+  font-size: var(--font-size-md);
   white-space: nowrap;
 }
 
@@ -223,11 +233,11 @@
 }
 .sectionTitle h2 {
   margin: 0;
-  font-size: 17px;
+  font-size: var(--font-size-xl);
 }
 .sectionTitle span {
   color: var(--color-text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
 }
 .rankList {
   overflow: hidden;
@@ -252,17 +262,17 @@
   border-radius: 50%;
   background: var(--color-surface-soft);
   color: var(--color-primary);
-  font-size: 11px;
-  font-weight: 800;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-heavy);
 }
 .rankRow strong {
   overflow: hidden;
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .rankRow b {
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   white-space: nowrap;
 }
 
@@ -282,13 +292,13 @@
 .targetGrid span {
   display: block;
   color: var(--color-text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
 }
 .targetGrid strong {
   display: block;
   margin-top: 4px;
   overflow: hidden;
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -299,7 +309,7 @@
   margin: 0;
   padding: 18px 14px;
   color: var(--color-text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   line-height: 1.55;
   text-align: center;
 }
@@ -314,7 +324,7 @@
     padding-left: 14px;
   }
   .reportSummary strong {
-    font-size: 12.5px;
+    font-size: var(--font-size-xs);
   }
   .targetGrid {
     grid-template-columns: 1fr;
@@ -340,12 +350,12 @@
 .snapshotCurrent small,
 .snapshotActions small {
   color: var(--color-text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
   line-height: 1.5;
 }
 
 .snapshotCurrent strong {
-  font-size: 16px;
+  font-size: var(--font-size-lg);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -368,7 +378,7 @@
   padding: 10px 14px;
   border-top: 1px solid var(--color-border);
   color: var(--color-primary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   line-height: 1.5;
   text-align: center;
 }
@@ -394,11 +404,11 @@
 
 .snapshotHistory span {
   color: var(--color-text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 }
 
 .snapshotHistory strong {
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -422,8 +432,8 @@
 
 .advancedFilters span {
   color: var(--color-text-secondary);
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-bold);
 }
 
 .advancedFilters input,
@@ -437,7 +447,7 @@
   background: var(--color-surface);
   color: var(--color-text-primary);
   font: inherit;
-  font-size: 16px /* iOS는 16px 미만 입력칸에 포커스하면 화면을 확대합니다 */;
+  font-size: var(--font-size-lg) /* iOS는 16px 미만 입력칸에 포커스하면 화면을 확대합니다 */;
 }
 
 .advancedFilters input:focus,
@@ -483,15 +493,15 @@
 .grossBreakdown span {
   display: block;
   color: var(--color-text-secondary);
-  font-size: 10px;
-  font-weight: 700;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-bold);
 }
 
 .grossBreakdown strong {
   display: block;
   margin-top: 3px;
   overflow: hidden;
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -506,8 +516,8 @@
   gap: 12px;
   margin-bottom: 8px;
   color: var(--color-text-secondary);
-  font-size: 10px;
-  font-weight: 700;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-bold);
 }
 
 .trendLegend span {
@@ -567,7 +577,7 @@
 .netWorthTrendMonth small {
   overflow: hidden;
   color: var(--color-text-secondary);
-  font-size: 9px;
+  font-size: var(--font-size-2xs);
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -646,8 +656,8 @@
 .dayHeader {
   margin: 0 2px 6px;
   color: var(--color-text-secondary);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
   letter-spacing: -0.01em;
 }
 
@@ -661,8 +671,8 @@
 .searchModeBar span {
   min-width: 0;
   overflow: hidden;
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -676,8 +686,8 @@
   border: 0;
   background: none;
   color: var(--color-text-secondary);
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
 }
 
 .searchActions {
@@ -708,11 +718,11 @@ button.transactionMain {
   min-height: 28px;
   padding: 0 8px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--color-surface-soft);
   color: var(--color-text-secondary);
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-semibold);
 }
 
 button.rankRow {
@@ -750,7 +760,7 @@ button.rankRow:disabled,
 .reportDetailHint {
   margin: 8px 0;
   color: var(--color-text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   line-height: 1.6;
 }
 
@@ -759,7 +769,7 @@ button.rankRow:disabled,
   gap: 3px;
   text-align: right;
   color: var(--color-text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
   line-height: 1.4;
 }
 

@@ -57,6 +57,14 @@ tests/                  Node 기본 테스트 러너 기반 테스트
 
 페이지에서 직접 `fetch()`를 호출하거나 `window.confirm()`을 사용하지 않습니다. API 요청은 `src/api/client.ts`, 확인창은 공통 `ConfirmDialog` 경로를 사용합니다. `npm run check:boundaries`가 이 규칙을 검사합니다.
 
+## 디자인 토큰과 다크 모드
+
+- 색·글자 크기·굵기·모서리는 `src/styles/tokens.css`의 변수만 사용합니다. 화면 CSS에 `#hex`, `rgba()`, `font-size: 13px` 같은 값을 직접 쓰지 않습니다.
+- 글자 크기는 `--font-size-2xs`(11px)부터 `--font-size-5xl`(32px)까지이며, 11px 미만은 쓰지 않습니다.
+- 글자색은 배경 위에서 WCAG AA(4.5:1) 이상이 되도록 맞춰 두었습니다. 색을 바꿀 때 대비를 다시 확인하세요.
+- 다크 모드는 기기 설정을 따르고, 설정 > 화면·알림·내 계정에서 기기마다 밝게/어둡게로 고정할 수 있습니다(`src/utils/theme.ts`). 새 색 변수를 추가하면 `tokens.css`의 다크 블록 두 곳에도 같은 값을 넣어야 합니다.
+- 데이터를 불러오는 동안에는 공통 `Skeleton` 컴포넌트를 사용합니다.
+
 ## Cloudflare 구성
 
 `wrangler.jsonc`는 다음 리소스를 사용합니다.
