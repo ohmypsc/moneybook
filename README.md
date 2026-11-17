@@ -25,9 +25,29 @@ src/
   types/                공통 API/도메인 타입
   utils/                시간, 동기화, 오프라인 큐 등 공통 로직
 worker/
-  index.js              Worker 라우팅 및 D1 도메인 처리
-  auth.js               로그인/세션
+  index.js              Worker 진입점(fetch 분기, cron)
+  http.js               JSON 응답·요청 본문 공통 헬퍼
+  auth.js               세션 쿠키·비밀번호 검증
+  authRoutes.js         로그인/세션 라우트, 로그인 시도 제한
+  realtime.js           실시간 동기화 Durable Object
+  symbolRoutes.js       투자 종목 검색 라우트
   investmentSymbols.js  투자 종목 검색
+  d1/                   D1 도메인 처리
+    router.js           /api/* 경로 분기
+    core.js             공통 상수·에러·쿼리 헬퍼·변경 로그
+    records.js          DB 행 매핑과 기본 조회
+    queries.js          조회 API 데이터
+    transactions.js     거래 생성·수정·삭제·정산
+    settings.js         카테고리·계좌·입력 설정 등
+    dashboard.js        대시보드·bootstrap
+    automation.js       자동화 설정·정기 거래
+    benefits.js         카드 혜택
+    investments.js      보유종목·투자거래·시세
+    backup.js           백업 내보내기·복원
+    tax.js              연말정산
+    classification.js   분류 태그
+    importAnalysis.js   거래 가져오기 매칭
+    realEstate.js       부동산 API
   domain/               테스트 가능한 Worker 순수 로직(날짜·자동화·검색조건 등)
 tests/                  Node 기본 테스트 러너 기반 테스트
 ```
@@ -48,7 +68,6 @@ tests/                  Node 기본 테스트 러너 기반 테스트
 
 - `LOGIN_USERS`: 로그인 사용자 JSON
 - `SESSION_SECRET`: 세션 HMAC 서명 키
-- `LEDGER_API_SECRET`, `APPS_SCRIPT_URL`: (선택) 예전 Google Sheets → D1 이전 관리 도구에서만 사용합니다. 일반 운영에는 필요하지 않습니다.
 - `DATA_GO_KR_SERVICE_KEY`: 아파트 주소 검색·국토부 실거래가 자동 시세용 공공데이터포털 서비스키(부동산 자동평가를 쓸 때만 필요)
 
 비밀값은 저장소에 직접 커밋하지 않습니다.
