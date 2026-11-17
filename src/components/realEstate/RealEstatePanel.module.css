@@ -19,7 +19,7 @@
 .formHeading p {
   margin: 4px 0 0;
   color: var(--color-text-subtle);
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   line-height: 1.55;
 }
 
@@ -36,10 +36,10 @@
   place-items: center;
   width: 54px;
   height: 54px;
-  border-radius: 18px;
+  border-radius: var(--radius-lg);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  font-size: 30px;
+  font-size: var(--font-size-5xl);
   line-height: 1;
 }
 
@@ -50,13 +50,13 @@
 }
 
 .emptyCopy strong {
-  font-size: 18px;
+  font-size: var(--font-size-xl);
 }
 
 .emptyCopy p {
   margin: 0;
   color: var(--color-text-subtle);
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   line-height: 1.65;
 }
 
@@ -86,21 +86,21 @@
 .homeBadge {
   justify-self: start;
   padding: 4px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--color-surface-soft);
   color: var(--color-text-subtle);
-  font-size: 11px;
-  font-weight: 800;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-heavy);
 }
 
 .assetName {
-  font-size: 19px;
+  font-size: var(--font-size-2xl);
   line-height: 1.35;
 }
 
 .assetMeta {
   color: var(--color-text-subtle);
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   line-height: 1.5;
 }
 
@@ -113,12 +113,12 @@
 
 .priceBlock > span {
   color: var(--color-text-subtle);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 }
 
 .value {
   white-space: nowrap;
-  font-size: 22px;
+  font-size: var(--font-size-3xl);
 }
 
 .summaryGrid {
@@ -138,13 +138,13 @@
 
 .summaryGrid strong {
   overflow-wrap: anywhere;
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   line-height: 1.45;
 }
 
 .summaryLabel {
   color: var(--color-text-subtle);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
 }
 
 .positive {
@@ -164,8 +164,8 @@
 
 .tradeTitle {
   color: var(--color-text-subtle);
-  font-size: 12px;
-  font-weight: 800;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-heavy);
 }
 
 .tradeRow {
@@ -173,7 +173,7 @@
   grid-template-columns: minmax(0, 1fr) auto 44px;
   align-items: center;
   gap: var(--space-3);
-  font-size: 13px;
+  font-size: var(--font-size-sm);
 }
 
 .tradeRow span:last-child {
@@ -212,8 +212,8 @@
   display: grid;
   gap: 7px;
   min-width: 0;
-  font-size: 13px;
-  font-weight: 800;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-heavy);
 }
 
 .coreFields input,
@@ -239,8 +239,8 @@
 
 .coreFields small {
   color: var(--color-text-subtle);
-  font-size: 11px;
-  font-weight: 500;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-medium);
   line-height: 1.55;
 }
 
@@ -262,8 +262,8 @@
   gap: 8px;
   padding: 13px 2px;
   cursor: pointer;
-  font-size: 13px;
-  font-weight: 800;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-heavy);
   list-style: none;
 }
 
@@ -284,8 +284,8 @@
 
 .optionalDetails summary span {
   color: var(--color-text-subtle);
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-semibold);
 }
 
 .formGrid {
@@ -308,7 +308,7 @@
   padding: 10px 12px;
   border-radius: var(--radius-sm);
   background: var(--color-surface-soft);
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   line-height: 1.5;
 }
 
@@ -349,6 +349,6 @@
   .tradeRow span:last-child {
     grid-column: 1 / -1;
     text-align: left;
-    font-size: 12px;
+    font-size: var(--font-size-xs);
   }
 }

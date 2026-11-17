@@ -98,39 +98,49 @@ export function QuickEntryBar({
     }
   }
 
+  const isEmpty = entries.length === 0 && !editing;
+
   return (
-    <section className={styles.panel} aria-label="내 빠른 입력">
+    <section
+      className={[styles.panel, isEmpty ? styles.panelCompact : ""].filter(Boolean).join(" ")}
+      aria-label="내 빠른 입력"
+    >
       <div className={styles.heading}>
-        <strong>{userName}님의 빠른 입력</strong>
+        <span className={styles.headingText}>
+          <strong>{userName}님의 빠른 입력</strong>
+          {isEmpty && <span className={styles.hint}>자주 쓰는 입력을 버튼으로 저장해요</span>}
+        </span>
         <Button
           size="sm"
           variant="ghost"
           disabled={busy}
           onClick={() => setEditing(value => !value)}
         >
-          {editing ? "닫기" : "버튼 관리"}
+          {editing ? "닫기" : entries.length ? "버튼 관리" : "+ 만들기"}
         </Button>
       </div>
-      <div className={styles.wrap}>
-        {entries.map(entry => (
-          <Button
-            key={entry.id}
-            variant="secondary"
-            disabled={busy}
-            onClick={() => {
-              const issue = validateQuickEntry(entry, bootstrap);
-              if (issue) {
-                setMessage(`${entry.name}: ${issue} 버튼을 삭제한 뒤 새로 등록해주세요.`);
-                return;
-              }
-              void onApply(entry);
-            }}
-          >
-            {entry.name}
-          </Button>
-        ))}
-      </div>
-      {!entries.length && (
+      {entries.length > 0 && (
+        <div className={styles.wrap}>
+          {entries.map(entry => (
+            <Button
+              key={entry.id}
+              variant="secondary"
+              disabled={busy}
+              onClick={() => {
+                const issue = validateQuickEntry(entry, bootstrap);
+                if (issue) {
+                  setMessage(`${entry.name}: ${issue} 버튼을 삭제한 뒤 새로 등록해주세요.`);
+                  return;
+                }
+                void onApply(entry);
+              }}
+            >
+              {entry.name}
+            </Button>
+          ))}
+        </div>
+      )}
+      {!entries.length && editing && (
         <p className={styles.hint}>
           자주 쓰는 카테고리와 계좌를 선택한 뒤 버튼으로 등록하세요. 다음에는 금액만 입력하면
           됩니다.

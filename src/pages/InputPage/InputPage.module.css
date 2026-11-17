@@ -23,7 +23,7 @@
 .title {
   margin: 0;
 
-  font-size: 28px;
+  font-size: var(--font-size-4xl);
   line-height: 1.3;
 }
 
@@ -58,8 +58,8 @@
   color: inherit;
 
   font: inherit;
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
 
   cursor: pointer;
 
@@ -130,8 +130,8 @@
 
   gap: 4px;
 
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
 }
 
 .required {
@@ -220,8 +220,8 @@
   color: inherit;
 
   font: inherit;
-  font-size: 26px;
-  font-weight: 800;
+  font-size: var(--font-size-4xl);
+  font-weight: var(--font-weight-heavy);
   text-align: right;
 
   outline: none;
@@ -247,8 +247,8 @@
 
   color: var(--color-text-secondary);
 
-  font-size: 15px;
-  font-weight: 700;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
 
   pointer-events: none;
 }
@@ -266,8 +266,8 @@
 .sectionTitle {
   margin: 0;
 
-  font-size: 15px;
-  font-weight: 800;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-heavy);
 }
 
 .helper {
@@ -275,7 +275,7 @@
 
   color: var(--color-text-secondary);
 
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   line-height: 1.5;
 }
 
@@ -307,7 +307,7 @@
 .cardPaymentNoticeIcon {
   flex: 0 0 auto;
 
-  font-size: 17px;
+  font-size: var(--font-size-xl);
   line-height: 1.4;
 }
 
@@ -316,14 +316,14 @@
 
   color: var(--color-text-secondary);
 
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   line-height: 1.55;
 }
 
 .cardPaymentNoticeText strong {
   color: inherit;
 
-  font-weight: 800;
+  font-weight: var(--font-weight-heavy);
 }
 
 /* =========================================================
@@ -340,7 +340,7 @@
 
   color: var(--color-text-secondary);
 
-  font-size: 14px;
+  font-size: var(--font-size-md);
   line-height: 1.6;
 
   text-align: center;
@@ -351,7 +351,7 @@
 
   color: var(--color-error);
 
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   line-height: 1.5;
 }
 
@@ -375,8 +375,8 @@
 
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22);
 
-  font-size: 15px;
-  font-weight: 800;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-heavy);
   line-height: 1.45;
   text-align: center;
 
@@ -396,12 +396,12 @@
   height: 24px;
   margin-right: 8px;
 
-  border-radius: 999px;
+  border-radius: var(--radius-full);
 
   background: color-mix(in srgb, white 20%, transparent);
 
-  font-size: 15px;
-  font-weight: 900;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-heavy);
   vertical-align: -1px;
 }
 
@@ -431,7 +431,7 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
 
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   line-height: 1.45;
 }
 
@@ -470,12 +470,12 @@
 
 .queueFailureLabel {
   color: var(--color-text-primary);
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
 }
 
 .queueFailureMessage {
   color: var(--color-error);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 }
 
 /* =========================================================
@@ -498,7 +498,7 @@
   }
 
   .title {
-    font-size: 26px;
+    font-size: var(--font-size-4xl);
   }
 
   .card {
@@ -511,15 +511,15 @@
 
   .input {
     min-height: 48px;
-    font-size: 16px;
+    font-size: var(--font-size-lg);
   }
 
   .textarea {
-    font-size: 16px;
+    font-size: var(--font-size-lg);
   }
 
   .amountInput {
-    font-size: 24px;
+    font-size: var(--font-size-3xl);
   }
 
   .submitArea {
@@ -560,14 +560,14 @@
 }
 
 .title {
-  font-size: 24px;
+  font-size: var(--font-size-3xl);
   letter-spacing: -0.035em;
 }
 
 .typeTabs {
   margin-bottom: 12px;
   border-color: var(--color-border);
-  background: rgba(237, 243, 241, 0.82);
+  background: var(--color-surface-soft-glass);
 }
 
 .typeButton {
@@ -576,7 +576,7 @@
 
 .typeButtonActive {
   background: var(--color-primary);
-  box-shadow: 0 5px 12px rgba(71, 106, 132, 0.13);
+  box-shadow: 0 5px 12px var(--color-primary-glow);
 }
 
 .form {
@@ -592,14 +592,24 @@
 }
 
 .amountField {
-  gap: 5px;
-  padding: 5px 0 10px;
-  border-bottom: 1px solid rgba(220, 229, 229, 0.82);
+  gap: 4px;
+  padding: 12px 16px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-tint);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.amountField:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-focus-ring);
 }
 
 .amountField .fieldLabel {
   color: var(--color-text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 }
 
 .amountWrap {
@@ -614,29 +624,35 @@
   background: transparent;
   color: var(--color-primary);
   font-size: clamp(32px, 9vw, 42px);
-  font-weight: 800;
+  font-weight: var(--font-weight-heavy);
   letter-spacing: -0.045em;
+  font-variant-numeric: tabular-nums;
   box-shadow: none !important;
+}
+
+.amountInput::placeholder {
+  color: var(--color-primary);
+  opacity: 0.32;
 }
 
 .currency {
   color: var(--color-primary);
-  font-size: 18px;
-  font-weight: 800;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-heavy);
 }
 
 .input,
 .textarea,
 .pickerButton {
   border-color: var(--color-border);
-  background: #fbfcfc;
+  background: var(--color-surface-raised);
 }
 
 .input:focus,
 .textarea:focus,
 .pickerButton:focus-visible {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(71, 106, 132, 0.1);
+  box-shadow: 0 0 0 3px var(--color-focus-ring);
 }
 
 .pickerButton {
@@ -664,12 +680,12 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 14px;
+  font-size: var(--font-size-md);
 }
 
 .pickerValue {
   color: var(--color-text);
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
 }
 
 .pickerPlaceholder {
@@ -679,25 +695,25 @@
 .pickerChevron {
   flex: 0 0 auto;
   color: var(--color-text-secondary);
-  font-size: 18px;
+  font-size: var(--font-size-xl);
   line-height: 1;
 }
 
 .conditionalSection {
   gap: 14px;
   padding-top: 14px;
-  border-top: 1px solid rgba(220, 229, 229, 0.82);
+  border-top: 1px solid var(--color-divider);
 }
 
 .sectionTitle {
   color: var(--color-text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   letter-spacing: 0;
 }
 
 .helper {
   margin-top: 0;
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
 }
 
 /* 다른 명의 계좌 접기/펼치기 */
@@ -710,7 +726,7 @@
   gap: 12px;
   padding: 9px 10px;
   border: 0;
-  border-bottom: 1px solid rgba(220, 229, 229, 0.76);
+  border-bottom: 1px solid var(--color-divider);
   background: var(--color-surface-soft);
   color: var(--color-text-primary);
   font: inherit;
@@ -736,8 +752,8 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 5px 8px;
-  font-size: 13px;
-  font-weight: 800;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-heavy);
   line-height: 1.35;
 }
 
@@ -746,11 +762,11 @@
   align-items: center;
   min-height: 22px;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--color-surface);
   color: var(--color-primary);
-  font-size: 11px;
-  font-weight: 800;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-heavy);
   white-space: nowrap;
 }
 
@@ -763,18 +779,18 @@
   border-radius: 50%;
   background: var(--color-surface);
   color: var(--color-primary);
-  font-size: 16px;
-  font-weight: 900;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-heavy);
   line-height: 1;
 }
 
 .sheetGroupLabel {
   padding: 11px 4px 7px;
-  border-bottom: 1px solid rgba(220, 229, 229, 0.52);
+  border-bottom: 1px solid var(--color-divider);
   background: var(--color-surface);
   color: var(--color-text-secondary);
-  font-size: 11px;
-  font-weight: 800;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-heavy);
   line-height: 1.3;
   letter-spacing: 0.01em;
 }
@@ -788,7 +804,7 @@
   gap: 12px;
   padding: 10px 4px;
   border: 0;
-  border-bottom: 1px solid rgba(220, 229, 229, 0.68);
+  border-bottom: 1px solid var(--color-divider);
   background: transparent;
   color: inherit;
   font: inherit;
@@ -811,7 +827,7 @@
 
 .sheetOptionText strong {
   overflow: hidden;
-  font-size: 14px;
+  font-size: var(--font-size-md);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -819,7 +835,7 @@
 .sheetOptionText span {
   overflow: hidden;
   color: var(--color-text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -833,8 +849,8 @@
   border-radius: 50%;
   background: var(--color-surface-sage);
   color: var(--color-positive);
-  font-size: 13px;
-  font-weight: 900;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-heavy);
 }
 
 @media (max-width: 390px) {
@@ -885,25 +901,25 @@
   margin-top: 8px;
   padding: 12px 14px;
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: var(--color-surface-subtle);
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   line-height: 1.45;
 }
 
 .cardBillingBox strong {
   margin-top: 2px;
-  font-size: 14px;
+  font-size: var(--font-size-md);
 }
 
 .cardBillingBox small {
-  color: var(--color-text-secondary, #68707c);
+  color: var(--color-text-secondary);
 }
 
 .cardBillingError {
   margin: 8px 0 0;
-  color: var(--color-error, #b3261e);
-  font-size: 12px;
+  color: var(--color-error);
+  font-size: var(--font-size-xs);
 }
 
 .cardAmountField {
@@ -928,8 +944,8 @@
   background: var(--color-surface);
   color: var(--color-primary);
   font: inherit;
-  font-size: 26px;
-  font-weight: 800;
+  font-size: var(--font-size-4xl);
+  font-weight: var(--font-weight-heavy);
   text-align: right;
   outline: none;
 }
@@ -945,8 +961,8 @@
   right: 14px;
   transform: translateY(-50%);
   color: var(--color-primary);
-  font-size: 14px;
-  font-weight: 800;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-heavy);
   pointer-events: none;
 }
 
@@ -975,13 +991,13 @@
 
 .benefitHeader strong {
   color: var(--color-text-primary);
-  font-size: 14px;
+  font-size: var(--font-size-md);
   line-height: 1.35;
 }
 
 .benefitHeader span {
   color: var(--color-text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
 }
 
 .benefitToggle {
@@ -990,8 +1006,8 @@
   align-items: center;
   gap: 6px;
   color: var(--color-text-primary);
-  font-size: 12px;
-  font-weight: 800;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-heavy);
 }
 
 .benefitToggle input {
@@ -1007,19 +1023,19 @@
   border-radius: var(--radius-sm);
   background: var(--color-surface);
   color: var(--color-text-primary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   line-height: 1.45;
 }
 
 .benefitSummary strong {
   color: var(--color-primary);
-  font-size: 14px;
+  font-size: var(--font-size-md);
 }
 
 .benefitMuted {
   margin: 0;
   color: var(--color-text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
   line-height: 1.55;
 }
 
@@ -1032,20 +1048,20 @@
   border-radius: var(--radius-sm);
   background: var(--color-surface);
   color: var(--color-text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 }
 
 .benefitRewardBalance strong {
   color: var(--color-text-primary);
-  font-size: 15px;
+  font-size: var(--font-size-base);
 }
 
 .benefitRewardField {
   display: grid;
   gap: 6px;
   color: var(--color-text-primary);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
 }
 
 .benefitRewardInputRow {
@@ -1069,7 +1085,7 @@
   background: var(--color-surface);
   color: var(--color-text-primary);
   font: inherit;
-  font-size: 16px /* iOS는 16px 미만 입력칸에 포커스하면 화면을 확대합니다 */;
+  font-size: var(--font-size-lg) /* iOS는 16px 미만 입력칸에 포커스하면 화면을 확대합니다 */;
   text-align: right;
 }
 
@@ -1085,7 +1101,7 @@
   right: 12px;
   transform: translateY(-50%);
   color: var(--color-text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   pointer-events: none;
 }
 
@@ -1094,7 +1110,7 @@
   .typeButton {
     padding-right: 8px;
     padding-left: 8px;
-    font-size: 13px;
+    font-size: var(--font-size-sm);
   }
 }
 

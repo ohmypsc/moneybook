@@ -51,6 +51,7 @@ import { Money, formatMoney } from "../../components/common/Money/Money";
 import type { BootstrapData, BootstrapResponse } from "../../types/bootstrap";
 
 import styles from "./CalendarPage.module.css";
+import { Skeleton } from "../../components/common/Skeleton/Skeleton";
 
 type CalendarFilter = "전체" | LedgerTransactionType;
 
@@ -1446,8 +1447,9 @@ export default function CalendarPage({
 
   return (
     <main className={styles.page}>
-      <header className={styles.header}>
-        {onReturnToList && (
+      {/* 페이지 제목("내역")과 보기 탭은 HistoryPage가 그립니다. */}
+      {onReturnToList && (
+        <header className={styles.header}>
           <Button
             variant="secondary"
             size="sm"
@@ -1456,11 +1458,8 @@ export default function CalendarPage({
           >
             ← 보던 목록으로
           </Button>
-        )}
-        <p className={styles.eyebrow}>거래 기록</p>
-
-        <h1 className={styles.title}>내역</h1>
-      </header>
+        </header>
+      )}
 
       <div className={styles.toolbar}>
         <div className={styles.monthNavigator}>
@@ -1545,54 +1544,12 @@ export default function CalendarPage({
         </div>
       </Card>
 
-      <div className={tagStyles.tagFilter}>
-        <label>
-          태그로 보기{" "}
-          <select
-            aria-label="태그로 보기"
-            value={tagFilter}
-            onChange={e => setTagFilter(e.target.value)}
-          >
-            <option value="">모든 태그</option>
-            {tagFilter && !availableTags.includes(tagFilter) && (
-              <option value={tagFilter}>{tagFilter} (이번 달 0건)</option>
-            )}
-            {availableTags.map(tag => (
-              <option key={tag} value={tag}>
-                #{tag}
-              </option>
-            ))}
-          </select>
-        </label>
-        {tagFilter && (
-          <p className={tagStyles.muted}>
-            현재 월·거래 유형 기준 {filteredTransactions.length}건 · 수입{" "}
-            {formatMoney(
-              filteredTransactions
-                .filter(t => t.type === "수입")
-                .reduce((sum, t) => sum + t.amount, 0)
-            )}{" "}
-            · 지출{" "}
-            {formatMoney(
-              filteredTransactions
-                .filter(t => t.type === "지출")
-                .reduce((sum, t) => sum + t.amount, 0)
-            )}{" "}
-            · 이체{" "}
-            {formatMoney(
-              filteredTransactions
-                .filter(t => t.type === "이체")
-                .reduce((sum, t) => sum + t.amount, 0)
-            )}{" "}
-            (원거래 금액 합계)
-          </p>
-        )}
-      </div>
-      <div className={styles.filters} aria-label="거래 유형">
+      <div className={styles.filters} aria-label="거래 유형과 태그">
         {FILTERS.map(item => (
           <button
             type="button"
             key={item}
+            aria-pressed={filter === item}
             className={[styles.filterButton, filter === item ? styles.filterButtonActive : ""]
               .filter(Boolean)
               .join(" ")}
@@ -1601,9 +1558,54 @@ export default function CalendarPage({
             {item}
           </button>
         ))}
+
+        {(availableTags.length > 0 || tagFilter) && (
+          <select
+            aria-label="태그로 보기"
+            className={[tagStyles.tagSelect, tagFilter ? tagStyles.tagSelectActive : ""]
+              .filter(Boolean)
+              .join(" ")}
+            value={tagFilter}
+            onChange={e => setTagFilter(e.target.value)}
+          >
+            <option value="">#태그 전체</option>
+            {tagFilter && !availableTags.includes(tagFilter) && (
+              <option value={tagFilter}>#{tagFilter} (이번 달 0건)</option>
+            )}
+            {availableTags.map(tag => (
+              <option key={tag} value={tag}>
+                #{tag}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
-      {loading && <p className={styles.loading}>거래 내역을 불러오는 중입니다.</p>}
+      {tagFilter && (
+        <p className={tagStyles.tagSummary}>
+          #{tagFilter} · {filteredTransactions.length}건 · 수입{" "}
+          {formatMoney(
+            filteredTransactions
+              .filter(t => t.type === "수입")
+              .reduce((sum, t) => sum + t.amount, 0)
+          )}{" "}
+          · 지출{" "}
+          {formatMoney(
+            filteredTransactions
+              .filter(t => t.type === "지출")
+              .reduce((sum, t) => sum + t.amount, 0)
+          )}{" "}
+          · 이체{" "}
+          {formatMoney(
+            filteredTransactions
+              .filter(t => t.type === "이체")
+              .reduce((sum, t) => sum + t.amount, 0)
+          )}
+          <span> (현재 월·거래 유형 기준, 원거래 금액 합계)</span>
+        </p>
+      )}
+
+      {loading && <Skeleton label="거래 내역을 불러오는 중입니다." lines={4} />}
 
       {!loading && error && (
         <p className={styles.error} role="alert">

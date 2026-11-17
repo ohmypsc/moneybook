@@ -30,6 +30,7 @@ import { DataFreshnessNotice } from "../../components/common/DataFreshnessNotice
 import type { DashboardData } from "../../types/dashboard";
 
 import styles from "./AssetsPage.module.css";
+import { Skeleton } from "../../components/common/Skeleton/Skeleton";
 
 type AssetsTab = "cash" | "investment" | "realEstate" | "liability";
 
@@ -681,7 +682,7 @@ export default function AssetsPage({ userName, onOpenInput }: AssetsPageProps) {
       {fallbackSnapshotAt && <DataFreshnessNotice fetchedAt={fallbackSnapshotAt} />}
 
       <Card as="section" padding="none" className={styles.summaryCard}>
-        {loading && <p className={styles.loading}>순자산 요약을 불러오는 중입니다.</p>}
+        {loading && <Skeleton label="순자산 요약을 불러오는 중입니다." variant="block" />}
 
         {!loading && error && <p className={styles.error}>{error}</p>}
 

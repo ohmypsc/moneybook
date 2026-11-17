@@ -23,7 +23,7 @@
 .heading h1 {
   margin: 0 0 var(--space-2);
 
-  font-size: 30px;
+  font-size: var(--font-size-5xl);
   line-height: 1.25;
 }
 
@@ -46,8 +46,8 @@
 }
 
 .field span {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
 }
 
 .field input {
@@ -73,6 +73,6 @@
 
   color: var(--color-error);
 
-  font-size: 14px;
+  font-size: var(--font-size-md);
   line-height: 1.5;
 }

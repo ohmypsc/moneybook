@@ -11,10 +11,49 @@ import { getPendingTransactions } from "../../utils/pendingTransactionQueue";
 import { saveLastAuthenticatedUser } from "../../app/lastAuthenticatedUser";
 import PwaInstallPrompt from "../../components/pwa/PwaInstallPrompt/PwaInstallPrompt";
 import { disablePushOnThisDevice } from "../../utils/pushNotifications";
+import { readThemePreference, saveThemePreference, type ThemePreference } from "../../utils/theme";
 import { PartnerPushSettings } from "./PartnerPushSettings";
 import { Button } from "../../components/common/Button/Button";
 import { Card } from "../../components/common/Card/Card";
 import styles from "./SettingsPage.module.css";
+
+const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
+  { value: "system", label: "기기 설정" },
+  { value: "light", label: "밝게" },
+  { value: "dark", label: "어둡게" }
+];
+
+function ThemeSettings() {
+  const [theme, setTheme] = useState<ThemePreference>(() => readThemePreference());
+
+  return (
+    <Card as="section">
+      <div className={styles.sectionHeading}>
+        <h2>화면 테마</h2>
+
+        <p>이 기기에서만 적용됩니다. 기기 설정을 고르면 휴대폰의 다크 모드를 따라갑니다.</p>
+      </div>
+
+      <div className={styles.segmentedControl} role="radiogroup" aria-label="화면 테마">
+        {THEME_OPTIONS.map(option => (
+          <button
+            type="button"
+            key={option.value}
+            role="radio"
+            aria-checked={theme === option.value}
+            className={theme === option.value ? styles.segmentButtonActive : styles.segmentButton}
+            onClick={() => {
+              setTheme(option.value);
+              saveThemePreference(option.value);
+            }}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </Card>
+  );
+}
 
 export function ProfileSettings() {
   const [userName, setUserName] = useState("");
@@ -137,6 +176,8 @@ export function ProfileSettings() {
           </div>
         </dl>
       </Card>
+
+      <ThemeSettings />
 
       <PartnerPushSettings userName={userName} />
 

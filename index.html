@@ -11,6 +11,13 @@
     <meta
       name="theme-color"
       content="#f5f8f7"
+      media="(prefers-color-scheme: light)"
+    />
+
+    <meta
+      name="theme-color"
+      content="#11181c"
+      media="(prefers-color-scheme: dark)"
     />
 
     <meta
@@ -55,6 +62,23 @@
     <script>
       window.__moneybookSplashStartedAt =
         Date.now();
+
+      // 첫 화면이 다른 테마로 깜빡이지 않도록 React보다 먼저 저장된 테마를 적용합니다.
+      // 저장 키는 src/utils/theme.ts의 THEME_STORAGE_KEY와 같아야 합니다.
+      try {
+        var savedTheme =
+          localStorage.getItem("moneybook.theme");
+
+        if (
+          savedTheme === "light" ||
+          savedTheme === "dark"
+        ) {
+          document.documentElement.setAttribute(
+            "data-theme",
+            savedTheme
+          );
+        }
+      } catch (error) {}
     </script>
 
     <style>
@@ -67,6 +91,19 @@
 
       body {
         background: #f5f8f7;
+      }
+
+      @media (
+        prefers-color-scheme:
+          dark
+      ) {
+        html:not([data-theme="light"]) body {
+          background: #11181c;
+        }
+      }
+
+      html[data-theme="dark"] body {
+        background: #11181c;
       }
 
       #launch-splash {

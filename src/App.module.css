@@ -28,7 +28,7 @@
 .panel h1 {
   margin: 0 0 var(--space-3);
 
-  font-size: 26px;
+  font-size: var(--font-size-4xl);
   line-height: 1.3;
 }
 

@@ -17,9 +17,9 @@
   margin-bottom: 16px;
   padding: 24px 22px 20px;
   overflow: hidden;
-  border: 1px solid rgba(207, 222, 220, 0.86);
+  border: 1px solid var(--color-hero-border);
   border-radius: var(--radius-xl);
-  background: linear-gradient(145deg, #f8fbfa 0%, #e9f2f2 100%);
+  background: linear-gradient(145deg, var(--color-hero-from) 0%, var(--color-hero-to) 100%);
 }
 
 .togetherBlock {
@@ -35,18 +35,18 @@
   width: 72px;
   height: 72px;
   flex: 0 0 72px;
-  border: 1px solid rgba(126, 155, 158, 0.42);
-  border-radius: 18px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
   object-fit: cover;
-  box-shadow: 0 6px 18px rgba(46, 70, 82, 0.12);
+  box-shadow: var(--shadow-raised);
 }
 
 .togetherLabel,
 .togetherDate {
   margin: 0;
   color: var(--color-text-secondary);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
 }
 
 .togetherValue {
@@ -72,11 +72,11 @@
 
 .summaryHeader h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--font-size-lg);
 }
 .summaryHeader span {
   color: var(--color-text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 }
 .summaryMeta {
   display: grid;
@@ -85,8 +85,8 @@
 }
 .summaryMeta small {
   color: var(--color-text-tertiary, var(--color-text-secondary));
-  font-size: 10px;
-  font-weight: 600;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-semibold);
 }
 
 .summaryRows {
@@ -98,19 +98,19 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  border-top: 1px solid rgba(220, 229, 229, 0.72);
+  border-top: 1px solid var(--color-divider);
 }
 .summaryRow:first-child {
   border-top: 0;
 }
 .summaryLabel {
   color: var(--color-text-secondary);
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
 }
 .summaryRow strong {
   min-width: 0;
-  font-size: 16px;
+  font-size: var(--font-size-lg);
   line-height: 1.2;
   text-align: right;
   white-space: nowrap;
@@ -134,25 +134,25 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   padding: 10px 0 12px;
-  border-top: 1px solid rgba(220, 229, 229, 0.72);
+  border-top: 1px solid var(--color-divider);
 }
 .assetComposition > div {
   min-width: 0;
   display: grid;
   gap: 4px;
   padding: 9px 10px;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: var(--color-surface-soft);
 }
 .assetComposition span {
   color: var(--color-text-secondary);
-  font-size: 10.5px;
-  font-weight: 700;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-bold);
 }
 .assetComposition strong {
   min-width: 0;
   overflow: hidden;
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -161,8 +161,8 @@
 .summaryLabel small {
   margin-left: 4px;
   color: var(--color-text-tertiary, var(--color-text-secondary));
-  font-size: 9.5px;
-  font-weight: 700;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-bold);
 }
 
 .section {
@@ -184,16 +184,16 @@
 }
 .sectionHeader h2 {
   margin: 0;
-  font-size: 17px;
+  font-size: var(--font-size-xl);
   letter-spacing: -0.02em;
 }
 .sectionHint {
   color: var(--color-text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
 }
 .sectionTotal {
   flex: 0 0 auto;
-  font-size: 15px;
+  font-size: var(--font-size-base);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
@@ -210,7 +210,7 @@
   align-items: center;
   gap: 12px;
   padding: 13px 15px;
-  border-bottom: 1px solid rgba(220, 229, 229, 0.72);
+  border-bottom: 1px solid var(--color-divider);
 }
 .cardRow:last-child,
 .rankRow:last-child {
@@ -235,8 +235,8 @@
   border-radius: 50%;
   background: var(--color-surface-blue);
   color: var(--color-primary);
-  font-size: 13px;
-  font-weight: 800;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-heavy);
 }
 .cardName div {
   min-width: 0;
@@ -245,18 +245,18 @@
 }
 .cardName strong {
   overflow: hidden;
-  font-size: 14px;
+  font-size: var(--font-size-md);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .cardName span {
   color: var(--color-text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
 }
 .cardAccountMeta {
   color: var(--color-text-secondary);
-  font-size: 10.5px;
-  font-weight: 650;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-semibold);
 }
 .cardAmountBlock {
   min-width: 112px;
@@ -266,16 +266,16 @@
 }
 .cardAmount {
   flex: 0 0 auto;
-  font-size: 14px;
+  font-size: var(--font-size-md);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 .cardEmptyStatus,
 .cardPaidStatus {
   padding: 5px 8px;
-  border-radius: 999px;
-  font-size: 10.5px;
-  font-weight: 800;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-heavy);
   white-space: nowrap;
 }
 .cardEmptyStatus {
@@ -292,11 +292,11 @@
   align-items: center;
   gap: 3px;
   padding: 4px 7px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--color-error-soft);
   color: var(--color-error);
-  font-size: 10.5px;
-  font-weight: 800;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-heavy);
   white-space: nowrap;
 }
 
@@ -311,7 +311,7 @@
   align-items: center;
   gap: 11px;
   padding: 13px 15px;
-  border-bottom: 1px solid rgba(220, 229, 229, 0.72);
+  border-bottom: 1px solid var(--color-divider);
 }
 
 .upcomingRow:last-child {
@@ -324,8 +324,8 @@
   display: grid;
   place-items: center;
   border-radius: 50%;
-  font-size: 12px;
-  font-weight: 850;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-heavy);
 }
 
 .upcomingIconCard {
@@ -346,24 +346,24 @@
 
 .upcomingCopy strong {
   overflow: hidden;
-  font-size: 14px;
+  font-size: var(--font-size-md);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .upcomingCopy span {
   color: var(--color-text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
 }
 
 .upcomingCopy small {
   color: var(--color-error);
-  font-size: 10.5px;
-  font-weight: 750;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-bold);
 }
 
 .upcomingAmount {
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
@@ -380,22 +380,22 @@
   border-radius: 50%;
   background: var(--color-surface-soft);
   color: var(--color-primary);
-  font-size: 12px;
-  font-weight: 800;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-heavy);
 }
 .rankName {
   min-width: 0;
   flex: 1 1 auto;
   overflow: hidden;
-  font-size: 14px;
+  font-size: var(--font-size-md);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .rankAmount {
   flex: 0 0 auto;
   color: var(--color-text);
-  font-size: 13px;
-  font-weight: 800;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-heavy);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
@@ -404,7 +404,7 @@
   margin: 0;
   padding: 20px 16px;
   color: var(--color-text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   line-height: 1.5;
   text-align: center;
 }
@@ -441,7 +441,7 @@
 .errorCard p {
   margin: 0;
   color: var(--color-error);
-  font-size: 14px;
+  font-size: var(--font-size-md);
   line-height: 1.6;
 }
 
@@ -449,12 +449,12 @@
 .monthLabel {
   margin: 0 0 4px;
   color: var(--color-text-secondary);
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
 }
 .header h1:not(.togetherValue) {
   margin: 0;
-  font-size: 26px;
+  font-size: var(--font-size-4xl);
 }
 
 @media (max-width: 390px) {
@@ -473,13 +473,13 @@
     width: 68px;
     height: 68px;
     flex-basis: 68px;
-    border-radius: 18px;
+    border-radius: var(--radius-lg);
   }
   .summaryCard {
     padding: 16px;
   }
   .summaryRow strong {
-    font-size: 15px;
+    font-size: var(--font-size-base);
   }
   .cardRow,
   .rankRow {
@@ -488,7 +488,7 @@
   }
   .cardAmount,
   .rankAmount {
-    font-size: 12.5px;
+    font-size: var(--font-size-xs);
   }
   .cardAmountBlock {
     min-width: 96px;
@@ -498,7 +498,7 @@
     padding-left: 13px;
   }
   .upcomingAmount {
-    font-size: 12.5px;
+    font-size: var(--font-size-xs);
   }
 }
 
@@ -520,8 +520,8 @@
 .summaryRowButton .summaryLabel small {
   margin-left: 5px;
   color: var(--color-text-secondary);
-  font-size: 10px;
-  font-weight: 700;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-bold);
 }
 
 .detailBackdrop {
@@ -532,7 +532,7 @@
   align-items: flex-end;
   justify-content: center;
   padding: 16px;
-  background: rgb(0 0 0 / 0.38);
+  background: var(--color-overlay-strong);
 }
 
 .detailModal {
@@ -541,7 +541,7 @@
   overflow: auto;
   border-radius: 20px 20px 16px 16px;
   background: var(--color-surface);
-  box-shadow: 0 20px 60px rgb(0 0 0 / 0.2);
+  box-shadow: var(--shadow-lg);
   padding: 18px;
 }
 
@@ -565,17 +565,17 @@
 }
 
 .detailHeader strong {
-  font-size: 17px;
+  font-size: var(--font-size-xl);
 }
 
 .detailHeader span {
   color: var(--color-text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 }
 
 .detailClose {
-  font-size: 22px;
-  font-weight: 500;
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-medium);
 }
 
 .detailState,
@@ -613,12 +613,12 @@
 .detailRow small,
 .detailRow em {
   color: var(--color-text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
   font-style: normal;
 }
 
 .detailRow strong {
-  font-size: 14px;
+  font-size: var(--font-size-md);
 }
 
 .detailOffset {
@@ -628,16 +628,16 @@
   width: fit-content;
   margin-top: 2px;
   padding: 5px 7px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--color-surface-soft);
   color: var(--color-text) !important;
-  font-size: 10.5px !important;
-  font-weight: 750;
+  font-size: var(--font-size-2xs) !important;
+  font-weight: var(--font-weight-bold);
 }
 
 .detailRow b {
   flex: 0 0 auto;
-  font-size: 14px;
+  font-size: var(--font-size-md);
 }
 
 .detailRowActions {
@@ -653,6 +653,6 @@
   }
 
   .detailModal {
-    border-radius: 20px;
+    border-radius: var(--radius-lg);
   }
 }

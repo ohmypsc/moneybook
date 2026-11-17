@@ -8,8 +8,8 @@
   border-radius: var(--radius-md);
   background: var(--color-surface-soft);
   color: var(--color-text-secondary);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
   line-height: 1.45;
 }
 

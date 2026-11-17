@@ -11,9 +11,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background:
-    linear-gradient(180deg, rgba(228, 239, 244, 0.34) 0, rgba(245, 248, 247, 0) 190px),
-    var(--color-bg);
+  background: linear-gradient(180deg, var(--color-bg-glow) 0, transparent 190px), var(--color-bg);
   color: var(--color-text);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -43,4 +41,22 @@ textarea {
 
 #root {
   min-height: 100vh;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--color-text-tertiary);
+  opacity: 1;
+}
+
+/* 기기에서 '동작 줄이기'를 켠 경우 전환·애니메이션을 사실상 없앱니다. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

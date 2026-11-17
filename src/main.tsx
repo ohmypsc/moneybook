@@ -8,7 +8,9 @@ import "./styles/tokens.css";
 import "./styles/global.css";
 
 import { initializePwaInstall } from "./utils/pwaInstall";
+import { initTheme } from "./utils/theme";
 
+initTheme();
 initializePwaInstall();
 
 const root = document.getElementById("root");

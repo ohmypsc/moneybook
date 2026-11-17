@@ -34,6 +34,7 @@ import { Money, formatMoney } from "../../components/common/Money/Money";
 
 import styles from "./HistoryPage.module.css";
 import { YearEndTaxView } from "./YearEndTaxView";
+import { Skeleton } from "../../components/common/Skeleton/Skeleton";
 
 type HistoryView = "calendar" | "search" | "report" | "tax";
 type TransactionFilter = "전체" | "지출" | "수입" | "이체";
@@ -523,11 +524,14 @@ export default function HistoryPage({ onAddTransaction, onCopyTransaction }: His
 
   return (
     <>
+      <h1 className={styles.pageTitle}>내역</h1>
+
       <div className={styles.toolbarWrap}>
-        <div className={styles.toolbar} aria-label="내역 보기 방식">
+        <div className={styles.toolbar} role="group" aria-label="내역 보기 방식">
           <button
             type="button"
             className={view === "calendar" ? styles.active : ""}
+            aria-pressed={view === "calendar"}
             onClick={() => setView("calendar")}
           >
             캘린더
@@ -535,6 +539,7 @@ export default function HistoryPage({ onAddTransaction, onCopyTransaction }: His
           <button
             type="button"
             className={view === "search" ? styles.active : ""}
+            aria-pressed={view === "search"}
             onClick={() => setView("search")}
           >
             목록
@@ -542,6 +547,7 @@ export default function HistoryPage({ onAddTransaction, onCopyTransaction }: His
           <button
             type="button"
             className={view === "report" ? styles.active : ""}
+            aria-pressed={view === "report"}
             onClick={() => setView("report")}
           >
             리포트
@@ -549,6 +555,7 @@ export default function HistoryPage({ onAddTransaction, onCopyTransaction }: His
           <button
             type="button"
             className={view === "tax" ? styles.active : ""}
+            aria-pressed={view === "tax"}
             onClick={() => setView("tax")}
           >
             연말정산
@@ -767,7 +774,7 @@ export default function HistoryPage({ onAddTransaction, onCopyTransaction }: His
           {searchError && <p className={styles.error}>{searchError}</p>}
 
           {searchLoading && searchItems.length === 0 && (
-            <p className={styles.state}>내역을 불러오는 중입니다.</p>
+            <Skeleton label="내역을 불러오는 중입니다." lines={5} />
           )}
 
           {!searchLoading && searchItems.length === 0 ? (
@@ -917,7 +924,7 @@ export default function HistoryPage({ onAddTransaction, onCopyTransaction }: His
             </Button>
           </div>
 
-          {reportLoading && !report && <p className={styles.state}>리포트를 불러오는 중입니다.</p>}
+          {reportLoading && !report && <Skeleton label="리포트를 불러오는 중입니다." lines={4} />}
           {reportError && <p className={styles.error}>{reportError}</p>}
 
           {report && (

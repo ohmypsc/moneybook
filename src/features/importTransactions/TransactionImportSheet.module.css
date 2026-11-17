@@ -17,14 +17,14 @@
 }
 
 .sourceIntro strong {
-  font-size: 18px;
+  font-size: var(--font-size-xl);
   letter-spacing: -0.02em;
 }
 
 .sourceIntro p {
   margin: 0;
   color: var(--color-text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   line-height: 1.55;
 }
 
@@ -34,7 +34,7 @@
   gap: 6px;
   padding: 5px;
   border: 1px solid var(--color-border);
-  border-radius: 16px;
+  border-radius: var(--radius-md);
   background: var(--color-surface-soft);
 }
 
@@ -46,12 +46,12 @@
   gap: 8px;
   padding: 0 12px;
   border: 1px solid transparent;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--color-text-secondary);
   font: inherit;
-  font-size: 14px;
-  font-weight: 750;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
   cursor: pointer;
   transition:
     background-color 0.15s ease,
@@ -121,7 +121,7 @@
   gap: 14px;
   padding: 18px;
   border: 1.5px dashed var(--color-border-strong);
-  border-radius: 18px;
+  border-radius: var(--radius-lg);
   background: var(--color-surface-soft);
   color: var(--color-text-primary);
   text-align: left;
@@ -148,7 +148,7 @@
   display: grid;
   place-items: center;
   padding: 12px;
-  border-radius: 15px;
+  border-radius: var(--radius-md);
   background: var(--color-surface);
   color: var(--color-primary);
   box-shadow: 0 1px 4px rgba(34, 51, 60, 0.08);
@@ -161,24 +161,24 @@
 }
 
 .uploadCopy strong {
-  font-size: 15px;
+  font-size: var(--font-size-base);
   letter-spacing: -0.01em;
 }
 
 .uploadCopy small {
   color: var(--color-text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   line-height: 1.45;
 }
 
 .uploadAction {
   flex: 0 0 auto;
   padding: 7px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--color-surface);
   color: var(--color-primary);
-  font-size: 12px;
-  font-weight: 800;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-heavy);
 }
 
 .selectedFiles {
@@ -186,7 +186,7 @@
   gap: 9px;
   padding: 12px;
   border: 1px solid var(--color-border);
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: var(--color-surface);
 }
 
@@ -198,12 +198,12 @@
 }
 
 .selectedFilesHeader strong {
-  font-size: 13px;
+  font-size: var(--font-size-sm);
 }
 
 .selectedFilesHeader span {
   color: var(--color-text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
 }
 
 .fileList {
@@ -219,7 +219,7 @@
   align-items: center;
   gap: 9px;
   padding: 5px 7px 5px 6px;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: var(--color-surface-soft);
 }
 
@@ -228,11 +228,11 @@
   height: 26px;
   display: grid;
   place-items: center;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--color-surface);
   color: var(--color-primary);
-  font-size: 11px;
-  font-weight: 800;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-heavy);
 }
 
 .fileName {
@@ -240,8 +240,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
-  font-weight: 650;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
 }
 
 .fileRemove {
@@ -251,11 +251,11 @@
   place-items: center;
   padding: 0;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: transparent;
   color: var(--color-text-secondary);
   font: inherit;
-  font-size: 19px;
+  font-size: var(--font-size-2xl);
   line-height: 1;
   cursor: pointer;
 }
@@ -269,7 +269,7 @@
   margin: 0;
   padding: 0 2px;
   color: var(--color-text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   line-height: 1.55;
 }
 
@@ -278,7 +278,7 @@
   min-height: 220px;
   padding: 14px 15px;
   border: 1px solid var(--color-border);
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: var(--color-surface);
   color: inherit;
   font: inherit;
@@ -311,15 +311,15 @@
   margin: -2px 0 2px;
   padding: 8px 0 10px;
   background: var(--color-surface);
-  font-size: 13px;
+  font-size: var(--font-size-sm);
 }
 
 .pill {
   padding: 6px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--color-surface-soft);
   border: 1px solid var(--color-border);
-  font-weight: 750;
+  font-weight: var(--font-weight-bold);
 }
 
 .bulkEdit {
@@ -327,7 +327,7 @@
   gap: 10px;
   padding: 12px;
   border: 1px solid var(--color-border);
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: var(--color-surface-soft);
 }
 
@@ -337,12 +337,12 @@
 }
 
 .bulkEdit strong {
-  font-size: 13px;
+  font-size: var(--font-size-sm);
 }
 
 .bulkEdit span {
   color: var(--color-text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
 }
 
 .bulkControls {
@@ -356,11 +356,11 @@
   min-height: 40px;
   padding: 0 9px;
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: var(--color-surface);
   color: inherit;
   font: inherit;
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 }
 
 .bulkSelect:focus {
@@ -374,18 +374,18 @@
   gap: 0;
   padding: 0;
   border: 1px solid var(--color-border);
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: var(--color-surface);
   box-shadow: 0 1px 3px rgba(34, 51, 60, 0.06);
   overflow: hidden;
 }
 
 .candidateWarning {
-  border-color: var(--color-warning-border, #e0b45c);
+  border-color: var(--color-warning-border);
 }
 
 .candidateDuplicate {
-  border-color: var(--color-error-border, #e2a09b);
+  border-color: var(--color-error-border);
 }
 
 .candidateCompactHeader {
@@ -420,7 +420,7 @@
 
 .candidateToggle:focus-visible {
   outline: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   box-shadow: 0 0 0 3px var(--color-focus-ring);
 }
 
@@ -432,7 +432,7 @@
 .candidateTitle strong {
   display: block;
   overflow: hidden;
-  font-size: 14px;
+  font-size: var(--font-size-md);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -441,7 +441,7 @@
   margin: 3px 0 0;
   overflow: hidden;
   color: var(--color-text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -451,9 +451,9 @@
   max-width: 100%;
   margin-top: 4px;
   overflow: hidden;
-  color: var(--color-warning-text, #8a5b00);
-  font-size: 10.5px;
-  font-weight: 750;
+  color: var(--color-warning-text);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-bold);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -466,13 +466,13 @@
 }
 
 .candidateSummaryAmount strong {
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   font-variant-numeric: tabular-nums;
 }
 
 .candidateSummaryAmount span {
   color: var(--color-text-secondary);
-  font-size: 14px;
+  font-size: var(--font-size-md);
 }
 
 .candidateDetails {
@@ -487,7 +487,7 @@
 .reasonList {
   margin: 0;
   color: var(--color-text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-sm);
 }
 
 .reasonList {
@@ -507,8 +507,8 @@
 }
 
 .field span {
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
   color: var(--color-text-secondary);
 }
 
@@ -537,7 +537,7 @@
   margin: 0;
   padding: 10px 12px;
   border-radius: var(--radius-md);
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   line-height: 1.5;
 }
 
@@ -552,8 +552,8 @@
 }
 
 .feedback {
-  background: var(--color-success-soft, #eef8f0);
-  color: var(--color-success, #26753b);
+  background: var(--color-success-soft);
+  color: var(--color-success);
 }
 
 .actions {
@@ -573,13 +573,13 @@
   }
 
   .sourceIntro strong {
-    font-size: 17px;
+    font-size: var(--font-size-xl);
   }
 
   .sourceTab {
     min-height: 46px;
     padding: 0 8px;
-    font-size: 13px;
+    font-size: var(--font-size-sm);
   }
 
   .uploadTrigger {
@@ -618,7 +618,7 @@
   }
 
   .candidateSummaryAmount strong {
-    font-size: 12px;
+    font-size: var(--font-size-xs);
   }
 
   .actions {

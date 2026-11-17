@@ -27,11 +27,11 @@
   font-size: inherit;
 }
 .size_sm {
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 }
 .size_md {
-  font-size: 14px;
+  font-size: var(--font-size-md);
 }
 .size_lg {
-  font-size: 16px;
+  font-size: var(--font-size-lg);
 }
