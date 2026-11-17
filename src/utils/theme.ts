@@ -9,7 +9,7 @@ export type ThemePreference = "system" | "light" | "dark";
 
 export const THEME_STORAGE_KEY = "moneybook.theme";
 
-const THEME_COLORS = { light: "#fff7f9", dark: "#1b1619" } as const;
+const THEME_COLORS = { light: "#f8f7f6", dark: "#171615" } as const;
 
 export function parseThemePreference(value: unknown): ThemePreference {
   return value === "light" || value === "dark" ? value : "system";

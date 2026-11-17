@@ -1,5 +1,5 @@
 const CACHE_VERSION =
-  "v8.8.0-macaron";
+  "v8.8.1-macaron-neutral";
 
 const STATIC_CACHE =
   `moneybook-static-${CACHE_VERSION}`;
