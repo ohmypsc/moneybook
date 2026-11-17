@@ -87,25 +87,31 @@
 
 .summaryRows {
   display: grid;
+  container-type: inline-size;
 }
 .summaryRow {
   min-height: 47px;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 2px 12px;
+  padding: 6px 0;
   border-top: 1px solid var(--color-divider);
 }
 .summaryRow:first-child {
   border-top: 0;
 }
 .summaryLabel {
+  flex: 1 1 auto;
+  min-width: 0;
   color: var(--color-text-secondary);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-bold);
 }
 .summaryRow strong {
-  min-width: 0;
+  flex: 0 0 auto;
+  margin-left: auto;
   font-size: var(--font-size-lg);
   line-height: 1.2;
   text-align: right;
@@ -153,12 +159,24 @@
 }
 .assetComposition strong {
   min-width: 0;
-  overflow: hidden;
   font-size: var(--font-size-xs);
   line-height: 1.25;
-  text-overflow: ellipsis;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
+}
+/* 카드 폭이 좁으면 구성 타일을 한 줄씩 쌓아 금액이 잘리지 않게 합니다. */
+@container (max-width: 460px) {
+  .assetComposition {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  .assetComposition > div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 10px;
+  }
 }
 .summaryLabel small {
   margin-left: 4px;
