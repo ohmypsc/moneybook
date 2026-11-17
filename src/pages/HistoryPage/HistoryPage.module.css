@@ -4,8 +4,8 @@
   margin: 0 auto;
   padding: 18px 18px 2px;
   font-size: var(--font-size-3xl);
-  font-weight: var(--font-weight-heavy);
-  letter-spacing: -0.03em;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0;
 }
 
 .toolbarWrap {
@@ -64,7 +64,7 @@
 .header h1 {
   margin: 0;
   font-size: var(--font-size-3xl);
-  letter-spacing: -0.03em;
+  letter-spacing: 0;
 }
 .header p {
   margin: 6px 0 0;
@@ -658,7 +658,7 @@
   color: var(--color-text-secondary);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 
 .searchModeBar {

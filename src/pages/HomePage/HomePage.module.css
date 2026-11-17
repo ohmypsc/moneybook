@@ -22,7 +22,7 @@
 .headerTitle {
   margin: 0;
   font-size: var(--font-size-3xl);
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
 }
 
 /* 함께한 날: 작은 배지 */
@@ -205,7 +205,7 @@
 .sectionHeader h2 {
   margin: 0;
   font-size: var(--font-size-xl);
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
 }
 .sectionHint {
   color: var(--color-text-secondary);

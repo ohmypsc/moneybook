@@ -55,6 +55,8 @@ body {
   background: linear-gradient(180deg, var(--color-bg-glow) 0, transparent 190px), var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-family-base);
+  line-height: 1.55;
+  letter-spacing: 0.01em;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -63,6 +65,18 @@ input,
 select,
 textarea {
   font: inherit;
+}
+
+/* 브라우저 기본 bold(700)는 페이퍼로지에서 너무 두꺼워 보여 한 단계 낮춥니다. */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+strong,
+b {
+  font-weight: var(--font-weight-bold);
 }
 
 button {
