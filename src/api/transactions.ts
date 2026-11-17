@@ -1,11 +1,6 @@
-import {
-  apiRequest
-} from "./client";
+import { apiRequest } from "./client";
 
-import type {
-  TransactionType
-} from "../types/api";
-
+import type { TransactionType } from "../types/api";
 
 export interface Transaction {
   tags?: string[];
@@ -14,59 +9,44 @@ export interface Transaction {
 
   date: string;
 
-  type:
-    TransactionType;
+  type: TransactionType;
 
-  categoryId:
-    string | null;
+  categoryId: string | null;
 
   category: string;
 
   amount: number;
 
-  fromAccountId:
-    string | null;
+  fromAccountId: string | null;
 
-  fromAccount:
-    string | null;
+  fromAccount: string | null;
 
-  toAccountId:
-    string | null;
+  toAccountId: string | null;
 
-  toAccount:
-    string | null;
+  toAccount: string | null;
 
-  paymentMethodId:
-    string | null;
+  paymentMethodId: string | null;
 
-  paymentMethod:
-    string | null;
+  paymentMethod: string | null;
 
-  spendingTarget:
-    string | null;
+  spendingTarget: string | null;
 
   description: string;
 
   memo: string;
 
-  billingOverride:
-    string | null;
+  billingOverride: string | null;
 
-  billingMonth:
-    string | null;
+  billingMonth: string | null;
 
   /** 신용카드 할부 개월 수(2~36). 일시불이면 null. */
-  installmentMonths?:
-    number | null;
+  installmentMonths?: number | null;
 
-  groupId:
-    string | null;
+  groupId: string | null;
 
-  requestId:
-    string | null;
+  requestId: string | null;
 
-  reversalOf:
-    string | null;
+  reversalOf: string | null;
 
   reversalAmount?: number;
 
@@ -76,21 +56,17 @@ export interface Transaction {
 
   netAmount?: number;
 
-  createdAt:
-    string | null;
+  createdAt: string | null;
 
-  updatedAt:
-    string | null;
+  updatedAt: string | null;
 
-  updatedAtMs:
-    number | null;
+  updatedAtMs: number | null;
 
   createdBy: string;
 
   updatedBy: string;
 
-  deletedAt:
-    string | null;
+  deletedAt: string | null;
 
   deletedBy: string;
 
@@ -99,63 +75,46 @@ export interface Transaction {
   row: number;
 }
 
-
 export interface CreateTransactionInput {
   tags?: string[];
   categorySource?: "manual" | "auto";
   date: string;
 
-  type:
-    TransactionType;
+  type: TransactionType;
 
   amount: number;
 
   categoryId: string;
 
-  fromAccountId?:
-    string;
+  fromAccountId?: string;
 
-  toAccountId?:
-    string;
+  toAccountId?: string;
 
-  paymentMethodId?:
-    string;
+  paymentMethodId?: string;
 
-  spendingTarget?:
-    string;
+  spendingTarget?: string;
 
-  description?:
-    string;
+  description?: string;
 
-  memo?:
-    string;
+  memo?: string;
 
-  billingMonth?:
-    string;
+  billingMonth?: string;
 
   /** 신용카드 할부 개월 수(2~36). 일시불이면 생략하거나 null. */
-  installmentMonths?:
-    number | null;
+  installmentMonths?: number | null;
 
-  groupId?:
-    string;
+  groupId?: string;
 
-  benefitRuleId?:
-    string;
+  benefitRuleId?: string;
 
-  benefitFaceAmount?:
-    number;
+  benefitFaceAmount?: number;
 
-  benefitRewardUsedAmount?:
-    number;
+  benefitRewardUsedAmount?: number;
 
-  benefitAccrualEnabled?:
-    boolean;
+  benefitAccrualEnabled?: boolean;
 
-  requestId?:
-    string;
+  requestId?: string;
 }
-
 
 export interface CreateTransactionData {
   created: boolean;
@@ -168,38 +127,30 @@ export interface CreateTransactionData {
 
   row: number;
 
-  transaction?:
-    Transaction;
+  transaction?: Transaction;
 }
-
 
 export interface CreateTransactionResponse {
   success: true;
 
   apiVersion: string;
 
-  data:
-    CreateTransactionData;
+  data: CreateTransactionData;
 }
-
 
 export interface TransactionListData {
   total: number;
 
-  items:
-    Transaction[];
+  items: Transaction[];
 }
-
 
 export interface TransactionsResponse {
   success: true;
 
   apiVersion: string;
 
-  data:
-    TransactionListData;
+  data: TransactionListData;
 }
-
 
 export interface GetTransactionsParams {
   tag?: string;
@@ -212,8 +163,7 @@ export interface GetTransactionsParams {
 
   dateTo?: string;
 
-  type?:
-    TransactionType;
+  type?: TransactionType;
 
   categoryId?: string;
 
@@ -232,154 +182,78 @@ export interface GetTransactionsParams {
   offset?: number;
 }
 
-
 export async function createTransaction(
-  input:
-    CreateTransactionInput
+  input: CreateTransactionInput
 ): Promise<CreateTransactionResponse> {
+  return apiRequest<CreateTransactionResponse>("/api/transactions", {
+    method: "POST",
 
-  return apiRequest<CreateTransactionResponse>(
-    "/api/transactions",
-    {
-      method:
-        "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
 
-      headers: {
-        "Content-Type":
-          "application/json"
-      },
-
-      body:
-        JSON.stringify(
-          input
-        )
-    }
-  );
+    body: JSON.stringify(input)
+  });
 }
 
-
 export async function getTransactions(
-  params:
-    GetTransactionsParams = {}
+  params: GetTransactionsParams = {}
 ): Promise<TransactionsResponse> {
-
-  const searchParams =
-    new URLSearchParams();
-
+  const searchParams = new URLSearchParams();
 
   if (params.tag) searchParams.set("tag", params.tag);
   if (params.dateFrom) {
-    searchParams.set(
-      "dateFrom",
-      params.dateFrom
-    );
+    searchParams.set("dateFrom", params.dateFrom);
   }
-
 
   if (params.dateTo) {
-    searchParams.set(
-      "dateTo",
-      params.dateTo
-    );
+    searchParams.set("dateTo", params.dateTo);
   }
-
 
   if (params.type) {
-    searchParams.set(
-      "type",
-      params.type
-    );
+    searchParams.set("type", params.type);
   }
-
 
   if (params.expenseCategory) searchParams.set("expenseCategory", params.expenseCategory);
   if (params.expenseTarget) searchParams.set("expenseTarget", params.expenseTarget);
 
   if (params.categoryId) {
-    searchParams.set(
-      "categoryId",
-      params.categoryId
-    );
+    searchParams.set("categoryId", params.categoryId);
   }
-
 
   if (params.accountId) {
-    searchParams.set(
-      "accountId",
-      params.accountId
-    );
+    searchParams.set("accountId", params.accountId);
   }
-
 
   if (params.spendingTarget) {
-    searchParams.set(
-      "spendingTarget",
-      params.spendingTarget
-    );
+    searchParams.set("spendingTarget", params.spendingTarget);
   }
-
 
   if (params.amount !== undefined) {
-    searchParams.set(
-      "amount",
-      String(params.amount)
-    );
+    searchParams.set("amount", String(params.amount));
   }
-
 
   if (params.q) {
-    searchParams.set(
-      "q",
-      params.q
-    );
+    searchParams.set("q", params.q);
   }
-
 
   if (params.includeDeleted) {
-    searchParams.set(
-      "includeDeleted",
-      "true"
-    );
+    searchParams.set("includeDeleted", "true");
   }
 
-
-  if (
-    params.limit !==
-      undefined
-  ) {
-    searchParams.set(
-      "limit",
-      String(
-        params.limit
-      )
-    );
+  if (params.limit !== undefined) {
+    searchParams.set("limit", String(params.limit));
   }
 
-
-  if (
-    params.offset !==
-      undefined
-  ) {
-    searchParams.set(
-      "offset",
-      String(
-        params.offset
-      )
-    );
+  if (params.offset !== undefined) {
+    searchParams.set("offset", String(params.offset));
   }
 
+  const query = searchParams.toString();
 
-  const query =
-    searchParams.toString();
+  const url = query ? `/api/transactions?${query}` : "/api/transactions";
 
-
-  const url =
-    query
-      ? `/api/transactions?${query}`
-      : "/api/transactions";
-
-
-return apiRequest<TransactionsResponse>(
+  return apiRequest<TransactionsResponse>(
     url,
     params.timeoutMs ? { timeoutMs: params.timeoutMs } : {}
   );

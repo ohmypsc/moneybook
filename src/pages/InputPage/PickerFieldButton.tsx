@@ -28,7 +28,9 @@ export function PickerFieldButton({
       <span className={hasValue ? styles.pickerValue : styles.pickerPlaceholder}>
         {hasValue ? value : placeholder}
       </span>
-      <span className={styles.pickerChevron} aria-hidden="true">⌄</span>
+      <span className={styles.pickerChevron} aria-hidden="true">
+        ⌄
+      </span>
     </button>
   );
 }

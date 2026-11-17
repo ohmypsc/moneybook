@@ -16,10 +16,7 @@ export class HouseholdRealtime extends DurableObject {
   async fetch(request) {
     const url = new URL(request.url);
 
-    if (
-      request.method === "POST" &&
-      url.pathname.startsWith("/auth/rate-limit/")
-    ) {
+    if (request.method === "POST" && url.pathname.startsWith("/auth/rate-limit/")) {
       let body;
       try {
         body = await request.json();
@@ -27,7 +24,9 @@ export class HouseholdRealtime extends DurableObject {
         return Response.json({ error: "invalid request" }, { status: 400 });
       }
 
-      const key = String(body?.key || "").trim().slice(0, 200);
+      const key = String(body?.key || "")
+        .trim()
+        .slice(0, 200);
       if (!key) {
         return Response.json({ error: "missing key" }, { status: 400 });
       }
@@ -95,7 +94,9 @@ export class HouseholdRealtime extends DurableObject {
       }
       const message = JSON.stringify(payload || { type: "ledger.poke" });
       for (const socket of this.ctx.getWebSockets()) {
-        try { socket.send(message); } catch { }
+        try {
+          socket.send(message);
+        } catch {}
       }
       return new Response(null, { status: 204 });
     }
@@ -112,12 +113,13 @@ export class HouseholdRealtime extends DurableObject {
 
   webSocketMessage(socket, message) {
     if (typeof message === "string" && message === "ping") {
-      try { socket.send("pong"); } catch { }
+      try {
+        socket.send("pong");
+      } catch {}
     }
   }
 
-  webSocketClose() {
-  }
+  webSocketClose() {}
 
   async alarm() {
     const pending = (await this.ctx.storage.get(MB_PUSH_PENDING_KEY)) || [];
@@ -140,6 +142,5 @@ export class HouseholdRealtime extends DurableObject {
     }
   }
 
-  webSocketError() {
-  }
+  webSocketError() {}
 }

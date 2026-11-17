@@ -25,7 +25,6 @@ test("정산 가능 잔액은 환불과 정산을 모두 차감하고 0 아래�
   assert.equal(settlementRemaining(120000, [50000, 80000]), 0);
 });
 
-
 test("시스템 카테고리는 이름 또는 고정 ID로 역할을 유지한다", () => {
   // 회식비는 더 이상 잠긴 시스템 카테고리가 아니라 이름을 바꾸거나 사용 중지할 수 있다
   assert.equal(systemCategoryRole("지출", "회식비", "CAT_X"), "");

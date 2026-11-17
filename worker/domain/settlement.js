@@ -21,13 +21,16 @@ export function systemCategoryRole(type, name, categoryId = "") {
 
   if (
     cleanType === "수입" &&
-    (cleanName === SETTLEMENT_INCOME_CATEGORY_NAME || cleanId === SYSTEM_CATEGORY_IDS.settlementIncome)
-  ) return "settlement_income";
+    (cleanName === SETTLEMENT_INCOME_CATEGORY_NAME ||
+      cleanId === SYSTEM_CATEGORY_IDS.settlementIncome)
+  )
+    return "settlement_income";
 
   if (
     cleanType === "수입" &&
     (cleanName === BENEFIT_INCOME_CATEGORY_NAME || cleanId === SYSTEM_CATEGORY_IDS.benefitIncome)
-  ) return "benefit_income";
+  )
+    return "benefit_income";
 
   return "";
 }

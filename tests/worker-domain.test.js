@@ -94,11 +94,8 @@ test("recurringPayload emits account fields appropriate to each transaction type
   );
 
   assert.equal(
-    recurringPayload(
-      { ...common, type: "수입", toAccountId: "BANK_1" },
-      "2026-09-15",
-      "REQ_INC"
-    ).toAccountId,
+    recurringPayload({ ...common, type: "수입", toAccountId: "BANK_1" }, "2026-09-15", "REQ_INC")
+      .toAccountId,
     "BANK_1"
   );
 
@@ -115,7 +112,6 @@ test("recurringPayload emits account fields appropriate to each transaction type
   assert.equal(transfer.fromAccountId, "BANK_1");
   assert.equal(transfer.toAccountId, "BANK_2");
 });
-
 
 test("automatic credit-card billing month recalculates after date changes", () => {
   assert.deepEqual(

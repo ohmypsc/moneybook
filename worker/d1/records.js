@@ -1,8 +1,25 @@
 // D1 행 → API 모델 매핑과 기본 조회(계좌·거래·보유종목·투자거래)
 import { normalizeTags } from "../domain/classification.js";
 import { dateOnly as mbD1DateOnly } from "../domain/date.js";
-import { isSettlementEligibleCategory as mbD1IsSettlementEligibleCategory, SETTLEMENT_REQUEST_PREFIX, systemCategoryRole as mbD1SystemCategoryRole } from "../domain/settlement.js";
-import { MB_D1_HOUSEHOLD_ID, mbD1AccountActive, mbD1All, mbD1Bool, mbD1CurrentDateSeoul, mbD1DisplayName, mbD1First, mbD1NullableNumber, mbD1Number, mbD1Round, mbD1Text, mbD1TimestampMs } from "./core.js";
+import {
+  isSettlementEligibleCategory as mbD1IsSettlementEligibleCategory,
+  SETTLEMENT_REQUEST_PREFIX,
+  systemCategoryRole as mbD1SystemCategoryRole
+} from "../domain/settlement.js";
+import {
+  MB_D1_HOUSEHOLD_ID,
+  mbD1AccountActive,
+  mbD1All,
+  mbD1Bool,
+  mbD1CurrentDateSeoul,
+  mbD1DisplayName,
+  mbD1First,
+  mbD1NullableNumber,
+  mbD1Number,
+  mbD1Round,
+  mbD1Text,
+  mbD1TimestampMs
+} from "./core.js";
 
 export function mbD1MapCategory(row) {
   const type = mbD1Text(row.type);
@@ -73,7 +90,11 @@ export function mbD1MapTransactionRow(row) {
     type: mbD1Text(row.type),
     categoryId: row.category_id || null,
     category: mbD1Text(row.category_name),
-    settlementEligible: mbD1IsSettlementEligibleCategory(row.type, row.category_name, row.category_id),
+    settlementEligible: mbD1IsSettlementEligibleCategory(
+      row.type,
+      row.category_name,
+      row.category_id
+    ),
     amount: mbD1Number(row.amount),
     fromAccountId: row.from_account_id || null,
     fromAccount: mbD1Text(row.from_account_name) || null,
@@ -177,13 +198,12 @@ export function mbD1MapHoldingRow(row) {
   const quantity = mbD1Number(row.quantity);
   const currentPrice = mbD1NullableNumber(row.current_price);
   const fx = mbD1NullableNumber(row.fx_rate) ?? (mbD1Text(row.market) === "국내" ? 1 : null);
-  const value = mbD1NullableNumber(row.value_krw) ?? (
-    currentPrice !== null && fx !== null ? quantity * currentPrice * fx : 0
-  );
+  const value =
+    mbD1NullableNumber(row.value_krw) ??
+    (currentPrice !== null && fx !== null ? quantity * currentPrice * fx : 0);
   const bookCost = mbD1NullableNumber(row.book_cost_krw) ?? 0;
-  const returnRate = mbD1NullableNumber(row.return_rate) ?? (
-    bookCost > 0 ? (value - bookCost) / bookCost : null
-  );
+  const returnRate =
+    mbD1NullableNumber(row.return_rate) ?? (bookCost > 0 ? (value - bookCost) / bookCost : null);
   let elapsedDays = mbD1NullableNumber(row.elapsed_days);
   const lastUpdated = mbD1Text(row.last_updated) || null;
   if (lastUpdated && mbD1DateOnly(lastUpdated)) {

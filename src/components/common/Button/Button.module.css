@@ -163,10 +163,16 @@
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .button { transition: none; }
-  .spinner { animation-duration: 1.4s; }
+  .button {
+    transition: none;
+  }
+  .spinner {
+    animation-duration: 1.4s;
+  }
 }

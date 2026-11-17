@@ -1,6 +1,4 @@
-import {
-  isSystemSettlementCategory
-} from "../../utils/settlement.ts";
+import { isSystemSettlementCategory } from "../../utils/settlement.ts";
 
 import {
   CARD_PAYMENT_CATEGORY,
@@ -82,10 +80,7 @@ export function getPickerTitle(kind: PickerKind, mode: InputMode) {
   }
 }
 
-export function getPickerSelectedValue(
-  kind: PickerKind,
-  selection: PickerSelection
-) {
+export function getPickerSelectedValue(kind: PickerKind, selection: PickerSelection) {
   switch (kind) {
     case "category":
       return selection.categoryId;
@@ -124,25 +119,15 @@ export function getAccountPickerSource(
   }
 
   if (kind === "loanSource") {
-    return uniqueAccounts(
-      context.orderedAllAccounts.filter(isLoanSourceAccount)
-    );
+    return uniqueAccounts(context.orderedAllAccounts.filter(isLoanSourceAccount));
   }
 
   if (kind === "loanAccount") {
-    return uniqueAccounts(
-      context.orderedAllAccounts.filter(isLoanAccount)
-    );
+    return uniqueAccounts(context.orderedAllAccounts.filter(isLoanAccount));
   }
 
-  if (
-    kind === "incomeAccount" ||
-    kind === "fromAccount" ||
-    kind === "toAccount"
-  ) {
-    return uniqueAccounts(
-      context.orderedAllAccounts.filter(isTransferAssetAccount)
-    );
+  if (kind === "incomeAccount" || kind === "fromAccount" || kind === "toAccount") {
+    return uniqueAccounts(context.orderedAllAccounts.filter(isTransferAssetAccount));
   }
 
   if (kind === "paymentMethod") {
@@ -176,10 +161,7 @@ export function getAccountPickerSource(
     ]);
   }
 
-  return uniqueAccounts([
-    ...context.visibleAccounts,
-    ...otherOwnerAccounts
-  ]);
+  return uniqueAccounts([...context.visibleAccounts, ...otherOwnerAccounts]);
 }
 
 export function getAccountPickerGroups(
@@ -189,18 +171,12 @@ export function getAccountPickerGroups(
   const source = getAccountPickerSource(kind, context);
 
   return {
-    primary: source.filter(
-      account => !isOtherOwnerAccount(account, context.userName)
-    ),
-    other: source.filter(account =>
-      isOtherOwnerAccount(account, context.userName)
-    )
+    primary: source.filter(account => !isOtherOwnerAccount(account, context.userName)),
+    other: source.filter(account => isOtherOwnerAccount(account, context.userName))
   };
 }
 
-export function getOtherOwnerPickerLabel(
-  kind: Exclude<PickerKind, "category" | "spendingTarget">
-) {
+export function getOtherOwnerPickerLabel(kind: Exclude<PickerKind, "category" | "spendingTarget">) {
   switch (kind) {
     case "paymentMethod":
       return "다른 명의 결제수단";
@@ -226,16 +202,11 @@ export function getAccountPickerItem(account: Account): PickerItem {
   return {
     value: account.accountId,
     label: getAccountLabel(account),
-    meta: [account.subType, getAccountOwner(account)]
-      .filter(Boolean)
-      .join(" · ")
+    meta: [account.subType, getAccountOwner(account)].filter(Boolean).join(" · ")
   };
 }
 
-export function getPickerItems(
-  kind: PickerKind,
-  context: PickerItemsContext
-): PickerItem[] {
+export function getPickerItems(kind: PickerKind, context: PickerItemsContext): PickerItem[] {
   if (kind === "category") {
     const inputCategories = context.categories.filter(
       category =>
@@ -244,19 +215,14 @@ export function getPickerItems(
         !isSystemSettlementCategory(category)
     );
 
-    const visibleCategories = context.mode === "transfer"
-      ? [
-          ...inputCategories.filter(
-            category => category.name === CARD_PAYMENT_CATEGORY
-          ),
-          ...inputCategories.filter(
-            category => category.name === CARD_PREPAYMENT_CATEGORY
-          ),
-          ...inputCategories.filter(
-            category => !isCardSettlementCategory(category)
-          )
-        ]
-      : inputCategories;
+    const visibleCategories =
+      context.mode === "transfer"
+        ? [
+            ...inputCategories.filter(category => category.name === CARD_PAYMENT_CATEGORY),
+            ...inputCategories.filter(category => category.name === CARD_PREPAYMENT_CATEGORY),
+            ...inputCategories.filter(category => !isCardSettlementCategory(category))
+          ]
+        : inputCategories;
 
     const items = visibleCategories.map(category => ({
       value: category.categoryId,

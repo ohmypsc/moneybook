@@ -1,8 +1,10 @@
 import type { Transaction } from "../../api/transactions";
 
-export function reportExpenseAmounts(transaction: Pick<Transaction, "amount" | "netAmount" | "reversalAmount">) {
+export function reportExpenseAmounts(
+  transaction: Pick<Transaction, "amount" | "netAmount" | "reversalAmount">
+) {
   const original = transaction.amount;
-  const actual = transaction.netAmount ?? (original - (transaction.reversalAmount || 0));
+  const actual = transaction.netAmount ?? original - (transaction.reversalAmount || 0);
   return { original, actual, deducted: original - actual };
 }
 

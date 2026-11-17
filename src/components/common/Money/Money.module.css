@@ -4,14 +4,34 @@
   letter-spacing: -0.02em;
 }
 
-.default { color: inherit; }
-.muted { color: var(--color-text-secondary); }
-.income { color: var(--color-income); }
-.expense { color: var(--color-expense); }
-.positive { color: var(--color-positive); }
-.negative { color: var(--color-error); }
+.default {
+  color: inherit;
+}
+.muted {
+  color: var(--color-text-secondary);
+}
+.income {
+  color: var(--color-income);
+}
+.expense {
+  color: var(--color-expense);
+}
+.positive {
+  color: var(--color-positive);
+}
+.negative {
+  color: var(--color-error);
+}
 
-.size_inherit { font-size: inherit; }
-.size_sm { font-size: 12px; }
-.size_md { font-size: 14px; }
-.size_lg { font-size: 16px; }
+.size_inherit {
+  font-size: inherit;
+}
+.size_sm {
+  font-size: 12px;
+}
+.size_md {
+  font-size: 14px;
+}
+.size_lg {
+  font-size: 16px;
+}

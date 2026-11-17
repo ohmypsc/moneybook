@@ -1,14 +1,8 @@
-import {
-  apiRequest
-} from "./client";
+import { apiRequest } from "./client";
 
-import {
-  unwrapEnvelope
-} from "./envelope";
+import { unwrapEnvelope } from "./envelope";
 
-import type {
-  ApiEnvelope
-} from "./envelope";
+import type { ApiEnvelope } from "./envelope";
 
 export interface AssetSnapshot {
   month: string;
@@ -52,21 +46,15 @@ export async function getAssetSnapshots(
   }
 
   const query = params.toString();
-  const raw = await apiRequest<
-    ApiEnvelope<AssetSnapshotList> | AssetSnapshotList
-  >(
-    query
-      ? `/api/asset-snapshots?${query}`
-      : "/api/asset-snapshots"
+  const raw = await apiRequest<ApiEnvelope<AssetSnapshotList> | AssetSnapshotList>(
+    query ? `/api/asset-snapshots?${query}` : "/api/asset-snapshots"
   );
 
   return unwrapEnvelope<AssetSnapshotList>(raw);
 }
 
 export async function saveAssetSnapshot(month: string) {
-  const raw = await apiRequest<
-    ApiEnvelope<SaveAssetSnapshotResult> | SaveAssetSnapshotResult
-  >(
+  const raw = await apiRequest<ApiEnvelope<SaveAssetSnapshotResult> | SaveAssetSnapshotResult>(
     "/api/asset-snapshots",
     {
       method: "POST",

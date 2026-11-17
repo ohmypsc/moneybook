@@ -28,9 +28,7 @@ export function usePendingTransactionSummary(status: string, user: User | null) 
       const pendingTransactions = getPendingTransactions(user.name);
       setSummary({
         total: pendingTransactions.length,
-        failed: pendingTransactions.filter(
-          transaction => transaction.status === "failed"
-        ).length
+        failed: pendingTransactions.filter(transaction => transaction.status === "failed").length
       });
     };
 

@@ -1,22 +1,18 @@
-import {
-  getPushConfig,
-  registerPushSubscription,
-  unregisterPushSubscription
-} from "../api/push";
+import { getPushConfig, registerPushSubscription, unregisterPushSubscription } from "../api/push";
 
 export type PushSupport =
-  | { supported: true }
-  | { supported: false; reason: "ios-not-installed" | "unsupported" | "dev" };
+  { supported: true } | { supported: false; reason: "ios-not-installed" | "unsupported" | "dev" };
 
 function isIos() {
   const ua = navigator.userAgent || "";
-  return /iPad|iPhone|iPod/.test(ua) ||
-    (ua.includes("Macintosh") && navigator.maxTouchPoints > 1);
+  return /iPad|iPhone|iPod/.test(ua) || (ua.includes("Macintosh") && navigator.maxTouchPoints > 1);
 }
 
 function isStandalone() {
-  return window.matchMedia?.("(display-mode: standalone)").matches ||
-    (navigator as Navigator & { standalone?: boolean }).standalone === true;
+  return (
+    window.matchMedia?.("(display-mode: standalone)").matches ||
+    (navigator as Navigator & { standalone?: boolean }).standalone === true
+  );
 }
 
 export function getPushSupport(): PushSupport {
@@ -41,8 +37,8 @@ export function getPushSupport(): PushSupport {
 }
 
 function base64UrlToUint8Array(value: string) {
-  const padded = value.replace(/-/g, "+").replace(/_/g, "/") +
-    "=".repeat((4 - (value.length % 4)) % 4);
+  const padded =
+    value.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (value.length % 4)) % 4);
   const binary = atob(padded);
   return Uint8Array.from(binary, character => character.charCodeAt(0));
 }
@@ -55,7 +51,8 @@ async function getRegistration(timeoutMs = 5000) {
       navigator.serviceWorker.ready,
       new Promise<never>((_, reject) => {
         timer = window.setTimeout(
-          () => reject(new Error("앱 준비가 끝나지 않았어요. 앱을 완전히 닫았다가 다시 열어 주세요.")),
+          () =>
+            reject(new Error("앱 준비가 끝나지 않았어요. 앱을 완전히 닫았다가 다시 열어 주세요.")),
           timeoutMs
         );
       })
@@ -96,7 +93,8 @@ export async function enablePushOnThisDevice() {
   const currentKey = subscription?.options?.applicationServerKey;
   if (subscription && currentKey) {
     const existing = new Uint8Array(currentKey);
-    const same = existing.length === applicationServerKey.length &&
+    const same =
+      existing.length === applicationServerKey.length &&
       existing.every((byte, index) => byte === applicationServerKey[index]);
     if (!same) {
       await subscription.unsubscribe().catch(() => undefined);

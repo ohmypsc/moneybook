@@ -4,8 +4,8 @@ import { subscribeLedgerChanges } from "../utils/ledgerEvents";
 import { getSeoulMonthString } from "../utils/dateTime";
 
 interface MonthCacheEntry {
-    items: CalendarTransaction[];
-    storedAt: number;
+  items: CalendarTransaction[];
+  storedAt: number;
 }
 
 const CURRENT_MONTH_TTL_MS = 30 * 1000;
@@ -14,350 +14,229 @@ const ARCHIVE_MONTH_TTL_MS = 5 * 60 * 1000;
 const activeMonthCache = new Map<string, MonthCacheEntry>();
 const deletedMonthCache = new Map<string, MonthCacheEntry>();
 
-const activeMonthRequests =
-    new Map<string, Promise<CalendarTransaction[]>>();
+const activeMonthRequests = new Map<string, Promise<CalendarTransaction[]>>();
 
-const deletedMonthRequests =
-    new Map<string, Promise<CalendarTransaction[]>>();
+const deletedMonthRequests = new Map<string, Promise<CalendarTransaction[]>>();
 
 let cacheGeneration = 0;
 
 function pad(value: number) {
-    return String(value).padStart(2, "0");
+  return String(value).padStart(2, "0");
 }
 
 export function getCurrentCalendarMonth() {
-    return getSeoulMonthString();
+  return getSeoulMonthString();
 }
 
 function getMonthBounds(month: string) {
-    const match =
-        /^(\d{4})-(\d{2})$/.exec(month);
+  const match = /^(\d{4})-(\d{2})$/.exec(month);
 
-    if (!match) {
-        throw new Error(
-            "월 형식이 올바르지 않습니다."
-        );
-    }
+  if (!match) {
+    throw new Error("월 형식이 올바르지 않습니다.");
+  }
 
-    const year = Number(match[1]);
-    const monthNumber = Number(match[2]);
+  const year = Number(match[1]);
+  const monthNumber = Number(match[2]);
 
-    if (
-        !Number.isInteger(year) ||
-        monthNumber < 1 ||
-        monthNumber > 12
-    ) {
-        throw new Error(
-            "월 형식이 올바르지 않습니다."
-        );
-    }
+  if (!Number.isInteger(year) || monthNumber < 1 || monthNumber > 12) {
+    throw new Error("월 형식이 올바르지 않습니다.");
+  }
 
-    const lastDay =
-        new Date(
-            year,
-            monthNumber,
-            0
-        ).getDate();
+  const lastDay = new Date(year, monthNumber, 0).getDate();
 
-    return {
-        dateFrom: `${month}-01`,
-        dateTo: `${month}-${pad(lastDay)}`
-    };
+  return {
+    dateFrom: `${month}-01`,
+    dateTo: `${month}-${pad(lastDay)}`
+  };
 }
 
 function getTtl(month: string) {
-    return month === getCurrentCalendarMonth()
-        ? CURRENT_MONTH_TTL_MS
-        : ARCHIVE_MONTH_TTL_MS;
+  return month === getCurrentCalendarMonth() ? CURRENT_MONTH_TTL_MS : ARCHIVE_MONTH_TTL_MS;
 }
 
-async function loadAllCalendarTransactions(
-    params: GetCalendarTransactionsParams
-) {
-    const pageSize = 1000;
-    const items: CalendarTransaction[] = [];
-    let offset = 0;
-    let total = 0;
+async function loadAllCalendarTransactions(params: GetCalendarTransactionsParams) {
+  const pageSize = 1000;
+  const items: CalendarTransaction[] = [];
+  let offset = 0;
+  let total = 0;
 
-    do {
-        const page = await getCalendarTransactions({
-            ...params,
-            limit: pageSize,
-            offset
-        });
+  do {
+    const page = await getCalendarTransactions({
+      ...params,
+      limit: pageSize,
+      offset
+    });
 
-        const pageItems = Array.isArray(page.items)
-            ? page.items
-            : [];
+    const pageItems = Array.isArray(page.items) ? page.items : [];
 
-        total = Math.max(0, Number(page.total || 0));
-        items.push(...pageItems);
+    total = Math.max(0, Number(page.total || 0));
+    items.push(...pageItems);
 
-        if (pageItems.length === 0) {
-            break;
-        }
+    if (pageItems.length === 0) {
+      break;
+    }
 
-        offset += pageItems.length;
-    } while (items.length < total);
+    offset += pageItems.length;
+  } while (items.length < total);
 
-    return items;
+  return items;
 }
 
-function isFresh(
-    month: string,
-    entry: MonthCacheEntry | undefined
-) {
-    return Boolean(
-        entry &&
-        Date.now() - entry.storedAt <
-            getTtl(month)
-    );
+function isFresh(month: string, entry: MonthCacheEntry | undefined) {
+  return Boolean(entry && Date.now() - entry.storedAt < getTtl(month));
 }
 
-export function getCalendarMonthSnapshot(
-    month: string
-) {
-    return (
-        activeMonthCache.get(month)?.items ||
-        null
-    );
+export function getCalendarMonthSnapshot(month: string) {
+  return activeMonthCache.get(month)?.items || null;
 }
 
-export function getDeletedCalendarMonthSnapshot(
-    month: string
-) {
-    return (
-        deletedMonthCache.get(month)?.items ||
-        null
-    );
+export function getDeletedCalendarMonthSnapshot(month: string) {
+  return deletedMonthCache.get(month)?.items || null;
 }
 
 export async function loadCalendarMonth(
-    month: string,
-    options: {
-        forceRefresh?: boolean;
-    } = {}
+  month: string,
+  options: {
+    forceRefresh?: boolean;
+  } = {}
 ) {
-    const cached =
-        activeMonthCache.get(month);
+  const cached = activeMonthCache.get(month);
 
-    if (
-        !options.forceRefresh &&
-        isFresh(month, cached)
-    ) {
-        return cached!.items;
-    }
+  if (!options.forceRefresh && isFresh(month, cached)) {
+    return cached!.items;
+  }
 
-    const existingRequest =
-        activeMonthRequests.get(month);
+  const existingRequest = activeMonthRequests.get(month);
 
-    if (
-        !options.forceRefresh &&
-        existingRequest
-    ) {
-        return existingRequest;
-    }
+  if (!options.forceRefresh && existingRequest) {
+    return existingRequest;
+  }
 
-    const {
-        dateFrom,
-        dateTo
-    } = getMonthBounds(month);
+  const { dateFrom, dateTo } = getMonthBounds(month);
 
-    const requestGeneration =
-        cacheGeneration;
+  const requestGeneration = cacheGeneration;
 
-    let request:
-        Promise<CalendarTransaction[]>;
+  let request: Promise<CalendarTransaction[]>;
 
-    request =
-        loadAllCalendarTransactions({
-            dateFrom,
-            dateTo
-        })
-            .then(resultItems => {
-                const items =
-                    resultItems.filter(
-                        item =>
-                            !item.isDeleted
-                    );
+  request = loadAllCalendarTransactions({
+    dateFrom,
+    dateTo
+  })
+    .then(resultItems => {
+      const items = resultItems.filter(item => !item.isDeleted);
 
-                if (
-                    requestGeneration ===
-                    cacheGeneration
-                ) {
-                    activeMonthCache.set(
-                        month,
-                        {
-                            items,
-                            storedAt:
-                                Date.now()
-                        }
-                    );
-                }
+      if (requestGeneration === cacheGeneration) {
+        activeMonthCache.set(month, {
+          items,
+          storedAt: Date.now()
+        });
+      }
 
-                return items;
-            })
-            .finally(() => {
-                if (
-                    activeMonthRequests.get(
-                        month
-                    ) === request
-                ) {
-                    activeMonthRequests.delete(
-                        month
-                    );
-                }
-            });
+      return items;
+    })
+    .finally(() => {
+      if (activeMonthRequests.get(month) === request) {
+        activeMonthRequests.delete(month);
+      }
+    });
 
-    activeMonthRequests.set(
-        month,
-        request
-    );
+  activeMonthRequests.set(month, request);
 
-    return request;
+  return request;
 }
 
 export async function loadDeletedCalendarMonth(
-    month: string,
-    options: {
-        forceRefresh?: boolean;
-    } = {}
+  month: string,
+  options: {
+    forceRefresh?: boolean;
+  } = {}
 ) {
-    const cached =
-        deletedMonthCache.get(month);
+  const cached = deletedMonthCache.get(month);
 
-    if (
-        !options.forceRefresh &&
-        isFresh(month, cached)
-    ) {
-        return cached!.items;
-    }
+  if (!options.forceRefresh && isFresh(month, cached)) {
+    return cached!.items;
+  }
 
-    const existingRequest =
-        deletedMonthRequests.get(month);
+  const existingRequest = deletedMonthRequests.get(month);
 
-    if (
-        !options.forceRefresh &&
-        existingRequest
-    ) {
-        return existingRequest;
-    }
+  if (!options.forceRefresh && existingRequest) {
+    return existingRequest;
+  }
 
-    const {
-        dateFrom,
-        dateTo
-    } = getMonthBounds(month);
+  const { dateFrom, dateTo } = getMonthBounds(month);
 
-    const requestGeneration =
-        cacheGeneration;
+  const requestGeneration = cacheGeneration;
 
-    let request:
-        Promise<CalendarTransaction[]>;
+  let request: Promise<CalendarTransaction[]>;
 
-    request =
-        loadAllCalendarTransactions({
-            dateFrom,
-            dateTo,
-            includeDeleted: true
-        })
-            .then(allItems => {
+  request = loadAllCalendarTransactions({
+    dateFrom,
+    dateTo,
+    includeDeleted: true
+  })
+    .then(allItems => {
+      const deletedItems = allItems.filter(item => item.isDeleted);
 
-                const deletedItems =
-                    allItems.filter(
-                        item =>
-                            item.isDeleted
-                    );
+      const activeItems = allItems.filter(item => !item.isDeleted);
 
-                const activeItems =
-                    allItems.filter(
-                        item =>
-                            !item.isDeleted
-                    );
+      if (requestGeneration === cacheGeneration) {
+        const storedAt = Date.now();
 
-                if (
-                    requestGeneration ===
-                    cacheGeneration
-                ) {
-                    const storedAt =
-                        Date.now();
+        deletedMonthCache.set(month, {
+          items: deletedItems,
+          storedAt
+        });
 
-                    deletedMonthCache.set(
-                        month,
-                        {
-                            items:
-                                deletedItems,
-                            storedAt
-                        }
-                    );
+        activeMonthCache.set(month, {
+          items: activeItems,
+          storedAt
+        });
+      }
 
-                    activeMonthCache.set(
-                        month,
-                        {
-                            items:
-                                activeItems,
-                            storedAt
-                        }
-                    );
-                }
-
-                return deletedItems;
-            })
-            .finally(() => {
-                if (
-                    deletedMonthRequests.get(
-                        month
-                    ) === request
-                ) {
-                    deletedMonthRequests.delete(
-                        month
-                    );
-                }
-            });
-
-    deletedMonthRequests.set(
-        month,
-        request
-    );
-
-    return request;
-}
-
-export async function prefetchCalendarMonth(
-    month = getCurrentCalendarMonth()
-) {
-    try {
-        await loadCalendarMonth(month);
-    } catch {
-        /*
-         * 달력 프리페치 실패는
-         * 홈 화면과 앱 진입을 막지 않습니다.
-         */
-    }
-}
-
-export function invalidateCalendarCache(
-    month?: string
-) {
-    cacheGeneration += 1;
-
-    if (month) {
-        activeMonthCache.delete(month);
-        deletedMonthCache.delete(month);
-        activeMonthRequests.delete(month);
+      return deletedItems;
+    })
+    .finally(() => {
+      if (deletedMonthRequests.get(month) === request) {
         deletedMonthRequests.delete(month);
+      }
+    });
 
-        return;
-    }
+  deletedMonthRequests.set(month, request);
 
-    activeMonthCache.clear();
-    deletedMonthCache.clear();
-    activeMonthRequests.clear();
-    deletedMonthRequests.clear();
+  return request;
+}
+
+export async function prefetchCalendarMonth(month = getCurrentCalendarMonth()) {
+  try {
+    await loadCalendarMonth(month);
+  } catch {
+    /*
+     * 달력 프리페치 실패는
+     * 홈 화면과 앱 진입을 막지 않습니다.
+     */
+  }
+}
+
+export function invalidateCalendarCache(month?: string) {
+  cacheGeneration += 1;
+
+  if (month) {
+    activeMonthCache.delete(month);
+    deletedMonthCache.delete(month);
+    activeMonthRequests.delete(month);
+    deletedMonthRequests.delete(month);
+
+    return;
+  }
+
+  activeMonthCache.clear();
+  deletedMonthCache.clear();
+  activeMonthRequests.clear();
+  deletedMonthRequests.clear();
 }
 
 if (typeof window !== "undefined") {
-    subscribeLedgerChanges(() => {
-        invalidateCalendarCache();
-    });
+  subscribeLedgerChanges(() => {
+    invalidateCalendarCache();
+  });
 }

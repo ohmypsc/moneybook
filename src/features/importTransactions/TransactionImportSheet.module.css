@@ -53,7 +53,11 @@
   font-size: 14px;
   font-weight: 750;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .sourceTab:hover {
@@ -123,7 +127,10 @@
   text-align: left;
   font: inherit;
   cursor: pointer;
-  transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.1s ease;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    transform 0.1s ease;
 }
 
 .uploadTrigger:hover {
@@ -627,7 +634,17 @@
   }
 }
 
-.formFields { margin: 0; min-width: 0; border: 0; }
-.formFields:not(.candidateDetails) { padding: 0; }
-.formFields.candidateDetails { border-top: 1px solid var(--color-border); }
-.actions { flex-wrap: wrap; }
+.formFields {
+  margin: 0;
+  min-width: 0;
+  border: 0;
+}
+.formFields:not(.candidateDetails) {
+  padding: 0;
+}
+.formFields.candidateDetails {
+  border-top: 1px solid var(--color-border);
+}
+.actions {
+  flex-wrap: wrap;
+}

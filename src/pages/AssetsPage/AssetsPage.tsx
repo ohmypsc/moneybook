@@ -1,201 +1,89 @@
-import {
-  Fragment,
-  useEffect,
-  useMemo,
-  useState
-} from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 
-import {
-  getDashboard,
-  getDashboardSnapshot,
-  getDashboardSnapshotInfo
-} from "../../api/dashboard";
+import { getDashboard, getDashboardSnapshot, getDashboardSnapshotInfo } from "../../api/dashboard";
 
-import {
-  getBenefitRewardBalances
-} from "../../api/automation";
+import { getBenefitRewardBalances } from "../../api/automation";
 
-import {
-  setInvestmentCashBaseline,
-  updateHoldingManualPrice
-} from "../../api/investments";
+import { setInvestmentCashBaseline, updateHoldingManualPrice } from "../../api/investments";
 
-import InvestmentTradeForm
-  from "../../components/investment/InvestmentTradeForm/InvestmentTradeForm";
+import InvestmentTradeForm from "../../components/investment/InvestmentTradeForm/InvestmentTradeForm";
 
-import InvestmentTradeHistory
-  from "../../components/investment/InvestmentTradeHistory/InvestmentTradeHistory";
+import InvestmentTradeHistory from "../../components/investment/InvestmentTradeHistory/InvestmentTradeHistory";
 
 import { RealEstatePanel } from "../../components/realEstate/RealEstatePanel";
 
-import {
-  AccountSettings
-} from "../SettingsPage/AccountSettings";
+import { AccountSettings } from "../SettingsPage/AccountSettings";
 
-import {
-  updateManagedAccount
-} from "../../api/settingsManagement";
+import { updateManagedAccount } from "../../api/settingsManagement";
 
-import {
-  markLedgerChanged,
-  subscribeLedgerChanges
-} from "../../utils/ledgerEvents";
+import { markLedgerChanged, subscribeLedgerChanges } from "../../utils/ledgerEvents";
 
-import {
-  markBackgroundRefreshed,
-  shouldBackgroundRefresh
-} from "../../utils/backgroundRefresh";
+import { markBackgroundRefreshed, shouldBackgroundRefresh } from "../../utils/backgroundRefresh";
 
-import {
-  getSeoulDateString
-} from "../../utils/dateTime";
+import { getSeoulDateString } from "../../utils/dateTime";
 
 import { Button } from "../../components/common/Button/Button";
 import { Card } from "../../components/common/Card/Card";
 import { Money, formatMoney } from "../../components/common/Money/Money";
 import { DataFreshnessNotice } from "../../components/common/DataFreshnessNotice/DataFreshnessNotice";
 
-import type {
-  DashboardData
-} from "../../types/dashboard";
+import type { DashboardData } from "../../types/dashboard";
 
-import styles
-  from "./AssetsPage.module.css";
+import styles from "./AssetsPage.module.css";
 
+type AssetsTab = "cash" | "investment" | "realEstate" | "liability";
 
-type AssetsTab =
-  | "cash"
-  | "investment"
-  | "realEstate"
-  | "liability";
-
-
-function formatCurrency(
-  value:
-    number |
-    undefined |
-    null
-) {
-  if (
-    value === undefined ||
-    value === null ||
-    !Number.isFinite(value)
-  ) {
+function formatCurrency(value: number | undefined | null) {
+  if (value === undefined || value === null || !Number.isFinite(value)) {
     return "-";
   }
 
   return formatMoney(value);
 }
 
-
-function formatSignedCurrency(
-  value:
-    number |
-    undefined |
-    null
-) {
-  if (
-    value === undefined ||
-    value === null ||
-    !Number.isFinite(value)
-  ) {
+function formatSignedCurrency(value: number | undefined | null) {
+  if (value === undefined || value === null || !Number.isFinite(value)) {
     return "-";
   }
 
   return formatMoney(value, { showPlus: true });
 }
 
-
-function formatPercent(
-  value:
-    number |
-    undefined |
-    null
-) {
-  if (
-    value === undefined ||
-    value === null ||
-    !Number.isFinite(value)
-  ) {
+function formatPercent(value: number | undefined | null) {
+  if (value === undefined || value === null || !Number.isFinite(value)) {
     return "-";
   }
 
-  const sign =
-    value > 0
-      ? "+"
-      : "";
+  const sign = value > 0 ? "+" : "";
 
-  return (
-    sign +
-    (
-      value *
-      100
-    ).toFixed(2) +
-    "%"
-  );
+  return sign + (value * 100).toFixed(2) + "%";
 }
 
-
-function formatQuantity(
-  value:
-    number |
-    undefined |
-    null
-) {
-  if (
-    value === undefined ||
-    value === null ||
-    !Number.isFinite(value)
-  ) {
+function formatQuantity(value: number | undefined | null) {
+  if (value === undefined || value === null || !Number.isFinite(value)) {
     return "-";
   }
 
-  return value.toLocaleString(
-    "ko-KR",
-    {
-      maximumFractionDigits:
-        8
-    }
-  );
+  return value.toLocaleString("ko-KR", {
+    maximumFractionDigits: 8
+  });
 }
 
-
-function formatPrice(
-  value:
-    number |
-    undefined |
-    null,
-  market:
-    string
-) {
-  if (
-    value === undefined ||
-    value === null ||
-    !Number.isFinite(value)
-  ) {
+function formatPrice(value: number | undefined | null, market: string) {
+  if (value === undefined || value === null || !Number.isFinite(value)) {
     return "-";
   }
 
-  const formatted =
-    value.toLocaleString(
-      "ko-KR",
-      {
-        maximumFractionDigits:
-          8
-      }
-    );
+  const formatted = value.toLocaleString("ko-KR", {
+    maximumFractionDigits: 8
+  });
 
-  return market ===
-    "국내"
-    ? `${formatted}원`
-    : formatted;
+  return market === "국내" ? `${formatted}원` : formatted;
 }
-
 
 function getToday() {
   return getSeoulDateString();
 }
-
 
 interface AssetInputPreset {
   mode: "transfer";
@@ -209,17 +97,13 @@ interface AssetsPageProps {
   onOpenInput?: (preset: AssetInputPreset) => void;
 }
 
-export default function AssetsPage({
-  userName,
-  onOpenInput
-}: AssetsPageProps) {
+export default function AssetsPage({ userName, onOpenInput }: AssetsPageProps) {
   function openInput(preset: AssetInputPreset) {
     if (onOpenInput) {
       onOpenInput(preset);
     }
 
-    const currentState =
-      window.history.state || {};
+    const currentState = window.history.state || {};
 
     const nextState = {
       ...currentState,
@@ -235,144 +119,45 @@ export default function AssetsPage({
       window.history.pushState(nextState, "");
     }
 
-    window.dispatchEvent(
-      new PopStateEvent("popstate", { state: nextState })
-    );
+    window.dispatchEvent(new PopStateEvent("popstate", { state: nextState }));
   }
-  const [
-    activeTab,
-    setActiveTab
-  ] =
-    useState<AssetsTab>(
-      "cash"
-    );
+  const [activeTab, setActiveTab] = useState<AssetsTab>("cash");
 
-  const [
-    ownerFilter,
-    setOwnerFilter
-  ] = useState("전체");
+  const [ownerFilter, setOwnerFilter] = useState("전체");
 
-  const [
-    initialDashboardInfo
-  ] =
-    useState(
-      () =>
-        getDashboardSnapshotInfo()
-    );
+  const [initialDashboardInfo] = useState(() => getDashboardSnapshotInfo());
 
-  const initialDashboard =
-    initialDashboardInfo?.data ?? null;
+  const initialDashboard = initialDashboardInfo?.data ?? null;
 
-  const [
-    fallbackSnapshotAt,
-    setFallbackSnapshotAt
-  ] = useState<number | null>(
-    initialDashboardInfo?.source === "persisted"
-      ? initialDashboardInfo.fetchedAt
-      : null
+  const [fallbackSnapshotAt, setFallbackSnapshotAt] = useState<number | null>(
+    initialDashboardInfo?.source === "persisted" ? initialDashboardInfo.fetchedAt : null
   );
 
-  const [
-    dashboard,
-    setDashboard
-  ] =
-    useState<
-      DashboardData |
-      null
-    >(
-      initialDashboard
-    );
+  const [dashboard, setDashboard] = useState<DashboardData | null>(initialDashboard);
 
-  const [
-    loading,
-    setLoading
-  ] =
-    useState(
-      initialDashboard ===
-        null
-    );
+  const [loading, setLoading] = useState(initialDashboard === null);
 
-  const [
-    error,
-    setError
-  ] =
-    useState("");
+  const [error, setError] = useState("");
 
+  const [rewardBalances, setRewardBalances] = useState<Record<string, number>>({});
 
-  const [
-    rewardBalances,
-    setRewardBalances
-  ] =
-    useState<Record<string, number>>({});
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
 
-  const [
-    selectedAccountId,
-    setSelectedAccountId
-  ] =
-    useState<
-      string |
-      null
-    >(null);
+  const [selectedCashAccountId, setSelectedCashAccountId] = useState<string | null>(null);
 
-  const [
-    selectedCashAccountId,
-    setSelectedCashAccountId
-  ] =
-    useState<
-      string |
-      null
-    >(null);
+  const [selectedLiabilityAccountId, setSelectedLiabilityAccountId] = useState<string | null>(null);
 
-  const [
-    selectedLiabilityAccountId,
-    setSelectedLiabilityAccountId
-  ] =
-    useState<
-      string |
-      null
-    >(null);
+  const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
 
-  const [
-    editingAccountId,
-    setEditingAccountId
-  ] =
-    useState<
-      string |
-      null
-    >(null);
+  const [creatingAccount, setCreatingAccount] = useState(false);
 
-  const [
-    creatingAccount,
-    setCreatingAccount
-  ] =
-    useState(false);
+  const [reconcileAccountId, setReconcileAccountId] = useState<string | null>(null);
 
-  const [
-    reconcileAccountId,
-    setReconcileAccountId
-  ] =
-    useState<
-      string |
-      null
-    >(null);
+  const [reconcileInput, setReconcileInput] = useState("");
 
-  const [
-    reconcileInput,
-    setReconcileInput
-  ] =
-    useState("");
+  const [reconcileSaving, setReconcileSaving] = useState(false);
 
-  const [
-    reconcileSaving,
-    setReconcileSaving
-  ] =
-    useState(false);
-
-  const [
-    reconcileError,
-    setReconcileError
-  ] =
-    useState("");
+  const [reconcileError, setReconcileError] = useState("");
 
   useEffect(() => {
     if (activeTab !== "liability" && selectedLiabilityAccountId) {
@@ -405,229 +190,96 @@ export default function AssetsPage({
     };
   }, [selectedCashAccountId, selectedAccountId, selectedLiabilityAccountId]);
 
-  useEffect(
-    () => {
-      if (
-        !editingAccountId &&
-        !creatingAccount
-      ) {
-        return;
-      }
-
-      const previousOverflow =
-        document.body.style.overflow;
-      document.body.style.overflow =
-        "hidden";
-
-      function handleKeyDown(
-        event: KeyboardEvent
-      ) {
-        if (
-          event.key ===
-          "Escape"
-        ) {
-          setEditingAccountId(
-            null
-          );
-          setCreatingAccount(
-            false
-          );
-        }
-      }
-
-      window.addEventListener(
-        "keydown",
-        handleKeyDown
-      );
-
-      return () => {
-        document.body.style.overflow =
-          previousOverflow;
-        window.removeEventListener(
-          "keydown",
-          handleKeyDown
-        );
-      };
-    },
-    [
-      editingAccountId,
-      creatingAccount
-    ]
-  );
-
-
-  const [
-    cashInput,
-    setCashInput
-  ] =
-    useState("");
-
-  const [
-    cashSaving,
-    setCashSaving
-  ] =
-    useState(
-      false
-    );
-
-  const [
-    cashError,
-    setCashError
-  ] =
-    useState("");
-
-  const [
-    tradeHistoryRefreshKey,
-    setTradeHistoryRefreshKey
-  ] =
-    useState(
-      0
-    );
-
-
-  const [
-    manualPriceDrafts,
-    setManualPriceDrafts
-  ] =
-    useState<
-      Record<
-        string,
-        string
-      >
-    >({});
-
-  const [
-    manualPriceSavingId,
-    setManualPriceSavingId
-  ] =
-    useState<
-      string |
-      null
-    >(null);
-
-  const [
-    manualPriceErrors,
-    setManualPriceErrors
-  ] =
-    useState<
-      Record<
-        string,
-        string
-      >
-    >({});
-
-  const [
-    manualPriceFeedbackId,
-    setManualPriceFeedbackId
-  ] =
-    useState<
-      string |
-      null
-    >(null);
-
-
-  const [
-    quoteRefreshing,
-    setQuoteRefreshing
-  ] = useState(false);
-
-
-  async function loadDashboard(
-    forceRefresh = false,
-    refreshQuotes = false
-  ) {
-    const cachedDashboard =
-      getDashboardSnapshot();
-
-    if (
-      cachedDashboard
-    ) {
-      setDashboard(
-        cachedDashboard
-      );
-
-      setLoading(
-        false
-      );
-    } else if (
-      !dashboard
-    ) {
-      setLoading(
-        true
-      );
+  useEffect(() => {
+    if (!editingAccountId && !creatingAccount) {
+      return;
     }
 
-    setError(
-      ""
-    );
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setEditingAccountId(null);
+        setCreatingAccount(false);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [editingAccountId, creatingAccount]);
+
+  const [cashInput, setCashInput] = useState("");
+
+  const [cashSaving, setCashSaving] = useState(false);
+
+  const [cashError, setCashError] = useState("");
+
+  const [tradeHistoryRefreshKey, setTradeHistoryRefreshKey] = useState(0);
+
+  const [manualPriceDrafts, setManualPriceDrafts] = useState<Record<string, string>>({});
+
+  const [manualPriceSavingId, setManualPriceSavingId] = useState<string | null>(null);
+
+  const [manualPriceErrors, setManualPriceErrors] = useState<Record<string, string>>({});
+
+  const [manualPriceFeedbackId, setManualPriceFeedbackId] = useState<string | null>(null);
+
+  const [quoteRefreshing, setQuoteRefreshing] = useState(false);
+
+  async function loadDashboard(forceRefresh = false, refreshQuotes = false) {
+    const cachedDashboard = getDashboardSnapshot();
+
+    if (cachedDashboard) {
+      setDashboard(cachedDashboard);
+
+      setLoading(false);
+    } else if (!dashboard) {
+      setLoading(true);
+    }
+
+    setError("");
 
     try {
-      const [data, benefitBalances] =
-        await Promise.all([
-          getDashboard(
-            undefined,
-            {
-              forceRefresh,
-              refreshQuotes
-            }
-          ),
-          getBenefitRewardBalances().catch(
-            () => []
-          )
-        ]);
+      const [data, benefitBalances] = await Promise.all([
+        getDashboard(undefined, {
+          forceRefresh,
+          refreshQuotes
+        }),
+        getBenefitRewardBalances().catch(() => [])
+      ]);
 
-      setDashboard(
-        data
-      );
+      setDashboard(data);
 
-      setFallbackSnapshotAt(
-        null
-      );
+      setFallbackSnapshotAt(null);
 
       setRewardBalances(
         Object.fromEntries(
-          benefitBalances.map(
-            item => [
-              item.accountId,
-              Math.max(
-                0,
-                Number(item.rewardBalance || 0)
-              )
-            ]
-          )
+          benefitBalances.map(item => [
+            item.accountId,
+            Math.max(0, Number(item.rewardBalance || 0))
+          ])
         )
       );
 
-      markBackgroundRefreshed(
-        "assets-dashboard"
-      );
-    } catch (
-      err
-    ) {
-      const fallbackInfo =
-        getDashboardSnapshotInfo();
+      markBackgroundRefreshed("assets-dashboard");
+    } catch (err) {
+      const fallbackInfo = getDashboardSnapshotInfo();
 
       if (fallbackInfo) {
-        setDashboard(
-          fallbackInfo.data
-        );
-        setFallbackSnapshotAt(
-          fallbackInfo.fetchedAt
-        );
+        setDashboard(fallbackInfo.data);
+        setFallbackSnapshotAt(fallbackInfo.fetchedAt);
       } else if (!dashboard) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "자산 정보를 불러오지 못했습니다."
-        );
+        setError(err instanceof Error ? err.message : "자산 정보를 불러오지 못했습니다.");
       }
     } finally {
-      setLoading(
-        false
-      );
+      setLoading(false);
     }
   }
-
 
   async function handleRefreshInvestmentQuotes() {
     if (quoteRefreshing) {
@@ -643,273 +295,129 @@ export default function AssetsPage({
     }
   }
 
-
-  useEffect(
-    () => {
-      function refreshWhenVisible() {
-        if (
-          document.visibilityState !==
-          "visible" ||
-          !shouldBackgroundRefresh(
-            "assets-dashboard",
-            60_000
-          )
-        ) {
-          return;
-        }
-
-        void loadDashboard(
-          true
-        );
+  useEffect(() => {
+    function refreshWhenVisible() {
+      if (
+        document.visibilityState !== "visible" ||
+        !shouldBackgroundRefresh("assets-dashboard", 60_000)
+      ) {
+        return;
       }
 
-      document.addEventListener(
-        "visibilitychange",
-        refreshWhenVisible
-      );
-      window.addEventListener(
-        "focus",
-        refreshWhenVisible
-      );
+      void loadDashboard(true);
+    }
 
-      return () => {
-        document.removeEventListener(
-          "visibilitychange",
-          refreshWhenVisible
-        );
-        window.removeEventListener(
-          "focus",
-          refreshWhenVisible
-        );
-      };
-    },
-    []
-  );
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    window.addEventListener("focus", refreshWhenVisible);
 
+    return () => {
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+      window.removeEventListener("focus", refreshWhenVisible);
+    };
+  }, []);
 
   async function handleInvestmentSaved() {
-    setTradeHistoryRefreshKey(
-      current =>
-        current +
-        1
-    );
+    setTradeHistoryRefreshKey(current => current + 1);
 
     await loadDashboard();
   }
 
-
-  useEffect(
-    () => {
-      void loadDashboard();
-    },
-    []
-  );
-
+  useEffect(() => {
+    void loadDashboard();
+  }, []);
 
   useEffect(
     () =>
-      subscribeLedgerChanges(
-        () => {
-          void loadDashboard(
-            true
-          );
-        }
-      ),
+      subscribeLedgerChanges(() => {
+        void loadDashboard(true);
+      }),
     []
   );
 
+  async function handleReconcileAccount(accountId: string) {
+    const account = dashboard?.accounts.find(item => item.accountId === accountId);
 
-  async function handleReconcileAccount(
-    accountId: string
-  ) {
-    const account =
-      dashboard?.accounts.find(
-        item =>
-          item.accountId ===
-          accountId
-      );
-
-    if (
-      !account
-    ) {
+    if (!account) {
       return;
     }
 
-    const actualBalance =
-      Number(
-        reconcileInput.replace(
-          /,/g,
-          ""
-        )
-      );
+    const actualBalance = Number(reconcileInput.replace(/,/g, ""));
 
-    if (
-      !Number.isFinite(
-        actualBalance
-      )
-    ) {
-      setReconcileError(
-        "실제 잔액을 숫자로 입력해주세요."
-      );
+    if (!Number.isFinite(actualBalance)) {
+      setReconcileError("실제 잔액을 숫자로 입력해주세요.");
       return;
     }
 
-    const difference =
-      actualBalance -
-      Number(
-        account.currentBalance ||
-        0
-      );
+    const difference = actualBalance - Number(account.currentBalance || 0);
 
-    if (
-      Math.abs(
-        difference
-      ) < 0.5
-    ) {
-      setReconcileAccountId(
-        null
-      );
+    if (Math.abs(difference) < 0.5) {
+      setReconcileAccountId(null);
       setReconcileInput("");
       setReconcileError("");
       return;
     }
 
-    setReconcileSaving(
-      true
-    );
+    setReconcileSaving(true);
     setReconcileError("");
 
     try {
       await updateManagedAccount({
-        accountId:
-          account.accountId,
-        accountName:
-          account.accountName,
-        accountType:
-          account.accountType,
-        subType:
-          account.subType,
-        owner:
-          account.owner,
-        openingBalance:
-          Number(
-            account.openingBalance ||
-            0
-          ) +
-          difference,
-        billingCutoffDay:
-          account.billingCutoffDay,
-        paymentDay:
-          account.paymentDay,
-        startYear:
-          account.startYear,
-        endYear:
-          account.endYear,
-        balanceMethod:
-          account.balanceMethod,
-        paymentAccountId:
-          account.paymentAccountId,
-        assetAttribution:
-          account.assetAttribution
+        accountId: account.accountId,
+        accountName: account.accountName,
+        accountType: account.accountType,
+        subType: account.subType,
+        owner: account.owner,
+        openingBalance: Number(account.openingBalance || 0) + difference,
+        billingCutoffDay: account.billingCutoffDay,
+        paymentDay: account.paymentDay,
+        startYear: account.startYear,
+        endYear: account.endYear,
+        balanceMethod: account.balanceMethod,
+        paymentAccountId: account.paymentAccountId,
+        assetAttribution: account.assetAttribution
       });
 
       markLedgerChanged();
-      await loadDashboard(
-        true
-      );
+      await loadDashboard(true);
 
-      setReconcileAccountId(
-        null
-      );
+      setReconcileAccountId(null);
       setReconcileInput("");
-    } catch (
-      err
-    ) {
-      setReconcileError(
-        err instanceof Error
-          ? err.message
-          : "잔액을 맞추지 못했습니다."
-      );
+    } catch (err) {
+      setReconcileError(err instanceof Error ? err.message : "잔액을 맞추지 못했습니다.");
     } finally {
-      setReconcileSaving(
-        false
-      );
+      setReconcileSaving(false);
     }
   }
 
+  const summary = dashboard?.summary;
 
-  const summary =
-    dashboard?.summary;
-
-
-  const investmentAccountIds =
-    new Set(
-      (dashboard?.investments.accounts || []).map(
-        account => account.accountId
-      )
-    );
-
+  const investmentAccountIds = new Set(
+    (dashboard?.investments.accounts || []).map(account => account.accountId)
+  );
 
   const cashLikeAccounts =
     dashboard?.accounts.filter(
-      account =>
-        account.accountType ===
-          "자산" &&
-        !investmentAccountIds.has(
-          account.accountId
-        )
+      account => account.accountType === "자산" && !investmentAccountIds.has(account.accountId)
     ) || [];
-
 
   const liabilityAccounts =
-    dashboard?.accounts.filter(
-      account =>
-        account.accountType ===
-          "부채"
-    ) || [];
-
+    dashboard?.accounts.filter(account => account.accountType === "부채") || [];
 
   const selectedCashAccount =
-    cashLikeAccounts.find(
-      account =>
-        account.accountId ===
-        selectedCashAccountId
-    ) ||
-    null;
+    cashLikeAccounts.find(account => account.accountId === selectedCashAccountId) || null;
 
   const selectedLiabilityAccount =
-    liabilityAccounts.find(
-      account =>
-        account.accountId ===
-        selectedLiabilityAccountId
-    ) ||
-    null;
-
+    liabilityAccounts.find(account => account.accountId === selectedLiabilityAccountId) || null;
 
   const selectedRewardBalance =
     selectedCashAccount &&
-    Object.prototype.hasOwnProperty.call(
-      rewardBalances,
-      selectedCashAccount.accountId
-    )
-      ? rewardBalances[
-          selectedCashAccount.accountId
-        ]
+    Object.prototype.hasOwnProperty.call(rewardBalances, selectedCashAccount.accountId)
+      ? rewardBalances[selectedCashAccount.accountId]
       : null;
 
+  const investmentAccounts = dashboard?.investments.accounts || [];
 
-  const investmentAccounts =
-    dashboard
-      ?.investments
-      .accounts ||
-    [];
-
-
-  const investmentHoldings =
-    dashboard
-      ?.investments
-      .holdings ||
-    [];
+  const investmentHoldings = dashboard?.investments.holdings || [];
 
   const ownerOptions = useMemo(() => {
     const owners = new Set<string>();
@@ -991,295 +499,155 @@ export default function AssetsPage({
     visibleInvestmentAccounts.map(account => account.accountId)
   );
 
-  const visibleStaleManualPrices = (dashboard?.investments.staleManualPrices || [])
-    .filter(item => visibleInvestmentAccountIds.has(item.accountId));
+  const visibleStaleManualPrices = (dashboard?.investments.staleManualPrices || []).filter(item =>
+    visibleInvestmentAccountIds.has(item.accountId)
+  );
 
-  const visibleCashBaselinePending = (dashboard?.investments.cashBaselinePending || [])
-    .filter(item => visibleInvestmentAccountIds.has(item.accountId));
+  const visibleCashBaselinePending = (dashboard?.investments.cashBaselinePending || []).filter(
+    item => visibleInvestmentAccountIds.has(item.accountId)
+  );
 
   const visibleLiabilityTotal = visibleLiabilityAccounts.reduce(
-    (sum, account) =>
-      sum + Math.abs(Number(account.currentBalance || 0)),
+    (sum, account) => sum + Math.abs(Number(account.currentBalance || 0)),
     0
   );
 
-
-  const selectedAccount =
-    investmentAccounts.find(
-      account =>
-        account.accountId ===
-        selectedAccountId
-    );
-
-
-  const holdingsForSelected =
-    investmentHoldings.filter(
-      holding =>
-        holding.accountId ===
-        selectedAccountId
-    );
-
-
-  useEffect(
-    () => {
-      if (
-        !selectedAccount
-      ) {
-        setCashInput(
-          ""
-        );
-
-        return;
-      }
-
-      setCashInput(
-        selectedAccount
-          .cashBaselineKrw !==
-          null
-          ? String(
-              selectedAccount
-                .cashBaselineKrw
-            )
-          : ""
-      );
-    },
-    [
-      selectedAccountId,
-      selectedAccount
-        ?.cashBaselineKrw
-    ]
+  const selectedAccount = investmentAccounts.find(
+    account => account.accountId === selectedAccountId
   );
 
+  const holdingsForSelected = investmentHoldings.filter(
+    holding => holding.accountId === selectedAccountId
+  );
+
+  useEffect(() => {
+    if (!selectedAccount) {
+      setCashInput("");
+
+      return;
+    }
+
+    setCashInput(
+      selectedAccount.cashBaselineKrw !== null ? String(selectedAccount.cashBaselineKrw) : ""
+    );
+  }, [selectedAccountId, selectedAccount?.cashBaselineKrw]);
 
   async function handleSaveCashBaseline() {
-    if (
-      !selectedAccountId
-    ) {
+    if (!selectedAccountId) {
       return;
     }
 
+    const parsed = Number(cashInput);
 
-    const parsed =
-      Number(
-        cashInput
-      );
-
-
-    if (
-      !Number.isFinite(
-        parsed
-      ) ||
-      parsed <
-        0
-    ) {
-      setCashError(
-        "올바른 금액을 입력해주세요."
-      );
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      setCashError("올바른 금액을 입력해주세요.");
 
       return;
     }
 
+    setCashSaving(true);
 
-    setCashSaving(
-      true
-    );
-
-    setCashError(
-      ""
-    );
-
+    setCashError("");
 
     try {
       await setInvestmentCashBaseline({
-        accountId:
-          selectedAccountId,
+        accountId: selectedAccountId,
 
-        cashBaselineKrw:
-          parsed,
+        cashBaselineKrw: parsed,
 
-        force:
-          true
+        force: true
       });
 
-
       await loadDashboard();
-    } catch (
-      err
-    ) {
-      setCashError(
-        err instanceof Error
-          ? err.message
-          : "예수금 기준값 저장에 실패했습니다."
-      );
+    } catch (err) {
+      setCashError(err instanceof Error ? err.message : "예수금 기준값 저장에 실패했습니다.");
     } finally {
-      setCashSaving(
-        false
-      );
+      setCashSaving(false);
     }
   }
-
 
   function getManualPriceInput(
     holdingId: string,
-    manualPrice:
-      number |
-      null |
-      undefined,
-    currentPrice:
-      number |
-      null |
-      undefined
+    manualPrice: number | null | undefined,
+    currentPrice: number | null | undefined
   ) {
-    if (
-      Object.prototype
-        .hasOwnProperty
-        .call(
-          manualPriceDrafts,
-          holdingId
-        )
-    ) {
-      return manualPriceDrafts[
-        holdingId
-      ];
+    if (Object.prototype.hasOwnProperty.call(manualPriceDrafts, holdingId)) {
+      return manualPriceDrafts[holdingId];
     }
 
-    const value =
-      manualPrice ??
-      currentPrice;
+    const value = manualPrice ?? currentPrice;
 
-    return (
-      value !== null &&
-      value !== undefined &&
-      Number.isFinite(value)
-    )
-      ? String(value)
-      : "";
+    return value !== null && value !== undefined && Number.isFinite(value) ? String(value) : "";
   }
 
+  function handleManualPriceChange(holdingId: string, value: string) {
+    setManualPriceDrafts(current => ({
+      ...current,
+      [holdingId]: value
+    }));
 
-  function handleManualPriceChange(
-    holdingId: string,
-    value: string
-  ) {
-    setManualPriceDrafts(
-      current => ({
-        ...current,
-        [holdingId]: value
-      })
-    );
+    setManualPriceErrors(current => ({
+      ...current,
+      [holdingId]: ""
+    }));
 
-    setManualPriceErrors(
-      current => ({
-        ...current,
-        [holdingId]: ""
-      })
-    );
-
-    setManualPriceFeedbackId(
-      null
-    );
+    setManualPriceFeedbackId(null);
   }
-
 
   async function handleSaveManualPrice(
     holdingId: string,
-    manualPrice:
-      number |
-      null |
-      undefined,
-    currentPrice:
-      number |
-      null |
-      undefined
+    manualPrice: number | null | undefined,
+    currentPrice: number | null | undefined
   ) {
-    const input =
-      getManualPriceInput(
-        holdingId,
-        manualPrice,
-        currentPrice
-      );
+    const input = getManualPriceInput(holdingId, manualPrice, currentPrice);
 
-    const parsed =
-      Number(input);
+    const parsed = Number(input);
 
-    if (
-      !Number.isFinite(parsed) ||
-      parsed <= 0
-    ) {
-      setManualPriceErrors(
-        current => ({
-          ...current,
-          [holdingId]:
-            "수동 시세는 0보다 큰 숫자로 입력해주세요."
-        })
-      );
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      setManualPriceErrors(current => ({
+        ...current,
+        [holdingId]: "수동 시세는 0보다 큰 숫자로 입력해주세요."
+      }));
 
       return;
     }
 
-    setManualPriceSavingId(
-      holdingId
-    );
+    setManualPriceSavingId(holdingId);
 
-    setManualPriceErrors(
-      current => ({
-        ...current,
-        [holdingId]: ""
-      })
-    );
+    setManualPriceErrors(current => ({
+      ...current,
+      [holdingId]: ""
+    }));
 
-    setManualPriceFeedbackId(
-      null
-    );
+    setManualPriceFeedbackId(null);
 
     try {
       await updateHoldingManualPrice({
         holdingId,
-        manualPrice:
-          parsed,
-        lastUpdated:
-          getToday()
+        manualPrice: parsed,
+        lastUpdated: getToday()
       });
 
-      setManualPriceDrafts(
-        current => ({
-          ...current,
-          [holdingId]:
-            String(parsed)
-        })
-      );
+      setManualPriceDrafts(current => ({
+        ...current,
+        [holdingId]: String(parsed)
+      }));
 
       await loadDashboard();
 
-      setManualPriceFeedbackId(
-        holdingId
-      );
-    } catch (
-      err
-    ) {
-      setManualPriceErrors(
-        current => ({
-          ...current,
-          [holdingId]:
-            err instanceof Error
-              ? err.message
-              : "수동 시세 저장에 실패했습니다."
-        })
-      );
+      setManualPriceFeedbackId(holdingId);
+    } catch (err) {
+      setManualPriceErrors(current => ({
+        ...current,
+        [holdingId]: err instanceof Error ? err.message : "수동 시세 저장에 실패했습니다."
+      }));
     } finally {
-      setManualPriceSavingId(
-        null
-      );
+      setManualPriceSavingId(null);
     }
   }
 
-
   return (
-    <main
-      className={
-        styles.page
-      }
-    >
+    <main className={styles.page}>
       <header className={styles.header}>
         <div>
           <h1 className={styles.title}>자산</h1>
@@ -1310,186 +678,83 @@ export default function AssetsPage({
         </div>
       </header>
 
+      {fallbackSnapshotAt && <DataFreshnessNotice fetchedAt={fallbackSnapshotAt} />}
 
-      {fallbackSnapshotAt && (
-        <DataFreshnessNotice fetchedAt={fallbackSnapshotAt} />
-      )}
+      <Card as="section" padding="none" className={styles.summaryCard}>
+        {loading && <p className={styles.loading}>순자산 요약을 불러오는 중입니다.</p>}
 
+        {!loading && error && <p className={styles.error}>{error}</p>}
 
-      <Card
-        as="section"
-        padding="none"
-        className={styles.summaryCard}
-      >
-        {loading && (
-          <p
-            className={
-              styles.loading
-            }
-          >
-            순자산 요약을 불러오는 중입니다.
-          </p>
-        )}
-
-
-        {!loading &&
-          error && (
-            <p
-              className={
-                styles.error
-              }
+        {!loading && !error && summary && (
+          <div className={styles.summaryHero}>
+            <span className={styles.summaryHeroLabel}>순자산</span>
+            <strong
+              className={`${styles.summaryHeroValue} ${summary.netWorth < 0 ? styles.summaryHeroNegative : ""}`}
+              title={formatCurrency(summary.netWorth)}
             >
-              {error}
-            </p>
-          )}
+              <Money amount={summary.netWorth} />
+            </strong>
 
-
-        {!loading &&
-          !error &&
-          summary && (
-            <div className={styles.summaryHero}>
-              <span className={styles.summaryHeroLabel}>순자산</span>
-              <strong
-                className={`${styles.summaryHeroValue} ${summary.netWorth < 0 ? styles.summaryHeroNegative : ""}`}
-                title={formatCurrency(summary.netWorth)}
-              >
-                <Money amount={summary.netWorth} />
-              </strong>
-
-              <div className={styles.summarySecondary}>
-                <div>
-                  <span>총자산</span>
-                  <strong title={formatCurrency(summary.assets)}>
-                    <Money amount={summary.assets} absolute />
-                  </strong>
-                </div>
-                <div>
-                  <span>총부채</span>
-                  <strong title={formatCurrency(summary.liabilities)}>
-                    <Money amount={summary.liabilities} absolute />
-                  </strong>
-                </div>
+            <div className={styles.summarySecondary}>
+              <div>
+                <span>총자산</span>
+                <strong title={formatCurrency(summary.assets)}>
+                  <Money amount={summary.assets} absolute />
+                </strong>
+              </div>
+              <div>
+                <span>총부채</span>
+                <strong title={formatCurrency(summary.liabilities)}>
+                  <Money amount={summary.liabilities} absolute />
+                </strong>
               </div>
             </div>
-          )}
+          </div>
+        )}
       </Card>
 
-
       <div
-        className={
-          styles.tabs
-        }
+        className={styles.tabs}
         style={{
           gridTemplateColumns: "repeat(4, minmax(0, 1fr))"
         }}
       >
         <button
           type="button"
-          className={[
-            styles.tabButton,
-
-            activeTab ===
-            "cash"
-              ? styles
-                  .tabButtonActive
-              : ""
-          ]
-            .filter(
-              Boolean
-            )
-            .join(
-              " "
-            )}
-          onClick={
-            () =>
-              setActiveTab(
-                "cash"
-              )
-          }
+          className={[styles.tabButton, activeTab === "cash" ? styles.tabButtonActive : ""]
+            .filter(Boolean)
+            .join(" ")}
+          onClick={() => setActiveTab("cash")}
         >
           현금성자산
         </button>
 
-
         <button
           type="button"
-          className={[
-            styles.tabButton,
-
-            activeTab ===
-            "investment"
-              ? styles
-                  .tabButtonActive
-              : ""
-          ]
-            .filter(
-              Boolean
-            )
-            .join(
-              " "
-            )}
-          onClick={
-            () =>
-              setActiveTab(
-                "investment"
-              )
-          }
+          className={[styles.tabButton, activeTab === "investment" ? styles.tabButtonActive : ""]
+            .filter(Boolean)
+            .join(" ")}
+          onClick={() => setActiveTab("investment")}
         >
           투자
         </button>
 
-
         <button
           type="button"
-          className={[
-            styles.tabButton,
-
-            activeTab ===
-            "realEstate"
-              ? styles
-                  .tabButtonActive
-              : ""
-          ]
-            .filter(
-              Boolean
-            )
-            .join(
-              " "
-            )}
-          onClick={
-            () =>
-              setActiveTab(
-                "realEstate"
-              )
-          }
+          className={[styles.tabButton, activeTab === "realEstate" ? styles.tabButtonActive : ""]
+            .filter(Boolean)
+            .join(" ")}
+          onClick={() => setActiveTab("realEstate")}
         >
           우리집
         </button>
 
-
         <button
           type="button"
-          className={[
-            styles.tabButton,
-
-            activeTab ===
-            "liability"
-              ? styles
-                  .tabButtonActive
-              : ""
-          ]
-            .filter(
-              Boolean
-            )
-            .join(
-              " "
-            )}
-          onClick={
-            () =>
-              setActiveTab(
-                "liability"
-              )
-          }
+          className={[styles.tabButton, activeTab === "liability" ? styles.tabButtonActive : ""]
+            .filter(Boolean)
+            .join(" ")}
+          onClick={() => setActiveTab("liability")}
         >
           부채
         </button>
@@ -1515,466 +780,267 @@ export default function AssetsPage({
         </div>
       )}
 
-
-      {activeTab ===
-        "cash" && (
-        <section
-          className={
-            styles.section
-          }
-        >
+      {activeTab === "cash" && (
+        <section className={styles.section}>
           <h2 className={styles.sectionTitle}>현금성자산</h2>
 
+          {!loading && summary && (
+            <div className={styles.cashSummary}>
+              <span className={styles.summaryLabel}>합계</span>
 
-          {!loading &&
-            summary && (
-              <div
-                className={
-                  styles.cashSummary
-                }
-              >
-                <span
-                  className={
-                    styles.summaryLabel
-                  }
-                >
-                  합계
-                </span>
-
-                <strong
-                  className={
-                    styles.summaryValue
-                  }
-                >
-                  {formatCurrency(
-                    visibleCashTotal
-                  )}
-                </strong>
-              </div>
-            )}
-
-
-          {loading && (
-            <p
-              className={
-                styles.loading
-              }
-            >
-              불러오는 중입니다.
-            </p>
+              <strong className={styles.summaryValue}>{formatCurrency(visibleCashTotal)}</strong>
+            </div>
           )}
 
+          {loading && <p className={styles.loading}>불러오는 중입니다.</p>}
 
-          {!loading &&
-            visibleCashLikeAccounts
-              .length ===
-              0 && (
-              <p
-                className={
-                  styles.emptyState
-                }
-              >
-                표시할 현금성 계좌가 없습니다.
-              </p>
-            )}
+          {!loading && visibleCashLikeAccounts.length === 0 && (
+            <p className={styles.emptyState}>표시할 현금성 계좌가 없습니다.</p>
+          )}
 
+          {!loading && visibleCashLikeAccounts.length > 0 && (
+            <ul className={styles.cashAccountList}>
+              {visibleCashLikeAccounts.map(account => {
+                const isSelected = selectedCashAccountId === account.accountId;
 
-          {!loading &&
-            visibleCashLikeAccounts
-              .length >
-              0 && (
-              <ul
-                className={
-                  styles.cashAccountList
-                }
-              >
-                {visibleCashLikeAccounts.map(
-                  account => {
-                    const isSelected =
-                      selectedCashAccountId ===
-                      account.accountId;
+                const difference =
+                  isSelected && reconcileInput.trim()
+                    ? Number(reconcileInput.replace(/,/g, "")) - Number(account.currentBalance || 0)
+                    : null;
 
-                    const difference =
-                      isSelected &&
-                      reconcileInput.trim()
-                        ? Number(
-                            reconcileInput.replace(
-                              /,/g,
-                              ""
-                            )
-                          ) -
-                          Number(
-                            account.currentBalance ||
-                            0
-                          )
-                        : null;
-
-                    return (
-                      <Fragment
-                        key={
-                          account.accountId
-                        }
+                return (
+                  <Fragment key={account.accountId}>
+                    <li>
+                      <button
+                        type="button"
+                        className={[
+                          styles.cashAccountRow,
+                          isSelected ? styles.cashAccountRowActive : ""
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                        onClick={() => {
+                          setSelectedCashAccountId(isSelected ? null : account.accountId);
+                          setReconcileAccountId(null);
+                          setReconcileInput("");
+                          setReconcileError("");
+                        }}
                       >
-                        <li>
-                          <button
-                            type="button"
-                            className={[
-                              styles.cashAccountRow,
-                              isSelected
-                                ? styles.cashAccountRowActive
+                        <div className={styles.cashAccountInfo}>
+                          <strong className={styles.cashAccountName}>{account.displayName}</strong>
+
+                          <span className={styles.cashAccountMeta}>
+                            {[
+                              account.subType,
+                              account.owner,
+                              Object.prototype.hasOwnProperty.call(
+                                rewardBalances,
+                                account.accountId
+                              )
+                                ? `캐시백 ${formatCurrency(rewardBalances[account.accountId])} 포함`
                                 : ""
                             ]
                               .filter(Boolean)
-                              .join(" ")}
-                            onClick={
-                              () => {
-                                setSelectedCashAccountId(
-                                  isSelected
-                                    ? null
-                                    : account.accountId
-                                );
-                                setReconcileAccountId(
-                                  null
-                                );
-                                setReconcileInput("");
-                                setReconcileError("");
-                              }
-                            }
-                          >
-                            <div
-                              className={
-                                styles.cashAccountInfo
-                              }
-                            >
-                              <strong
-                                className={
-                                  styles.cashAccountName
-                                }
-                              >
-                                {
-                                  account.displayName
-                                }
-                              </strong>
+                              .join(" · ")}
+                          </span>
+                        </div>
 
-                              <span
-                                className={
-                                  styles.cashAccountMeta
-                                }
-                              >
-                                {[
-                                  account.subType,
-                                  account.owner,
-                                  Object.prototype.hasOwnProperty.call(
-                                    rewardBalances,
-                                    account.accountId
-                                  )
-                                    ? `캐시백 ${formatCurrency(
-                                        rewardBalances[account.accountId]
-                                      )} 포함`
-                                    : ""
-                                ]
+                        <strong className={styles.cashAccountValue}>
+                          {formatCurrency(account.currentBalance)}
+                        </strong>
+                      </button>
+                    </li>
+
+                    {isSelected && selectedCashAccount && (
+                      <li
+                        className={styles.cashDetailItem}
+                        role="presentation"
+                        onClick={() => {
+                          setSelectedCashAccountId(null);
+                          setReconcileAccountId(null);
+                        }}
+                      >
+                        <section
+                          className={styles.cashDetailCard}
+                          role="dialog"
+                          aria-modal="true"
+                          aria-label={`${selectedCashAccount.displayName} 상세`}
+                          onClick={event => event.stopPropagation()}
+                        >
+                          <div className={styles.cashDetailHeader}>
+                            <div>
+                              <span>
+                                {[selectedCashAccount.subType, selectedCashAccount.owner]
                                   .filter(Boolean)
                                   .join(" · ")}
                               </span>
+                              <strong>{selectedCashAccount.displayName}</strong>
                             </div>
 
-                            <strong
-                              className={
-                                styles.cashAccountValue
-                              }
-                            >
-                              {formatCurrency(
-                                account.currentBalance
-                              )}
-                            </strong>
-                          </button>
-                        </li>
+                            <div className={styles.modalHeaderActions}>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => setEditingAccountId(selectedCashAccount.accountId)}
+                              >
+                                편집
+                              </Button>
+                              <Button
+                                className={styles.modalCloseButton}
+                                variant="soft"
+                                size="sm"
+                                iconOnly
+                                aria-label="상세 닫기"
+                                onClick={() => {
+                                  setSelectedCashAccountId(null);
+                                  setReconcileAccountId(null);
+                                }}
+                              >
+                                ×
+                              </Button>
+                            </div>
+                          </div>
 
-                        {
-                          isSelected &&
-                          selectedCashAccount && (
-                            <li
-                              className={
-                                styles.cashDetailItem
-                              }
-                              role="presentation"
+                          <div className={styles.cashDetailMetrics}>
+                            <div>
+                              <span>
+                                {selectedRewardBalance !== null ? "총 사용 가능 잔액" : "계산 잔액"}
+                              </span>
+                              <strong>{formatCurrency(selectedCashAccount.currentBalance)}</strong>
+                            </div>
+
+                            {selectedRewardBalance !== null && (
+                              <>
+                                <div>
+                                  <span>그중 캐시백</span>
+                                  <strong>{formatCurrency(selectedRewardBalance)}</strong>
+                                </div>
+                                <div>
+                                  <span>일반 잔액</span>
+                                  <strong>
+                                    {formatCurrency(
+                                      selectedCashAccount.currentBalance - selectedRewardBalance
+                                    )}
+                                  </strong>
+                                </div>
+                              </>
+                            )}
+
+                            <div>
+                              <span>시작 잔액</span>
+                              <strong>{formatCurrency(selectedCashAccount.openingBalance)}</strong>
+                            </div>
+                          </div>
+
+                          <div className={styles.reconcileActions}>
+                            <Button
+                              variant="secondary"
+                              size="sm"
                               onClick={() => {
+                                const accountId = selectedCashAccount.accountId;
                                 setSelectedCashAccountId(null);
                                 setReconcileAccountId(null);
+                                openInput({
+                                  mode: "transfer",
+                                  fromAccountId: accountId
+                                });
                               }}
                             >
-                              <section
-                                className={
-                                  styles.cashDetailCard
-                                }
-                                role="dialog"
-                                aria-modal="true"
-                                aria-label={`${selectedCashAccount.displayName} 상세`}
-                                onClick={event => event.stopPropagation()}
-                              >
-                                <div
-                                  className={
-                                    styles.cashDetailHeader
+                              여기서 보내기
+                            </Button>
+
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => {
+                                const accountId = selectedCashAccount.accountId;
+                                setSelectedCashAccountId(null);
+                                setReconcileAccountId(null);
+                                openInput({
+                                  mode: "transfer",
+                                  toAccountId: accountId
+                                });
+                              }}
+                            >
+                              여기로 받기
+                            </Button>
+                          </div>
+
+                          {reconcileAccountId !== selectedCashAccount.accountId ? (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => {
+                                setReconcileAccountId(selectedCashAccount.accountId);
+                                setReconcileInput(
+                                  String(Math.round(selectedCashAccount.currentBalance))
+                                );
+                                setReconcileError("");
+                              }}
+                            >
+                              실제 잔액과 맞추기
+                            </Button>
+                          ) : (
+                            <div className={styles.reconcilePanel}>
+                              <label>
+                                <span>실제 잔액</span>
+                                <input
+                                  type="number"
+                                  inputMode="decimal"
+                                  value={reconcileInput}
+                                  onChange={event => {
+                                    setReconcileInput(event.target.value);
+                                    setReconcileError("");
+                                  }}
+                                />
+                              </label>
+
+                              <p>
+                                차이{" "}
+                                {difference === null || !Number.isFinite(difference)
+                                  ? "-"
+                                  : formatSignedCurrency(difference)}
+                              </p>
+                              <small>
+                                거래 내역은 건드리지 않고 시작 잔액을 차이만큼 조정합니다.
+                              </small>
+
+                              {reconcileError && <p className={styles.error}>{reconcileError}</p>}
+
+                              <div className={styles.reconcileActions}>
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={() => {
+                                    setReconcileAccountId(null);
+                                    setReconcileError("");
+                                  }}
+                                >
+                                  취소
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  loading={reconcileSaving}
+                                  loadingLabel="저장 중"
+                                  onClick={() =>
+                                    void handleReconcileAccount(selectedCashAccount.accountId)
                                   }
                                 >
-                                  <div>
-                                    <span>
-                                      {[
-                                        selectedCashAccount.subType,
-                                        selectedCashAccount.owner
-                                      ]
-                                        .filter(Boolean)
-                                        .join(" · ")}
-                                    </span>
-                                    <strong>
-                                      {
-                                        selectedCashAccount.displayName
-                                      }
-                                    </strong>
-                                  </div>
-
-                                  <div className={styles.modalHeaderActions}>
-                                    <Button
-                                      variant="secondary"
-                                      size="sm"
-                                      onClick={() => setEditingAccountId(selectedCashAccount.accountId)}
-                                    >
-                                      편집
-                                    </Button>
-                                    <Button
-                                      className={styles.modalCloseButton}
-                                      variant="soft"
-                                      size="sm"
-                                      iconOnly
-                                      aria-label="상세 닫기"
-                                      onClick={() => {
-                                        setSelectedCashAccountId(null);
-                                        setReconcileAccountId(null);
-                                      }}
-                                    >
-                                      ×
-                                    </Button>
-                                  </div>
-                                </div>
-
-                                <div
-                                  className={
-                                    styles.cashDetailMetrics
-                                  }
-                                >
-                                  <div>
-                                    <span>
-                                      {selectedRewardBalance !== null
-                                        ? "총 사용 가능 잔액"
-                                        : "계산 잔액"}
-                                    </span>
-                                    <strong>
-                                      {formatCurrency(
-                                        selectedCashAccount.currentBalance
-                                      )}
-                                    </strong>
-                                  </div>
-
-                                  {selectedRewardBalance !== null && (
-                                    <>
-                                      <div>
-                                        <span>그중 캐시백</span>
-                                        <strong>
-                                          {formatCurrency(
-                                            selectedRewardBalance
-                                          )}
-                                        </strong>
-                                      </div>
-                                      <div>
-                                        <span>일반 잔액</span>
-                                        <strong>
-                                          {formatCurrency(
-                                            selectedCashAccount.currentBalance -
-                                              selectedRewardBalance
-                                          )}
-                                        </strong>
-                                      </div>
-                                    </>
-                                  )}
-
-                                  <div>
-                                    <span>시작 잔액</span>
-                                    <strong>
-                                      {formatCurrency(
-                                        selectedCashAccount.openingBalance
-                                      )}
-                                    </strong>
-                                  </div>
-                                </div>
-
-                                <div
-                                  className={
-                                    styles.reconcileActions
-                                  }
-                                >
-                                  <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    onClick={() => {
-                                      const accountId =
-                                        selectedCashAccount.accountId;
-                                      setSelectedCashAccountId(null);
-                                      setReconcileAccountId(null);
-                                      openInput({
-                                        mode: "transfer",
-                                        fromAccountId: accountId
-                                      });
-                                    }}
-                                  >
-                                    여기서 보내기
-                                  </Button>
-
-                                  <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    onClick={() => {
-                                      const accountId =
-                                        selectedCashAccount.accountId;
-                                      setSelectedCashAccountId(null);
-                                      setReconcileAccountId(null);
-                                      openInput({
-                                        mode: "transfer",
-                                        toAccountId: accountId
-                                      });
-                                    }}
-                                  >
-                                    여기로 받기
-                                  </Button>
-                                </div>
-
-                                {
-                                  reconcileAccountId !==
-                                    selectedCashAccount.accountId ? (
-                                    <Button
-                                      variant="secondary"
-                                      size="sm"
-                                      onClick={
-                                        () => {
-                                          setReconcileAccountId(
-                                            selectedCashAccount.accountId
-                                          );
-                                          setReconcileInput(
-                                            String(
-                                              Math.round(
-                                                selectedCashAccount.currentBalance
-                                              )
-                                            )
-                                          );
-                                          setReconcileError("");
-                                        }
-                                      }
-                                    >
-                                      실제 잔액과 맞추기
-                                    </Button>
-                                  ) : (
-                                    <div
-                                      className={
-                                        styles.reconcilePanel
-                                      }
-                                    >
-                                      <label>
-                                        <span>실제 잔액</span>
-                                        <input
-                                          type="number"
-                                          inputMode="decimal"
-                                          value={
-                                            reconcileInput
-                                          }
-                                          onChange={
-                                            event => {
-                                              setReconcileInput(
-                                                event.target.value
-                                              );
-                                              setReconcileError("");
-                                            }
-                                          }
-                                        />
-                                      </label>
-
-                                      <p>
-                                        차이 {
-                                          difference ===
-                                          null ||
-                                          !Number.isFinite(
-                                            difference
-                                          )
-                                            ? "-"
-                                            : formatSignedCurrency(
-                                                difference
-                                              )
-                                        }
-                                      </p>
-                                      <small>
-                                        거래 내역은 건드리지 않고 시작 잔액을 차이만큼 조정합니다.
-                                      </small>
-
-                                      {
-                                        reconcileError && (
-                                          <p
-                                            className={
-                                              styles.error
-                                            }
-                                          >
-                                            {reconcileError}
-                                          </p>
-                                        )
-                                      }
-
-                                      <div
-                                        className={
-                                          styles.reconcileActions
-                                        }
-                                      >
-                                        <Button
-                                          variant="secondary"
-                                          size="sm"
-                                          onClick={
-                                            () => {
-                                              setReconcileAccountId(
-                                                null
-                                              );
-                                              setReconcileError("");
-                                            }
-                                          }
-                                        >
-                                          취소
-                                        </Button>
-                                        <Button
-                                          size="sm"
-                                          loading={reconcileSaving}
-                                          loadingLabel="저장 중"
-                                          onClick={
-                                            () =>
-                                              void handleReconcileAccount(
-                                                selectedCashAccount.accountId
-                                              )
-                                          }
-                                        >
-                                          맞추기
-                                        </Button>
-                                      </div>
-                                    </div>
-                                  )
-                                }
-                              </section>
-                            </li>
-                          )
-                        }
-                      </Fragment>
-                    );
-                  }
-                )}
-              </ul>
-            )}
-
+                                  맞추기
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </section>
+                      </li>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </ul>
+          )}
         </section>
       )}
-
 
       {activeTab === "realEstate" && (
         <RealEstatePanel
@@ -1984,164 +1050,63 @@ export default function AssetsPage({
         />
       )}
 
+      {activeTab === "liability" && (
+        <section className={styles.section}>
+          <div className={styles.sectionHeading}>
+            <h2 className={styles.sectionTitle}>부채</h2>
 
-      {activeTab ===
-        "liability" && (
-        <section
-          className={
-            styles.section
-          }
-        >
-          <div
-            className={
-              styles.sectionHeading
-            }
-          >
-            <h2
-              className={
-                styles.sectionTitle
-              }
-            >
-              부채
-            </h2>
-
-            {!loading &&
-              visibleLiabilityAccounts.length > 0 && (
-                <span
-                  className={
-                    styles.sectionCount
-                  }
-                >
-                  {visibleLiabilityAccounts.length}개 계좌
-                </span>
-              )}
+            {!loading && visibleLiabilityAccounts.length > 0 && (
+              <span className={styles.sectionCount}>{visibleLiabilityAccounts.length}개 계좌</span>
+            )}
           </div>
 
-          {!loading &&
-            summary && (
-              <div
-                className={
-                  styles.cashSummary
-                }
-              >
-                <span
-                  className={
-                    styles.summaryLabel
-                  }
-                >
-                  총 부채
-                </span>
+          {!loading && summary && (
+            <div className={styles.cashSummary}>
+              <span className={styles.summaryLabel}>총 부채</span>
 
-                <strong
-                  className={
-                    styles.summaryValue
-                  }
-                >
-                  {formatCurrency(
-                    visibleLiabilityTotal
-                  )}
-                </strong>
-              </div>
-            )}
-
-          {loading && (
-            <p
-              className={
-                styles.loading
-              }
-            >
-              부채계좌를 불러오는 중입니다.
-            </p>
+              <strong className={styles.summaryValue}>
+                {formatCurrency(visibleLiabilityTotal)}
+              </strong>
+            </div>
           )}
 
-          {!loading &&
-            visibleLiabilityAccounts.length === 0 && (
-              <p
-                className={
-                  styles.emptyState
-                }
-              >
-                등록된 부채계좌가 없습니다.
-              </p>
-            )}
+          {loading && <p className={styles.loading}>부채계좌를 불러오는 중입니다.</p>}
 
-          {!loading &&
-            visibleLiabilityAccounts.length > 0 && (
-              <ul
-                className={
-                  styles.cashAccountList
-                }
-              >
-                {visibleLiabilityAccounts.map(
-                  account => {
-                    const outstanding =
-                      Math.abs(
-                        Number(
-                          account.currentBalance || 0
-                        )
-                      );
+          {!loading && visibleLiabilityAccounts.length === 0 && (
+            <p className={styles.emptyState}>등록된 부채계좌가 없습니다.</p>
+          )}
 
-                    return (
-                      <li
-                        key={
-                          account.accountId
-                        }
-                      >
-                        <button
-                          type="button"
-                          className={
-                            styles.cashAccountRow
-                          }
-                          onClick={() =>
-                            setSelectedLiabilityAccountId(
-                              account.accountId
-                            )
-                          }
-                        >
-                          <div
-                            className={
-                              styles.cashAccountInfo
-                            }
-                          >
-                            <strong
-                              className={
-                                styles.cashAccountName
-                              }
-                            >
-                              {account.displayName}
-                            </strong>
+          {!loading && visibleLiabilityAccounts.length > 0 && (
+            <ul className={styles.cashAccountList}>
+              {visibleLiabilityAccounts.map(account => {
+                const outstanding = Math.abs(Number(account.currentBalance || 0));
 
-                            <span
-                              className={
-                                styles.cashAccountMeta
-                              }
-                            >
-                              {[
-                                account.subType,
-                                account.owner,
-                                "눌러서 상세"
-                              ]
-                                .filter(Boolean)
-                                .join(" · ")}
-                            </span>
-                          </div>
+                return (
+                  <li key={account.accountId}>
+                    <button
+                      type="button"
+                      className={styles.cashAccountRow}
+                      onClick={() => setSelectedLiabilityAccountId(account.accountId)}
+                    >
+                      <div className={styles.cashAccountInfo}>
+                        <strong className={styles.cashAccountName}>{account.displayName}</strong>
 
-                          <strong
-                            className={
-                              styles.cashAccountValue
-                            }
-                          >
-                            {formatCurrency(
-                              outstanding
-                            )}
-                          </strong>
-                        </button>
-                      </li>
-                    );
-                  }
-                )}
-              </ul>
-            )}
+                        <span className={styles.cashAccountMeta}>
+                          {[account.subType, account.owner, "눌러서 상세"]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </span>
+                      </div>
+
+                      <strong className={styles.cashAccountValue}>
+                        {formatCurrency(outstanding)}
+                      </strong>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
 
           {selectedLiabilityAccount && (
             <div
@@ -2163,14 +1128,14 @@ export default function AssetsPage({
                         .filter(Boolean)
                         .join(" · ")}
                     </span>
-                    <h3 className={styles.detailTitle}>
-                      {selectedLiabilityAccount.displayName}
-                    </h3>
+                    <h3 className={styles.detailTitle}>{selectedLiabilityAccount.displayName}</h3>
                   </div>
 
                   <div className={styles.detailHeaderActions}>
                     <strong className={styles.detailTotal}>
-                      {formatCurrency(Math.abs(Number(selectedLiabilityAccount.currentBalance || 0)))}
+                      {formatCurrency(
+                        Math.abs(Number(selectedLiabilityAccount.currentBalance || 0))
+                      )}
                     </strong>
                     <Button
                       variant="secondary"
@@ -2200,13 +1165,17 @@ export default function AssetsPage({
                   <div>
                     <span>현재 남은 부채</span>
                     <strong>
-                      {formatCurrency(Math.abs(Number(selectedLiabilityAccount.currentBalance || 0)))}
+                      {formatCurrency(
+                        Math.abs(Number(selectedLiabilityAccount.currentBalance || 0))
+                      )}
                     </strong>
                   </div>
                   <div>
                     <span>시작 금액</span>
                     <strong>
-                      {formatCurrency(Math.abs(Number(selectedLiabilityAccount.openingBalance || 0)))}
+                      {formatCurrency(
+                        Math.abs(Number(selectedLiabilityAccount.openingBalance || 0))
+                      )}
                     </strong>
                   </div>
                   {selectedLiabilityAccount.startYear && (
@@ -2214,7 +1183,9 @@ export default function AssetsPage({
                       <span>기간</span>
                       <strong>
                         {selectedLiabilityAccount.startYear}
-                        {selectedLiabilityAccount.endYear ? ` ~ ${selectedLiabilityAccount.endYear}` : " ~"}
+                        {selectedLiabilityAccount.endYear
+                          ? ` ~ ${selectedLiabilityAccount.endYear}`
+                          : " ~"}
                       </strong>
                     </div>
                   )}
@@ -2248,1143 +1219,579 @@ export default function AssetsPage({
         </section>
       )}
 
+      {activeTab === "investment" && (
+        <section className={styles.section}>
+          <div className={styles.sectionHeading}>
+            <h2 className={styles.sectionTitle}>투자자산</h2>
 
-      {activeTab ===
-        "investment" && (
-        <section
-          className={
-            styles.section
-          }
-        >
-          <div
-            className={
-              styles.sectionHeading
-            }
-          >
-            <h2
-              className={
-                styles.sectionTitle
-              }
-            >
-              투자자산
-            </h2>
-
-            {!loading &&
-              visibleInvestmentAccounts
-                .length >
-                0 && (
-                <div className={styles.sectionHeadingActions}>
-                  <span
-                    className={
-                      styles.sectionCount
-                    }
-                  >
-                    {
-                      visibleInvestmentAccounts
-                        .length
-                    }
-                    개 계좌
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    loading={quoteRefreshing}
-                    loadingLabel="갱신 중"
-                    onClick={() => void handleRefreshInvestmentQuotes()}
-                  >
-                    시세 새로고침
-                  </Button>
-                </div>
-              )}
-          </div>
-
-
-          {!loading &&
-            summary && (
-              <div
-                className={
-                  styles.investmentSummary
-                }
-              >
-                <div>
-                  <span
-                    className={
-                      styles.summaryLabel
-                    }
-                  >
-                    합계
-                  </span>
-
-                  <strong
-                    className={
-                      styles.investmentSummaryValue
-                    }
-                  >
-                    {formatCurrency(
-                      visibleInvestmentTotal
-                    )}
-                  </strong>
-                </div>
-
-
-                <div
-                  className={
-                    styles.investmentSummarySub
-                  }
+            {!loading && visibleInvestmentAccounts.length > 0 && (
+              <div className={styles.sectionHeadingActions}>
+                <span className={styles.sectionCount}>
+                  {visibleInvestmentAccounts.length}개 계좌
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  loading={quoteRefreshing}
+                  loadingLabel="갱신 중"
+                  onClick={() => void handleRefreshInvestmentQuotes()}
                 >
-                  <span>
-                    예수금{" "}
-                    <strong>
-                      {formatCurrency(
-                        visibleInvestmentCashTotal
-                      )}
-                    </strong>
-                  </span>
-
-                  <span>
-                    실현손익{" "}
-                    <strong
-                      style={{
-                        color:
-                          (
-                            visibleInvestmentRealizedPnlTotal
-                          ) <
-                          0
-                            ? "var(--color-error)"
-                            : undefined
-                      }}
-                    >
-                      {formatSignedCurrency(
-                        visibleInvestmentRealizedPnlTotal
-                      )}
-                    </strong>
-                  </span>
-                </div>
+                  시세 새로고침
+                </Button>
               </div>
             )}
+          </div>
 
+          {!loading && summary && (
+            <div className={styles.investmentSummary}>
+              <div>
+                <span className={styles.summaryLabel}>합계</span>
 
-          {!loading && (visibleCashBaselinePending.length > 0 || visibleStaleManualPrices.length > 0) && (
-            <Card padding="sm" tone="soft" shadow="none" className={styles.investmentWarnings}>
-              {visibleCashBaselinePending.map(item => (
-                <div key={`cash:${item.accountId}`} className={styles.investmentWarningRow}>
-                  <div>
-                    <strong>예수금 기준 미설정</strong>
-                    <span>{item.accountName}의 현재 예수금을 한 번 입력해주세요.</span>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSelectedAccountId(item.accountId)}
+                <strong className={styles.investmentSummaryValue}>
+                  {formatCurrency(visibleInvestmentTotal)}
+                </strong>
+              </div>
+
+              <div className={styles.investmentSummarySub}>
+                <span>
+                  예수금 <strong>{formatCurrency(visibleInvestmentCashTotal)}</strong>
+                </span>
+
+                <span>
+                  실현손익{" "}
+                  <strong
+                    style={{
+                      color:
+                        visibleInvestmentRealizedPnlTotal < 0 ? "var(--color-error)" : undefined
+                    }}
                   >
-                    설정
-                  </Button>
-                </div>
-              ))}
-
-              {visibleStaleManualPrices.map(item => (
-                <div key={`quote:${item.holdingId}`} className={styles.investmentWarningRow}>
-                  <div>
-                    <strong>수동 시세 갱신 필요</strong>
-                    <span>
-                      {item.stockName || item.stockCode}
-                      {item.elapsedDays === null ? " · 갱신일 없음" : ` · ${item.elapsedDays}일 전`}
-                    </span>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSelectedAccountId(item.accountId)}
-                  >
-                    확인
-                  </Button>
-                </div>
-              ))}
-            </Card>
+                    {formatSignedCurrency(visibleInvestmentRealizedPnlTotal)}
+                  </strong>
+                </span>
+              </div>
+            </div>
           )}
-
-
-          {loading && (
-            <p
-              className={
-                styles.loading
-              }
-            >
-              투자계좌를 불러오는 중입니다.
-            </p>
-          )}
-
 
           {!loading &&
-            visibleInvestmentAccounts
-              .length ===
-              0 && (
-              <p
-                className={
-                  styles.emptyState
-                }
-              >
-                등록된 투자계좌가 없습니다.
-              </p>
+            (visibleCashBaselinePending.length > 0 || visibleStaleManualPrices.length > 0) && (
+              <Card padding="sm" tone="soft" shadow="none" className={styles.investmentWarnings}>
+                {visibleCashBaselinePending.map(item => (
+                  <div key={`cash:${item.accountId}`} className={styles.investmentWarningRow}>
+                    <div>
+                      <strong>예수금 기준 미설정</strong>
+                      <span>{item.accountName}의 현재 예수금을 한 번 입력해주세요.</span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedAccountId(item.accountId)}
+                    >
+                      설정
+                    </Button>
+                  </div>
+                ))}
+
+                {visibleStaleManualPrices.map(item => (
+                  <div key={`quote:${item.holdingId}`} className={styles.investmentWarningRow}>
+                    <div>
+                      <strong>수동 시세 갱신 필요</strong>
+                      <span>
+                        {item.stockName || item.stockCode}
+                        {item.elapsedDays === null
+                          ? " · 갱신일 없음"
+                          : ` · ${item.elapsedDays}일 전`}
+                      </span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedAccountId(item.accountId)}
+                    >
+                      확인
+                    </Button>
+                  </div>
+                ))}
+              </Card>
             )}
 
+          {loading && <p className={styles.loading}>투자계좌를 불러오는 중입니다.</p>}
 
-          {!loading &&
-            visibleInvestmentAccounts
-              .length >
-              0 && (
-              <div
-                className={
-                  styles.accountList
-                }
-              >
-                {visibleInvestmentAccounts.map(
-                  account => {
-                    const isSelected =
-                      selectedAccountId ===
-                      account.accountId;
+          {!loading && visibleInvestmentAccounts.length === 0 && (
+            <p className={styles.emptyState}>등록된 투자계좌가 없습니다.</p>
+          )}
 
+          {!loading && visibleInvestmentAccounts.length > 0 && (
+            <div className={styles.accountList}>
+              {visibleInvestmentAccounts.map(account => {
+                const isSelected = selectedAccountId === account.accountId;
 
-                    const holdingCount =
-                      investmentHoldings.filter(
-                        holding =>
-                          holding.accountId ===
-                          account.accountId
-                      ).length;
+                const holdingCount = investmentHoldings.filter(
+                  holding => holding.accountId === account.accountId
+                ).length;
 
+                return (
+                  <Fragment key={account.accountId}>
+                    <button
+                      type="button"
+                      className={[styles.accountCard, isSelected ? styles.accountCardActive : ""]
+                        .filter(Boolean)
+                        .join(" ")}
+                      onClick={() => {
+                        setCashError("");
 
-                    return (
-                      <Fragment
-                        key={
-                          account.accountId
-                        }
-                      >
-                        <button
-                          type="button"
-                          className={[
-                            styles.accountCard,
+                        setSelectedAccountId(isSelected ? null : account.accountId);
+                      }}
+                    >
+                      <div className={styles.accountCardTop}>
+                        <div className={styles.accountIdentity}>
+                          <strong className={styles.accountName}>{account.accountName}</strong>
 
-                            isSelected
-                              ? styles
-                                  .accountCardActive
-                              : ""
-                          ]
-                            .filter(
-                              Boolean
-                            )
-                            .join(
-                              " "
-                            )}
-                          onClick={
-                            () => {
-                              setCashError(
-                                ""
-                              );
+                          <span className={styles.accountSub}>
+                            {[account.subType, account.owner, `${holdingCount}종목`]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </span>
+                        </div>
 
-                              setSelectedAccountId(
-                                isSelected
-                                  ? null
-                                  : account.accountId
-                              );
-                            }
-                          }
-                        >
-                          <div
-                            className={
-                              styles.accountCardTop
-                            }
+                        <div className={styles.accountTotal}>
+                          <strong>{formatCurrency(account.accountValueKrw)}</strong>
+
+                          <span>총 평가</span>
+                        </div>
+                      </div>
+
+                      <div className={styles.accountMetrics}>
+                        <div className={styles.accountMetric}>
+                          <span>예수금</span>
+
+                          <strong>
+                            {account.cashBaselineConfigured
+                              ? formatCurrency(account.currentCashKrw)
+                              : "미설정"}
+                          </strong>
+                        </div>
+
+                        <div className={styles.accountMetric}>
+                          <span>실현손익</span>
+
+                          <strong
+                            style={{
+                              color: account.realizedPnlKrw < 0 ? "var(--color-error)" : undefined
+                            }}
                           >
-                            <div
-                              className={
-                                styles.accountIdentity
-                              }
-                            >
-                              <strong
-                                className={
-                                  styles.accountName
-                                }
-                              >
-                                {
-                                  account.accountName
-                                }
-                              </strong>
+                            {formatSignedCurrency(account.realizedPnlKrw)}
+                          </strong>
+                        </div>
+                      </div>
+                    </button>
 
-                              <span
-                                className={
-                                  styles.accountSub
-                                }
-                              >
-                                {[
-                                  account.subType,
-                                  account.owner,
-                                  `${holdingCount}종목`
-                                ]
-                                  .filter(Boolean)
-                                  .join(" · ")}
+                    {isSelected && selectedAccount && (
+                      <div
+                        className={styles.investmentDetailBackdrop}
+                        role="presentation"
+                        onClick={() => setSelectedAccountId(null)}
+                      >
+                        <div
+                          className={styles.detailCard}
+                          role="dialog"
+                          aria-modal="true"
+                          aria-label={`${selectedAccount.accountName} 상세`}
+                          onClick={event => event.stopPropagation()}
+                        >
+                          <div className={styles.detailHeader}>
+                            <div>
+                              <span className={styles.detailEyebrow}>
+                                {["투자계좌", selectedAccount.owner].filter(Boolean).join(" · ")}
                               </span>
+
+                              <h3 className={styles.detailTitle}>{selectedAccount.accountName}</h3>
                             </div>
 
-
-                            <div
-                              className={
-                                styles.accountTotal
-                              }
-                            >
-                              <strong>
-                                {formatCurrency(
-                                  account.accountValueKrw
-                                )}
+                            <div className={styles.detailHeaderActions}>
+                              <strong className={styles.detailTotal}>
+                                {formatCurrency(selectedAccount.accountValueKrw)}
                               </strong>
 
-                              <span>
-                                총 평가
-                              </span>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => setEditingAccountId(selectedAccount.accountId)}
+                              >
+                                편집
+                              </Button>
+
+                              <Button
+                                className={styles.modalCloseButton}
+                                variant="soft"
+                                size="sm"
+                                iconOnly
+                                aria-label="상세 닫기"
+                                onClick={() => setSelectedAccountId(null)}
+                              >
+                                ×
+                              </Button>
                             </div>
                           </div>
 
-
-                          <div
-                            className={
-                              styles.accountMetrics
-                            }
-                          >
-                            <div
-                              className={
-                                styles.accountMetric
-                              }
-                            >
-                              <span>
-                                예수금
-                              </span>
+                          <div className={styles.detailMetrics}>
+                            <div className={styles.detailMetric}>
+                              <span>현재 예수금</span>
 
                               <strong>
-                                {account.cashBaselineConfigured
-                                  ? formatCurrency(
-                                      account.currentCashKrw
-                                    )
+                                {selectedAccount.cashBaselineConfigured
+                                  ? formatCurrency(selectedAccount.currentCashKrw)
                                   : "미설정"}
                               </strong>
                             </div>
 
+                            <div className={styles.detailMetric}>
+                              <span>보유종목</span>
 
-                            <div
-                              className={
-                                styles.accountMetric
-                              }
-                            >
-                              <span>
-                                실현손익
-                              </span>
+                              <strong>{formatCurrency(selectedAccount.holdingValueKrw)}</strong>
+                            </div>
+
+                            <div className={styles.detailMetric}>
+                              <span>실현손익</span>
 
                               <strong
                                 style={{
                                   color:
-                                    account.realizedPnlKrw <
-                                    0
+                                    selectedAccount.realizedPnlKrw < 0
                                       ? "var(--color-error)"
                                       : undefined
                                 }}
                               >
-                                {formatSignedCurrency(
-                                  account.realizedPnlKrw
-                                )}
+                                {formatSignedCurrency(selectedAccount.realizedPnlKrw)}
                               </strong>
                             </div>
                           </div>
-                        </button>
 
-
-                        {isSelected &&
-                          selectedAccount && (
-                            <div
-                              className={styles.investmentDetailBackdrop}
-                              role="presentation"
-                              onClick={() => setSelectedAccountId(null)}
+                          <div className={styles.reconcileActions}>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => {
+                                const accountId = selectedAccount.accountId;
+                                setSelectedAccountId(null);
+                                openInput({
+                                  mode: "transfer",
+                                  fromAccountId: accountId
+                                });
+                              }}
                             >
-                            <div
-                              className={
-                                styles.detailCard
-                              }
-                              role="dialog"
-                              aria-modal="true"
-                              aria-label={`${selectedAccount.accountName} 상세`}
-                              onClick={event => event.stopPropagation()}
+                              여기서 보내기
+                            </Button>
+
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                const accountId = selectedAccount.accountId;
+                                setSelectedAccountId(null);
+                                openInput({
+                                  mode: "transfer",
+                                  toAccountId: accountId
+                                });
+                              }}
                             >
-                              <div
-                                className={
-                                  styles.detailHeader
-                                }
-                              >
-                                <div>
-                                  <span
-                                    className={
-                                      styles.detailEyebrow
-                                    }
-                                  >
-                                    {[
-                                      "투자계좌",
-                                      selectedAccount.owner
-                                    ]
-                                      .filter(Boolean)
-                                      .join(" · ")}
-                                  </span>
+                              여기로 받기
+                            </Button>
+                          </div>
 
-                                  <h3
-                                    className={
-                                      styles.detailTitle
-                                    }
-                                  >
-                                    {
-                                      selectedAccount.accountName
-                                    }
-                                  </h3>
-                                </div>
+                          {!selectedAccount.cashBaselineConfigured && (
+                            <div className={styles.cashSetupCard}>
+                              <div className={styles.cashSetupHeading}>
+                                <strong>예수금 설정</strong>
 
-
-                                <div
-                                  className={
-                                    styles.detailHeaderActions
-                                  }
-                                >
-                                  <strong
-                                    className={
-                                      styles.detailTotal
-                                    }
-                                  >
-                                    {formatCurrency(
-                                      selectedAccount.accountValueKrw
-                                    )}
-                                  </strong>
-
-                                  <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    onClick={() => setEditingAccountId(selectedAccount.accountId)}
-                                  >
-                                    편집
-                                  </Button>
-
-                                  <Button
-                                    className={styles.modalCloseButton}
-                                    variant="soft"
-                                    size="sm"
-                                    iconOnly
-                                    aria-label="상세 닫기"
-                                    onClick={() => setSelectedAccountId(null)}
-                                  >
-                                    ×
-                                  </Button>
-                                </div>
+                                <span>증권사 앱의 현재 예수금을 한 번 입력해주세요.</span>
                               </div>
 
-
-                              <div
-                                className={
-                                  styles.detailMetrics
-                                }
-                              >
-                                <div
-                                  className={
-                                    styles.detailMetric
-                                  }
-                                >
-                                  <span>
-                                    현재 예수금
-                                  </span>
-
-                                  <strong>
-                                    {selectedAccount.cashBaselineConfigured
-                                      ? formatCurrency(
-                                          selectedAccount.currentCashKrw
-                                        )
-                                      : "미설정"}
-                                  </strong>
-                                </div>
-
-
-                                <div
-                                  className={
-                                    styles.detailMetric
-                                  }
-                                >
-                                  <span>
-                                    보유종목
-                                  </span>
-
-                                  <strong>
-                                    {formatCurrency(
-                                      selectedAccount.holdingValueKrw
-                                    )}
-                                  </strong>
-                                </div>
-
-
-                                <div
-                                  className={
-                                    styles.detailMetric
-                                  }
-                                >
-                                  <span>
-                                    실현손익
-                                  </span>
-
-                                  <strong
-                                    style={{
-                                      color:
-                                        selectedAccount.realizedPnlKrw <
-                                        0
-                                          ? "var(--color-error)"
-                                          : undefined
-                                    }}
-                                  >
-                                    {formatSignedCurrency(
-                                      selectedAccount.realizedPnlKrw
-                                    )}
-                                  </strong>
-                                </div>
-                              </div>
-
-
-                              <div
-                                className={
-                                  styles.reconcileActions
-                                }
-                              >
-                                <Button
-                                  variant="secondary"
-                                  size="sm"
-                                  onClick={() => {
-                                    const accountId =
-                                      selectedAccount.accountId;
-                                    setSelectedAccountId(null);
-                                    openInput({
-                                      mode: "transfer",
-                                      fromAccountId: accountId
-                                    });
-                                  }}
-                                >
-                                  여기서 보내기
-                                </Button>
+                              <div className={styles.cashForm}>
+                                <input
+                                  className={styles.cashInput}
+                                  type="number"
+                                  inputMode="numeric"
+                                  min="0"
+                                  value={cashInput}
+                                  onChange={event => setCashInput(event.target.value)}
+                                  placeholder="예: 327500"
+                                />
 
                                 <Button
                                   size="sm"
-                                  onClick={() => {
-                                    const accountId =
-                                      selectedAccount.accountId;
-                                    setSelectedAccountId(null);
-                                    openInput({
-                                      mode: "transfer",
-                                      toAccountId: accountId
-                                    });
-                                  }}
+                                  onClick={handleSaveCashBaseline}
+                                  loading={cashSaving}
+                                  loadingLabel="저장 중..."
                                 >
-                                  여기로 받기
+                                  설정
                                 </Button>
                               </div>
-
-
-                              {!selectedAccount
-                                .cashBaselineConfigured && (
-                                <div
-                                  className={
-                                    styles.cashSetupCard
-                                  }
-                                >
-                                  <div
-                                    className={
-                                      styles.cashSetupHeading
-                                    }
-                                  >
-                                    <strong>
-                                      예수금 설정
-                                    </strong>
-
-                                    <span>
-                                      증권사 앱의 현재 예수금을 한 번 입력해주세요.
-                                    </span>
-                                  </div>
-
-
-                                  <div
-                                    className={
-                                      styles.cashForm
-                                    }
-                                  >
-                                    <input
-                                      className={
-                                        styles.cashInput
-                                      }
-                                      type="number"
-                                      inputMode="numeric"
-                                      min="0"
-                                      value={
-                                        cashInput
-                                      }
-                                      onChange={
-                                        event =>
-                                          setCashInput(
-                                            event.target.value
-                                          )
-                                      }
-                                      placeholder="예: 327500"
-                                    />
-
-                                    <Button
-                                      size="sm"
-                                      onClick={
-                                        handleSaveCashBaseline
-                                      }
-                                      loading={cashSaving}
-                                      loadingLabel="저장 중..."
-                                    >
-                                      설정
-                                    </Button>
-                                  </div>
-                                </div>
-                              )}
-
-
-                              {selectedAccount
-                                .cashBaselineConfigured && (
-                                <details
-                                  className={
-                                    styles.baselineDetails
-                                  }
-                                >
-                                  <summary
-                                    className={
-                                      styles.baselineSummary
-                                    }
-                                  >
-                                    예수금 기준값 다시 설정
-                                  </summary>
-
-
-                                  <div
-                                    className={
-                                      styles.baselineBody
-                                    }
-                                  >
-                                    <p
-                                      className={
-                                        styles.helperText
-                                      }
-                                    >
-                                      현재 예수금과 다른 값입니다.
-                                      투자거래 계산의 시작점이 되는 기준값입니다.
-                                    </p>
-
-
-                                    <div
-                                      className={
-                                        styles.cashForm
-                                      }
-                                    >
-                                      <input
-                                        className={
-                                          styles.cashInput
-                                        }
-                                        type="number"
-                                        inputMode="numeric"
-                                        min="0"
-                                        value={
-                                          cashInput
-                                        }
-                                        onChange={
-                                          event =>
-                                            setCashInput(
-                                              event.target.value
-                                            )
-                                        }
-                                      />
-
-                                      <Button
-                                        size="sm"
-                                        onClick={
-                                          handleSaveCashBaseline
-                                        }
-                                        loading={cashSaving}
-                                        loadingLabel="저장 중..."
-                                      >
-                                        저장
-                                      </Button>
-                                    </div>
-                                  </div>
-                                </details>
-                              )}
-
-
-                              {cashError && (
-                                <p
-                                  className={
-                                    styles.error
-                                  }
-                                >
-                                  {cashError}
-                                </p>
-                              )}
-
-
-                              <div
-                                className={
-                                  styles.holdingsHeader
-                                }
-                              >
-                                <h4
-                                  className={
-                                    styles.holdingsTitle
-                                  }
-                                >
-                                  보유종목
-                                </h4>
-
-                                <span
-                                  className={
-                                    styles.holdingsCount
-                                  }
-                                >
-                                  {
-                                    holdingsForSelected.length
-                                  }
-                                  종목
-                                </span>
-                              </div>
-
-
-                              {holdingsForSelected
-                                .length ===
-                                0 && (
-                                <p
-                                  className={
-                                    styles.emptyState
-                                  }
-                                >
-                                  보유 중인 종목이 없습니다.
-                                </p>
-                              )}
-
-
-                              {holdingsForSelected
-                                .length >
-                                0 && (
-                                <ul
-                                  className={
-                                    styles.investmentHoldingList
-                                  }
-                                >
-                                  {holdingsForSelected.map(
-                                    holding => {
-                                      const evaluationPnl =
-                                        holding.valueKrw -
-                                        holding.costKrw;
-
-
-                                      return (
-                                        <li
-                                          key={
-                                            holding.holdingId
-                                          }
-                                          className={
-                                            styles.investmentHoldingRow
-                                          }
-                                        >
-                                          <div
-                                            className={
-                                              styles.investmentHoldingTop
-                                            }
-                                          >
-                                            <div
-                                              className={
-                                                styles.investmentHoldingIdentity
-                                              }
-                                            >
-                                              <div
-                                                className={
-                                                  styles.stockNameRow
-                                                }
-                                              >
-                                                <strong
-                                                  className={
-                                                    styles.holdingName
-                                                  }
-                                                >
-                                                  {
-                                                    holding.stockName
-                                                  }
-                                                </strong>
-
-
-                                                {holding.quoteMode ===
-                                                  "수동" && (
-                                                  <span
-                                                    className={
-                                                      styles.manualBadge
-                                                    }
-                                                  >
-                                                    수동시세
-                                                  </span>
-                                                )}
-                                              </div>
-
-
-                                              <span
-                                                className={
-                                                  styles.holdingMeta
-                                                }
-                                              >
-                                                {
-                                                  holding.stockCode
-                                                }
-                                                {" · "}
-                                                {
-                                                  holding.market
-                                                }
-                                                {" · "}
-                                                {formatQuantity(
-                                                  holding.quantity
-                                                )}
-                                                주
-                                              </span>
-                                            </div>
-
-
-                                            <div
-                                              className={
-                                                styles.holdingResult
-                                              }
-                                            >
-                                              <strong
-                                                className={
-                                                  styles.holdingValue
-                                                }
-                                              >
-                                                {formatCurrency(
-                                                  holding.valueKrw
-                                                )}
-                                              </strong>
-
-                                              <span
-                                                className={
-                                                  styles.holdingReturn
-                                                }
-                                                style={{
-                                                  color:
-                                                    holding.returnRate <
-                                                    0
-                                                      ? "var(--color-error)"
-                                                      : undefined
-                                                }}
-                                              >
-                                                {formatPercent(
-                                                  holding.returnRate
-                                                )}
-                                              </span>
-                                            </div>
-                                          </div>
-
-
-                                          <div
-                                            className={
-                                              styles.holdingDetails
-                                            }
-                                          >
-                                            <div
-                                              className={
-                                                styles.holdingDetailItem
-                                              }
-                                            >
-                                              <span>
-                                                평단
-                                              </span>
-
-                                              <strong>
-                                                {formatPrice(
-                                                  holding.avgBuyPrice,
-                                                  holding.market
-                                                )}
-                                              </strong>
-                                            </div>
-
-
-                                            <div
-                                              className={
-                                                styles.holdingDetailItem
-                                              }
-                                            >
-                                              <span>
-                                                현재가
-                                              </span>
-
-                                              <strong>
-                                                {formatPrice(
-                                                  holding.currentPrice,
-                                                  holding.market
-                                                )}
-                                              </strong>
-                                            </div>
-
-
-                                            <div
-                                              className={
-                                                styles.holdingDetailItem
-                                              }
-                                            >
-                                              <span>
-                                                평가손익
-                                              </span>
-
-                                              <strong
-                                                style={{
-                                                  color:
-                                                    evaluationPnl <
-                                                    0
-                                                      ? "var(--color-error)"
-                                                      : undefined
-                                                }}
-                                              >
-                                                {formatSignedCurrency(
-                                                  evaluationPnl
-                                                )}
-                                              </strong>
-                                            </div>
-                                          </div>
-
-
-                                          {holding.quoteMode ===
-                                            "수동" && (
-                                            <details
-                                              className={
-                                                styles.baselineDetails
-                                              }
-                                            >
-                                              <summary
-                                                className={
-                                                  styles.baselineSummary
-                                                }
-                                              >
-                                                수동시세 수정
-                                              </summary>
-
-                                              <div
-                                                className={
-                                                  styles.baselineBody
-                                                }
-                                              >
-                                                <p
-                                                  className={
-                                                    styles.helperText
-                                                  }
-                                                >
-                                                  자동 시세 대신 이 평가단가를 사용합니다.
-                                                </p>
-
-                                                <div
-                                                  className={
-                                                    styles.cashForm
-                                                  }
-                                                >
-                                                  <input
-                                                    className={
-                                                      styles.cashInput
-                                                    }
-                                                    type="number"
-                                                    inputMode="decimal"
-                                                    min="0"
-                                                    step="any"
-                                                    value={
-                                                      getManualPriceInput(
-                                                        holding.holdingId,
-                                                        holding.manualPrice,
-                                                        holding.currentPrice
-                                                      )
-                                                    }
-                                                    onChange={
-                                                      event =>
-                                                        handleManualPriceChange(
-                                                          holding.holdingId,
-                                                          event.target.value
-                                                        )
-                                                    }
-                                                    placeholder={
-                                                      holding.market ===
-                                                        "국내"
-                                                        ? "평가단가(원)"
-                                                        : "평가단가"
-                                                    }
-                                                  />
-
-                                                  <Button
-                                                    size="sm"
-                                                    loading={
-                                                      manualPriceSavingId ===
-                                                        holding.holdingId
-                                                    }
-                                                    loadingLabel="저장 중"
-                                                    onClick={
-                                                      () =>
-                                                        void handleSaveManualPrice(
-                                                          holding.holdingId,
-                                                          holding.manualPrice,
-                                                          holding.currentPrice
-                                                        )
-                                                    }
-                                                  >
-                                                    시세 저장
-                                                  </Button>
-                                                </div>
-
-                                                {manualPriceErrors[
-                                                  holding.holdingId
-                                                ] && (
-                                                  <p
-                                                    className={
-                                                      styles.error
-                                                    }
-                                                  >
-                                                    {manualPriceErrors[
-                                                      holding.holdingId
-                                                    ]}
-                                                  </p>
-                                                )}
-
-                                                {manualPriceFeedbackId ===
-                                                  holding.holdingId && (
-                                                  <p
-                                                    className={
-                                                      styles.helperText
-                                                    }
-                                                  >
-                                                    수동시세를 저장했습니다.
-                                                  </p>
-                                                )}
-                                              </div>
-                                            </details>
-                                          )}
-
-
-                                          {holding.market ===
-                                            "해외" &&
-                                            holding.fx >
-                                              0 && (
-                                              <p
-                                                className={
-                                                  styles.fxMeta
-                                                }
-                                              >
-                                                적용환율{" "}
-                                                {formatCurrency(
-                                                  holding.fx
-                                                )}
-                                              </p>
-                                            )}
-                                        </li>
-                                      );
-                                    }
-                                  )}
-                                </ul>
-                              )}
-
-
-                              <InvestmentTradeForm
-                                account={
-                                  selectedAccount
-                                }
-                                holdings={
-                                  holdingsForSelected
-                                }
-                                onSaved={
-                                  handleInvestmentSaved
-                                }
-                              />
-
-
-                              <InvestmentTradeHistory
-                                accountId={
-                                  selectedAccount.accountId
-                                }
-                                refreshKey={
-                                  tradeHistoryRefreshKey
-                                }
-                                onChanged={
-                                  handleInvestmentSaved
-                                }
-                              />
-                            </div>
                             </div>
                           )}
-                      </Fragment>
-                    );
-                  }
-                )}
-              </div>
-            )}
+
+                          {selectedAccount.cashBaselineConfigured && (
+                            <details className={styles.baselineDetails}>
+                              <summary className={styles.baselineSummary}>
+                                예수금 기준값 다시 설정
+                              </summary>
+
+                              <div className={styles.baselineBody}>
+                                <p className={styles.helperText}>
+                                  현재 예수금과 다른 값입니다. 투자거래 계산의 시작점이 되는
+                                  기준값입니다.
+                                </p>
+
+                                <div className={styles.cashForm}>
+                                  <input
+                                    className={styles.cashInput}
+                                    type="number"
+                                    inputMode="numeric"
+                                    min="0"
+                                    value={cashInput}
+                                    onChange={event => setCashInput(event.target.value)}
+                                  />
+
+                                  <Button
+                                    size="sm"
+                                    onClick={handleSaveCashBaseline}
+                                    loading={cashSaving}
+                                    loadingLabel="저장 중..."
+                                  >
+                                    저장
+                                  </Button>
+                                </div>
+                              </div>
+                            </details>
+                          )}
+
+                          {cashError && <p className={styles.error}>{cashError}</p>}
+
+                          <div className={styles.holdingsHeader}>
+                            <h4 className={styles.holdingsTitle}>보유종목</h4>
+
+                            <span className={styles.holdingsCount}>
+                              {holdingsForSelected.length}
+                              종목
+                            </span>
+                          </div>
+
+                          {holdingsForSelected.length === 0 && (
+                            <p className={styles.emptyState}>보유 중인 종목이 없습니다.</p>
+                          )}
+
+                          {holdingsForSelected.length > 0 && (
+                            <ul className={styles.investmentHoldingList}>
+                              {holdingsForSelected.map(holding => {
+                                const evaluationPnl = holding.valueKrw - holding.costKrw;
+
+                                return (
+                                  <li
+                                    key={holding.holdingId}
+                                    className={styles.investmentHoldingRow}
+                                  >
+                                    <div className={styles.investmentHoldingTop}>
+                                      <div className={styles.investmentHoldingIdentity}>
+                                        <div className={styles.stockNameRow}>
+                                          <strong className={styles.holdingName}>
+                                            {holding.stockName}
+                                          </strong>
+
+                                          {holding.quoteMode === "수동" && (
+                                            <span className={styles.manualBadge}>수동시세</span>
+                                          )}
+                                        </div>
+
+                                        <span className={styles.holdingMeta}>
+                                          {holding.stockCode}
+                                          {" · "}
+                                          {holding.market}
+                                          {" · "}
+                                          {formatQuantity(holding.quantity)}주
+                                        </span>
+                                      </div>
+
+                                      <div className={styles.holdingResult}>
+                                        <strong className={styles.holdingValue}>
+                                          {formatCurrency(holding.valueKrw)}
+                                        </strong>
+
+                                        <span
+                                          className={styles.holdingReturn}
+                                          style={{
+                                            color:
+                                              holding.returnRate < 0
+                                                ? "var(--color-error)"
+                                                : undefined
+                                          }}
+                                        >
+                                          {formatPercent(holding.returnRate)}
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    <div className={styles.holdingDetails}>
+                                      <div className={styles.holdingDetailItem}>
+                                        <span>평단</span>
+
+                                        <strong>
+                                          {formatPrice(holding.avgBuyPrice, holding.market)}
+                                        </strong>
+                                      </div>
+
+                                      <div className={styles.holdingDetailItem}>
+                                        <span>현재가</span>
+
+                                        <strong>
+                                          {formatPrice(holding.currentPrice, holding.market)}
+                                        </strong>
+                                      </div>
+
+                                      <div className={styles.holdingDetailItem}>
+                                        <span>평가손익</span>
+
+                                        <strong
+                                          style={{
+                                            color:
+                                              evaluationPnl < 0 ? "var(--color-error)" : undefined
+                                          }}
+                                        >
+                                          {formatSignedCurrency(evaluationPnl)}
+                                        </strong>
+                                      </div>
+                                    </div>
+
+                                    {holding.quoteMode === "수동" && (
+                                      <details className={styles.baselineDetails}>
+                                        <summary className={styles.baselineSummary}>
+                                          수동시세 수정
+                                        </summary>
+
+                                        <div className={styles.baselineBody}>
+                                          <p className={styles.helperText}>
+                                            자동 시세 대신 이 평가단가를 사용합니다.
+                                          </p>
+
+                                          <div className={styles.cashForm}>
+                                            <input
+                                              className={styles.cashInput}
+                                              type="number"
+                                              inputMode="decimal"
+                                              min="0"
+                                              step="any"
+                                              value={getManualPriceInput(
+                                                holding.holdingId,
+                                                holding.manualPrice,
+                                                holding.currentPrice
+                                              )}
+                                              onChange={event =>
+                                                handleManualPriceChange(
+                                                  holding.holdingId,
+                                                  event.target.value
+                                                )
+                                              }
+                                              placeholder={
+                                                holding.market === "국내"
+                                                  ? "평가단가(원)"
+                                                  : "평가단가"
+                                              }
+                                            />
+
+                                            <Button
+                                              size="sm"
+                                              loading={manualPriceSavingId === holding.holdingId}
+                                              loadingLabel="저장 중"
+                                              onClick={() =>
+                                                void handleSaveManualPrice(
+                                                  holding.holdingId,
+                                                  holding.manualPrice,
+                                                  holding.currentPrice
+                                                )
+                                              }
+                                            >
+                                              시세 저장
+                                            </Button>
+                                          </div>
+
+                                          {manualPriceErrors[holding.holdingId] && (
+                                            <p className={styles.error}>
+                                              {manualPriceErrors[holding.holdingId]}
+                                            </p>
+                                          )}
+
+                                          {manualPriceFeedbackId === holding.holdingId && (
+                                            <p className={styles.helperText}>
+                                              수동시세를 저장했습니다.
+                                            </p>
+                                          )}
+                                        </div>
+                                      </details>
+                                    )}
+
+                                    {holding.market === "해외" && holding.fx > 0 && (
+                                      <p className={styles.fxMeta}>
+                                        적용환율 {formatCurrency(holding.fx)}
+                                      </p>
+                                    )}
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          )}
+
+                          <InvestmentTradeForm
+                            account={selectedAccount}
+                            holdings={holdingsForSelected}
+                            onSaved={handleInvestmentSaved}
+                          />
+
+                          <InvestmentTradeHistory
+                            accountId={selectedAccount.accountId}
+                            refreshKey={tradeHistoryRefreshKey}
+                            onChanged={handleInvestmentSaved}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </div>
+          )}
         </section>
       )}
 
-      {
-        (editingAccountId || creatingAccount) && (
-          <div
-            className={
-              styles.editorBackdrop
-            }
-            role="presentation"
-            onClick={
-              () => {
-                setEditingAccountId(
-                  null
-                );
-                setCreatingAccount(
-                  false
-                );
-              }
-            }
+      {(editingAccountId || creatingAccount) && (
+        <div
+          className={styles.editorBackdrop}
+          role="presentation"
+          onClick={() => {
+            setEditingAccountId(null);
+            setCreatingAccount(false);
+          }}
+        >
+          <section
+            className={styles.editorSheet}
+            role="dialog"
+            aria-modal="true"
+            aria-label="계좌 편집"
+            onClick={event => event.stopPropagation()}
           >
-            <section
-              className={
-                styles.editorSheet
-              }
-              role="dialog"
-              aria-modal="true"
-              aria-label="계좌 편집"
-              onClick={
-                event =>
-                  event.stopPropagation()
-              }
-            >
-              <AccountSettings
-                initialAccountId={
-                  editingAccountId || undefined
-                }
-                createNew={
-                  creatingAccount
-                }
-                initialOwner={
-                  userName
-                }
-                embedded
-                onClose={
-                  () => {
-                    setEditingAccountId(
-                      null
-                    );
-                    setCreatingAccount(
-                      false
-                    );
-                  }
-                }
-                onSaved={
-                  async () => {
-                    markLedgerChanged();
-                    await loadDashboard(
-                      true
-                    );
-                  }
-                }
-              />
-            </section>
-          </div>
-        )
-      }
+            <AccountSettings
+              initialAccountId={editingAccountId || undefined}
+              createNew={creatingAccount}
+              initialOwner={userName}
+              embedded
+              onClose={() => {
+                setEditingAccountId(null);
+                setCreatingAccount(false);
+              }}
+              onSaved={async () => {
+                markLedgerChanged();
+                await loadDashboard(true);
+              }}
+            />
+          </section>
+        </div>
+      )}
     </main>
   );
 }

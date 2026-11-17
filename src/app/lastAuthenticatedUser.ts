@@ -12,9 +12,7 @@ export function readLastAuthenticatedUser(): User | null {
     if (!raw) return null;
 
     const parsed = JSON.parse(raw) as Partial<User>;
-    return typeof parsed.name === "string" && parsed.name
-      ? { name: parsed.name }
-      : null;
+    return typeof parsed.name === "string" && parsed.name ? { name: parsed.name } : null;
   } catch {
     return null;
   }

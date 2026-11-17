@@ -70,7 +70,6 @@ export interface SaveAutomationSettingsResult {
   updatedBy: string;
 }
 
-
 export interface BenefitRewardBalance {
   ruleId: string;
   accountId: string;
@@ -105,26 +104,16 @@ export async function getAutomationSettings() {
 }
 
 export async function saveAutomationSettings(settings: AutomationSettings) {
-  return post<SaveAutomationSettingsResult>(
-    "/api/settings/automation",
-    { settings }
-  );
+  return post<SaveAutomationSettingsResult>("/api/settings/automation", { settings });
 }
 
 export async function processRecurringTransactions() {
-  return post<RecurringProcessResult>(
-    "/api/automations/recurring/process",
-    {}
-  );
+  return post<RecurringProcessResult>("/api/automations/recurring/process", {});
 }
 
 export async function createRecurringTransaction(ruleId: string, month?: string) {
-  return post<RecurringProcessResult>(
-    "/api/automations/recurring/create",
-    { ruleId, month }
-  );
+  return post<RecurringProcessResult>("/api/automations/recurring/create", { ruleId, month });
 }
-
 
 export async function getBenefitRewardBalances() {
   const raw = await apiRequest<ApiEnvelope<BenefitRewardBalance[]> | BenefitRewardBalance[]>(

@@ -37,25 +37,11 @@ function renderJpegRegion(
   canvas.height = height;
   const context = canvas.getContext("2d");
   if (!context) return "";
-  context.drawImage(
-    image,
-    0,
-    sourceY,
-    image.naturalWidth,
-    sourceHeight,
-    0,
-    0,
-    width,
-    height
-  );
+  context.drawImage(image, 0, sourceY, image.naturalWidth, sourceHeight, 0, 0, width, height);
   return canvas.toDataURL("image/jpeg", quality);
 }
 
-function encodeRegion(
-  image: HTMLImageElement,
-  sourceY: number,
-  sourceHeight: number
-) {
+function encodeRegion(image: HTMLImageElement, sourceY: number, sourceHeight: number) {
   let scale = Math.min(
     1,
     MAX_WIDTH / Math.max(1, image.naturalWidth),
@@ -83,9 +69,10 @@ export async function prepareImportImages(file: File, maxParts = MAX_SPLIT_PARTS
   const image = await loadImage(original);
   const aspect = image.naturalHeight / Math.max(1, image.naturalWidth);
   const allowedParts = Math.max(1, Math.min(MAX_SPLIT_PARTS, Math.floor(maxParts)));
-  const partCount = aspect > SPLIT_ASPECT_THRESHOLD && allowedParts > 1
-    ? Math.min(allowedParts, Math.max(2, Math.ceil(aspect / SPLIT_TARGET_ASPECT)))
-    : 1;
+  const partCount =
+    aspect > SPLIT_ASPECT_THRESHOLD && allowedParts > 1
+      ? Math.min(allowedParts, Math.max(2, Math.ceil(aspect / SPLIT_TARGET_ASPECT)))
+      : 1;
 
   if (partCount === 1) {
     const result = encodeRegion(image, 0, image.naturalHeight);
@@ -102,7 +89,8 @@ export async function prepareImportImages(file: File, maxParts = MAX_SPLIT_PARTS
     const start = Math.max(0, rawStart - (index > 0 ? overlap : 0));
     const end = Math.min(image.naturalHeight, rawEnd + (index < partCount - 1 ? overlap : 0));
     const result = encodeRegion(image, start, Math.max(1, end - start));
-    if (!result) throw new Error("이미지가 너무 큽니다. 스크롤 캡처를 여러 장으로 나눠서 선택해주세요.");
+    if (!result)
+      throw new Error("이미지가 너무 큽니다. 스크롤 캡처를 여러 장으로 나눠서 선택해주세요.");
     results.push(result);
   }
   return results;

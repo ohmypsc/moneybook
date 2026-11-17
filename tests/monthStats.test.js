@@ -36,47 +36,52 @@ test("settlement in the next month reduces the original expense month", () => {
 });
 
 test("benefit income does not count as monthly income", () => {
-  const stats = netMonthStats([
-    {
-      transactionId: "BEN_1",
-      date: "2026-09-10",
-      type: "수입",
-      amount: 10000,
-      requestId: "BENEFIT_RULE_1_REQ_1"
-    },
-    {
-      transactionId: "INC_1",
-      date: "2026-09-10",
-      type: "수입",
-      amount: 500000,
-      requestId: "REQ_2"
-    }
-  ], "2026-09");
+  const stats = netMonthStats(
+    [
+      {
+        transactionId: "BEN_1",
+        date: "2026-09-10",
+        type: "수입",
+        amount: 10000,
+        requestId: "BENEFIT_RULE_1_REQ_1"
+      },
+      {
+        transactionId: "INC_1",
+        date: "2026-09-10",
+        type: "수입",
+        amount: 500000,
+        requestId: "REQ_2"
+      }
+    ],
+    "2026-09"
+  );
 
   assert.equal(stats.income, 500000);
   assert.equal(stats.incomeGross, 500000);
 });
 
-
 test("manual cash cashback counts as ordinary income", () => {
-  const stats = netMonthStats([
-    {
-      transactionId: "CASHBACK_1",
-      date: "2026-09-10",
-      type: "수입",
-      category: "캐시백",
-      amount: 10000,
-      requestId: "REQ_CASHBACK_1"
-    },
-    {
-      transactionId: "BEN_1",
-      date: "2026-09-10",
-      type: "수입",
-      category: "캐시백/할인혜택",
-      amount: 5000,
-      requestId: "BENEFIT_RULE_1_REQ_1"
-    }
-  ], "2026-09");
+  const stats = netMonthStats(
+    [
+      {
+        transactionId: "CASHBACK_1",
+        date: "2026-09-10",
+        type: "수입",
+        category: "캐시백",
+        amount: 10000,
+        requestId: "REQ_CASHBACK_1"
+      },
+      {
+        transactionId: "BEN_1",
+        date: "2026-09-10",
+        type: "수입",
+        category: "캐시백/할인혜택",
+        amount: 5000,
+        requestId: "BENEFIT_RULE_1_REQ_1"
+      }
+    ],
+    "2026-09"
+  );
 
   assert.equal(stats.income, 10000);
   assert.equal(stats.incomeGross, 10000);

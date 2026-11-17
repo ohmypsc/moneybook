@@ -1,13 +1,36 @@
 // 대시보드 집계와 bootstrap 응답 생성
 import { getClassificationSettings } from "../classification.js";
-import { estimateBillingMonth as mbD1EstimateBilling, monthOnly as mbD1MonthOnly } from "../domain/date.js";
+import {
+  estimateBillingMonth as mbD1EstimateBilling,
+  monthOnly as mbD1MonthOnly
+} from "../domain/date.js";
 import { installmentAmountForMonth, installmentRemainingAfter } from "../domain/installment.js";
 import { netMonthStats as mbD1NetMonthStats } from "../domain/monthStats.js";
 import { listRealEstateAssets, realEstateSummary } from "../realEstate.js";
 import { mbD1AutomationSettingsData } from "./automation.js";
 import { mbD1EnsureDefaultCashbackIncomeCategory } from "./benefits.js";
-import { MB_D1_API_VERSION, MB_D1_HOUSEHOLD_ID, mbD1All, mbD1CurrentMonthSeoul, mbD1Fail, mbD1GetLedgerConfigData, mbD1IsInvestmentAccount, mbD1Members, mbD1Number, mbD1Round, mbD1Text, mbD1TimestampMs } from "./core.js";
-import { mbD1AllTransactions, mbD1Holdings, mbD1MapAccountRow, mbD1MapCategory, mbD1RawAccounts, mbD1Trades } from "./records.js";
+import {
+  MB_D1_API_VERSION,
+  MB_D1_HOUSEHOLD_ID,
+  mbD1All,
+  mbD1CurrentMonthSeoul,
+  mbD1Fail,
+  mbD1GetLedgerConfigData,
+  mbD1IsInvestmentAccount,
+  mbD1Members,
+  mbD1Number,
+  mbD1Round,
+  mbD1Text,
+  mbD1TimestampMs
+} from "./core.js";
+import {
+  mbD1AllTransactions,
+  mbD1Holdings,
+  mbD1MapAccountRow,
+  mbD1MapCategory,
+  mbD1RawAccounts,
+  mbD1Trades
+} from "./records.js";
 import { mbD1HouseholdOverviewData, mbD1InputPreferencesData } from "./settings.js";
 
 export function mbD1TransactionAfterBaseline(transaction, baselineAt) {
@@ -20,7 +43,13 @@ export function mbD1TransactionAfterBaseline(transaction, baselineAt) {
   return createdMs !== null && createdMs > baselineMs;
 }
 
-export function mbD1InvestmentStatusFromData(accounts, transactions, trades, holdings, accountId = "") {
+export function mbD1InvestmentStatusFromData(
+  accounts,
+  transactions,
+  trades,
+  holdings,
+  accountId = ""
+) {
   const valueMap = new Map();
   for (const holding of holdings || []) {
     if (holding.isDeleted) continue;
@@ -30,8 +59,8 @@ export function mbD1InvestmentStatusFromData(accounts, transactions, trades, hol
     );
   }
   let items = (accounts || [])
-    .filter((account) => !account.isDeleted && account.active && mbD1IsInvestmentAccount(account))
-    .map((account) => {
+    .filter(account => !account.isDeleted && account.active && mbD1IsInvestmentAccount(account))
+    .map(account => {
       const configured = Boolean(account.cashBaselineAt);
       let ledgerDelta = 0;
       let tradeDelta = 0;
@@ -47,9 +76,10 @@ export function mbD1InvestmentStatusFromData(accounts, transactions, trades, hol
           if (trade.isDeleted || trade.accountId !== account.accountId) continue;
           const createdMs = mbD1TimestampMs(trade.createdAt);
           if (baselineMs !== null && createdMs !== null && createdMs < baselineMs) continue;
-          tradeDelta += trade.tradeType === "매수"
-            ? -mbD1Number(trade.settlementKrw)
-            : mbD1Number(trade.settlementKrw);
+          tradeDelta +=
+            trade.tradeType === "매수"
+              ? -mbD1Number(trade.settlementKrw)
+              : mbD1Number(trade.settlementKrw);
           realized += mbD1Number(trade.realizedPnlKrw);
         }
       }
@@ -74,7 +104,7 @@ export function mbD1InvestmentStatusFromData(accounts, transactions, trades, hol
         realizedPnlKrw: mbD1Round(realized, 2)
       };
     });
-  if (accountId) items = items.filter((item) => item.accountId === accountId);
+  if (accountId) items = items.filter(item => item.accountId === accountId);
   return { accounts: items };
 }
 
@@ -87,7 +117,8 @@ export async function mbD1LoadFinancialData(env) {
   const investment = mbD1InvestmentStatusFromData(accounts, transactions, trades, holdings);
   const balances = new Map();
   for (const account of accounts) {
-    if (account.active && !account.isDeleted) balances.set(account.accountId, mbD1Number(account.openingBalance));
+    if (account.active && !account.isDeleted)
+      balances.set(account.accountId, mbD1Number(account.openingBalance));
   }
   for (const tx of transactions) {
     if (tx.fromAccountId && balances.has(tx.fromAccountId)) {
@@ -104,7 +135,7 @@ export async function mbD1LoadFinancialData(env) {
     account.currentBalance = balances.has(account.accountId)
       ? mbD1Round(balances.get(account.accountId), 2)
       : mbD1Number(account.sheetCurrentBalance);
-    const inv = investment.accounts.find((item) => item.accountId === account.accountId);
+    const inv = investment.accounts.find(item => item.accountId === account.accountId);
     if (inv) {
       account.investmentCashConfigured = inv.cashBaselineConfigured;
       account.investmentCashKrw = inv.currentCashKrw ?? 0;
@@ -125,7 +156,7 @@ export async function mbD1BuildDashboard(env, monthValue = "") {
   let liabilities = 0;
   let investmentValue = 0;
   let cashLikeValue = 0;
-  for (const account of accounts.filter((item) => item.active && !item.isDeleted)) {
+  for (const account of accounts.filter(item => item.active && !item.isDeleted)) {
     const balance = mbD1Number(account.currentBalance);
     if (account.accountType === "부채") {
       liabilities += Math.max(0, -balance);
@@ -136,24 +167,28 @@ export async function mbD1BuildDashboard(env, monthValue = "") {
     }
   }
   const stats = mbD1NetMonthStats(transactions, month);
-  const transactionById = new Map(transactions.map((tx) => [tx.transactionId, tx]));
+  const transactionById = new Map(transactions.map(tx => [tx.transactionId, tx]));
   const cards = accounts
-    .filter((account) => account.active && !account.isDeleted && account.subType === "신용카드")
-    .map((card) => {
+    .filter(account => account.active && !account.isDeleted && account.subType === "신용카드")
+    .map(card => {
       let usage = 0;
       let payments = 0;
       let installmentRemaining = 0;
       for (const tx of transactions) {
         if (tx.type === "지출" && tx.paymentMethodId === card.accountId) {
-          const bill = tx.billingOverride || tx.billingMonth || mbD1EstimateBilling(
-            tx.date,
-            card.billingCutoffDay,
-            card.paymentDay
-          );
+          const bill =
+            tx.billingOverride ||
+            tx.billingMonth ||
+            mbD1EstimateBilling(tx.date, card.billingCutoffDay, card.paymentDay);
           // 할부는 첫 청구월부터 개월 수만큼 나눠 청구합니다(일시불이면 그 달 전액).
           usage += installmentAmountForMonth(tx.amount, tx.installmentMonths, bill, month);
           if (tx.installmentMonths) {
-            installmentRemaining += installmentRemainingAfter(tx.amount, tx.installmentMonths, bill, month);
+            installmentRemaining += installmentRemainingAfter(
+              tx.amount,
+              tx.installmentMonths,
+              bill,
+              month
+            );
           }
         }
         if (tx.type === "이체" && tx.toAccountId === card.accountId) {
@@ -168,15 +203,19 @@ export async function mbD1BuildDashboard(env, monthValue = "") {
             original.type === "지출" &&
             original.paymentMethodId === card.accountId
           ) {
-            const bill = original.billingOverride || original.billingMonth || mbD1EstimateBilling(
-              original.date,
-              card.billingCutoffDay,
-              card.paymentDay
-            );
+            const bill =
+              original.billingOverride ||
+              original.billingMonth ||
+              mbD1EstimateBilling(original.date, card.billingCutoffDay, card.paymentDay);
             // 할부 거래의 취소·환불은 남은 회차에 같은 비율로 나눠 빼서 전액 취소 시 정확히 0이 되게 합니다.
             usage -= installmentAmountForMonth(tx.amount, original.installmentMonths, bill, month);
             if (original.installmentMonths) {
-              installmentRemaining -= installmentRemainingAfter(tx.amount, original.installmentMonths, bill, month);
+              installmentRemaining -= installmentRemainingAfter(
+                tx.amount,
+                original.installmentMonths,
+                bill,
+                month
+              );
             }
           }
           if (
@@ -185,7 +224,8 @@ export async function mbD1BuildDashboard(env, monthValue = "") {
             original.type === "이체" &&
             original.toAccountId === card.accountId
           ) {
-            const bill = original.billingOverride || original.billingMonth || original.date.slice(0, 7);
+            const bill =
+              original.billingOverride || original.billingMonth || original.date.slice(0, 7);
             if (bill === month) payments -= tx.amount;
           }
         }
@@ -211,9 +251,13 @@ export async function mbD1BuildDashboard(env, monthValue = "") {
   }
   const recentTransactions = transactions
     .slice()
-    .sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.createdAt || "").localeCompare(a.createdAt || ""))
+    .sort(
+      (a, b) =>
+        (b.date || "").localeCompare(a.date || "") ||
+        (b.createdAt || "").localeCompare(a.createdAt || "")
+    )
     .slice(0, 20)
-    .map((tx) => ({
+    .map(tx => ({
       transactionId: tx.transactionId,
       date: tx.date,
       type: tx.type,
@@ -232,10 +276,11 @@ export async function mbD1BuildDashboard(env, monthValue = "") {
       reversalOf: tx.reversalOf
     }));
   const staleManual = holdings
-    .filter((holding) => holding.quoteMode === "수동" && (
-      holding.elapsedDays === null || holding.elapsedDays >= 7
-    ))
-    .map((holding) => ({
+    .filter(
+      holding =>
+        holding.quoteMode === "수동" && (holding.elapsedDays === null || holding.elapsedDays >= 7)
+    )
+    .map(holding => ({
       holdingId: holding.holdingId,
       accountId: holding.accountId,
       accountName: holding.accountName,
@@ -263,7 +308,7 @@ export async function mbD1BuildDashboard(env, monthValue = "") {
       monthRefunds: stats.expenseRefunds,
       monthNetCashFlow: stats.net
     },
-    accounts: accounts.filter((account) => account.active && !account.isDeleted),
+    accounts: accounts.filter(account => account.active && !account.isDeleted),
     categoryExpense: stats.categoryExpense,
     spendingTargetExpense: stats.targetExpense,
     cards,
@@ -271,36 +316,48 @@ export async function mbD1BuildDashboard(env, monthValue = "") {
     recentTransactions,
     realEstate,
     investments: {
-      totalAccountValue: mbD1Round(investment.accounts.reduce((sum, item) => sum + item.accountValueKrw, 0), 2),
-      cashTotal: mbD1Round(investment.accounts.reduce((sum, item) => sum + (item.currentCashKrw ?? 0), 0), 2),
-      realizedPnlTotal: mbD1Round(trades.reduce((sum, item) => sum + item.realizedPnlKrw, 0), 2),
+      totalAccountValue: mbD1Round(
+        investment.accounts.reduce((sum, item) => sum + item.accountValueKrw, 0),
+        2
+      ),
+      cashTotal: mbD1Round(
+        investment.accounts.reduce((sum, item) => sum + (item.currentCashKrw ?? 0), 0),
+        2
+      ),
+      realizedPnlTotal: mbD1Round(
+        trades.reduce((sum, item) => sum + item.realizedPnlKrw, 0),
+        2
+      ),
       accounts: investment.accounts,
       holdings,
       staleManualPrices: staleManual,
       cashBaselinePending: investment.accounts
-        .filter((item) => !item.cashBaselineConfigured)
-        .map((item) => ({ accountId: item.accountId, accountName: item.accountName }))
+        .filter(item => !item.cashBaselineConfigured)
+        .map(item => ({ accountId: item.accountId, accountName: item.accountName }))
     }
   };
 }
 
 export async function mbD1BuildBootstrap(env, session = null) {
   await mbD1EnsureDefaultCashbackIncomeCategory(env);
-  const [members, rawAccounts, categoryRows, ledgerConfig, inputPreferences, automationSettings] = await Promise.all([
-    mbD1Members(env),
-    mbD1RawAccounts(env),
-    mbD1All(
-      env,
-      "SELECT * FROM categories WHERE household_id=? AND deleted_at IS NULL AND is_active=1 ORDER BY CASE type WHEN '수입' THEN 1 WHEN '지출' THEN 2 WHEN '이체' THEN 3 ELSE 99 END,name",
-      [MB_D1_HOUSEHOLD_ID]
-    ),
-    mbD1GetLedgerConfigData(env),
-    mbD1InputPreferencesData(env, session?.name || ""),
-    mbD1AutomationSettingsData(env)
-  ]);
-  const accounts = rawAccounts.map(mbD1MapAccountRow).filter((account) => account.active && !account.isDeleted);
+  const [members, rawAccounts, categoryRows, ledgerConfig, inputPreferences, automationSettings] =
+    await Promise.all([
+      mbD1Members(env),
+      mbD1RawAccounts(env),
+      mbD1All(
+        env,
+        "SELECT * FROM categories WHERE household_id=? AND deleted_at IS NULL AND is_active=1 ORDER BY CASE type WHEN '수입' THEN 1 WHEN '지출' THEN 2 WHEN '이체' THEN 3 ELSE 99 END,name",
+        [MB_D1_HOUSEHOLD_ID]
+      ),
+      mbD1GetLedgerConfigData(env),
+      mbD1InputPreferencesData(env, session?.name || ""),
+      mbD1AutomationSettingsData(env)
+    ]);
+  const accounts = rawAccounts
+    .map(mbD1MapAccountRow)
+    .filter(account => account.active && !account.isDeleted);
   const categories = categoryRows.map(mbD1MapCategory);
-  const memberNames = members.map((member) => mbD1Text(member.display_name)).filter(Boolean);
+  const memberNames = members.map(member => mbD1Text(member.display_name)).filter(Boolean);
   return {
     classificationSettings: await getClassificationSettings(env, MB_D1_HOUSEHOLD_ID),
     userName: session?.name || "",
@@ -312,18 +369,16 @@ export async function mbD1BuildBootstrap(env, session = null) {
     spendingTargets: [...memberNames, "공동"],
     accounts,
     categories,
-    investmentAccounts: accounts
-      .filter(mbD1IsInvestmentAccount)
-      .map((account) => ({
-        accountId: account.accountId,
-        accountName: account.displayName,
-        owner: account.owner,
-        accountType: account.accountType,
-        subType: account.subType,
-        cashBaselineConfigured: Boolean(account.cashBaselineAt),
-        cashBaselineKrw: account.cashBaselineKrw,
-        cashBaselineAt: account.cashBaselineAt
-      })),
+    investmentAccounts: accounts.filter(mbD1IsInvestmentAccount).map(account => ({
+      accountId: account.accountId,
+      accountName: account.displayName,
+      owner: account.owner,
+      accountType: account.accountType,
+      subType: account.subType,
+      cashBaselineConfigured: Boolean(account.cashBaselineAt),
+      cashBaselineKrw: account.cashBaselineKrw,
+      cashBaselineAt: account.cashBaselineAt
+    })),
     ledgerConfig,
     inputPreferences,
     automationSettings

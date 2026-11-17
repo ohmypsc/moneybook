@@ -1,12 +1,6 @@
-import {
-  useEffect,
-  useState
-} from "react";
+import { useEffect, useState } from "react";
 
-import {
-  getSeoulDateString,
-  getSeoulTimestampLabel
-} from "../../../utils/dateTime";
+import { getSeoulDateString, getSeoulTimestampLabel } from "../../../utils/dateTime";
 
 import styles from "./DataFreshnessNotice.module.css";
 
@@ -37,9 +31,7 @@ function formatSnapshotTime(fetchedAt: number) {
     : `${year}년 ${month}월 ${day}일 ${time}`;
 }
 
-export function DataFreshnessNotice({
-  fetchedAt
-}: DataFreshnessNoticeProps) {
+export function DataFreshnessNotice({ fetchedAt }: DataFreshnessNoticeProps) {
   const [online, setOnline] = useState(
     () => typeof navigator === "undefined" || navigator.onLine !== false
   );
@@ -58,11 +50,7 @@ export function DataFreshnessNotice({
   }, []);
 
   return (
-    <div
-      className={styles.notice}
-      role="status"
-      aria-live="polite"
-    >
+    <div className={styles.notice} role="status" aria-live="polite">
       <span className={styles.dot} aria-hidden="true" />
       <span>
         {online ? "최신 데이터 확인 실패" : "오프라인"}

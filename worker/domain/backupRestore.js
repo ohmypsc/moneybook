@@ -41,20 +41,21 @@ function uniqueIdSet(items, key, label) {
   return ids;
 }
 
-
 function assertUniqueOptional(items, key, label) {
   const values = new Set();
   for (const item of items) {
     const value = text(item?.[key]);
     if (!value) continue;
-    if (values.has(value)) fail("BACKUP_DUPLICATE_REQUEST_ID", `${label}에 중복 요청 ID가 있습니다: ${value}`);
+    if (values.has(value))
+      fail("BACKUP_DUPLICATE_REQUEST_ID", `${label}에 중복 요청 ID가 있습니다: ${value}`);
     values.add(value);
   }
 }
 
 function requireReference(id, ids, label) {
   const clean = text(id);
-  if (clean && !ids.has(clean)) fail("BACKUP_REFERENCE_MISSING", `${label} 참조를 찾을 수 없습니다: ${clean}`);
+  if (clean && !ids.has(clean))
+    fail("BACKUP_REFERENCE_MISSING", `${label} 참조를 찾을 수 없습니다: ${clean}`);
 }
 
 function optionalObject(value, label) {
@@ -65,16 +66,23 @@ function optionalObject(value, label) {
 
 export function validateBackupDocument(input) {
   try {
-    if (input?.payload?.classificationSettings !== undefined) normalizeRules(input.payload.classificationSettings.rules);
+    if (input?.payload?.classificationSettings !== undefined)
+      normalizeRules(input.payload.classificationSettings.rules);
     for (const item of input?.payload?.transactions || []) {
       if (item.tags !== undefined) normalizeTags(item.tags);
-      if (item.categorySource !== undefined && !["auto", "manual"].includes(item.categorySource)) throw new Error("분류 출처가 올바르지 않습니다.");
+      if (item.categorySource !== undefined && !["auto", "manual"].includes(item.categorySource))
+        throw new Error("분류 출처가 올바르지 않습니다.");
     }
-  } catch (error) { fail("BACKUP_INVALID_CLASSIFICATION", error.message); }
-  if (!isObject(input)) fail("BACKUP_INVALID_DOCUMENT", "백업 파일의 최상위 형식이 올바르지 않습니다.");
-  if (input.format !== "moneybook-backup") fail("BACKUP_INVALID_FORMAT", "Moneybook 백업 파일이 아닙니다.");
+  } catch (error) {
+    fail("BACKUP_INVALID_CLASSIFICATION", error.message);
+  }
+  if (!isObject(input))
+    fail("BACKUP_INVALID_DOCUMENT", "백업 파일의 최상위 형식이 올바르지 않습니다.");
+  if (input.format !== "moneybook-backup")
+    fail("BACKUP_INVALID_FORMAT", "Moneybook 백업 파일이 아닙니다.");
   const version = Number(input.version);
-  if (![1, 2, 3].includes(version)) fail("BACKUP_UNSUPPORTED_VERSION", `지원하지 않는 백업 버전입니다: ${input.version}`);
+  if (![1, 2, 3].includes(version))
+    fail("BACKUP_UNSUPPORTED_VERSION", `지원하지 않는 백업 버전입니다: ${input.version}`);
   if (!isObject(input.payload)) fail("BACKUP_INVALID_PAYLOAD", "백업 데이터가 없습니다.");
 
   const payload = input.payload;
@@ -87,17 +95,24 @@ export function validateBackupDocument(input) {
   const assetSnapshots = array(payload.assetSnapshots, "자산 스냅샷");
   const investmentHoldings = array(payload.investmentHoldings, "투자 보유종목");
   const investmentTrades = array(payload.investmentTrades, "투자 거래");
-  const benefitRewardUsage = version >= 2
-    ? array(payload.benefitRewardUsage ?? [], "혜택 사용내역")
-    : [];
-  const realEstateAssets = version >= 3
-    ? array(payload.realEstateAssets ?? [], "부동산 자산")
-    : [];
+  const benefitRewardUsage =
+    version >= 2 ? array(payload.benefitRewardUsage ?? [], "혜택 사용내역") : [];
+  const realEstateAssets = version >= 3 ? array(payload.realEstateAssets ?? [], "부동산 자산") : [];
 
-  const totalRecords = categories.length + accounts.length + transactions.length + assetSnapshots.length
-    + investmentHoldings.length + investmentTrades.length + benefitRewardUsage.length + realEstateAssets.length;
+  const totalRecords =
+    categories.length +
+    accounts.length +
+    transactions.length +
+    assetSnapshots.length +
+    investmentHoldings.length +
+    investmentTrades.length +
+    benefitRewardUsage.length +
+    realEstateAssets.length;
   if (totalRecords > MAX_TOTAL_RECORDS) {
-    fail("BACKUP_TOO_LARGE", `복원 항목이 너무 많습니다. 최대 ${MAX_TOTAL_RECORDS.toLocaleString("ko-KR")}건까지 지원합니다.`);
+    fail(
+      "BACKUP_TOO_LARGE",
+      `복원 항목이 너무 많습니다. 최대 ${MAX_TOTAL_RECORDS.toLocaleString("ko-KR")}건까지 지원합니다.`
+    );
   }
 
   const categoryIds = uniqueIdSet(categories, "categoryId", "카테고리");
@@ -110,26 +125,51 @@ export function validateBackupDocument(input) {
   assertUniqueOptional(investmentTrades, "requestId", "투자 거래");
 
   for (const category of categories) {
-    if (!TRANSACTION_TYPES.has(text(category?.type))) fail("BACKUP_CATEGORY_TYPE_INVALID", `카테고리 유형이 올바르지 않습니다: ${category?.type ?? ""}`);
-    if (!text(category?.name)) fail("BACKUP_CATEGORY_NAME_REQUIRED", "이름이 없는 카테고리가 있습니다.");
+    if (!TRANSACTION_TYPES.has(text(category?.type)))
+      fail(
+        "BACKUP_CATEGORY_TYPE_INVALID",
+        `카테고리 유형이 올바르지 않습니다: ${category?.type ?? ""}`
+      );
+    if (!text(category?.name))
+      fail("BACKUP_CATEGORY_NAME_REQUIRED", "이름이 없는 카테고리가 있습니다.");
   }
 
   for (const account of accounts) {
-    if (!text(account?.accountName) && !text(account?.displayName)) fail("BACKUP_ACCOUNT_NAME_REQUIRED", `이름이 없는 계좌가 있습니다: ${account?.accountId ?? ""}`);
+    if (!text(account?.accountName) && !text(account?.displayName))
+      fail(
+        "BACKUP_ACCOUNT_NAME_REQUIRED",
+        `이름이 없는 계좌가 있습니다: ${account?.accountId ?? ""}`
+      );
     requireReference(account?.paymentAccountId, accountIds, "계좌의 결제계좌");
   }
 
   for (const transaction of transactions) {
     const type = text(transaction?.type);
-    if (!TRANSACTION_TYPES.has(type)) fail("BACKUP_TRANSACTION_TYPE_INVALID", `거래 유형이 올바르지 않습니다: ${type}`);
+    if (!TRANSACTION_TYPES.has(type))
+      fail("BACKUP_TRANSACTION_TYPE_INVALID", `거래 유형이 올바르지 않습니다: ${type}`);
     const transactionDate = text(transaction?.date);
-    if (!dateOnly(transactionDate)) fail("BACKUP_TRANSACTION_DATE_INVALID", `거래 날짜가 올바르지 않습니다: ${transaction?.transactionId ?? ""}`);
-    for (const [field, value] of [["청구월", transaction?.billingMonth], ["청구월 수정값", transaction?.billingOverride]]) {
+    if (!dateOnly(transactionDate))
+      fail(
+        "BACKUP_TRANSACTION_DATE_INVALID",
+        `거래 날짜가 올바르지 않습니다: ${transaction?.transactionId ?? ""}`
+      );
+    for (const [field, value] of [
+      ["청구월", transaction?.billingMonth],
+      ["청구월 수정값", transaction?.billingOverride]
+    ]) {
       const month = text(value);
-      if (month && !monthOnly(month)) fail("BACKUP_TRANSACTION_BILLING_MONTH_INVALID", `${field}이 올바르지 않습니다: ${transaction?.transactionId ?? ""}`);
+      if (month && !monthOnly(month))
+        fail(
+          "BACKUP_TRANSACTION_BILLING_MONTH_INVALID",
+          `${field}이 올바르지 않습니다: ${transaction?.transactionId ?? ""}`
+        );
     }
     const amount = Number(transaction?.amount);
-    if (!Number.isFinite(amount) || amount <= 0) fail("BACKUP_TRANSACTION_AMOUNT_INVALID", `거래 금액이 올바르지 않습니다: ${transaction?.transactionId ?? ""}`);
+    if (!Number.isFinite(amount) || amount <= 0)
+      fail(
+        "BACKUP_TRANSACTION_AMOUNT_INVALID",
+        `거래 금액이 올바르지 않습니다: ${transaction?.transactionId ?? ""}`
+      );
     requireReference(transaction?.categoryId, categoryIds, "거래의 카테고리");
     requireReference(transaction?.fromAccountId, accountIds, "거래의 출금계좌");
     requireReference(transaction?.toAccountId, accountIds, "거래의 입금계좌");
@@ -140,20 +180,34 @@ export function validateBackupDocument(input) {
   const snapshotMonths = new Set();
   for (const snapshot of assetSnapshots) {
     const month = text(snapshot?.month);
-    if (!monthOnly(month)) fail("BACKUP_SNAPSHOT_MONTH_INVALID", `자산 스냅샷 월이 올바르지 않습니다: ${month}`);
-    if (snapshotMonths.has(month)) fail("BACKUP_DUPLICATE_SNAPSHOT", `중복된 자산 스냅샷 월이 있습니다: ${month}`);
+    if (!monthOnly(month))
+      fail("BACKUP_SNAPSHOT_MONTH_INVALID", `자산 스냅샷 월이 올바르지 않습니다: ${month}`);
+    if (snapshotMonths.has(month))
+      fail("BACKUP_DUPLICATE_SNAPSHOT", `중복된 자산 스냅샷 월이 있습니다: ${month}`);
     snapshotMonths.add(month);
   }
 
   for (const holding of investmentHoldings) {
     requireReference(holding?.accountId, accountIds, "보유종목의 투자계좌");
-    if (!text(holding?.stockCode)) fail("BACKUP_HOLDING_CODE_REQUIRED", `종목코드가 없는 보유종목이 있습니다: ${holding?.holdingId ?? ""}`);
+    if (!text(holding?.stockCode))
+      fail(
+        "BACKUP_HOLDING_CODE_REQUIRED",
+        `종목코드가 없는 보유종목이 있습니다: ${holding?.holdingId ?? ""}`
+      );
   }
 
   for (const trade of investmentTrades) {
-    if (!TRADE_TYPES.has(text(trade?.tradeType))) fail("BACKUP_TRADE_TYPE_INVALID", `투자 거래 유형이 올바르지 않습니다: ${trade?.tradeType ?? ""}`);
+    if (!TRADE_TYPES.has(text(trade?.tradeType)))
+      fail(
+        "BACKUP_TRADE_TYPE_INVALID",
+        `투자 거래 유형이 올바르지 않습니다: ${trade?.tradeType ?? ""}`
+      );
     const tradeDate = text(trade?.tradeDate ?? trade?.date);
-    if (!dateOnly(tradeDate)) fail("BACKUP_TRADE_DATE_INVALID", `투자 거래 날짜가 올바르지 않습니다: ${trade?.investmentTradeId ?? ""}`);
+    if (!dateOnly(tradeDate))
+      fail(
+        "BACKUP_TRADE_DATE_INVALID",
+        `투자 거래 날짜가 올바르지 않습니다: ${trade?.investmentTradeId ?? ""}`
+      );
     requireReference(trade?.accountId, accountIds, "투자 거래의 계좌");
     requireReference(trade?.holdingId, holdingIds, "투자 거래의 보유종목");
   }
@@ -161,25 +215,39 @@ export function validateBackupDocument(input) {
   for (const usage of benefitRewardUsage) {
     requireReference(usage?.transactionId, transactionIds, "혜택 사용내역의 거래");
     requireReference(usage?.accountId, accountIds, "혜택 사용내역의 계좌");
-    if (!text(usage?.ruleId)) fail("BACKUP_BENEFIT_RULE_REQUIRED", "혜택 사용내역에 규칙 ID가 없습니다.");
+    if (!text(usage?.ruleId))
+      fail("BACKUP_BENEFIT_RULE_REQUIRED", "혜택 사용내역에 규칙 ID가 없습니다.");
   }
 
   for (const property of realEstateAssets) {
-    if (text(property?.propertyType || "아파트") !== "아파트") fail("BACKUP_REAL_ESTATE_TYPE_INVALID", "현재는 아파트 자산만 복원할 수 있습니다.");
-    if (!text(property?.name) || !text(property?.apartmentName)) fail("BACKUP_REAL_ESTATE_NAME_REQUIRED", "이름이 없는 부동산 자산이 있습니다.");
-    if (text(property?.valuationMode) !== "manual" && !/^\d{5}$/.test(text(property?.lawdCode))) fail("BACKUP_REAL_ESTATE_LAWD_INVALID", `자동 평가 부동산의 지역코드가 올바르지 않습니다: ${property?.name ?? ""}`);
+    if (text(property?.propertyType || "아파트") !== "아파트")
+      fail("BACKUP_REAL_ESTATE_TYPE_INVALID", "현재는 아파트 자산만 복원할 수 있습니다.");
+    if (!text(property?.name) || !text(property?.apartmentName))
+      fail("BACKUP_REAL_ESTATE_NAME_REQUIRED", "이름이 없는 부동산 자산이 있습니다.");
+    if (text(property?.valuationMode) !== "manual" && !/^\d{5}$/.test(text(property?.lawdCode)))
+      fail(
+        "BACKUP_REAL_ESTATE_LAWD_INVALID",
+        `자동 평가 부동산의 지역코드가 올바르지 않습니다: ${property?.name ?? ""}`
+      );
     const area = Number(property?.exclusiveAreaSqm);
-    if (!Number.isFinite(area) || area <= 0) fail("BACKUP_REAL_ESTATE_AREA_INVALID", `부동산 전용면적이 올바르지 않습니다: ${property?.name ?? ""}`);
+    if (!Number.isFinite(area) || area <= 0)
+      fail(
+        "BACKUP_REAL_ESTATE_AREA_INVALID",
+        `부동산 전용면적이 올바르지 않습니다: ${property?.name ?? ""}`
+      );
   }
 
   const members = Array.isArray(bootstrap.members)
     ? bootstrap.members.map(text).filter(Boolean)
     : [];
-  if (new Set(members).size !== members.length) fail("BACKUP_DUPLICATE_MEMBER", "구성원 이름이 중복되어 있습니다.");
+  if (new Set(members).size !== members.length)
+    fail("BACKUP_DUPLICATE_MEMBER", "구성원 이름이 중복되어 있습니다.");
 
   const warnings = [];
   if (version === 1) {
-    warnings.push("이 백업은 버전 1이라 카드 혜택 사용 누계가 포함되지 않습니다. 일반 거래·계좌·투자 데이터는 복원할 수 있습니다.");
+    warnings.push(
+      "이 백업은 버전 1이라 카드 혜택 사용 누계가 포함되지 않습니다. 일반 거래·계좌·투자 데이터는 복원할 수 있습니다."
+    );
   }
   if (!bootstrap.inputPreferences) warnings.push("입력 화면 노출/순서 설정이 백업에 없습니다.");
   if (!bootstrap.automationSettings) warnings.push("자동화 설정이 백업에 없습니다.");
@@ -221,10 +289,9 @@ export function findRequestIdConflicts(items, idKey, currentRows) {
     const id = text(item?.[idKey]);
     if (!requestId || !id) continue;
     const currentIds = currentByRequestId.get(requestId);
-    if (currentIds && Array.from(currentIds).some((currentId) => currentId !== id)) {
+    if (currentIds && Array.from(currentIds).some(currentId => currentId !== id)) {
       conflicts.push({ requestId, id });
     }
   }
   return conflicts;
 }
-

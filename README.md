@@ -7,11 +7,14 @@ React + TypeScript + Vite 프론트엔드와 Cloudflare Worker/D1로 구성된 2
 ```bash
 npm install
 npm run dev
+npm run format
 npm run check
 npm run build
 ```
 
-`npm run check`는 TypeScript 검사, Node 기본 테스트, Worker 문법 검사, 소스 경계 검사를 순서대로 실행합니다. 기능 변경 후에는 최소한 `npm run check`를 통과시키고 배포 전에는 `npm run build`까지 확인합니다.
+코드 모양은 Prettier로 통일합니다. 수정 후 `npm run format`을 실행하면 자동으로 맞춰집니다.
+
+`npm run check`는 코드 모양 검사, TypeScript 검사, Node 기본 테스트, Worker 문법 검사, 소스 경계 검사를 순서대로 실행합니다. 기능 변경 후에는 최소한 `npm run check`를 통과시키고 배포 전에는 `npm run build`까지 확인합니다.
 
 의존성 버전은 `package-lock.json`으로 고정되어 있습니다. 새로 설치할 때는 `npm ci`를 사용하세요.
 

@@ -22,20 +22,20 @@ export async function getPushConfig() {
 
 export async function registerPushSubscription(subscription: PushSubscriptionJSON) {
   return unwrap(
-    await apiRequest<ApiEnvelope<{ subscribed: true }>>(
-      "/api/push/subscribe",
-      { method: "POST", body: JSON.stringify({ subscription }) }
-    ),
+    await apiRequest<ApiEnvelope<{ subscribed: true }>>("/api/push/subscribe", {
+      method: "POST",
+      body: JSON.stringify({ subscription })
+    }),
     "알림을 켜지 못했습니다."
   );
 }
 
 export async function unregisterPushSubscription(endpoint: string) {
   return unwrap(
-    await apiRequest<ApiEnvelope<{ unsubscribed: true }>>(
-      "/api/push/unsubscribe",
-      { method: "POST", body: JSON.stringify({ endpoint }) }
-    ),
+    await apiRequest<ApiEnvelope<{ unsubscribed: true }>>("/api/push/unsubscribe", {
+      method: "POST",
+      body: JSON.stringify({ endpoint })
+    }),
     "알림을 끄지 못했습니다."
   );
 }

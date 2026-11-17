@@ -1,21 +1,10 @@
-import {
-  apiRequest
-} from "./client";
+import { apiRequest } from "./client";
 
-import {
-  unwrapEnvelope
-} from "./envelope";
+import { unwrapEnvelope } from "./envelope";
 
-import type {
-  ApiEnvelope
-} from "./envelope";
+import type { ApiEnvelope } from "./envelope";
 
-
-export type LedgerTransactionType =
-  | "지출"
-  | "수입"
-  | "이체";
-
+export type LedgerTransactionType = "지출" | "수입" | "이체";
 
 export interface CalendarTransaction {
   tags?: string[];
@@ -24,11 +13,9 @@ export interface CalendarTransaction {
 
   date: string;
 
-  type:
-    LedgerTransactionType;
+  type: LedgerTransactionType;
 
-  categoryId:
-    string | null;
+  categoryId: string | null;
 
   category: string;
 
@@ -42,86 +29,65 @@ export interface CalendarTransaction {
 
   amount: number;
 
-  fromAccountId:
-    string | null;
+  fromAccountId: string | null;
 
-  fromAccount:
-    string | null;
+  fromAccount: string | null;
 
-  toAccountId:
-    string | null;
+  toAccountId: string | null;
 
-  toAccount:
-    string | null;
+  toAccount: string | null;
 
-  paymentMethodId:
-    string | null;
+  paymentMethodId: string | null;
 
-  paymentMethod:
-    string | null;
+  paymentMethod: string | null;
 
-  spendingTarget:
-    string | null;
+  spendingTarget: string | null;
 
   description: string;
 
   memo: string;
 
-  billingOverride:
-    string | null;
+  billingOverride: string | null;
 
-  billingMonth:
-    string | null;
+  billingMonth: string | null;
 
-  installmentMonths?:
-    number | null;
+  installmentMonths?: number | null;
 
-  groupId:
-    string | null;
+  groupId: string | null;
 
-  requestId:
-    string | null;
+  requestId: string | null;
 
-  reversalOf:
-    string | null;
+  reversalOf: string | null;
 
-  createdAt:
-    string | null;
+  createdAt: string | null;
 
-  updatedAt:
-    string | null;
+  updatedAt: string | null;
 
-  updatedAtMs:
-    number | null;
+  updatedAtMs: number | null;
 
   createdBy?: string;
 
   updatedBy?: string;
 
-  deletedAt?:
-    string | null;
+  deletedAt?: string | null;
 
   deletedBy?: string;
 
   isDeleted: boolean;
 }
 
-
 export interface CalendarTransactionsResponse {
   total: number;
 
-  items:
-    CalendarTransaction[];
+  items: CalendarTransaction[];
 }
-
 
 export interface GetCalendarTransactionsParams {
   dateFrom?: string;
 
   dateTo?: string;
 
-  type?:
-    LedgerTransactionType;
+  type?: LedgerTransactionType;
 
   categoryId?: string;
 
@@ -138,118 +104,54 @@ export interface GetCalendarTransactionsParams {
   offset?: number;
 }
 
-
-export async function getCalendarTransactions(
-  params:
-    GetCalendarTransactionsParams = {}
-) {
-  const searchParams =
-    new URLSearchParams();
-
+export async function getCalendarTransactions(params: GetCalendarTransactionsParams = {}) {
+  const searchParams = new URLSearchParams();
 
   if (params.dateFrom) {
-    searchParams.set(
-      "dateFrom",
-      params.dateFrom
-    );
+    searchParams.set("dateFrom", params.dateFrom);
   }
-
 
   if (params.dateTo) {
-    searchParams.set(
-      "dateTo",
-      params.dateTo
-    );
+    searchParams.set("dateTo", params.dateTo);
   }
-
 
   if (params.type) {
-    searchParams.set(
-      "type",
-      params.type
-    );
+    searchParams.set("type", params.type);
   }
-
 
   if (params.categoryId) {
-    searchParams.set(
-      "categoryId",
-      params.categoryId
-    );
+    searchParams.set("categoryId", params.categoryId);
   }
-
 
   if (params.accountId) {
-    searchParams.set(
-      "accountId",
-      params.accountId
-    );
+    searchParams.set("accountId", params.accountId);
   }
-
 
   if (params.spendingTarget) {
-    searchParams.set(
-      "spendingTarget",
-      params.spendingTarget
-    );
+    searchParams.set("spendingTarget", params.spendingTarget);
   }
-
 
   if (params.q) {
-    searchParams.set(
-      "q",
-      params.q
-    );
+    searchParams.set("q", params.q);
   }
-
 
   if (params.includeDeleted) {
-    searchParams.set(
-      "includeDeleted",
-      "true"
-    );
+    searchParams.set("includeDeleted", "true");
   }
 
+  searchParams.set("limit", String(params.limit ?? 1000));
 
-  searchParams.set(
-    "limit",
-    String(
-      params.limit ?? 1000
-    )
-  );
-
-
-  if (
-    params.offset !==
-      undefined
-  ) {
-    searchParams.set(
-      "offset",
-      String(
-        params.offset
-      )
-    );
+  if (params.offset !== undefined) {
+    searchParams.set("offset", String(params.offset));
   }
 
+  const query = searchParams.toString();
 
-  const query =
-    searchParams.toString();
+  const url = query ? `/api/transactions?${query}` : "/api/transactions";
 
+  const raw = await apiRequest<
+    ApiEnvelope<CalendarTransactionsResponse> | CalendarTransactionsResponse
+  >(url);
 
-  const url =
-    query
-      ? `/api/transactions?${query}`
-      : "/api/transactions";
-
-
-  const raw =
-    await apiRequest<
-      | ApiEnvelope<CalendarTransactionsResponse>
-      | CalendarTransactionsResponse
-    >(url);
-
-
-  return unwrapEnvelope<
-    CalendarTransactionsResponse
-  >(raw);
+  return unwrapEnvelope<CalendarTransactionsResponse>(raw);
 }

@@ -1,10 +1,6 @@
 // Worker 공통 HTTP 응답·요청 본문 헬퍼
 
-export function jsonResponse(
-  data,
-  status = 200,
-  extraHeaders = {}
-) {
+export function jsonResponse(data, status = 200, extraHeaders = {}) {
   const headers = new Headers({
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
@@ -12,24 +8,13 @@ export function jsonResponse(
     ...extraHeaders
   });
 
-  return new Response(
-    JSON.stringify(
-      data,
-      null,
-      2
-    ),
-    {
-      status,
-      headers
-    }
-  );
+  return new Response(JSON.stringify(data, null, 2), {
+    status,
+    headers
+  });
 }
 
-export function errorResponse(
-  code,
-  message,
-  status
-) {
+export function errorResponse(code, message, status) {
   return jsonResponse(
     {
       success: false,
@@ -58,57 +43,31 @@ export function unauthorized() {
   );
 }
 
-export function isObject(
-  value
-) {
-  return (
-    Boolean(value) &&
-    typeof value === "object" &&
-    !Array.isArray(value)
-  );
+export function isObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-export async function readJsonObject(
-  request,
-  options = {}
-) {
-  if (
-    options.allowEmptyBody
-  ) {
-    const text =
-      await request.text();
+export async function readJsonObject(request, options = {}) {
+  if (options.allowEmptyBody) {
+    const text = await request.text();
 
-    if (
-      !text.trim()
-    ) {
+    if (!text.trim()) {
       return {};
     }
 
     try {
-      const parsed =
-        JSON.parse(
-          text
-        );
+      const parsed = JSON.parse(text);
 
-      return isObject(
-        parsed
-      )
-        ? parsed
-        : null;
+      return isObject(parsed) ? parsed : null;
     } catch {
       return null;
     }
   }
 
   try {
-    const parsed =
-      await request.json();
+    const parsed = await request.json();
 
-    return isObject(
-      parsed
-    )
-      ? parsed
-      : null;
+    return isObject(parsed) ? parsed : null;
   } catch {
     return null;
   }

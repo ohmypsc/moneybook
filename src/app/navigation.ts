@@ -32,22 +32,13 @@ const PRIMARY_NAVIGATION_KEYS = new Set<NavigationKey>([
 ]);
 
 export function isPrimaryNavigation(value: unknown): value is NavigationKey {
-  return (
-    typeof value === "string" &&
-    PRIMARY_NAVIGATION_KEYS.has(value as NavigationKey)
-  );
+  return typeof value === "string" && PRIMARY_NAVIGATION_KEYS.has(value as NavigationKey);
 }
 
 /** 기존 거래를 복사해 새 거래 입력 화면을 열 때 쓰는 프리셋 */
-export function createInputPresetFromTransaction(
-  transaction: Transaction
-): InputLaunchPreset {
+export function createInputPresetFromTransaction(transaction: Transaction): InputLaunchPreset {
   const mode: InputLaunchPreset["mode"] =
-    transaction.type === "수입"
-      ? "income"
-      : transaction.type === "이체"
-        ? "transfer"
-        : "expense";
+    transaction.type === "수입" ? "income" : transaction.type === "이체" ? "transfer" : "expense";
 
   return {
     mode,
@@ -86,14 +77,9 @@ export function isSameHistoryDestination(
   return (
     currentState?.moneybook === true &&
     currentState.navigation === navigation &&
-    (
-      navigation !== "input" ||
-      (
-        (currentState.inputInitialDate ?? null) === inputInitialDate &&
-        JSON.stringify(currentState.inputPreset ?? null) ===
-          JSON.stringify(inputPreset)
-      )
-    )
+    (navigation !== "input" ||
+      ((currentState.inputInitialDate ?? null) === inputInitialDate &&
+        JSON.stringify(currentState.inputPreset ?? null) === JSON.stringify(inputPreset)))
   );
 }
 

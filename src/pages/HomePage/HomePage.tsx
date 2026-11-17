@@ -1,51 +1,23 @@
-import {
-  useEffect,
-  useMemo,
-  useState
-} from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import {
-  getDashboard,
-  getDashboardSnapshot,
-  getDashboardSnapshotInfo
-} from "../../api/dashboard";
+import { getDashboard, getDashboardSnapshot, getDashboardSnapshotInfo } from "../../api/dashboard";
 
 import { getBootstrap } from "../../api/bootstrap";
 import type { RecurringTransactionRule } from "../../api/automation";
 
-import {
-  getTransactions,
-  type Transaction
-} from "../../api/transactions";
+import { getTransactions, type Transaction } from "../../api/transactions";
 
-import type {
-  DashboardAccount,
-  DashboardData
-} from "../../types/dashboard";
+import type { DashboardAccount, DashboardData } from "../../types/dashboard";
 
-import {
-  clearLedgerDirty,
-  isLedgerDirty,
-  subscribeLedgerChanges
-} from "../../utils/ledgerEvents";
+import { clearLedgerDirty, isLedgerDirty, subscribeLedgerChanges } from "../../utils/ledgerEvents";
 
-import {
-  markBackgroundRefreshed,
-  shouldBackgroundRefresh
-} from "../../utils/backgroundRefresh";
+import { markBackgroundRefreshed, shouldBackgroundRefresh } from "../../utils/backgroundRefresh";
 
-import {
-  getSeoulDateString,
-  getSeoulTimestampLabel
-} from "../../utils/dateTime";
+import { getSeoulDateString, getSeoulTimestampLabel } from "../../utils/dateTime";
 
-import {
-  isBenefitTransaction
-} from "../../utils/transactionBenefits";
+import { isBenefitTransaction } from "../../utils/transactionBenefits";
 
-import {
-  isSettlementTransaction
-} from "../../utils/settlement";
+import { isSettlementTransaction } from "../../utils/settlement";
 
 import { Button } from "../../components/common/Button/Button";
 import { Card } from "../../components/common/Card/Card";
@@ -53,8 +25,7 @@ import { Money, formatMoney } from "../../components/common/Money/Money";
 import { DataFreshnessNotice } from "../../components/common/DataFreshnessNotice/DataFreshnessNotice";
 import PwaInstallPrompt from "../../components/pwa/PwaInstallPrompt/PwaInstallPrompt";
 
-import styles
-  from "./HomePage.module.css";
+import styles from "./HomePage.module.css";
 
 interface DashboardCardView {
   accountId: string;
@@ -132,10 +103,7 @@ function getBillingPeriodLabel(
 ) {
   if (!cutoffDay || !paymentDay) return null;
 
-  const endMonth = addMonths(
-    billingMonth,
-    paymentDay <= cutoffDay ? -1 : 0
-  );
+  const endMonth = addMonths(billingMonth, paymentDay <= cutoffDay ? -1 : 0);
   const endMatch = /^(\d{4})-(\d{2})$/.exec(endMonth);
   if (!endMatch) return null;
 
@@ -149,13 +117,8 @@ function getBillingPeriodLabel(
 
   const previousYear = Number(previousMatch[1]);
   const previousMonthNumber = Number(previousMatch[2]);
-  const previousCutoff = Math.min(
-    cutoffDay,
-    daysInMonth(previousYear, previousMonthNumber)
-  );
-  const start = new Date(
-    Date.UTC(previousYear, previousMonthNumber - 1, previousCutoff + 1)
-  );
+  const previousCutoff = Math.min(cutoffDay, daysInMonth(previousYear, previousMonthNumber));
+  const start = new Date(Date.UTC(previousYear, previousMonthNumber - 1, previousCutoff + 1));
 
   return `${start.getUTCMonth() + 1}/${start.getUTCDate()}~${endMonthNumber}/${endDay} 사용분`;
 }
@@ -198,18 +161,21 @@ function getTransactionTitle(transaction: Transaction) {
 }
 
 function getTransactionMeta(transaction: Transaction) {
-  const method = transaction.type === "수입"
-    ? transaction.toAccount
-    : transaction.type === "이체"
-      ? `${transaction.fromAccount || "출금"} → ${transaction.toAccount || "입금"}`
-      : transaction.paymentMethod || transaction.fromAccount;
+  const method =
+    transaction.type === "수입"
+      ? transaction.toAccount
+      : transaction.type === "이체"
+        ? `${transaction.fromAccount || "출금"} → ${transaction.toAccount || "입금"}`
+        : transaction.paymentMethod || transaction.fromAccount;
 
   return [
     transaction.description ? transaction.category : "",
     method,
     transaction.type === "지출" ? transaction.spendingTarget : "",
     transaction.createdBy
-  ].filter(Boolean).join(" · ");
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 interface HomePageProps {
@@ -230,21 +196,13 @@ function getTogetherDays() {
   return Math.max(1, difference + 1);
 }
 
-export default function HomePage({
-  onCopyTransaction
-}: HomePageProps) {
+export default function HomePage({ onCopyTransaction }: HomePageProps) {
   const [needsInitialRefresh] = useState(() => isLedgerDirty());
-  const [initialDashboardInfo] = useState(
-    () => getDashboardSnapshotInfo()
-  );
+  const [initialDashboardInfo] = useState(() => getDashboardSnapshotInfo());
   const initialDashboard = initialDashboardInfo?.data ?? null;
-  const [dashboard, setDashboard] = useState<DashboardData | null>(
-    initialDashboard
-  );
+  const [dashboard, setDashboard] = useState<DashboardData | null>(initialDashboard);
   const [fallbackSnapshotAt, setFallbackSnapshotAt] = useState<number | null>(
-    initialDashboardInfo?.source === "persisted"
-      ? initialDashboardInfo.fetchedAt
-      : null
+    initialDashboardInfo?.source === "persisted" ? initialDashboardInfo.fetchedAt : null
   );
   const [loading, setLoading] = useState(initialDashboard === null);
   const [errorMessage, setErrorMessage] = useState("");
@@ -273,10 +231,12 @@ export default function HomePage({
     };
   }, [detailType]);
 
-  async function loadDashboard(options: {
-    forceRefresh?: boolean;
-    background?: boolean;
-  } = {}) {
+  async function loadDashboard(
+    options: {
+      forceRefresh?: boolean;
+      background?: boolean;
+    } = {}
+  ) {
     const cachedDashboard = getDashboardSnapshot();
 
     if (cachedDashboard) {
@@ -311,9 +271,7 @@ export default function HomePage({
       } else if (!options.background) {
         setDashboard(null);
         setErrorMessage(
-          error instanceof Error
-            ? error.message
-            : "가계부 데이터를 불러오지 못했습니다."
+          error instanceof Error ? error.message : "가계부 데이터를 불러오지 못했습니다."
         );
       }
     } finally {
@@ -347,20 +305,14 @@ export default function HomePage({
         }
 
         setErrorMessage(
-          error instanceof Error
-            ? error.message
-            : "가계부 데이터를 불러오지 못했습니다."
+          error instanceof Error ? error.message : "가계부 데이터를 불러오지 못했습니다."
         );
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
 
-    if (
-      needsInitialRefresh ||
-      !initialDashboard ||
-      initialDashboardInfo?.source === "persisted"
-    ) {
+    if (needsInitialRefresh || !initialDashboard || initialDashboardInfo?.source === "persisted") {
       void loadDashboard();
     } else {
       setLastUpdatedLabel(getSeoulTimestampLabel());
@@ -430,19 +382,11 @@ export default function HomePage({
       const items = response.data.items || [];
       setDetailItems(
         type === "수입"
-          ? items.filter(
-              item =>
-                !isBenefitTransaction(item) &&
-                !isSettlementTransaction(item)
-            )
+          ? items.filter(item => !isBenefitTransaction(item) && !isSettlementTransaction(item))
           : items
       );
     } catch (error) {
-      setDetailError(
-        error instanceof Error
-          ? error.message
-          : "거래 내역을 불러오지 못했습니다."
-      );
+      setDetailError(error instanceof Error ? error.message : "거래 내역을 불러오지 못했습니다.");
     } finally {
       setDetailLoading(false);
     }
@@ -454,30 +398,31 @@ export default function HomePage({
     }
 
     const accountMap = new Map<string, DashboardAccount>(
-      (Array.isArray(dashboard.accounts) ? dashboard.accounts : [])
-        .map(account => [account.accountId, account] as const)
+      (Array.isArray(dashboard.accounts) ? dashboard.accounts : []).map(
+        account => [account.accountId, account] as const
+      )
     );
 
-    const baseCards = (Array.isArray(dashboard.cards) ? dashboard.cards : [])
-      .map(card => {
-        const account = accountMap.get(card.accountId);
+    const baseCards = (Array.isArray(dashboard.cards) ? dashboard.cards : []).map(card => {
+      const account = accountMap.get(card.accountId);
 
-        return {
-          ...card,
-          name: card.accountName || account?.displayName || "신용카드",
-          paymentDay: account?.paymentDay ?? null,
-          billingCutoffDay: account?.billingCutoffDay ?? null,
-          owner: account?.owner || "",
-          paymentAccountId: account?.paymentAccountId ?? null
-        };
-      });
+      return {
+        ...card,
+        name: card.accountName || account?.displayName || "신용카드",
+        paymentDay: account?.paymentDay ?? null,
+        billingCutoffDay: account?.billingCutoffDay ?? null,
+        owner: account?.owner || "",
+        paymentAccountId: account?.paymentAccountId ?? null
+      };
+    });
 
     const scheduledByPaymentAccount = new Map<string, number>();
     for (const card of baseCards) {
       if (!card.paymentAccountId) continue;
       scheduledByPaymentAccount.set(
         card.paymentAccountId,
-        (scheduledByPaymentAccount.get(card.paymentAccountId) || 0) + Math.max(0, Number(card.estimatedRemaining) || 0)
+        (scheduledByPaymentAccount.get(card.paymentAccountId) || 0) +
+          Math.max(0, Number(card.estimatedRemaining) || 0)
       );
     }
 
@@ -492,9 +437,10 @@ export default function HomePage({
         const paymentAccountScheduledTotal = card.paymentAccountId
           ? scheduledByPaymentAccount.get(card.paymentAccountId) || 0
           : 0;
-        const paymentAccountShortage = paymentAccountBalance === null
-          ? 0
-          : Math.max(0, paymentAccountScheduledTotal - Math.max(0, paymentAccountBalance));
+        const paymentAccountShortage =
+          paymentAccountBalance === null
+            ? 0
+            : Math.max(0, paymentAccountScheduledTotal - Math.max(0, paymentAccountBalance));
 
         return {
           ...card,
@@ -504,9 +450,7 @@ export default function HomePage({
           paymentAccountShortage
         };
       })
-      .sort((first, second) =>
-        (first.paymentDay ?? 99) - (second.paymentDay ?? 99)
-      );
+      .sort((first, second) => (first.paymentDay ?? 99) - (second.paymentDay ?? 99));
 
     const dueCards = cards.filter(
       card => Math.max(0, Number(card.estimatedRemaining) || 0) > 0.0001
@@ -540,10 +484,9 @@ export default function HomePage({
         id: `card:${card.accountId}:${card.billingMonth}`,
         date: dueDate,
         label: `${card.name} 결제`,
-        meta: [
-          card.paymentAccountName || "결제계좌 미설정",
-          formatUpcomingDate(dueDate)
-        ].join(" · "),
+        meta: [card.paymentAccountName || "결제계좌 미설정", formatUpcomingDate(dueDate)].join(
+          " · "
+        ),
         amount: Math.max(0, Number(card.estimatedRemaining) || 0),
         kind: "card",
         shortage: card.paymentAccountShortage
@@ -564,9 +507,10 @@ export default function HomePage({
       // 오늘 날짜의 자동 정기거래는 Cron에서 이미 장부에 반영됐을 수 있으므로
       // 잔액과 예정액을 동시에 차감해 보이는 일을 피하고 내일부터 표시합니다.
       if (distance <= 0 || distance > 7) continue;
-      const sourceAccount = rule.type === "이체" && rule.fromAccountId
-        ? accountMap.get(rule.fromAccountId)
-        : paymentAccount;
+      const sourceAccount =
+        rule.type === "이체" && rule.fromAccountId
+          ? accountMap.get(rule.fromAccountId)
+          : paymentAccount;
       items.push({
         id: `recurring:${rule.id}:${date}`,
         date,
@@ -575,7 +519,9 @@ export default function HomePage({
           rule.type === "이체" ? "정기 이체" : "정기 지출",
           sourceAccount?.displayName || sourceAccount?.accountName || "",
           formatUpcomingDate(date)
-        ].filter(Boolean).join(" · "),
+        ]
+          .filter(Boolean)
+          .join(" · "),
         amount: Math.max(0, Number(rule.amount) || 0),
         kind: "recurring"
       });
@@ -606,7 +552,10 @@ export default function HomePage({
         <Card as="section" className={styles.loadingCard}>
           <div className={styles.loadingLineShort} />
           <div className={styles.loadingLineLong} />
-          <div className={styles.loadingGrid}><div /><div /></div>
+          <div className={styles.loadingGrid}>
+            <div />
+            <div />
+          </div>
         </Card>
       </main>
     );
@@ -621,11 +570,7 @@ export default function HomePage({
         </header>
         <Card as="section" className={styles.errorCard}>
           <p>{errorMessage}</p>
-          <Button
-            fullWidth
-            size="lg"
-            onClick={() => void loadDashboard({ forceRefresh: true })}
-          >
+          <Button fullWidth size="lg" onClick={() => void loadDashboard({ forceRefresh: true })}>
             다시 불러오기
           </Button>
         </Card>
@@ -633,12 +578,7 @@ export default function HomePage({
     );
   }
 
-  const {
-    netWorth,
-    monthIncome,
-    monthExpense,
-    monthNetCashFlow
-  } = dashboard.summary;
+  const { netWorth, monthIncome, monthExpense, monthNetCashFlow } = dashboard.summary;
   const realEstateValue = Number(dashboard.summary.realEstateValue || 0);
   const financialAssets = Number(dashboard.summary.assets || 0) - realEstateValue;
   const liabilities = Number(dashboard.summary.liabilities || 0);
@@ -649,12 +589,7 @@ export default function HomePage({
     <main className={styles.page}>
       <header className={styles.header}>
         <div className={styles.togetherBlock}>
-          <img
-            src="/splash-photo.jpg"
-            alt=""
-            className={styles.homePhoto}
-            aria-hidden="true"
-          />
+          <img src="/splash-photo.jpg" alt="" className={styles.homePhoto} aria-hidden="true" />
           <div>
             <p className={styles.togetherLabel}>함께한 지</p>
             <h1 className={styles.togetherValue}>
@@ -665,10 +600,7 @@ export default function HomePage({
         </div>
       </header>
 
-      {fallbackSnapshotAt && (
-        <DataFreshnessNotice fetchedAt={fallbackSnapshotAt} />
-      )}
-
+      {fallbackSnapshotAt && <DataFreshnessNotice fetchedAt={fallbackSnapshotAt} />}
 
       <Card as="section" className={styles.summaryCard}>
         <div className={styles.summaryHeader}>
@@ -681,7 +613,9 @@ export default function HomePage({
 
         <div className={styles.summaryRows}>
           <div className={styles.summaryRow}>
-            <span className={styles.summaryLabel}>우리 순자산 <small>부동산 포함</small></span>
+            <span className={styles.summaryLabel}>
+              우리 순자산 <small>부동산 포함</small>
+            </span>
             <strong className={netWorth < 0 ? styles.negativeAmount : styles.netAmount}>
               <Money amount={netWorth} />
             </strong>
@@ -689,11 +623,15 @@ export default function HomePage({
           <div className={styles.assetComposition} aria-label="순자산 구성">
             <div>
               <span>금융자산</span>
-              <strong><Money amount={financialAssets} /></strong>
+              <strong>
+                <Money amount={financialAssets} />
+              </strong>
             </div>
             <div>
               <span>부동산</span>
-              <strong><Money amount={realEstateValue} /></strong>
+              <strong>
+                <Money amount={realEstateValue} />
+              </strong>
             </div>
             <div>
               <span>부채</span>
@@ -707,26 +645,37 @@ export default function HomePage({
             className={[styles.summaryRow, styles.summaryRowButton].join(" ")}
             onClick={() => void openMonthlyDetail("수입")}
           >
-            <span className={styles.summaryLabel}>수입 <small>내역 보기</small></span>
-            <strong className={styles.incomeAmount}><Money amount={monthIncome} absolute tone="income" /></strong>
+            <span className={styles.summaryLabel}>
+              수입 <small>내역 보기</small>
+            </span>
+            <strong className={styles.incomeAmount}>
+              <Money amount={monthIncome} absolute tone="income" />
+            </strong>
           </button>
           <button
             type="button"
             className={[styles.summaryRow, styles.summaryRowButton].join(" ")}
             onClick={() => void openMonthlyDetail("지출")}
           >
-            <span className={styles.summaryLabel}>지출 <small>내역 보기</small></span>
-            <strong className={styles.expenseAmount}><Money amount={monthExpense} absolute tone="expense" /></strong>
+            <span className={styles.summaryLabel}>
+              지출 <small>내역 보기</small>
+            </span>
+            <strong className={styles.expenseAmount}>
+              <Money amount={monthExpense} absolute tone="expense" />
+            </strong>
           </button>
           <div className={styles.summaryRow}>
             <span className={styles.summaryLabel}>순현금흐름</span>
             <strong className={monthNetCashFlow < 0 ? styles.negativeAmount : styles.netAmount}>
-              <Money amount={monthNetCashFlow} showPlus tone={monthNetCashFlow < 0 ? "negative" : "positive"} />
+              <Money
+                amount={monthNetCashFlow}
+                showPlus
+                tone={monthNetCashFlow < 0 ? "negative" : "positive"}
+              />
             </strong>
           </div>
         </div>
       </Card>
-
 
       <section className={styles.section}>
         <div className={styles.sectionHeader}>
@@ -742,7 +691,9 @@ export default function HomePage({
               <div key={item.name} className={styles.rankRow}>
                 <span className={styles.rankNumber}>{index + 1}</span>
                 <strong className={styles.rankName}>{item.name}</strong>
-                <span className={styles.rankAmount}><Money amount={item.amount} absolute /></span>
+                <span className={styles.rankAmount}>
+                  <Money amount={item.amount} absolute />
+                </span>
               </div>
             ))
           ) : (
@@ -757,7 +708,9 @@ export default function HomePage({
             <h2>카드 결제 예정</h2>
             <span className={styles.sectionHint}>입력 내역 기준 · 결제계좌 잔액과 부족액 확인</span>
           </div>
-          <strong className={styles.sectionTotal}><Money amount={cardSummary.total} absolute /></strong>
+          <strong className={styles.sectionTotal}>
+            <Money amount={cardSummary.total} absolute />
+          </strong>
         </div>
 
         <Card padding="none" className={styles.cardList}>
@@ -765,15 +718,25 @@ export default function HomePage({
             cardSummary.cards.map(card => (
               <div key={card.accountId} className={styles.cardRow}>
                 <div className={styles.cardName}>
-                  <span className={styles.cardIcon} aria-hidden="true">₩</span>
+                  <span className={styles.cardIcon} aria-hidden="true">
+                    ₩
+                  </span>
                   <div>
                     <strong>{card.name}</strong>
                     <span>
                       {[
-                        card.paymentDay ? `${Number(card.billingMonth.slice(5))}월 ${card.paymentDay}일 결제` : "결제일 미설정",
-                        getBillingPeriodLabel(card.billingMonth, card.billingCutoffDay, card.paymentDay),
+                        card.paymentDay
+                          ? `${Number(card.billingMonth.slice(5))}월 ${card.paymentDay}일 결제`
+                          : "결제일 미설정",
+                        getBillingPeriodLabel(
+                          card.billingMonth,
+                          card.billingCutoffDay,
+                          card.paymentDay
+                        ),
                         card.owner
-                      ].filter(Boolean).join(" · ")}
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </span>
                     <small className={styles.cardAccountMeta}>
                       {card.paymentAccountName
@@ -823,7 +786,9 @@ export default function HomePage({
             <h2>앞으로 나갈 돈</h2>
             <span className={styles.sectionHint}>7일 안에 예정된 카드대금·정기 지출</span>
           </div>
-          <strong className={styles.sectionTotal}><Money amount={upcomingOutflows.total} absolute /></strong>
+          <strong className={styles.sectionTotal}>
+            <Money amount={upcomingOutflows.total} absolute />
+          </strong>
         </div>
 
         <Card padding="none" className={styles.upcomingList}>
@@ -843,10 +808,14 @@ export default function HomePage({
                   <strong>{item.label}</strong>
                   <span>{item.meta}</span>
                   {item.shortage && item.shortage > 0 ? (
-                    <small>결제계좌 부족 예상 <Money amount={item.shortage} absolute /></small>
+                    <small>
+                      결제계좌 부족 예상 <Money amount={item.shortage} absolute />
+                    </small>
                   ) : null}
                 </div>
-                <strong className={styles.upcomingAmount}><Money amount={item.amount} absolute /></strong>
+                <strong className={styles.upcomingAmount}>
+                  <Money amount={item.amount} absolute />
+                </strong>
               </div>
             ))
           ) : (
@@ -872,10 +841,21 @@ export default function HomePage({
           >
             <div className={styles.detailHeader}>
               <div>
-                <strong>{formatMonth(dashboard.month)} {detailType} 내역</strong>
+                <strong>
+                  {formatMonth(dashboard.month)} {detailType} 내역
+                </strong>
                 <span>{detailItems.length.toLocaleString("ko-KR")}건</span>
               </div>
-              <Button className={styles.detailClose} variant="soft" size="sm" iconOnly aria-label="닫기" onClick={() => setDetailType(null)}>×</Button>
+              <Button
+                className={styles.detailClose}
+                variant="soft"
+                size="sm"
+                iconOnly
+                aria-label="닫기"
+                onClick={() => setDetailType(null)}
+              >
+                ×
+              </Button>
             </div>
 
             {detailLoading && <p className={styles.detailState}>내역을 불러오는 중입니다.</p>}
@@ -892,7 +872,7 @@ export default function HomePage({
                   const reversalAmount = Math.max(0, Number(transaction.reversalAmount) || 0);
                   const expenseNetAmount = Math.max(
                     0,
-                    Number(transaction.netAmount ?? (transaction.amount - reversalAmount)) || 0
+                    Number(transaction.netAmount ?? transaction.amount - reversalAmount) || 0
                   );
 
                   return (
@@ -912,7 +892,11 @@ export default function HomePage({
                         {transaction.memo && <em>{transaction.memo}</em>}
                       </div>
                       <div className={styles.detailRowActions}>
-                        <b className={detailType === "수입" ? styles.incomeAmount : styles.expenseAmount}>
+                        <b
+                          className={
+                            detailType === "수입" ? styles.incomeAmount : styles.expenseAmount
+                          }
+                        >
                           <Money
                             amount={detailType === "수입" ? transaction.amount : -expenseNetAmount}
                             showPlus={detailType === "수입"}

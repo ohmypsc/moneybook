@@ -1,20 +1,13 @@
-import type {
-  ReactNode,
-} from "react";
+import type { ReactNode } from "react";
 
-import {
-  BottomNav,
-  type NavigationKey,
-} from "../BottomNav/BottomNav";
+import { BottomNav, type NavigationKey } from "../BottomNav/BottomNav";
 
 import styles from "./AppShell.module.css";
 
 type AppShellProps = {
   activeNavigation: NavigationKey;
 
-  onNavigate: (
-    navigation: NavigationKey
-  ) => void;
+  onNavigate: (navigation: NavigationKey) => void;
 
   pendingTransactionCount?: number;
   pendingTransactionFailedCount?: number;
@@ -27,24 +20,16 @@ export function AppShell({
   onNavigate,
   pendingTransactionCount = 0,
   pendingTransactionFailedCount = 0,
-  children,
+  children
 }: AppShellProps) {
   return (
     <div className={styles.shell}>
-      <div className={styles.main}>
-        {children}
-      </div>
+      <div className={styles.main}>{children}</div>
 
       <BottomNav
-        activeNavigation={
-          activeNavigation
-        }
-        pendingTransactionCount={
-          pendingTransactionCount
-        }
-        pendingTransactionFailedCount={
-          pendingTransactionFailedCount
-        }
+        activeNavigation={activeNavigation}
+        pendingTransactionCount={pendingTransactionCount}
+        pendingTransactionFailedCount={pendingTransactionFailedCount}
         onNavigate={onNavigate}
       />
     </div>

@@ -1,7 +1,4 @@
-import type {
-  HTMLAttributes,
-  ReactNode
-} from "react";
+import type { HTMLAttributes, ReactNode } from "react";
 
 import styles from "./Card.module.css";
 
@@ -35,7 +32,9 @@ export function Card({
     styles[`tone_${tone}`],
     styles[`shadow_${shadow}`],
     className
-  ].filter(Boolean).join(" ");
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <Component className={classNames} {...props}>

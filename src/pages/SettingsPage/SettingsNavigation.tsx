@@ -3,19 +3,9 @@ import { Card } from "../../components/common/Card/Card";
 import styles from "./SettingsPage.module.css";
 
 export type SettingsView =
-  | "home"
-  | "categories"
-  | "accounts"
-  | "classification"
-  | "automation"
-  | "ledger"
-  | "profile";
+  "home" | "categories" | "accounts" | "classification" | "automation" | "ledger" | "profile";
 
-export function SettingsHome({
-  onOpen
-}: {
-  onOpen: (view: SettingsView) => void;
-}) {
+export function SettingsHome({ onOpen }: { onOpen: (view: SettingsView) => void }) {
   const sharedItems: Array<{
     key: SettingsView;
     title: string;
@@ -36,7 +26,7 @@ export function SettingsHome({
       title: "자동화",
       description: "고정 거래 자동 등록과 확인"
     },
-    {key: "classification", title: "자동 분류·태그", description: "분류 규칙과 기존 거래 적용"},
+    { key: "classification", title: "자동 분류·태그", description: "분류 규칙과 기존 거래 적용" },
     {
       key: "ledger",
       title: "가계부 운영·데이터",
@@ -78,11 +68,7 @@ export function SettingsHome({
         <h2 className={styles.menuSectionTitle}>내 설정</h2>
 
         <Card padding="none" className={styles.menuCard}>
-          <button
-            type="button"
-            className={styles.menuRow}
-            onClick={() => onOpen("profile")}
-          >
+          <button type="button" className={styles.menuRow} onClick={() => onOpen("profile")}>
             <span className={styles.menuText}>
               <strong>알림·내 계정</strong>
               <span>배우자 입력 알림, 현재 사용자, 로그아웃</span>
@@ -109,12 +95,7 @@ export function DetailHeader({
 }) {
   return (
     <header className={styles.detailHeader}>
-      <Button
-        variant="secondary"
-        size="sm"
-        className={styles.backButton}
-        onClick={onBack}
-      >
+      <Button variant="secondary" size="sm" className={styles.backButton} onClick={onBack}>
         <span aria-hidden="true">‹</span>
         설정
       </Button>

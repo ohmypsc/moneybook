@@ -7,9 +7,7 @@ export interface PersistedDashboardSnapshot {
   fetchedAt: number;
 }
 
-export function parsePersistedDashboardSnapshot(
-  value: unknown
-): PersistedDashboardSnapshot | null {
+export function parsePersistedDashboardSnapshot(value: unknown): PersistedDashboardSnapshot | null {
   if (!value || typeof value !== "object") {
     return null;
   }
@@ -44,27 +42,19 @@ export function readPersistedDashboardSnapshot() {
 
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw
-      ? parsePersistedDashboardSnapshot(JSON.parse(raw))
-      : null;
+    return raw ? parsePersistedDashboardSnapshot(JSON.parse(raw)) : null;
   } catch {
     return null;
   }
 }
 
-export function rememberPersistedDashboardSnapshot(
-  data: DashboardData,
-  fetchedAt = Date.now()
-) {
+export function rememberPersistedDashboardSnapshot(data: DashboardData, fetchedAt = Date.now()) {
   if (typeof window === "undefined") {
     return;
   }
 
   try {
-    window.localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({ data, fetchedAt })
-    );
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ data, fetchedAt }));
   } catch {
     // 오프라인 조회 캐시 저장 실패가 실제 API 성공을 실패로 바꾸면 안 됩니다.
   }

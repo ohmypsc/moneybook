@@ -16,7 +16,9 @@ export function normalizeInstallmentMonths(value) {
   }
   if (number <= 1) return { months: null };
   if (number < INSTALLMENT_MIN_MONTHS || number > INSTALLMENT_MAX_MONTHS) {
-    return { error: `할부는 ${INSTALLMENT_MIN_MONTHS}~${INSTALLMENT_MAX_MONTHS}개월까지 입력할 수 있습니다.` };
+    return {
+      error: `할부는 ${INSTALLMENT_MIN_MONTHS}~${INSTALLMENT_MAX_MONTHS}개월까지 입력할 수 있습니다.`
+    };
   }
   return { months: number };
 }
@@ -45,7 +47,10 @@ export function installmentSchedule(amount, months) {
   const absolute = Math.abs(total);
   const base = Math.floor(absolute / count);
   const remainder = absolute - base * count;
-  return Array.from({ length: count }, (_, index) => sign * (index === 0 ? base + remainder : base));
+  return Array.from(
+    { length: count },
+    (_, index) => sign * (index === 0 ? base + remainder : base)
+  );
 }
 
 /**

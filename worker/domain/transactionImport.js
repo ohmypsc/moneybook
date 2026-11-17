@@ -40,17 +40,23 @@ function normalizeTransactionTime(value) {
 export function normalizeImportedCandidate(raw, index = 0) {
   const source = raw && typeof raw === "object" ? raw : {};
   const date = String(source.date ?? source.d ?? "").trim();
-  const time = normalizeTransactionTime(source.time ?? source.t ?? source.transactionTime ?? source.approvalTime);
+  const time = normalizeTransactionTime(
+    source.time ?? source.t ?? source.transactionTime ?? source.approvalTime
+  );
   const amount = toPositiveAmount(source.amount ?? source.a);
-  const merchant = String(source.merchant ?? source.m ?? source.description ?? "").trim().slice(0, 160);
+  const merchant = String(source.merchant ?? source.m ?? source.description ?? "")
+    .trim()
+    .slice(0, 160);
   const status = String(source.status ?? source.s ?? source.kind ?? "expense").toLowerCase();
-  const kind = /refund|cancel|취소|환불/.test(status) ? "refund"
-    : /transfer|이체/.test(status) ? "transfer"
-    : /income|deposit|수입|입금/.test(status) ? "income" : "expense";
+  const kind = /refund|cancel|취소|환불/.test(status)
+    ? "refund"
+    : /transfer|이체/.test(status)
+      ? "transfer"
+      : /income|deposit|수입|입금/.test(status)
+        ? "income"
+        : "expense";
   const confidenceRaw = String(source.confidence || "medium").toLowerCase();
-  const confidence = ["high", "medium", "low"].includes(confidenceRaw)
-    ? confidenceRaw
-    : "medium";
+  const confidence = ["high", "medium", "low"].includes(confidenceRaw) ? confidenceRaw : "medium";
 
   return {
     candidateId: `IMP_${index + 1}`,
@@ -58,12 +64,20 @@ export function normalizeImportedCandidate(raw, index = 0) {
     time,
     merchant,
     amount,
-    cardName: String(source.cardName ?? source.c ?? source.card ?? "").trim().slice(0, 100),
-    suggestedCategoryName: String(source.category ?? source.g ?? source.suggestedCategoryName ?? "").trim().slice(0, 80),
+    cardName: String(source.cardName ?? source.c ?? source.card ?? "")
+      .trim()
+      .slice(0, 100),
+    suggestedCategoryName: String(source.category ?? source.g ?? source.suggestedCategoryName ?? "")
+      .trim()
+      .slice(0, 80),
     kind,
     confidence,
-    memo: String(source.memo || "").trim().slice(0, 240),
-    sourceText: String(source.sourceText ?? source.r ?? source.rawText ?? "").trim().slice(0, 300)
+    memo: String(source.memo || "")
+      .trim()
+      .slice(0, 240),
+    sourceText: String(source.sourceText ?? source.r ?? source.rawText ?? "")
+      .trim()
+      .slice(0, 300)
   };
 }
 
@@ -71,7 +85,8 @@ export function extractJsonValue(value) {
   if (value && typeof value === "object") {
     if (Array.isArray(value)) return value;
     if (Array.isArray(value.transactions)) return value.transactions;
-    if (value.response && typeof value.response === "object") return extractJsonValue(value.response);
+    if (value.response && typeof value.response === "object")
+      return extractJsonValue(value.response);
     if (typeof value.response === "string") return extractJsonValue(value.response);
     if (typeof value.result === "string") return extractJsonValue(value.result);
     if (typeof value.answer === "string") return extractJsonValue(value.answer);
@@ -80,8 +95,8 @@ export function extractJsonValue(value) {
     if (typeof choiceContent === "string") return extractJsonValue(choiceContent);
     if (Array.isArray(choiceContent)) {
       const joined = choiceContent
-        .map((part) => typeof part === "string" ? part : part?.text)
-        .filter((part) => typeof part === "string")
+        .map(part => (typeof part === "string" ? part : part?.text))
+        .filter(part => typeof part === "string")
         .join("\n");
       if (joined) return extractJsonValue(joined);
     }
@@ -122,7 +137,9 @@ export function extractJsonValue(value) {
 
 export function choosePaymentMethod(cardName, accounts) {
   const target = normalizeCardLabel(cardName);
-  const active = (accounts || []).filter((account) => account && account.active && !account.isDeleted);
+  const active = (accounts || []).filter(
+    account => account && account.active && !account.isDeleted
+  );
   if (!target) return null;
 
   let best = null;
@@ -138,7 +155,12 @@ export function choosePaymentMethod(cardName, accounts) {
       else {
         const shortTarget = target.replace(/(신용|체크|법인|개인)/g, "");
         const shortLabel = label.replace(/(신용|체크|법인|개인)/g, "");
-        if (shortTarget && shortLabel && (shortLabel.includes(shortTarget) || shortTarget.includes(shortLabel))) score = 65;
+        if (
+          shortTarget &&
+          shortLabel &&
+          (shortLabel.includes(shortTarget) || shortTarget.includes(shortLabel))
+        )
+          score = 65;
       }
       if (score > bestScore) {
         best = account;
@@ -150,15 +172,25 @@ export function choosePaymentMethod(cardName, accounts) {
 }
 
 export function chooseCategory(candidate, categories, recentTransactions = []) {
-  const type = candidate?.kind === "income" ? "수입" : candidate?.kind === "transfer" ? "이체" : "지출";
+  const type =
+    candidate?.kind === "income" ? "수입" : candidate?.kind === "transfer" ? "이체" : "지출";
   const merchant = normalizeMerchant(candidate?.merchant);
   if (merchant) {
     for (const transaction of recentTransactions || []) {
       if (!transaction?.categoryId || transaction?.type !== type) continue;
       const prior = normalizeMerchant(transaction.description);
       if (!prior) continue;
-      if (merchant === prior || (merchant.length >= 4 && (merchant.includes(prior) || prior.includes(merchant)))) {
-        const category = (categories || []).find((item) => item.categoryId === transaction.categoryId && item.type === type && item.active && !item.isDeleted);
+      if (
+        merchant === prior ||
+        (merchant.length >= 4 && (merchant.includes(prior) || prior.includes(merchant)))
+      ) {
+        const category = (categories || []).find(
+          item =>
+            item.categoryId === transaction.categoryId &&
+            item.type === type &&
+            item.active &&
+            !item.isDeleted
+        );
         if (category) return { category, source: "history" };
       }
     }
@@ -166,10 +198,18 @@ export function chooseCategory(candidate, categories, recentTransactions = []) {
 
   const suggested = String(candidate?.suggestedCategoryName || "").trim();
   if (suggested) {
-    const exact = (categories || []).find((item) => item.type === type && item.active && !item.isDeleted && item.name === suggested);
+    const exact = (categories || []).find(
+      item => item.type === type && item.active && !item.isDeleted && item.name === suggested
+    );
     if (exact) return { category: exact, source: "ai" };
     const normalized = normalizeMerchant(suggested);
-    const fuzzy = (categories || []).find((item) => item.type === type && item.active && !item.isDeleted && normalizeMerchant(item.name) === normalized);
+    const fuzzy = (categories || []).find(
+      item =>
+        item.type === type &&
+        item.active &&
+        !item.isDeleted &&
+        normalizeMerchant(item.name) === normalized
+    );
     if (fuzzy) return { category: fuzzy, source: "ai" };
   }
   return { category: null, source: null };
@@ -183,7 +223,8 @@ function dateDistanceDays(a, b) {
 }
 
 export function findDuplicateTransaction(candidate, transactions, paymentMethodId = null) {
-  const type = candidate?.kind === "income" ? "수입" : candidate?.kind === "transfer" ? "이체" : "지출";
+  const type =
+    candidate?.kind === "income" ? "수입" : candidate?.kind === "transfer" ? "이체" : "지출";
   const merchant = normalizeMerchant(candidate?.merchant);
   const amount = Number(candidate?.amount || 0);
   if (!amount || !candidate?.date) return null;
@@ -197,13 +238,30 @@ export function findDuplicateTransaction(candidate, transactions, paymentMethodI
     if (days > 1) continue;
 
     let score = days === 0 ? 50 : 35;
-    if (type === "지출" && paymentMethodId && transaction.paymentMethodId === paymentMethodId) score += 30;
-    if (type === "수입" && candidate.toAccountId && transaction.toAccountId === candidate.toAccountId) score += 30;
-    if (type === "이체" && candidate.fromAccountId && candidate.toAccountId && transaction.fromAccountId === candidate.fromAccountId && transaction.toAccountId === candidate.toAccountId) score += 30;
+    if (type === "지출" && paymentMethodId && transaction.paymentMethodId === paymentMethodId)
+      score += 30;
+    if (
+      type === "수입" &&
+      candidate.toAccountId &&
+      transaction.toAccountId === candidate.toAccountId
+    )
+      score += 30;
+    if (
+      type === "이체" &&
+      candidate.fromAccountId &&
+      candidate.toAccountId &&
+      transaction.fromAccountId === candidate.fromAccountId &&
+      transaction.toAccountId === candidate.toAccountId
+    )
+      score += 30;
     const priorMerchant = normalizeMerchant(transaction.description);
     if (merchant && priorMerchant) {
       if (merchant === priorMerchant) score += 30;
-      else if (merchant.length >= 4 && (merchant.includes(priorMerchant) || priorMerchant.includes(merchant))) score += 20;
+      else if (
+        merchant.length >= 4 &&
+        (merchant.includes(priorMerchant) || priorMerchant.includes(merchant))
+      )
+        score += 20;
     }
     if (score > bestScore) {
       best = transaction;
@@ -218,8 +276,11 @@ export function dedupeImportedCandidates(items) {
   const result = [];
   for (const item of items || []) {
     const merchant = normalizeMerchant(item?.merchant);
-    const coreFieldCount = [Boolean(item?.date), Number(item?.amount || 0) > 0, Boolean(merchant)]
-      .filter(Boolean).length;
+    const coreFieldCount = [
+      Boolean(item?.date),
+      Number(item?.amount || 0) > 0,
+      Boolean(merchant)
+    ].filter(Boolean).length;
 
     // Keep incomplete but recognizable transactions so the review UI can repair them.
     // A single isolated field is too weak and is more likely to be a balance/summary value.
@@ -230,7 +291,9 @@ export function dedupeImportedCandidates(items) {
       .toLowerCase()
       .replace(/\s+/g, " ")
       .trim();
-    const baseKey = [item?.date || "", item?.amount || 0, merchant, item?.kind || "expense"].join("|");
+    const baseKey = [item?.date || "", item?.amount || 0, merchant, item?.kind || "expense"].join(
+      "|"
+    );
     const time = String(item?.time || "").trim();
 
     if (sourceText) {

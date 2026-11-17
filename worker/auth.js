@@ -30,7 +30,6 @@ async function pbkdf2Sha256(password, salt, iterations) {
   return new Uint8Array(bits);
 }
 
-
 function isObject(value) {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -119,16 +118,11 @@ function bytesToBase64Url(bytes) {
     binary += String.fromCharCode(byte);
   }
 
-  return btoa(binary)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
 function base64UrlToBytes(value) {
-  let text = String(value)
-    .replace(/-/g, "+")
-    .replace(/_/g, "/");
+  let text = String(value).replace(/-/g, "+").replace(/_/g, "/");
 
   text += "=".repeat((4 - (text.length % 4)) % 4);
 
@@ -159,9 +153,7 @@ export async function createSessionToken(name, env) {
     exp: now + SESSION_MAX_AGE
   };
 
-  const body = bytesToBase64Url(
-    encoder.encode(JSON.stringify(payload))
-  );
+  const body = bytesToBase64Url(encoder.encode(JSON.stringify(payload)));
 
   const signature = await crypto.subtle.sign(
     "HMAC",
@@ -196,9 +188,7 @@ export async function verifySessionToken(token, env) {
       return null;
     }
 
-    const payload = JSON.parse(
-      decoder.decode(base64UrlToBytes(body))
-    );
+    const payload = JSON.parse(decoder.decode(base64UrlToBytes(body)));
 
     if (
       !isObject(payload) ||
@@ -258,17 +248,12 @@ export function clearCookie() {
 }
 
 export async function getSession(request, env) {
-  const payload = await verifySessionToken(
-    getCookie(request, COOKIE_NAME),
-    env
-  );
+  const payload = await verifySessionToken(getCookie(request, COOKIE_NAME), env);
 
   if (!payload) {
     return null;
   }
 
   const users = getLoginUsers(env);
-  return Object.prototype.hasOwnProperty.call(users, payload.name)
-    ? payload
-    : null;
+  return Object.prototype.hasOwnProperty.call(users, payload.name) ? payload : null;
 }

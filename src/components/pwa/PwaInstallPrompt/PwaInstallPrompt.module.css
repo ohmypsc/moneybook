@@ -19,11 +19,9 @@
 
   border-radius: 14px;
 
-  background:
-    var(--color-primary);
+  background: var(--color-primary);
 
-  color:
-    var(--color-primary-text);
+  color: var(--color-primary-text);
 
   font-size: 22px;
   font-weight: 900;
@@ -39,8 +37,7 @@
 
   margin: 0;
 
-  color:
-    var(--color-text-primary);
+  color: var(--color-text-primary);
 
   font-size: 15px;
   font-weight: 800;
@@ -50,8 +47,7 @@
 .message {
   margin: 4px 0 0;
 
-  color:
-    var(--color-text-secondary);
+  color: var(--color-text-secondary);
 
   font-size: 12px;
   line-height: 1.55;
@@ -63,26 +59,20 @@
 
   padding: 12px 13px;
 
-  border:
-    1px solid
-    var(--color-border);
+  border: 1px solid var(--color-border);
 
-  border-radius:
-    var(--radius-md);
+  border-radius: var(--radius-md);
 
-  background:
-    var(--color-surface-soft);
+  background: var(--color-surface-soft);
 
-  color:
-    var(--color-text-secondary);
+  color: var(--color-text-secondary);
 
   font-size: 12px;
   line-height: 1.55;
 }
 
 .instructions strong {
-  color:
-    var(--color-text-primary);
+  color: var(--color-text-primary);
 
   font-size: 12px;
 }

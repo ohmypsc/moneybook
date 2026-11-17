@@ -1,71 +1,35 @@
-import {
-  StrictMode
-} from "react";
+import { StrictMode } from "react";
 
-import {
-  createRoot
-} from "react-dom/client";
+import { createRoot } from "react-dom/client";
 
-import App
-  from "./App";
+import App from "./App";
 
 import "./styles/tokens.css";
 import "./styles/global.css";
 
-import {
-  initializePwaInstall
-} from "./utils/pwaInstall";
-
+import { initializePwaInstall } from "./utils/pwaInstall";
 
 initializePwaInstall();
 
-
-const root =
-  document.getElementById(
-    "root"
-  );
-
+const root = document.getElementById("root");
 
 if (!root) {
-  throw new Error(
-    "root 요소를 찾을 수 없습니다."
-  );
+  throw new Error("root 요소를 찾을 수 없습니다.");
 }
 
-
-createRoot(
-  root
-).render(
+createRoot(root).render(
   <StrictMode>
     <App />
   </StrictMode>
 );
 
-
-if (
-  import.meta.env.PROD &&
-  "serviceWorker" in navigator
-) {
-  window.addEventListener(
-    "load",
-    () => {
-      void navigator
-        .serviceWorker
-        .register(
-          "/sw.js"
-        )
-        .then(
-          registration =>
-            registration.update()
-        )
-        .catch(
-          error => {
-            console.error(
-              "서비스 워커 등록에 실패했습니다.",
-              error
-            );
-          }
-        );
-    }
-  );
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    void navigator.serviceWorker
+      .register("/sw.js")
+      .then(registration => registration.update())
+      .catch(error => {
+        console.error("서비스 워커 등록에 실패했습니다.", error);
+      });
+  });
 }

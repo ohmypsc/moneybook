@@ -4,27 +4,19 @@ import type { BootstrapResponse } from "../types/bootstrap";
 
 let bootstrapRequestGeneration = -1;
 
-let bootstrapRequestPromise:
-  Promise<BootstrapResponse> | null =
-    null;
+let bootstrapRequestPromise: Promise<BootstrapResponse> | null = null;
 
 /**
  * bootstrap은 apiRequest의 메모리 캐시를 사용하며, 동시에 여러 화면이
  * 요청해도 같은 네트워크 Promise를 공유합니다.
  */
-export function getBootstrap<
-  TResponse = BootstrapResponse
->() {
+export function getBootstrap<TResponse = BootstrapResponse>() {
   const generation = getBootstrapCacheGeneration();
   if (!bootstrapRequestPromise || bootstrapRequestGeneration !== generation) {
     bootstrapRequestGeneration = generation;
-    const task =
-      apiRequest<BootstrapResponse>(
-        "/api/bootstrap"
-      );
+    const task = apiRequest<BootstrapResponse>("/api/bootstrap");
 
-    bootstrapRequestPromise =
-      task;
+    bootstrapRequestPromise = task;
 
     const clearRequest = () => {
       if (bootstrapRequestPromise === task) bootstrapRequestPromise = null;
@@ -32,8 +24,7 @@ export function getBootstrap<
     void task.then(clearRequest, clearRequest);
   }
 
-  return bootstrapRequestPromise as
-    Promise<TResponse>;
+  return bootstrapRequestPromise as Promise<TResponse>;
 }
 
 /**
@@ -41,9 +32,7 @@ export function getBootstrap<
  * 실패해도 홈 화면은 막지 않고 실제 입력 화면에서 다시 시도합니다.
  */
 export async function prefetchBootstrap() {
-  if (
-    getCachedBootstrapPayload<BootstrapResponse>()
-  ) {
+  if (getCachedBootstrapPayload<BootstrapResponse>()) {
     return;
   }
 

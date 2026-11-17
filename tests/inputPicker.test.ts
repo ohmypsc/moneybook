@@ -10,9 +10,27 @@ import {
 import type { Account, Category } from "../src/pages/InputPage/inputDomain.ts";
 
 const accounts: Account[] = [
-  { accountId: "mine", displayName: "내 통장", accountType: "자산", subType: "입출금", owner: "승철" },
-  { accountId: "shared", displayName: "공동 통장", accountType: "자산", subType: "입출금", owner: "공동" },
-  { accountId: "other", displayName: "다른 카드", accountType: "자산", subType: "신용카드", owner: "미영" }
+  {
+    accountId: "mine",
+    displayName: "내 통장",
+    accountType: "자산",
+    subType: "입출금",
+    owner: "승철"
+  },
+  {
+    accountId: "shared",
+    displayName: "공동 통장",
+    accountType: "자산",
+    subType: "입출금",
+    owner: "공동"
+  },
+  {
+    accountId: "other",
+    displayName: "다른 카드",
+    accountType: "자산",
+    subType: "신용카드",
+    owner: "미영"
+  }
 ];
 
 const accountContext = {
@@ -35,8 +53,14 @@ test("picker title reflects transfer category mode", () => {
 test("account picker groups current/shared accounts before other owner accounts", () => {
   const groups = getAccountPickerGroups("paymentMethod", accountContext);
 
-  assert.deepEqual(groups.primary.map(account => account.accountId), ["mine", "shared"]);
-  assert.deepEqual(groups.other.map(account => account.accountId), ["other"]);
+  assert.deepEqual(
+    groups.primary.map(account => account.accountId),
+    ["mine", "shared"]
+  );
+  assert.deepEqual(
+    groups.other.map(account => account.accountId),
+    ["other"]
+  );
 });
 
 test("transfer category picker puts loan repayment and card settlement first", () => {
@@ -68,7 +92,10 @@ test("spending targets always put shared first", () => {
     spendingTargets: ["승철", "미영", "공동"]
   });
 
-  assert.deepEqual(items.map(item => item.value), ["공동", "미영", "승철"]);
+  assert.deepEqual(
+    items.map(item => item.value),
+    ["공동", "미영", "승철"]
+  );
 });
 
 test("picker selection maps account roles to the right state value", () => {
@@ -102,5 +129,8 @@ test("manual income picker hides internal settlement/benefit categories but keep
     spendingTargets: []
   });
 
-  assert.deepEqual(items.map(item => item.label), ["급여", "캐시백"]);
+  assert.deepEqual(
+    items.map(item => item.label),
+    ["급여", "캐시백"]
+  );
 });

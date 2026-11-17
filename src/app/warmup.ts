@@ -23,10 +23,7 @@ export async function warmPrimaryData() {
   void prefetchBootstrap().catch(() => {});
   void prefetchManagedSettings().catch(() => {});
 
-  await Promise.race([
-    Promise.allSettled([dashboardRequest]),
-    wait(PRIMARY_WARM_TIMEOUT_MS)
-  ]);
+  await Promise.race([Promise.allSettled([dashboardRequest]), wait(PRIMARY_WARM_TIMEOUT_MS)]);
 }
 
 /** 홈이 실제로 뜬 뒤에만 필요한 투자 매매내역을 준비합니다. */

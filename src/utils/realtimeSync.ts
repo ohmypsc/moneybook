@@ -44,7 +44,7 @@ const MASTER_ENTITY_TYPES = new Set([
   "account",
   "category",
   "input_preferences",
-    "household_overview",
+  "household_overview",
   "ledger_config",
   "automation_settings",
   "classification_rules",
@@ -63,9 +63,7 @@ function readLastSeq() {
     const raw = window.localStorage.getItem(LAST_SEQ_KEY);
     if (raw === null) return null;
     const value = Number(raw);
-    return Number.isFinite(value) && value >= 0
-      ? Math.floor(value)
-      : null;
+    return Number.isFinite(value) && value >= 0 ? Math.floor(value) : null;
   } catch {
     return null;
   }
@@ -73,12 +71,8 @@ function readLastSeq() {
 
 function writeLastSeq(value: number) {
   try {
-    window.localStorage.setItem(
-      LAST_SEQ_KEY,
-      String(Math.max(0, Math.floor(value)))
-    );
-  } catch {
-  }
+    window.localStorage.setItem(LAST_SEQ_KEY, String(Math.max(0, Math.floor(value))));
+  } catch {}
 }
 
 function makeRealtimeUrl() {
@@ -92,20 +86,12 @@ function applyChanges(
 ) {
   if (!changes.length) return;
 
-  if (
-    changes.some(change =>
-      MASTER_ENTITY_TYPES.has(change.entityType)
-    )
-  ) {
+  if (changes.some(change => MASTER_ENTITY_TYPES.has(change.entityType))) {
     clearBootstrapMemoryCache();
     clearManagedSettingsCache();
   }
 
-  if (
-    changes.some(change =>
-      INVESTMENT_ENTITY_TYPES.has(change.entityType)
-    )
-  ) {
+  if (changes.some(change => INVESTMENT_ENTITY_TYPES.has(change.entityType))) {
     clearInvestmentPrefetchCache();
   }
 
@@ -150,9 +136,7 @@ export function startRealtimeSync({
       return;
     }
 
-    const response = await apiRequest<ChangesResponse>(
-      "/api/changes?head=1"
-    );
+    const response = await apiRequest<ChangesResponse>("/api/changes?head=1");
 
     writeLastSeq(response.data.latestSeq || 0);
     initialized = true;
@@ -218,8 +202,7 @@ export function startRealtimeSync({
     if (stopped) return;
     clearPollTimer();
 
-    const socketOpen =
-      socket?.readyState === WebSocket.OPEN;
+    const socketOpen = socket?.readyState === WebSocket.OPEN;
 
     let nextDelay = delay;
     if (nextDelay === undefined) {
@@ -227,10 +210,7 @@ export function startRealtimeSync({
         nextDelay = SOCKET_POLL_MS;
       } else {
         nextDelay = fallbackPollMs;
-        fallbackPollMs = Math.min(
-          FALLBACK_POLL_MAX_MS,
-          fallbackPollMs * 2
-        );
+        fallbackPollMs = Math.min(FALLBACK_POLL_MAX_MS, fallbackPollMs * 2);
       }
     }
 
@@ -248,10 +228,7 @@ export function startRealtimeSync({
   function scheduleSocketRetry() {
     if (stopped) return;
     clearSocketRetryTimer();
-    socketRetryTimer = window.setTimeout(
-      connectSocket,
-      SOCKET_RETRY_MS
-    );
+    socketRetryTimer = window.setTimeout(connectSocket, SOCKET_RETRY_MS);
   }
 
   function connectSocket() {
@@ -293,8 +270,7 @@ export function startRealtimeSync({
     socket.addEventListener("error", () => {
       try {
         socket?.close();
-      } catch {
-      }
+      } catch {}
     });
   }
 
@@ -341,8 +317,7 @@ export function startRealtimeSync({
     if (socket) {
       try {
         socket.close();
-      } catch {
-      }
+      } catch {}
       socket = null;
     }
   };

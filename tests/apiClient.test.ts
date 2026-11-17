@@ -44,21 +44,22 @@ test("apiRequest reuses bootstrap memory cache and invalidates it after master-d
     }
 
     if (url === "/api/accounts/update" && method === "POST") {
-      return new Response(
-        JSON.stringify({ success: true, data: { ok: true } }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json" }
-        }
-      );
+      return new Response(JSON.stringify({ success: true, data: { ok: true } }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
     }
 
     throw new Error(`unexpected request: ${method} ${url}`);
   }) as typeof fetch;
 
   try {
-    const first = await apiRequest<{ success: boolean; data: { marker: number } }>("/api/bootstrap");
-    const second = await apiRequest<{ success: boolean; data: { marker: number } }>("/api/bootstrap");
+    const first = await apiRequest<{ success: boolean; data: { marker: number } }>(
+      "/api/bootstrap"
+    );
+    const second = await apiRequest<{ success: boolean; data: { marker: number } }>(
+      "/api/bootstrap"
+    );
 
     assert.equal(first.data.marker, 1);
     assert.equal(second.data.marker, 1);
@@ -72,7 +73,9 @@ test("apiRequest reuses bootstrap memory cache and invalidates it after master-d
     assert.ok(getBootstrapCacheGeneration() > startingGeneration);
     assert.ok(getLedgerChangeVersion() > startingLedgerVersion);
 
-    const third = await apiRequest<{ success: boolean; data: { marker: number } }>("/api/bootstrap");
+    const third = await apiRequest<{ success: boolean; data: { marker: number } }>(
+      "/api/bootstrap"
+    );
     assert.equal(third.data.marker, 3);
     assert.equal(fetchCount, 3);
   } finally {
@@ -87,26 +90,28 @@ test("apiRequest does not invalidate caches when a mutation fails", async () => 
   const startingGeneration = getBootstrapCacheGeneration();
   const startingLedgerVersion = getLedgerChangeVersion();
 
-  globalThis.fetch = (async () => new Response(
-    JSON.stringify({
-      success: false,
-      error: {
-        code: "TEST_FAILURE",
-        message: "실패"
+  globalThis.fetch = (async () =>
+    new Response(
+      JSON.stringify({
+        success: false,
+        error: {
+          code: "TEST_FAILURE",
+          message: "실패"
+        }
+      }),
+      {
+        status: 400,
+        headers: { "Content-Type": "application/json" }
       }
-    }),
-    {
-      status: 400,
-      headers: { "Content-Type": "application/json" }
-    }
-  )) as typeof fetch;
+    )) as typeof fetch;
 
   try {
     await assert.rejects(
-      () => apiRequest("/api/accounts/update", {
-        method: "POST",
-        body: JSON.stringify({})
-      }),
+      () =>
+        apiRequest("/api/accounts/update", {
+          method: "POST",
+          body: JSON.stringify({})
+        }),
       /실패/
     );
 
@@ -149,27 +154,51 @@ test("apiRequest aborts a request after the configured timeout", async () => {
 
 test("apiRequest timeout covers a stalled response body after headers arrive", async () => {
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = (async (_input, init) => new Response(new ReadableStream({
-    start(controller) {
-      init?.signal?.addEventListener("abort", () => controller.error(new DOMException("Aborted", "AbortError")), { once: true });
-      controller.enqueue(new TextEncoder().encode('{"success":'));
-    }
-  }))) as typeof fetch;
+  globalThis.fetch = (async (_input, init) =>
+    new Response(
+      new ReadableStream({
+        start(controller) {
+          init?.signal?.addEventListener(
+            "abort",
+            () => controller.error(new DOMException("Aborted", "AbortError")),
+            { once: true }
+          );
+          controller.enqueue(new TextEncoder().encode('{"success":'));
+        }
+      })
+    )) as typeof fetch;
   try {
-    await assert.rejects(() => apiRequest("/api/slow-body", { timeoutMs: 10 }), (error: any) => error.code === "REQUEST_TIMEOUT");
-  } finally { globalThis.fetch = originalFetch; }
+    await assert.rejects(
+      () => apiRequest("/api/slow-body", { timeoutMs: 10 }),
+      (error: any) => error.code === "REQUEST_TIMEOUT"
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("external cancellation remains effective while reading the body", async () => {
   const originalFetch = globalThis.fetch;
   const controller = new AbortController();
-  globalThis.fetch = (async (_input, init) => new Response(new ReadableStream({
-    start(stream) {
-      init?.signal?.addEventListener("abort", () => stream.error(new DOMException("Aborted", "AbortError")), { once: true });
-      setTimeout(() => controller.abort(), 10);
-    }
-  }))) as typeof fetch;
+  globalThis.fetch = (async (_input, init) =>
+    new Response(
+      new ReadableStream({
+        start(stream) {
+          init?.signal?.addEventListener(
+            "abort",
+            () => stream.error(new DOMException("Aborted", "AbortError")),
+            { once: true }
+          );
+          setTimeout(() => controller.abort(), 10);
+        }
+      })
+    )) as typeof fetch;
   try {
-    await assert.rejects(() => apiRequest("/api/cancel-body", { signal: controller.signal }), (error: any) => error.name === "AbortError");
-  } finally { globalThis.fetch = originalFetch; }
+    await assert.rejects(
+      () => apiRequest("/api/cancel-body", { signal: controller.signal }),
+      (error: any) => error.name === "AbortError"
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

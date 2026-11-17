@@ -7,13 +7,9 @@ import type {
   TransactionType
 } from "./api";
 
-import type {
-  AutomationSettings
-} from "../api/automation";
+import type { AutomationSettings } from "../api/automation";
 
-import type {
-  SharedInputPreferencesState
-} from "../utils/inputPreferences";
+import type { SharedInputPreferencesState } from "../utils/inputPreferences";
 
 export interface BootstrapData {
   classificationSettings?: import("../api/classification").ClassificationSettings;

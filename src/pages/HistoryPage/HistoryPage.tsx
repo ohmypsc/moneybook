@@ -1,10 +1,4 @@
-import {
-  type FormEvent,
-  useEffect,
-  useMemo,
-  useRef,
-  useState
-} from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { reportExpenseAmounts, reloadTransactionWindow } from "./reportDetails";
 
@@ -12,35 +6,19 @@ import CalendarPage from "../CalendarPage/CalendarPage";
 
 import { getBootstrap } from "../../api/bootstrap";
 
-import {
-  getTransactions,
-  type Transaction
-} from "../../api/transactions";
+import { getTransactions, type Transaction } from "../../api/transactions";
 
-import {
-  getAssetSnapshots,
-  saveAssetSnapshot,
-  type AssetSnapshot
-} from "../../api/assetSnapshots";
+import { getAssetSnapshots, saveAssetSnapshot, type AssetSnapshot } from "../../api/assetSnapshots";
 
-import {
-  getDashboard,
-  getDashboardSnapshot
-} from "../../api/dashboard";
+import { getDashboard, getDashboardSnapshot } from "../../api/dashboard";
 
-import type {
-  DashboardData
-} from "../../types/dashboard";
+import type { DashboardData } from "../../types/dashboard";
 
 import type { BootstrapData } from "../../types/bootstrap";
 
-import {
-  getSeoulMonthString
-} from "../../utils/dateTime";
+import { getSeoulMonthString } from "../../utils/dateTime";
 
-import {
-  subscribeLedgerChanges
-} from "../../utils/ledgerEvents";
+import { subscribeLedgerChanges } from "../../utils/ledgerEvents";
 
 import {
   getBenefitTransactionMeta,
@@ -137,7 +115,11 @@ function getTransactionMeta(transaction: Transaction) {
   }
 
   if (transaction.type === "수입") {
-    return [transaction.description ? transaction.category : "", transaction.toAccount, transaction.createdBy]
+    return [
+      transaction.description ? transaction.category : "",
+      transaction.toAccount,
+      transaction.createdBy
+    ]
       .filter(Boolean)
       .join(" · ");
   }
@@ -147,7 +129,9 @@ function getTransactionMeta(transaction: Transaction) {
       transaction.description ? transaction.category : "",
       `${transaction.fromAccount || "출금"} → ${transaction.toAccount || "입금"}`,
       transaction.createdBy
-    ].filter(Boolean).join(" · ");
+    ]
+      .filter(Boolean)
+      .join(" · ");
   }
 
   return [
@@ -156,13 +140,12 @@ function getTransactionMeta(transaction: Transaction) {
     Number(transaction.installmentMonths) > 1 ? `${transaction.installmentMonths}개월 할부` : "",
     transaction.spendingTarget,
     transaction.createdBy
-  ].filter(Boolean).join(" · ");
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
-export default function HistoryPage({
-  onAddTransaction,
-  onCopyTransaction
-}: HistoryPageProps) {
+export default function HistoryPage({ onAddTransaction, onCopyTransaction }: HistoryPageProps) {
   // 마지막으로 본 화면(캘린더/목록/리포트)을 기억해 다음에 그대로 엽니다.
   const [view, setViewState] = useState<HistoryView>(readStoredHistoryView);
   const setView = (next: HistoryView) => {
@@ -183,7 +166,11 @@ export default function HistoryPage({
   const [appliedQuery, setAppliedQuery] = useState("");
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [searchNonce, setSearchNonce] = useState(0);
-  const [reportSelection, setReportSelection] = useState<{ category?: string; target?: string; month: string } | null>(null);
+  const [reportSelection, setReportSelection] = useState<{
+    category?: string;
+    target?: string;
+    month: string;
+  } | null>(null);
   const searchRequest = useRef(0);
   const reportRequest = useRef(0);
   const listReturn = useRef<{ scrollY: number; count: number } | null>(null);
@@ -207,8 +194,8 @@ export default function HistoryPage({
   const [searchLoadingMore, setSearchLoadingMore] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [reportMonth, setReportMonth] = useState(getSeoulMonthString());
-  const [report, setReport] = useState<DashboardData | null>(
-    () => getDashboardSnapshot(getSeoulMonthString())
+  const [report, setReport] = useState<DashboardData | null>(() =>
+    getDashboardSnapshot(getSeoulMonthString())
   );
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState("");
@@ -219,10 +206,7 @@ export default function HistoryPage({
   const [snapshotFeedback, setSnapshotFeedback] = useState("");
   const [ledgerVersion, setLedgerVersion] = useState(0);
 
-  async function runSearch(
-    event?: FormEvent,
-    options: { append?: boolean } = {}
-  ) {
+  async function runSearch(event?: FormEvent, options: { append?: boolean } = {}) {
     event?.preventDefault();
 
     if (searchDateFrom && searchDateTo && searchDateFrom > searchDateTo) {
@@ -261,7 +245,7 @@ export default function HistoryPage({
         accountId: searchAccountId || undefined,
         spendingTarget: searchSpendingTarget || undefined,
         amount: numericQuery,
-        q: numericQuery === undefined && trimmed ? trimmed : undefined,
+        q: numericQuery === undefined && trimmed ? trimmed : undefined
       };
       const fetchPage = async (offset: number, limit: number) => {
         const response = await getTransactions({ ...searchParams, offset, limit });
@@ -269,23 +253,21 @@ export default function HistoryPage({
       };
       const result = append
         ? await fetchPage(searchItems.length, SEARCH_PAGE_SIZE)
-        : await reloadTransactionWindow(fetchPage,
-            restoreListScroll.current ? listReturn.current?.count || SEARCH_PAGE_SIZE : SEARCH_PAGE_SIZE,
-            () => request === searchRequest.current);
+        : await reloadTransactionWindow(
+            fetchPage,
+            restoreListScroll.current
+              ? listReturn.current?.count || SEARCH_PAGE_SIZE
+              : SEARCH_PAGE_SIZE,
+            () => request === searchRequest.current
+          );
       if (!result || request !== searchRequest.current) return;
-      const activeItems = result.items.filter(
-        transaction => !transaction.isDeleted
-      );
+      const activeItems = result.items.filter(transaction => !transaction.isDeleted);
 
-      setSearchItems(current =>
-        append ? [...current, ...activeItems] : activeItems
-      );
+      setSearchItems(current => (append ? [...current, ...activeItems] : activeItems));
       setSearchTotal(result.total);
     } catch (error) {
       if (request !== searchRequest.current) return;
-      setSearchError(
-        error instanceof Error ? error.message : "내역을 검색하지 못했습니다."
-      );
+      setSearchError(error instanceof Error ? error.message : "내역을 검색하지 못했습니다.");
     } finally {
       if (request !== searchRequest.current) return;
       if (append) {
@@ -314,7 +296,8 @@ export default function HistoryPage({
   }
 
   useEffect(() => {
-    if (view !== "search" || searchLoading || !restoreListScroll.current || !listReturn.current) return;
+    if (view !== "search" || searchLoading || !restoreListScroll.current || !listReturn.current)
+      return;
     const scrollY = listReturn.current.scrollY;
     const frame = requestAnimationFrame(() => {
       window.scrollTo({ top: scrollY, behavior: "instant" });
@@ -374,9 +357,7 @@ export default function HistoryPage({
     } catch (error) {
       if (request !== reportRequest.current) return;
       if (!cached) {
-        setReportError(
-          error instanceof Error ? error.message : "리포트를 불러오지 못했습니다."
-        );
+        setReportError(error instanceof Error ? error.message : "리포트를 불러오지 못했습니다.");
       }
     } finally {
       if (request === reportRequest.current) setReportLoading(false);
@@ -392,9 +373,7 @@ export default function HistoryPage({
       setAssetSnapshots(data.items || []);
     } catch (error) {
       setSnapshotError(
-        error instanceof Error
-          ? error.message
-          : "순자산 기록을 불러오지 못했습니다."
+        error instanceof Error ? error.message : "순자산 기록을 불러오지 못했습니다."
       );
     } finally {
       setSnapshotLoading(false);
@@ -418,11 +397,7 @@ export default function HistoryPage({
       );
       await loadAssetSnapshots();
     } catch (error) {
-      setSnapshotError(
-        error instanceof Error
-          ? error.message
-          : "순자산을 기록하지 못했습니다."
-      );
+      setSnapshotError(error instanceof Error ? error.message : "순자산을 기록하지 못했습니다.");
     } finally {
       setSnapshotSaving(false);
     }
@@ -438,7 +413,9 @@ export default function HistoryPage({
     if (view === "search") {
       void runSearch();
     }
-    return () => { searchRequest.current += 1; };
+    return () => {
+      searchRequest.current += 1;
+    };
   }, [view, ledgerVersion, listMonth, searchNonce]);
 
   useEffect(() => {
@@ -473,7 +450,10 @@ export default function HistoryPage({
   }, [view]);
 
   const topCategories = useMemo(
-    () => showAllCategories ? (report?.categoryExpense || []) : (report?.categoryExpense || []).slice(0, 5),
+    () =>
+      showAllCategories
+        ? report?.categoryExpense || []
+        : (report?.categoryExpense || []).slice(0, 5),
     [report, showAllCategories]
   );
 
@@ -483,19 +463,23 @@ export default function HistoryPage({
   );
 
   const searchCategories = useMemo(
-    () => (searchBootstrap?.categories || [])
-      .filter(category => category.active && !category.isDeleted)
-      .filter(category => filter === "전체" || category.type === filter)
-      .slice()
-      .sort((a, b) => a.name.localeCompare(b.name, "ko")),
+    () =>
+      (searchBootstrap?.categories || [])
+        .filter(category => category.active && !category.isDeleted)
+        .filter(category => filter === "전체" || category.type === filter)
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name, "ko")),
     [searchBootstrap, filter]
   );
 
   const searchAccounts = useMemo(
-    () => (searchBootstrap?.accounts || [])
-      .filter(account => account.active && !account.isDeleted)
-      .slice()
-      .sort((a, b) => (a.displayName || a.accountName).localeCompare(b.displayName || b.accountName, "ko")),
+    () =>
+      (searchBootstrap?.accounts || [])
+        .filter(account => account.active && !account.isDeleted)
+        .slice()
+        .sort((a, b) =>
+          (a.displayName || a.accountName).localeCompare(b.displayName || b.accountName, "ko")
+        ),
     [searchBootstrap]
   );
 
@@ -526,10 +510,7 @@ export default function HistoryPage({
     [assetSnapshots, reportMonth]
   );
 
-  const recentSnapshots = useMemo(
-    () => assetSnapshots.slice(0, 6),
-    [assetSnapshots]
-  );
+  const recentSnapshots = useMemo(() => assetSnapshots.slice(0, 6), [assetSnapshots]);
 
   const monthlyTrend = report?.monthlyTrend || [];
   const monthlyTrendMax = Math.max(
@@ -537,14 +518,8 @@ export default function HistoryPage({
     ...monthlyTrend.flatMap(item => [Math.abs(item.income), Math.abs(item.expense)])
   );
 
-  const netWorthTrend = useMemo(
-    () => assetSnapshots.slice().reverse(),
-    [assetSnapshots]
-  );
-  const netWorthTrendMax = Math.max(
-    1,
-    ...netWorthTrend.map(item => Math.abs(item.netWorth))
-  );
+  const netWorthTrend = useMemo(() => assetSnapshots.slice().reverse(), [assetSnapshots]);
+  const netWorthTrendMax = Math.max(1, ...netWorthTrend.map(item => Math.abs(item.netWorth)));
 
   return (
     <>
@@ -595,7 +570,15 @@ export default function HistoryPage({
         <main className={styles.page}>
           {browsingMonth ? (
             <div className={styles.monthControl}>
-              <Button variant="ghost" size="sm" iconOnly aria-label="이전 달" onClick={() => setListMonth(current => moveMonth(current, -1))}>‹</Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
+                aria-label="이전 달"
+                onClick={() => setListMonth(current => moveMonth(current, -1))}
+              >
+                ‹
+              </Button>
               <strong>{formatMonthLabel(listMonth)}</strong>
               <Button
                 variant="ghost"
@@ -604,7 +587,9 @@ export default function HistoryPage({
                 aria-label="다음 달"
                 disabled={listMonth >= getSeoulMonthString()}
                 onClick={() => setListMonth(current => moveMonth(current, 1))}
-              >›</Button>
+              >
+                ›
+              </Button>
             </div>
           ) : (
             <div className={styles.searchModeBar}>
@@ -630,131 +615,147 @@ export default function HistoryPage({
           {reportSelection && (
             <Card padding="sm">
               <div className={styles.searchModeBar}>
-                <strong>{formatMonthLabel(reportSelection.month)} · {reportSelection.category || reportSelection.target} 지출 내역</strong>
-                <Button variant="ghost" size="sm" onClick={() => setView("report")}>리포트로 돌아가기</Button>
+                <strong>
+                  {formatMonthLabel(reportSelection.month)} ·{" "}
+                  {reportSelection.category || reportSelection.target} 지출 내역
+                </strong>
+                <Button variant="ghost" size="sm" onClick={() => setView("report")}>
+                  리포트로 돌아가기
+                </Button>
               </div>
-              <p className={styles.reportDetailHint}>리포트와 같은 기준으로 환불·정산을 차감한 실제 지출을 표시합니다. 차감된 거래는 원금과 환불·정산 금액도 함께 확인할 수 있습니다.</p>
-              <Button variant="ghost" size="sm" onClick={resetSearchFilters}>리포트 조건 해제</Button>
+              <p className={styles.reportDetailHint}>
+                리포트와 같은 기준으로 환불·정산을 차감한 실제 지출을 표시합니다. 차감된 거래는
+                원금과 환불·정산 금액도 함께 확인할 수 있습니다.
+              </p>
+              <Button variant="ghost" size="sm" onClick={resetSearchFilters}>
+                리포트 조건 해제
+              </Button>
             </Card>
           )}
-          {!reportSelection && <Card as="form" padding="sm" onSubmit={runSearch}>
-            <div className={styles.searchRow}>
-              <input
-                type="search"
-                value={query}
-                onChange={event => setQuery(event.target.value)}
-                placeholder="전체 기간 검색: 쿠팡, 식비, 125000"
-                aria-label="내역 검색어"
-              />
-              <Button type="submit" loading={searchLoading} loadingLabel="검색 중">
-                검색
-              </Button>
-            </div>
-
-            <div className={styles.filterRow}>
-              {FILTERS.map(item => (
-                <button
-                  key={item}
-                  type="button"
-                  className={filter === item ? styles.filterActive : ""}
-                  onClick={() => {
-                    setFilter(item);
-                    const selected = searchBootstrap?.categories.find(
-                      category => category.categoryId === searchCategoryId
-                    );
-                    if (selected && item !== "전체" && selected.type !== item) {
-                      setSearchCategoryId("");
-                    }
-                    setSearchNonce(value => value + 1);
-                  }}
-                >
-                  {item}
-                </button>
-              ))}
-            </div>
-
-            <button
-              type="button"
-              className={styles.advancedToggle}
-              aria-expanded={showAdvancedFilters}
-              onClick={() => setShowAdvancedFilters(current => !current)}
-            >
-              상세 조건{activeAdvancedFilterCount > 0 ? ` ${activeAdvancedFilterCount}개 적용` : ""}
-              <span aria-hidden="true">{showAdvancedFilters ? "⌃" : "⌄"}</span>
-            </button>
-
-            {showAdvancedFilters && (
-            <>
-            <div className={styles.advancedFilters}>
-              <label>
-                <span>시작일</span>
+          {!reportSelection && (
+            <Card as="form" padding="sm" onSubmit={runSearch}>
+              <div className={styles.searchRow}>
                 <input
-                  type="date"
-                  value={searchDateFrom}
-                  onChange={event => setSearchDateFrom(event.target.value)}
+                  type="search"
+                  value={query}
+                  onChange={event => setQuery(event.target.value)}
+                  placeholder="전체 기간 검색: 쿠팡, 식비, 125000"
+                  aria-label="내역 검색어"
                 />
-              </label>
-              <label>
-                <span>종료일</span>
-                <input
-                  type="date"
-                  value={searchDateTo}
-                  onChange={event => setSearchDateTo(event.target.value)}
-                />
-              </label>
-              <label>
-                <span>카테고리</span>
-                <select
-                  value={searchCategoryId}
-                  onChange={event => setSearchCategoryId(event.target.value)}
-                >
-                  <option value="">전체 카테고리</option>
-                  {searchCategories.map(category => (
-                    <option key={category.categoryId} value={category.categoryId}>
-                      {filter === "전체" ? `${category.type} · ` : ""}{category.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span>계좌·카드</span>
-                <select
-                  value={searchAccountId}
-                  onChange={event => setSearchAccountId(event.target.value)}
-                >
-                  <option value="">전체 계좌·카드</option>
-                  {searchAccounts.map(account => (
-                    <option key={account.accountId} value={account.accountId}>
-                      {account.displayName || account.accountName}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span>지출대상</span>
-                <select
-                  value={searchSpendingTarget}
-                  onChange={event => setSearchSpendingTarget(event.target.value)}
-                >
-                  <option value="">전체 지출대상</option>
-                  {(searchBootstrap?.spendingTargets || []).map(target => (
-                    <option key={target} value={target}>{target}</option>
-                  ))}
-                </select>
-              </label>
-            </div>
+                <Button type="submit" loading={searchLoading} loadingLabel="검색 중">
+                  검색
+                </Button>
+              </div>
 
-            <div className={styles.searchActions}>
-              <Button type="button" variant="ghost" size="sm" onClick={resetSearchFilters}>
-                조건 초기화
-              </Button>
-              <Button type="submit" size="sm" loading={searchLoading} loadingLabel="적용 중">
-                조건 적용
-              </Button>
-            </div>
-            </>
-            )}
-          </Card>}
+              <div className={styles.filterRow}>
+                {FILTERS.map(item => (
+                  <button
+                    key={item}
+                    type="button"
+                    className={filter === item ? styles.filterActive : ""}
+                    onClick={() => {
+                      setFilter(item);
+                      const selected = searchBootstrap?.categories.find(
+                        category => category.categoryId === searchCategoryId
+                      );
+                      if (selected && item !== "전체" && selected.type !== item) {
+                        setSearchCategoryId("");
+                      }
+                      setSearchNonce(value => value + 1);
+                    }}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                className={styles.advancedToggle}
+                aria-expanded={showAdvancedFilters}
+                onClick={() => setShowAdvancedFilters(current => !current)}
+              >
+                상세 조건
+                {activeAdvancedFilterCount > 0 ? ` ${activeAdvancedFilterCount}개 적용` : ""}
+                <span aria-hidden="true">{showAdvancedFilters ? "⌃" : "⌄"}</span>
+              </button>
+
+              {showAdvancedFilters && (
+                <>
+                  <div className={styles.advancedFilters}>
+                    <label>
+                      <span>시작일</span>
+                      <input
+                        type="date"
+                        value={searchDateFrom}
+                        onChange={event => setSearchDateFrom(event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      <span>종료일</span>
+                      <input
+                        type="date"
+                        value={searchDateTo}
+                        onChange={event => setSearchDateTo(event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      <span>카테고리</span>
+                      <select
+                        value={searchCategoryId}
+                        onChange={event => setSearchCategoryId(event.target.value)}
+                      >
+                        <option value="">전체 카테고리</option>
+                        {searchCategories.map(category => (
+                          <option key={category.categoryId} value={category.categoryId}>
+                            {filter === "전체" ? `${category.type} · ` : ""}
+                            {category.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>계좌·카드</span>
+                      <select
+                        value={searchAccountId}
+                        onChange={event => setSearchAccountId(event.target.value)}
+                      >
+                        <option value="">전체 계좌·카드</option>
+                        {searchAccounts.map(account => (
+                          <option key={account.accountId} value={account.accountId}>
+                            {account.displayName || account.accountName}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>지출대상</span>
+                      <select
+                        value={searchSpendingTarget}
+                        onChange={event => setSearchSpendingTarget(event.target.value)}
+                      >
+                        <option value="">전체 지출대상</option>
+                        {(searchBootstrap?.spendingTargets || []).map(target => (
+                          <option key={target} value={target}>
+                            {target}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+
+                  <div className={styles.searchActions}>
+                    <Button type="button" variant="ghost" size="sm" onClick={resetSearchFilters}>
+                      조건 초기화
+                    </Button>
+                    <Button type="submit" size="sm" loading={searchLoading} loadingLabel="적용 중">
+                      조건 적용
+                    </Button>
+                  </div>
+                </>
+              )}
+            </Card>
+          )}
 
           <div className={styles.resultHeader}>
             <strong>{searchTotal.toLocaleString("ko-KR")}건</strong>
@@ -777,72 +778,93 @@ export default function HistoryPage({
             </Card>
           ) : (
             groupedSearchItems.map(group => (
-            <section key={group.date} className={styles.dayGroup}>
-            <h2 className={styles.dayHeader}>{formatDayHeader(group.date)}</h2>
-            <Card padding="none" className={styles.listCard}>
-            {group.items.map(transaction => {
-                const isBenefit = isBenefitTransaction(transaction);
-                const isSettlement = isSettlementTransaction(transaction);
-                const expense = reportSelection ? reportExpenseAmounts(transaction) : null;
+              <section key={group.date} className={styles.dayGroup}>
+                <h2 className={styles.dayHeader}>{formatDayHeader(group.date)}</h2>
+                <Card padding="none" className={styles.listCard}>
+                  {group.items.map(transaction => {
+                    const isBenefit = isBenefitTransaction(transaction);
+                    const isSettlement = isSettlementTransaction(transaction);
+                    const expense = reportSelection ? reportExpenseAmounts(transaction) : null;
 
-                return (
-                  <article key={transaction.transactionId} className={styles.transactionRow}>
-                    <button
-                      type="button"
-                      className={styles.transactionMain}
-                      onClick={() => openSearchResultForEdit(transaction)}
-                      aria-label={`${getTransactionTitle(transaction)} 수정`}
-                    >
-                      <strong>{getTransactionTitle(transaction)}</strong>
-                      <span>{getTransactionMeta(transaction)}</span>
-                    </button>
-                    <div className={[styles.transactionActions, expense ? styles.reportTransactionActions : ""].filter(Boolean).join(" ")}>
-                      <strong className={
-                        isBenefit || isSettlement
-                          ? styles.transfer
-                          : transaction.type === "수입"
-                            ? styles.income
-                            : transaction.type === "지출"
-                              ? styles.expense
-                              : styles.transfer
-                      }>
-                        <Money
-                          amount={expense ? -expense.actual : transaction.type === "지출" ? -transaction.amount : transaction.amount}
-                          showPlus={transaction.type === "수입"}
-                          tone={
-                            isBenefit || isSettlement
-                              ? "muted"
-                              : transaction.type === "수입"
-                                ? "income"
-                                : transaction.type === "지출"
-                                  ? "expense"
-                                  : "muted"
-                          }
-                        />
-                      </strong>
-                      {expense && expense.deducted !== 0 && (
-                        <span className={styles.expenseBreakdown}>
-                          <span>원금 <Money amount={expense.original} absolute /></span>
-                          <span>환불·정산 −<Money amount={expense.deducted} absolute /></span>
-                          <span>실제 지출 <Money amount={expense.actual} absolute /></span>
-                        </span>
-                      )}
-                      {onCopyTransaction && (
+                    return (
+                      <article key={transaction.transactionId} className={styles.transactionRow}>
                         <button
                           type="button"
-                          className={styles.copyButton}
-                          onClick={() => onCopyTransaction(transaction)}
-                          aria-label={`${getTransactionTitle(transaction)} 복사해서 새로 입력`}
+                          className={styles.transactionMain}
+                          onClick={() => openSearchResultForEdit(transaction)}
+                          aria-label={`${getTransactionTitle(transaction)} 수정`}
                         >
-                          복사
+                          <strong>{getTransactionTitle(transaction)}</strong>
+                          <span>{getTransactionMeta(transaction)}</span>
                         </button>
-                      )}
-                    </div>
-                  </article>
-                );
-              })}
-            </Card>
-            </section>
+                        <div
+                          className={[
+                            styles.transactionActions,
+                            expense ? styles.reportTransactionActions : ""
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                        >
+                          <strong
+                            className={
+                              isBenefit || isSettlement
+                                ? styles.transfer
+                                : transaction.type === "수입"
+                                  ? styles.income
+                                  : transaction.type === "지출"
+                                    ? styles.expense
+                                    : styles.transfer
+                            }
+                          >
+                            <Money
+                              amount={
+                                expense
+                                  ? -expense.actual
+                                  : transaction.type === "지출"
+                                    ? -transaction.amount
+                                    : transaction.amount
+                              }
+                              showPlus={transaction.type === "수입"}
+                              tone={
+                                isBenefit || isSettlement
+                                  ? "muted"
+                                  : transaction.type === "수입"
+                                    ? "income"
+                                    : transaction.type === "지출"
+                                      ? "expense"
+                                      : "muted"
+                              }
+                            />
+                          </strong>
+                          {expense && expense.deducted !== 0 && (
+                            <span className={styles.expenseBreakdown}>
+                              <span>
+                                원금 <Money amount={expense.original} absolute />
+                              </span>
+                              <span>
+                                환불·정산 −<Money amount={expense.deducted} absolute />
+                              </span>
+                              <span>
+                                실제 지출 <Money amount={expense.actual} absolute />
+                              </span>
+                            </span>
+                          )}
+                          {onCopyTransaction && (
+                            <button
+                              type="button"
+                              className={styles.copyButton}
+                              onClick={() => onCopyTransaction(transaction)}
+                              aria-label={`${getTransactionTitle(transaction)} 복사해서 새로 입력`}
+                            >
+                              복사
+                            </button>
+                          )}
+                        </div>
+                      </article>
+                    );
+                  })}
+                </Card>
+              </section>
             ))
           )}
 
@@ -855,7 +877,10 @@ export default function HistoryPage({
                 loadingLabel="불러오는 중"
                 onClick={() => void runSearch(undefined, { append: true })}
               >
-                {Math.min(SEARCH_PAGE_SIZE, searchTotal - searchItems.length).toLocaleString("ko-KR")}건 더 보기
+                {Math.min(SEARCH_PAGE_SIZE, searchTotal - searchItems.length).toLocaleString(
+                  "ko-KR"
+                )}
+                건 더 보기
               </Button>
             </div>
           )}
@@ -870,7 +895,15 @@ export default function HistoryPage({
           </header>
 
           <div className={styles.monthControl}>
-            <Button variant="ghost" size="sm" iconOnly aria-label="이전 달" onClick={() => setReportMonth(current => moveMonth(current, -1))}>‹</Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              iconOnly
+              aria-label="이전 달"
+              onClick={() => setReportMonth(current => moveMonth(current, -1))}
+            >
+              ‹
+            </Button>
             <strong>{formatMonthLabel(reportMonth)}</strong>
             <Button
               variant="ghost"
@@ -879,7 +912,9 @@ export default function HistoryPage({
               aria-label="다음 달"
               disabled={reportMonth >= getSeoulMonthString()}
               onClick={() => setReportMonth(current => moveMonth(current, 1))}
-            >›</Button>
+            >
+              ›
+            </Button>
           </div>
 
           {reportLoading && !report && <p className={styles.state}>리포트를 불러오는 중입니다.</p>}
@@ -888,23 +923,48 @@ export default function HistoryPage({
           {report && (
             <>
               <Card as="section" padding="none" className={styles.reportSummary}>
-                <div><span>수입</span><strong><Money amount={report.summary.monthIncome} absolute tone="income" /></strong></div>
-                <div><span>지출</span><strong><Money amount={report.summary.monthExpense} absolute tone="expense" /></strong></div>
-                <div><span>순현금흐름</span><strong><Money amount={report.summary.monthNetCashFlow} showPlus tone={report.summary.monthNetCashFlow < 0 ? "negative" : "positive"} /></strong></div>
+                <div>
+                  <span>수입</span>
+                  <strong>
+                    <Money amount={report.summary.monthIncome} absolute tone="income" />
+                  </strong>
+                </div>
+                <div>
+                  <span>지출</span>
+                  <strong>
+                    <Money amount={report.summary.monthExpense} absolute tone="expense" />
+                  </strong>
+                </div>
+                <div>
+                  <span>순현금흐름</span>
+                  <strong>
+                    <Money
+                      amount={report.summary.monthNetCashFlow}
+                      showPlus
+                      tone={report.summary.monthNetCashFlow < 0 ? "negative" : "positive"}
+                    />
+                  </strong>
+                </div>
               </Card>
 
               <Card padding="sm" tone="soft" shadow="none" className={styles.grossBreakdown}>
                 <div>
                   <span>총 지출</span>
-                  <strong><Money amount={report.summary.monthExpenseGross} absolute /></strong>
+                  <strong>
+                    <Money amount={report.summary.monthExpenseGross} absolute />
+                  </strong>
                 </div>
                 <div>
                   <span>환불·정산</span>
-                  <strong><Money amount={report.summary.monthRefunds} absolute tone="positive" /></strong>
+                  <strong>
+                    <Money amount={report.summary.monthRefunds} absolute tone="positive" />
+                  </strong>
                 </div>
                 <div>
                   <span>순지출</span>
-                  <strong><Money amount={report.summary.monthExpense} absolute tone="expense" /></strong>
+                  <strong>
+                    <Money amount={report.summary.monthExpense} absolute tone="expense" />
+                  </strong>
                 </div>
               </Card>
 
@@ -915,8 +975,14 @@ export default function HistoryPage({
                 </div>
                 <Card padding="sm" className={styles.trendCard}>
                   <div className={styles.trendLegend}>
-                    <span><i className={styles.incomeDot} />수입</span>
-                    <span><i className={styles.expenseDot} />지출</span>
+                    <span>
+                      <i className={styles.incomeDot} />
+                      수입
+                    </span>
+                    <span>
+                      <i className={styles.expenseDot} />
+                      지출
+                    </span>
                   </div>
                   <div className={styles.trendBars}>
                     {monthlyTrend.map(item => (
@@ -928,11 +994,15 @@ export default function HistoryPage({
                         <div className={styles.trendBarArea}>
                           <span
                             className={styles.incomeBar}
-                            style={{ height: `${Math.max(3, Math.abs(item.income) / monthlyTrendMax * 100)}%` }}
+                            style={{
+                              height: `${Math.max(3, (Math.abs(item.income) / monthlyTrendMax) * 100)}%`
+                            }}
                           />
                           <span
                             className={styles.expenseBar}
-                            style={{ height: `${Math.max(3, Math.abs(item.expense) / monthlyTrendMax * 100)}%` }}
+                            style={{
+                              height: `${Math.max(3, (Math.abs(item.expense) / monthlyTrendMax) * 100)}%`
+                            }}
                           />
                         </div>
                         <small>{Number(item.month.slice(5))}월</small>
@@ -948,21 +1018,37 @@ export default function HistoryPage({
                   <span>{showAllCategories ? "전체" : "상위 5개"} · 누르면 내역 보기</span>
                 </div>
                 <Card padding="none" className={styles.rankList}>
-                  {topCategories.length ? topCategories.map((item, index) => (
-                    <button type="button" key={item.name} className={styles.rankRow}
-                      disabled={reportLoading || report.month !== reportMonth}
-                      onClick={() => openReportDetails("category", item.name)}
-                      aria-label={`${item.name} 지출 내역 보기`}>
-                      <span>{index + 1}</span>
-                      <strong>{item.name}</strong>
-                      <b><Money amount={item.amount} absolute /> <span aria-hidden="true">›</span></b>
-                    </button>
-                  )) : <p className={styles.empty}>이 달의 지출이 없습니다.</p>}
+                  {topCategories.length ? (
+                    topCategories.map((item, index) => (
+                      <button
+                        type="button"
+                        key={item.name}
+                        className={styles.rankRow}
+                        disabled={reportLoading || report.month !== reportMonth}
+                        onClick={() => openReportDetails("category", item.name)}
+                        aria-label={`${item.name} 지출 내역 보기`}
+                      >
+                        <span>{index + 1}</span>
+                        <strong>{item.name}</strong>
+                        <b>
+                          <Money amount={item.amount} absolute /> <span aria-hidden="true">›</span>
+                        </b>
+                      </button>
+                    ))
+                  ) : (
+                    <p className={styles.empty}>이 달의 지출이 없습니다.</p>
+                  )}
                 </Card>
                 {(report.categoryExpense || []).length > 5 && (
-                  <Button variant="ghost" size="sm" aria-expanded={showAllCategories}
-                    onClick={() => setShowAllCategories(value => !value)}>
-                    {showAllCategories ? "상위 5개만 보기" : `전체 ${(report.categoryExpense || []).length}개 보기`}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-expanded={showAllCategories}
+                    onClick={() => setShowAllCategories(value => !value)}
+                  >
+                    {showAllCategories
+                      ? "상위 5개만 보기"
+                      : `전체 ${(report.categoryExpense || []).length}개 보기`}
                   </Button>
                 )}
               </section>
@@ -973,15 +1059,24 @@ export default function HistoryPage({
                   <span>누르면 내역 보기</span>
                 </div>
                 <Card padding="sm" className={styles.targetGrid}>
-                  {spendingTargets.length ? spendingTargets.map(item => (
-                    <button type="button" key={item.name}
-                      disabled={reportLoading || report.month !== reportMonth}
-                      onClick={() => openReportDetails("target", item.name)}
-                      aria-label={`${item.name} 지출 내역 보기`}>
-                      <span>{item.name} ›</span>
-                      <strong><Money amount={item.amount} absolute /></strong>
-                    </button>
-                  )) : <p className={styles.empty}>분류된 지출이 없습니다.</p>}
+                  {spendingTargets.length ? (
+                    spendingTargets.map(item => (
+                      <button
+                        type="button"
+                        key={item.name}
+                        disabled={reportLoading || report.month !== reportMonth}
+                        onClick={() => openReportDetails("target", item.name)}
+                        aria-label={`${item.name} 지출 내역 보기`}
+                      >
+                        <span>{item.name} ›</span>
+                        <strong>
+                          <Money amount={item.amount} absolute />
+                        </strong>
+                      </button>
+                    ))
+                  ) : (
+                    <p className={styles.empty}>분류된 지출이 없습니다.</p>
+                  )}
                 </Card>
               </section>
 
@@ -996,10 +1091,13 @@ export default function HistoryPage({
                     <div className={styles.snapshotCurrent}>
                       <div>
                         <span>{formatMonthLabel(selectedSnapshot.month)} 순자산</span>
-                        <strong><Money amount={selectedSnapshot.netWorth} /></strong>
+                        <strong>
+                          <Money amount={selectedSnapshot.netWorth} />
+                        </strong>
                       </div>
                       <small>
-                        자산 <Money amount={selectedSnapshot.assets} absolute /> · 부채 <Money amount={selectedSnapshot.liabilities} absolute />
+                        자산 <Money amount={selectedSnapshot.assets} absolute /> · 부채{" "}
+                        <Money amount={selectedSnapshot.liabilities} absolute />
                         {selectedSnapshot.updatedBy ? ` · 기록 ${selectedSnapshot.updatedBy}` : ""}
                       </small>
                     </div>
@@ -1018,13 +1116,18 @@ export default function HistoryPage({
                       >
                         {selectedSnapshot ? "현재 값으로 다시 기록" : "현재 순자산 기록"}
                       </Button>
-                      <small>현재 계좌·투자 평가액을 이달 기록으로 저장하며 수입·지출 통계에는 영향을 주지 않습니다.</small>
+                      <small>
+                        현재 계좌·투자 평가액을 이달 기록으로 저장하며 수입·지출 통계에는 영향을
+                        주지 않습니다.
+                      </small>
                     </div>
                   )}
 
                   {snapshotFeedback && <p className={styles.feedback}>{snapshotFeedback}</p>}
                   {snapshotError && <p className={styles.error}>{snapshotError}</p>}
-                  {snapshotLoading && !assetSnapshots.length && <p className={styles.state}>순자산 기록을 불러오는 중입니다.</p>}
+                  {snapshotLoading && !assetSnapshots.length && (
+                    <p className={styles.state}>순자산 기록을 불러오는 중입니다.</p>
+                  )}
                 </Card>
 
                 {netWorthTrend.length > 1 && (
@@ -1038,8 +1141,12 @@ export default function HistoryPage({
                         >
                           <div className={styles.netWorthBarArea}>
                             <span
-                              className={item.netWorth < 0 ? styles.netWorthBarNegative : styles.netWorthBar}
-                              style={{ height: `${Math.max(3, Math.abs(item.netWorth) / netWorthTrendMax * 100)}%` }}
+                              className={
+                                item.netWorth < 0 ? styles.netWorthBarNegative : styles.netWorthBar
+                              }
+                              style={{
+                                height: `${Math.max(3, (Math.abs(item.netWorth) / netWorthTrendMax) * 100)}%`
+                              }}
                             />
                           </div>
                           <small>{item.month.slice(2).replace("-", ".")}</small>
@@ -1054,13 +1161,14 @@ export default function HistoryPage({
                     {recentSnapshots.map(item => (
                       <div key={item.month}>
                         <span>{formatMonthLabel(item.month)}</span>
-                        <strong><Money amount={item.netWorth} /></strong>
+                        <strong>
+                          <Money amount={item.netWorth} />
+                        </strong>
                       </div>
                     ))}
                   </Card>
                 )}
               </section>
-
             </>
           )}
         </main>

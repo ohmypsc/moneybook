@@ -70,7 +70,12 @@ export interface TaxSummary {
     items: Partial<Record<TaxItemKey, TaxItemTotal>>;
   } | null;
   categories: { categoryId: string; name: string; taxCode: string }[];
-  incomeCategories: { categoryId: string; name: string; taxCode: string; countedAsSalary: boolean }[];
+  incomeCategories: {
+    categoryId: string;
+    name: string;
+    taxCode: string;
+    countedAsSalary: boolean;
+  }[];
   taxCodes: { code: string; label: string }[];
   incomeTaxCodes: { code: string; label: string }[];
   recommendations: { kind: string; member?: string; text: string }[];
@@ -85,12 +90,19 @@ function unwrap<T>(raw: ApiEnvelope<T>, fallback: string): T {
 
 export async function getTaxSummary(year: number) {
   return unwrap(
-    await apiRequest<ApiEnvelope<TaxSummary>>(`/api/tax/summary?year=${encodeURIComponent(String(year))}`),
+    await apiRequest<ApiEnvelope<TaxSummary>>(
+      `/api/tax/summary?year=${encodeURIComponent(String(year))}`
+    ),
     "연말정산 정보를 불러오지 못했습니다."
   );
 }
 
-export async function saveTaxProfile(input: { year: number; memberName: string; grossSalary: number; children: number }) {
+export async function saveTaxProfile(input: {
+  year: number;
+  memberName: string;
+  grossSalary: number;
+  children: number;
+}) {
   return unwrap(
     await apiRequest<ApiEnvelope<{ saved: true }>>("/api/tax/profile", {
       method: "POST",
@@ -112,7 +124,14 @@ export async function saveCategoryTaxCode(categoryId: string, taxCode: string) {
 
 export interface TaxPresetPlan {
   applied: boolean;
-  renames: { categoryId: string; type: string; from: string; to: string; taxCode: string | null; note: string }[];
+  renames: {
+    categoryId: string;
+    type: string;
+    from: string;
+    to: string;
+    taxCode: string | null;
+    note: string;
+  }[];
   links: { categoryId: string; type: string; name: string; taxCode: string; note: string }[];
   deactivations: { categoryId: string; type: string; name: string; note: string }[];
   creates: { type: string; name: string; taxCode: string; note: string }[];

@@ -1,8 +1,25 @@
 // 카드 혜택 계산, 혜택 적립금 사용 기록, 연결된 혜택 거래 갱신
 import { dateOnly as mbD1DateOnly } from "../domain/date.js";
-import { BENEFIT_INCOME_CATEGORY_NAME, CASHBACK_INCOME_CATEGORY_NAME, DEFAULT_CATEGORY_IDS, SETTLEMENT_INCOME_CATEGORY_NAME, SYSTEM_CATEGORY_IDS } from "../domain/settlement.js";
+import {
+  BENEFIT_INCOME_CATEGORY_NAME,
+  CASHBACK_INCOME_CATEGORY_NAME,
+  DEFAULT_CATEGORY_IDS,
+  SETTLEMENT_INCOME_CATEGORY_NAME,
+  SYSTEM_CATEGORY_IDS
+} from "../domain/settlement.js";
 import { mbD1AutomationSettingsData } from "./automation.js";
-import { MB_D1_HOUSEHOLD_ID, mbD1Bool, mbD1Fail, mbD1First, mbD1Id, mbD1InsertChange, mbD1MemberIdByName, mbD1Now, mbD1Number, mbD1Text } from "./core.js";
+import {
+  MB_D1_HOUSEHOLD_ID,
+  mbD1Bool,
+  mbD1Fail,
+  mbD1First,
+  mbD1Id,
+  mbD1InsertChange,
+  mbD1MemberIdByName,
+  mbD1Now,
+  mbD1Number,
+  mbD1Text
+} from "./core.js";
 import { mbD1AccountById, mbD1CategoryById } from "./records.js";
 import { mbD1BuildTransactionModel } from "./transactions.js";
 
@@ -27,28 +44,21 @@ export async function mbD1EnsureSystemCategory(env, { categoryId, type, name }) 
             ELSE 3 END,
        updated_at DESC
      LIMIT 1`,
-    [
-      MB_D1_HOUSEHOLD_ID,
-      categoryId,
-      type,
-      name,
-      type,
-      name,
-      type,
-      name,
-      categoryId
-    ]
+    [MB_D1_HOUSEHOLD_ID, categoryId, type, name, type, name, type, name, categoryId]
   );
 
   const now = mbD1Now();
   if (row?.category_id) {
-    const needsRepair = row.type !== type || row.name !== name || row.deleted_at || !mbD1Bool(row.is_active);
+    const needsRepair =
+      row.type !== type || row.name !== name || row.deleted_at || !mbD1Bool(row.is_active);
     if (needsRepair) {
       await env.DB.prepare(
         `UPDATE categories
          SET type=?,name=?,is_active=1,deleted_at=NULL,deleted_by=NULL,updated_at=?,updated_by=?
          WHERE household_id=? AND category_id=?`
-      ).bind(type, name, now, "system", MB_D1_HOUSEHOLD_ID, row.category_id).run();
+      )
+        .bind(type, name, now, "system", MB_D1_HOUSEHOLD_ID, row.category_id)
+        .run();
       return { ...row, type, name, is_active: 1, deleted_at: null };
     }
     return row;
@@ -56,26 +66,17 @@ export async function mbD1EnsureSystemCategory(env, { categoryId, type, name }) 
 
   await env.DB.prepare(
     "INSERT OR IGNORE INTO categories (category_id,household_id,type,name,is_active,created_at,updated_at,created_by,updated_by,deleted_at,deleted_by,source_row) VALUES (?,?,?,?,?,?,?,?,?,?,?,NULL)"
-  ).bind(
-    categoryId,
-    MB_D1_HOUSEHOLD_ID,
-    type,
-    name,
-    1,
-    now,
-    now,
-    "system",
-    "system",
-    null,
-    null
-  ).run();
+  )
+    .bind(categoryId, MB_D1_HOUSEHOLD_ID, type, name, 1, now, now, "system", "system", null, null)
+    .run();
 
   row = await mbD1First(
     env,
     "SELECT category_id,name,is_active,deleted_at,type FROM categories WHERE household_id=? AND category_id=? LIMIT 1",
     [MB_D1_HOUSEHOLD_ID, categoryId]
   );
-  if (!row?.category_id) mbD1Fail("SYSTEM_CATEGORY_CREATE_FAILED", `${name} 카테고리를 준비하지 못했습니다.`, 500);
+  if (!row?.category_id)
+    mbD1Fail("SYSTEM_CATEGORY_CREATE_FAILED", `${name} 카테고리를 준비하지 못했습니다.`, 500);
   return row;
 }
 
@@ -101,19 +102,21 @@ export async function mbD1EnsureDefaultCashbackIncomeCategory(env) {
   const now = mbD1Now();
   await env.DB.prepare(
     "INSERT OR IGNORE INTO categories (category_id,household_id,type,name,is_active,created_at,updated_at,created_by,updated_by,deleted_at,deleted_by,source_row) VALUES (?,?,?,?,?,?,?,?,?,?,?,NULL)"
-  ).bind(
-    categoryId,
-    MB_D1_HOUSEHOLD_ID,
-    "수입",
-    CASHBACK_INCOME_CATEGORY_NAME,
-    1,
-    now,
-    now,
-    "system-default",
-    "system-default",
-    null,
-    null
-  ).run();
+  )
+    .bind(
+      categoryId,
+      MB_D1_HOUSEHOLD_ID,
+      "수입",
+      CASHBACK_INCOME_CATEGORY_NAME,
+      1,
+      now,
+      now,
+      "system-default",
+      "system-default",
+      null,
+      null
+    )
+    .run();
 
   return mbD1First(
     env,
@@ -163,7 +166,7 @@ export async function mbD1EnsureBenefitUsageSchema(env) {
       .then(() => {
         mbD1BenefitUsageSchemaReady = true;
       })
-      .catch((error) => {
+      .catch(error => {
         mbD1BenefitUsageSchemaPromise = null;
         throw error;
       });
@@ -182,7 +185,12 @@ export async function mbD1BenefitRewardUsageRecord(env, transactionId) {
   );
 }
 
-export async function mbD1BenefitRewardBalance(env, rule, excludeTransactionId = "", excludeBenefitRequestId = "") {
+export async function mbD1BenefitRewardBalance(
+  env,
+  rule,
+  excludeTransactionId = "",
+  excludeBenefitRequestId = ""
+) {
   await mbD1EnsureBenefitUsageSchema(env);
   const earnedSql = `SELECT COALESCE(SUM(amount),0) AS earned
                      FROM transactions
@@ -211,9 +219,11 @@ export async function mbD1BenefitRewardBalance(env, rule, excludeTransactionId =
 
 export async function mbD1BenefitRewardBalancesData(env) {
   const settings = await mbD1AutomationSettingsData(env);
-  const rules = settings.benefitRules.filter((rule) => rule.accountId && (rule.kind === "post_reward" || rule.rewardOpeningBalance > 0));
+  const rules = settings.benefitRules.filter(
+    rule => rule.accountId && (rule.kind === "post_reward" || rule.rewardOpeningBalance > 0)
+  );
   return Promise.all(
-    rules.map(async (rule) => ({
+    rules.map(async rule => ({
       ruleId: rule.id,
       accountId: rule.accountId,
       rewardBalance: await mbD1BenefitRewardBalance(env, rule)
@@ -248,14 +258,15 @@ export async function mbD1PrepareBenefit(env, body, options = {}) {
   const ruleId = mbD1Text(body.benefitRuleId);
   if (!ruleId) return null;
   const settings = await mbD1AutomationSettingsData(env);
-  const rule = settings.benefitRules.find((item) => item.id === ruleId);
+  const rule = settings.benefitRules.find(item => item.id === ruleId);
   if (!rule) mbD1Fail("BENEFIT_RULE_NOT_FOUND", "선택한 혜택 규칙을 찾을 수 없습니다.");
   const date = mbD1DateOnly(body.date);
   if (!date || !mbD1BenefitRuleIsActive(rule, date)) return null;
   const type = mbD1Text(body.type);
 
   if (type === "지출") {
-    if (rule.kind !== "post_reward" || mbD1Text(body.paymentMethodId) !== rule.accountId) return null;
+    if (rule.kind !== "post_reward" || mbD1Text(body.paymentMethodId) !== rule.accountId)
+      return null;
     const faceAmount = Math.max(0, mbD1Number(body.amount));
     const rewardBalanceBefore = await mbD1BenefitRewardBalance(env, rule);
     const maxRewardUsable = Math.max(0, Math.min(faceAmount, rewardBalanceBefore));
@@ -357,33 +368,46 @@ export async function mbD1LinkedBenefit(env, current) {
 
 export async function mbD1MatchingBenefitRule(env, model) {
   const settings = await mbD1AutomationSettingsData(env);
-  const activeRules = settings.benefitRules.filter((rule) => mbD1BenefitRuleIsActive(rule, model.date));
+  const activeRules = settings.benefitRules.filter(rule =>
+    mbD1BenefitRuleIsActive(rule, model.date)
+  );
 
   if (model.type === "지출" && model.paymentMethodId) {
-    return activeRules.find(
-      (rule) => rule.kind === "post_reward" && rule.accountId === model.paymentMethodId
-    ) || null;
+    return (
+      activeRules.find(
+        rule => rule.kind === "post_reward" && rule.accountId === model.paymentMethodId
+      ) || null
+    );
   }
 
   if (model.type === "이체" && model.toAccountId) {
     const category = await mbD1CategoryById(env, model.categoryId, false);
     if (category?.name !== "지역화폐충전") return null;
-    return activeRules.find(
-      (rule) => rule.kind === "pre_discount" && rule.accountId === model.toAccountId
-    ) || null;
+    return (
+      activeRules.find(
+        rule => rule.kind === "pre_discount" && rule.accountId === model.toAccountId
+      ) || null
+    );
   }
 
   return null;
 }
 
-export async function mbD1LinkedBenefitUpdateStatements(env, current, model, actor, session, now, matchingRule = undefined) {
+export async function mbD1LinkedBenefitUpdateStatements(
+  env,
+  current,
+  model,
+  actor,
+  session,
+  now,
+  matchingRule = undefined
+) {
   const [linked, usage] = await Promise.all([
     mbD1LinkedBenefit(env, current),
     mbD1BenefitRewardUsageRecord(env, current.transactionId)
   ]);
-  const rule = matchingRule === undefined
-    ? await mbD1MatchingBenefitRule(env, model)
-    : matchingRule;
+  const rule =
+    matchingRule === undefined ? await mbD1MatchingBenefitRule(env, model) : matchingRule;
   const statements = [];
 
   if (!rule) {
@@ -400,7 +424,15 @@ export async function mbD1LinkedBenefitUpdateStatements(env, current, model, act
         env.DB.prepare(
           "UPDATE transactions SET deleted_at=?,deleted_by=?,updated_at=?,updated_by=?,version=? WHERE household_id=? AND transaction_id=?"
         ).bind(now, actor, now, actor, nextVersion, MB_D1_HOUSEHOLD_ID, linked.transaction_id),
-        await mbD1InsertChange(env, "transaction", linked.transaction_id, "deleted", nextVersion, session, { automaticBenefit: true })
+        await mbD1InsertChange(
+          env,
+          "transaction",
+          linked.transaction_id,
+          "deleted",
+          nextVersion,
+          session,
+          { automaticBenefit: true }
+        )
       );
     }
     return statements;
@@ -482,7 +514,15 @@ export async function mbD1LinkedBenefitUpdateStatements(env, current, model, act
         env.DB.prepare(
           "UPDATE transactions SET deleted_at=?,deleted_by=?,updated_at=?,updated_by=?,version=? WHERE household_id=? AND transaction_id=?"
         ).bind(now, actor, now, actor, nextVersion, MB_D1_HOUSEHOLD_ID, linked.transaction_id),
-        await mbD1InsertChange(env, "transaction", linked.transaction_id, "deleted", nextVersion, session, { automaticBenefit: true })
+        await mbD1InsertChange(
+          env,
+          "transaction",
+          linked.transaction_id,
+          "deleted",
+          nextVersion,
+          session,
+          { automaticBenefit: true }
+        )
       );
     }
     return statements;
@@ -494,9 +534,10 @@ export async function mbD1LinkedBenefitUpdateStatements(env, current, model, act
   }
   const account = await mbD1AccountById(env, creditAccountId, false);
   if (!account) mbD1Fail("BENEFIT_ACCOUNT_NOT_FOUND", "혜택 반영 계좌를 찾을 수 없습니다.");
-  const description = rule.kind === "pre_discount"
-    ? `${account.displayName} 선할인`
-    : `${account.displayName} 혜택 적립`;
+  const description =
+    rule.kind === "pre_discount"
+      ? `${account.displayName} 선할인`
+      : `${account.displayName} 혜택 적립`;
   const benefitRequestId = `BENEFIT_${rule.id}_${current.requestId}`;
 
   if (linked) {
@@ -522,11 +563,19 @@ export async function mbD1LinkedBenefitUpdateStatements(env, current, model, act
         MB_D1_HOUSEHOLD_ID,
         linked.transaction_id
       ),
-      await mbD1InsertChange(env, "transaction", linked.transaction_id, "updated", nextVersion, session, {
-        automaticBenefit: true,
-        benefitRuleId: rule.id,
-        amount: benefitAmount
-      })
+      await mbD1InsertChange(
+        env,
+        "transaction",
+        linked.transaction_id,
+        "updated",
+        nextVersion,
+        session,
+        {
+          automaticBenefit: true,
+          benefitRuleId: rule.id,
+          amount: benefitAmount
+        }
+      )
     );
     return statements;
   }
@@ -558,10 +607,33 @@ export async function mbD1LinkedBenefitUpdateStatements(env, current, model, act
         version,created_at,updated_at,created_by,updated_by,deleted_at,deleted_by,source_row
       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
     ).bind(
-      benefitTransactionId, MB_D1_HOUSEHOLD_ID, benefitRequestId, benefitModel.date, benefitModel.type, benefitModel.categoryId, benefitModel.amount,
-      benefitModel.fromAccountId, benefitModel.toAccountId, benefitModel.paymentMethodId, benefitModel.spendingTarget, benefitModel.spenderMemberId,
-      enteredBy, benefitModel.description || null, benefitModel.memo || null, benefitModel.billingOverride, benefitModel.billingMonth,
-      benefitModel.groupId, benefitModel.reversalOf, 1, now, now, actor, actor, null, null, null
+      benefitTransactionId,
+      MB_D1_HOUSEHOLD_ID,
+      benefitRequestId,
+      benefitModel.date,
+      benefitModel.type,
+      benefitModel.categoryId,
+      benefitModel.amount,
+      benefitModel.fromAccountId,
+      benefitModel.toAccountId,
+      benefitModel.paymentMethodId,
+      benefitModel.spendingTarget,
+      benefitModel.spenderMemberId,
+      enteredBy,
+      benefitModel.description || null,
+      benefitModel.memo || null,
+      benefitModel.billingOverride,
+      benefitModel.billingMonth,
+      benefitModel.groupId,
+      benefitModel.reversalOf,
+      1,
+      now,
+      now,
+      actor,
+      actor,
+      null,
+      null,
+      null
     ),
     await mbD1InsertChange(env, "transaction", benefitTransactionId, "created", 1, session, {
       date: benefitModel.date,

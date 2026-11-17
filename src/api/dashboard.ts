@@ -1,101 +1,56 @@
-import {
-  apiRequest
-} from "./client";
+import { apiRequest } from "./client";
 
-import type {
-  DashboardData
-} from "../types/dashboard";
+import type { DashboardData } from "../types/dashboard";
 
-import {
-  unwrapEnvelope
-} from "./envelope";
+import { unwrapEnvelope } from "./envelope";
 
-import type {
-  ApiEnvelope
-} from "./envelope";
+import type { ApiEnvelope } from "./envelope";
 
-import {
-  subscribeLedgerChanges
-} from "../utils/ledgerEvents";
+import { subscribeLedgerChanges } from "../utils/ledgerEvents";
 import {
   clearPersistedDashboardSnapshot,
   readPersistedDashboardSnapshot,
   rememberPersistedDashboardSnapshot
 } from "./dashboardPersistence";
 
-
 type DashboardCacheEntry = {
-  data:
-    DashboardData;
+  data: DashboardData;
 
-  fetchedAt:
-    number;
+  fetchedAt: number;
 
-  source:
-    "network" | "persisted";
+  source: "network" | "persisted";
 };
-
 
 type GetDashboardOptions = {
-  forceRefresh?:
-    boolean;
+  forceRefresh?: boolean;
 
-  refreshQuotes?:
-    boolean;
+  refreshQuotes?: boolean;
 };
 
+const CURRENT_KEY = "__current__";
 
-const CURRENT_KEY =
-  "__current__";
+const CURRENT_TTL_MS = 30 * 1000;
 
-const CURRENT_TTL_MS =
-  30 * 1000;
+const ARCHIVE_TTL_MS = 5 * 60 * 1000;
 
-const ARCHIVE_TTL_MS =
-  5 * 60 * 1000;
+const dashboardCache = new Map<string, DashboardCacheEntry>();
 
+const dashboardRequests = new Map<string, Promise<DashboardData>>();
 
-const dashboardCache =
-  new Map<
-    string,
-    DashboardCacheEntry
-  >();
+let dashboardGeneration = 0;
 
-
-const dashboardRequests =
-  new Map<
-    string,
-    Promise<DashboardData>
-  >();
-
-
-let dashboardGeneration =
-  0;
-
-
-function getCacheKey(
-  month?: string
-) {
-  return month ||
-    CURRENT_KEY;
+function getCacheKey(month?: string) {
+  return month || CURRENT_KEY;
 }
 
-
-function getTtl(
-  month?: string
-) {
-  return month
-    ? ARCHIVE_TTL_MS
-    : CURRENT_TTL_MS;
+function getTtl(month?: string) {
+  return month ? ARCHIVE_TTL_MS : CURRENT_TTL_MS;
 }
-
 
 function isFresh(
-  entry:
-    DashboardCacheEntry,
+  entry: DashboardCacheEntry,
 
-  month?:
-    string
+  month?: string
 ) {
   /*
    * 기기에 저장해 둔 스냅샷은 화면을 즉시 채우는 용도입니다.
@@ -106,15 +61,8 @@ function isFresh(
     return false;
   }
 
-  return (
-    Date.now() -
-      entry.fetchedAt <=
-    getTtl(
-      month
-    )
-  );
+  return Date.now() - entry.fetchedAt <= getTtl(month);
 }
-
 
 function hydratePersistedCurrentDashboard() {
   const key = getCacheKey();
@@ -123,74 +71,44 @@ function hydratePersistedCurrentDashboard() {
     return;
   }
 
-  const persisted =
-    readPersistedDashboardSnapshot();
+  const persisted = readPersistedDashboardSnapshot();
 
   if (!persisted) {
     return;
   }
 
-  dashboardCache.set(
-    key,
-    {
-      data: persisted.data,
-      fetchedAt: persisted.fetchedAt,
-      source: "persisted"
-    }
-  );
+  dashboardCache.set(key, {
+    data: persisted.data,
+    fetchedAt: persisted.fetchedAt,
+    source: "persisted"
+  });
 }
 
-
-export function getDashboardSnapshotInfo(
-  month?: string
-) {
+export function getDashboardSnapshotInfo(month?: string) {
   if (!month) {
     hydratePersistedCurrentDashboard();
   }
 
-  const entry =
-    dashboardCache.get(
-      getCacheKey(month)
-    );
+  const entry = dashboardCache.get(getCacheKey(month));
 
-  return entry
-    ? { ...entry }
-    : null;
+  return entry ? { ...entry } : null;
 }
 
-
-export function getDashboardSnapshot(
-  month?: string
-) {
+export function getDashboardSnapshot(month?: string) {
   return getDashboardSnapshotInfo(month)?.data ?? null;
 }
-
 
 export function clearDashboardPersistentSnapshot() {
   clearPersistedDashboardSnapshot();
 }
 
+export function invalidateDashboardCache(month?: string) {
+  dashboardGeneration += 1;
 
-export function invalidateDashboardCache(
-  month?: string
-) {
-  dashboardGeneration +=
-    1;
+  if (month) {
+    dashboardCache.delete(getCacheKey(month));
 
-  if (
-    month
-  ) {
-    dashboardCache.delete(
-      getCacheKey(
-        month
-      )
-    );
-
-    dashboardRequests.delete(
-      getCacheKey(
-        month
-      )
-    );
+    dashboardRequests.delete(getCacheKey(month));
 
     return;
   }
@@ -199,190 +117,89 @@ export function invalidateDashboardCache(
   dashboardRequests.clear();
 }
 
-
 export async function getDashboard(
   month?: string,
 
-  options:
-    GetDashboardOptions = {}
+  options: GetDashboardOptions = {}
 ) {
-  const forceRefresh =
-    options.forceRefresh ===
-    true;
+  const forceRefresh = options.forceRefresh === true;
 
-  const refreshQuotes =
-    options.refreshQuotes ===
-    true;
+  const refreshQuotes = options.refreshQuotes === true;
 
-  const key =
-    getCacheKey(
-      month
-    );
+  const key = getCacheKey(month);
 
-
-  if (
-    forceRefresh
-  ) {
-    invalidateDashboardCache(
-      month
-    );
+  if (forceRefresh) {
+    invalidateDashboardCache(month);
   }
 
+  const cached = dashboardCache.get(key);
 
-  const cached =
-    dashboardCache.get(
-      key
-    );
-
-
-  if (
-    !forceRefresh &&
-    cached &&
-    isFresh(
-      cached,
-      month
-    )
-  ) {
+  if (!forceRefresh && cached && isFresh(cached, month)) {
     return cached.data;
   }
 
+  if (!forceRefresh) {
+    const existingRequest = dashboardRequests.get(key);
 
-  if (
-    !forceRefresh
-  ) {
-    const existingRequest =
-      dashboardRequests.get(
-        key
-      );
-
-    if (
-      existingRequest
-    ) {
+    if (existingRequest) {
       return existingRequest;
     }
   }
 
+  const requestGeneration = dashboardGeneration;
 
-  const requestGeneration =
-    dashboardGeneration;
+  const searchParams = new URLSearchParams();
 
-
-  const searchParams =
-    new URLSearchParams();
-
-
-  if (
-    month
-  ) {
-    searchParams.set(
-      "month",
-      month
-    );
+  if (month) {
+    searchParams.set("month", month);
   }
 
-
-  if (
-    refreshQuotes
-  ) {
-    searchParams.set(
-      "refreshQuotes",
-      "1"
-    );
+  if (refreshQuotes) {
+    searchParams.set("refreshQuotes", "1");
   }
 
+  const query = searchParams.toString();
 
-  const query =
-    searchParams.toString();
+  let request: Promise<DashboardData>;
 
+  request = apiRequest<ApiEnvelope<DashboardData> | DashboardData>(
+    query ? `/api/dashboard?${query}` : "/api/dashboard"
+  )
+    .then(raw => {
+      const data = unwrapEnvelope<DashboardData>(raw);
 
-  let request:
-    Promise<DashboardData>;
+      if (requestGeneration === dashboardGeneration) {
+        const fetchedAt = Date.now();
 
+        dashboardCache.set(key, {
+          data,
+          fetchedAt,
+          source: "network"
+        });
 
-  request =
-    apiRequest<
-      | ApiEnvelope<DashboardData>
-      | DashboardData
-    >(
-      query
-        ? `/api/dashboard?${query}`
-        : "/api/dashboard"
-    )
-      .then(
-        raw => {
-          const data =
-            unwrapEnvelope<
-              DashboardData
-            >(
-              raw
-            );
-
-
-          if (
-            requestGeneration ===
-            dashboardGeneration
-          ) {
-            const fetchedAt =
-              Date.now();
-
-            dashboardCache.set(
-              key,
-              {
-                data,
-                fetchedAt,
-                source: "network"
-              }
-            );
-
-            if (!month) {
-              rememberPersistedDashboardSnapshot(
-                data,
-                fetchedAt
-              );
-            }
-          }
-
-
-          return data;
+        if (!month) {
+          rememberPersistedDashboardSnapshot(data, fetchedAt);
         }
-      )
-      .finally(
-        () => {
-          if (
-            dashboardRequests.get(
-              key
-            ) ===
-            request
-          ) {
-            dashboardRequests.delete(
-              key
-            );
-          }
-        }
-      );
+      }
 
+      return data;
+    })
+    .finally(() => {
+      if (dashboardRequests.get(key) === request) {
+        dashboardRequests.delete(key);
+      }
+    });
 
-  if (
-    !forceRefresh
-  ) {
-    dashboardRequests.set(
-      key,
-      request
-    );
+  if (!forceRefresh) {
+    dashboardRequests.set(key, request);
   }
-
 
   return request;
 }
 
-
-export async function prefetchDashboard(
-  month?: string
-) {
+export async function prefetchDashboard(month?: string) {
   try {
-    await getDashboard(
-      month
-    );
+    await getDashboard(month);
   } catch {
     /*
      * 프리페치 실패는 실제 화면 진입을
@@ -391,14 +208,8 @@ export async function prefetchDashboard(
   }
 }
 
-
-if (
-  typeof window !==
-  "undefined"
-) {
-  subscribeLedgerChanges(
-    () => {
-      invalidateDashboardCache();
-    }
-  );
+if (typeof window !== "undefined") {
+  subscribeLedgerChanges(() => {
+    invalidateDashboardCache();
+  });
 }

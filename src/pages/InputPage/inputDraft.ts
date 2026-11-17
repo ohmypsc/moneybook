@@ -39,15 +39,18 @@ export function parseInputDraft(value: unknown): InputDraft | null {
     return null;
   }
 
-  const text = (candidate: unknown) =>
-    typeof candidate === "string" ? candidate : "";
+  const text = (candidate: unknown) => (typeof candidate === "string" ? candidate : "");
 
   return {
     tagsText: text(draft.tagsText),
     categorySource: draft.categorySource === "auto" ? "auto" : "manual",
     mode: draft.mode,
-    installmentMonths: Number.isInteger(draft.installmentMonths) && Number(draft.installmentMonths) >= 1 && Number(draft.installmentMonths) <= 36
-      ? Number(draft.installmentMonths) : 1,
+    installmentMonths:
+      Number.isInteger(draft.installmentMonths) &&
+      Number(draft.installmentMonths) >= 1 &&
+      Number(draft.installmentMonths) <= 36
+        ? Number(draft.installmentMonths)
+        : 1,
     benefitEnabled: draft.benefitEnabled !== false,
     date: text(draft.date),
     amount: text(draft.amount),
@@ -69,16 +72,16 @@ export function hasMeaningfulInputDraft(draft: InputDraft) {
   return Boolean(
     draft.tagsText ||
     draft.amount ||
-      draft.categoryId ||
-      draft.paymentMethodId ||
-      draft.spendingTarget ||
-      draft.fromAccountId ||
-      draft.toAccountId ||
-      draft.description.trim() ||
-      draft.memo.trim() ||
-      draft.benefitRewardUsedAmount ||
-      draft.loanPrincipalAmount ||
-      draft.loanInterestAmount
+    draft.categoryId ||
+    draft.paymentMethodId ||
+    draft.spendingTarget ||
+    draft.fromAccountId ||
+    draft.toAccountId ||
+    draft.description.trim() ||
+    draft.memo.trim() ||
+    draft.benefitRewardUsedAmount ||
+    draft.loanPrincipalAmount ||
+    draft.loanInterestAmount
   );
 }
 
@@ -118,10 +121,7 @@ export function saveInputDraft(userName: string, draft: InputDraft) {
       return;
     }
 
-    window.localStorage.setItem(
-      `${INPUT_DRAFT_KEY_PREFIX}${userName}`,
-      JSON.stringify(draft)
-    );
+    window.localStorage.setItem(`${INPUT_DRAFT_KEY_PREFIX}${userName}`, JSON.stringify(draft));
   } catch {
     // 임시저장 실패가 실제 거래 입력을 막지는 않게 합니다.
   }

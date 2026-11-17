@@ -5,10 +5,13 @@ import {
 } from "./domain/realEstate.js";
 
 const REGION_API = "https://apis.data.go.kr/1741000/StanReginCd/getStanReginCdList";
-const TRADE_API = "https://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev";
+const TRADE_API =
+  "https://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev";
 
 function cleanText(value, max = 200) {
-  return String(value ?? "").trim().slice(0, max);
+  return String(value ?? "")
+    .trim()
+    .slice(0, max);
 }
 
 function positiveNumber(value, fallback = 0) {
@@ -56,7 +59,9 @@ export async function ensureRealEstateSchema(env) {
       deleted_at TEXT,
       deleted_by TEXT
     )`),
-    env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_real_estate_household ON real_estate_assets(household_id, deleted_at)")
+    env.DB.prepare(
+      "CREATE INDEX IF NOT EXISTS idx_real_estate_household ON real_estate_assets(household_id, deleted_at)"
+    )
   ]);
 }
 
@@ -80,7 +85,10 @@ function mapRow(row) {
     owner: cleanText(row?.owner_label, 80),
     purchasePriceKrw: Number(row?.purchase_price_krw || 0),
     valuationMode: row?.valuation_mode === "manual" ? "manual" : "auto",
-    manualValueKrw: row?.manual_value_krw === null || row?.manual_value_krw === undefined ? null : Number(row.manual_value_krw),
+    manualValueKrw:
+      row?.manual_value_krw === null || row?.manual_value_krw === undefined
+        ? null
+        : Number(row.manual_value_krw),
     estimatedValueKrw: Number(row?.estimated_value_krw || 0),
     estimateLowKrw: Number(row?.estimate_low_krw || 0),
     estimateHighKrw: Number(row?.estimate_high_krw || 0),
@@ -103,15 +111,20 @@ export async function listRealEstateAssets(env, householdId, includeDeleted = fa
   await ensureRealEstateSchema(env);
   const result = await env.DB.prepare(
     `SELECT * FROM real_estate_assets WHERE household_id=? ${includeDeleted ? "" : "AND deleted_at IS NULL"} ORDER BY created_at, property_id`
-  ).bind(householdId).all();
+  )
+    .bind(householdId)
+    .all();
   return (result.results || []).map(mapRow);
 }
 
 export async function saveRealEstateAsset(env, householdId, input, actor, now) {
   await ensureRealEstateSchema(env);
   const propertyId = cleanText(input?.propertyId, 120) || id();
-  const existing = await env.DB.prepare("SELECT property_id FROM real_estate_assets WHERE household_id=? AND property_id=? LIMIT 1")
-    .bind(householdId, propertyId).first();
+  const existing = await env.DB.prepare(
+    "SELECT property_id FROM real_estate_assets WHERE household_id=? AND property_id=? LIMIT 1"
+  )
+    .bind(householdId, propertyId)
+    .first();
   const name = cleanText(input?.name || input?.apartmentName);
   const address = cleanText(input?.address, 300);
   const apartmentName = cleanText(input?.apartmentName || name);
@@ -121,14 +134,33 @@ export async function saveRealEstateAsset(env, householdId, input, actor, now) {
   const owner = cleanText(input?.owner, 80);
   const purchasePriceKrw = Math.round(positiveNumber(input?.purchasePriceKrw));
   const valuationMode = input?.valuationMode === "manual" ? "manual" : "auto";
-  const manualValueKrw = valuationMode === "manual" ? Math.round(positiveNumber(input?.manualValueKrw)) : nullableNumber(input?.manualValueKrw);
-  if (!name || !apartmentName) throw Object.assign(new Error("아파트 이름을 입력해주세요."), { code: "REAL_ESTATE_NAME_REQUIRED" });
-  if (!address) throw Object.assign(new Error("지역을 입력해주세요."), { code: "REAL_ESTATE_ADDRESS_REQUIRED" });
-  if (valuationMode === "auto" && !/^\d{5}$/.test(lawdCode)) throw Object.assign(new Error("자동 시세를 사용하려면 국토부 지역코드 5자리를 입력해주세요."), { code: "REAL_ESTATE_LAWD_REQUIRED" });
-  if (!exclusiveAreaSqm) throw Object.assign(new Error("전용면적을 입력해주세요."), { code: "REAL_ESTATE_AREA_REQUIRED" });
-  if (valuationMode === "manual" && !manualValueKrw) throw Object.assign(new Error("수동 평가액을 입력해주세요."), { code: "REAL_ESTATE_MANUAL_VALUE_REQUIRED" });
+  const manualValueKrw =
+    valuationMode === "manual"
+      ? Math.round(positiveNumber(input?.manualValueKrw))
+      : nullableNumber(input?.manualValueKrw);
+  if (!name || !apartmentName)
+    throw Object.assign(new Error("아파트 이름을 입력해주세요."), {
+      code: "REAL_ESTATE_NAME_REQUIRED"
+    });
+  if (!address)
+    throw Object.assign(new Error("지역을 입력해주세요."), {
+      code: "REAL_ESTATE_ADDRESS_REQUIRED"
+    });
+  if (valuationMode === "auto" && !/^\d{5}$/.test(lawdCode))
+    throw Object.assign(new Error("자동 시세를 사용하려면 국토부 지역코드 5자리를 입력해주세요."), {
+      code: "REAL_ESTATE_LAWD_REQUIRED"
+    });
+  if (!exclusiveAreaSqm)
+    throw Object.assign(new Error("전용면적을 입력해주세요."), {
+      code: "REAL_ESTATE_AREA_REQUIRED"
+    });
+  if (valuationMode === "manual" && !manualValueKrw)
+    throw Object.assign(new Error("수동 평가액을 입력해주세요."), {
+      code: "REAL_ESTATE_MANUAL_VALUE_REQUIRED"
+    });
 
-  await env.DB.prepare(`INSERT INTO real_estate_assets (
+  await env.DB.prepare(
+    `INSERT INTO real_estate_assets (
       property_id,household_id,name,property_type,address,lawd_code,apartment_name,exclusive_area_sqm,floor,owner_label,purchase_price_krw,
       valuation_mode,manual_value_krw,estimated_value_krw,estimate_low_krw,estimate_high_krw,estimate_trade_count,estimate_updated_at,last_trade_date,recent_trades_json,
       created_at,updated_at,created_by,updated_by,deleted_at,deleted_by
@@ -137,20 +169,52 @@ export async function saveRealEstateAsset(env, householdId, input, actor, now) {
       name=excluded.name,address=excluded.address,lawd_code=excluded.lawd_code,apartment_name=excluded.apartment_name,
       exclusive_area_sqm=excluded.exclusive_area_sqm,floor=excluded.floor,owner_label=excluded.owner_label,purchase_price_krw=excluded.purchase_price_krw,
       valuation_mode=excluded.valuation_mode,manual_value_krw=excluded.manual_value_krw,updated_at=excluded.updated_at,updated_by=excluded.updated_by,
-      deleted_at=NULL,deleted_by=NULL`)
+      deleted_at=NULL,deleted_by=NULL`
+  )
     .bind(
-      propertyId, householdId, name, "아파트", address, lawdCode, apartmentName, exclusiveAreaSqm, floor, owner, purchasePriceKrw,
-      valuationMode, manualValueKrw, 0, 0, 0, 0, null, null, "[]",
-      now, now, actor, actor, null, null
-    ).run();
-  const row = await env.DB.prepare("SELECT * FROM real_estate_assets WHERE household_id=? AND property_id=?").bind(householdId, propertyId).first();
+      propertyId,
+      householdId,
+      name,
+      "아파트",
+      address,
+      lawdCode,
+      apartmentName,
+      exclusiveAreaSqm,
+      floor,
+      owner,
+      purchasePriceKrw,
+      valuationMode,
+      manualValueKrw,
+      0,
+      0,
+      0,
+      0,
+      null,
+      null,
+      "[]",
+      now,
+      now,
+      actor,
+      actor,
+      null,
+      null
+    )
+    .run();
+  const row = await env.DB.prepare(
+    "SELECT * FROM real_estate_assets WHERE household_id=? AND property_id=?"
+  )
+    .bind(householdId, propertyId)
+    .first();
   return { created: !existing, item: mapRow(row) };
 }
 
 export async function deleteRealEstateAsset(env, householdId, propertyId, actor, now) {
   await ensureRealEstateSchema(env);
-  const result = await env.DB.prepare("UPDATE real_estate_assets SET deleted_at=?,deleted_by=?,updated_at=?,updated_by=? WHERE household_id=? AND property_id=? AND deleted_at IS NULL")
-    .bind(now, actor, now, actor, householdId, propertyId).run();
+  const result = await env.DB.prepare(
+    "UPDATE real_estate_assets SET deleted_at=?,deleted_by=?,updated_at=?,updated_by=? WHERE household_id=? AND property_id=? AND deleted_at IS NULL"
+  )
+    .bind(now, actor, now, actor, householdId, propertyId)
+    .run();
   return { deleted: Number(result.meta?.changes || 0) > 0, propertyId };
 }
 
@@ -159,7 +223,7 @@ function getDataServiceKey(env) {
 }
 
 function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 function encodeServiceKeyOnce(value) {
@@ -197,7 +261,9 @@ function dataGoErrorDetails(text, httpStatus) {
     authMessage ||
     errMessage ||
     (resultCode && !["0", "00", "000"].includes(resultCode)) ||
-    /SERVICE[_ ]?KEY|PERMISSION[_ ]?DENIED|ACCESS[_ ]?DENIED|LIMITED[_ ]?NUMBER|BLACKLIST[_ ]?IP|UNREGISTERED[_ ]?IP|DEADLINE[_ ]?HAS[_ ]?EXPIRED|APPLICATION[_ ]?ERROR/i.test(String(text || ""))
+    /SERVICE[_ ]?KEY|PERMISSION[_ ]?DENIED|ACCESS[_ ]?DENIED|LIMITED[_ ]?NUMBER|BLACKLIST[_ ]?IP|UNREGISTERED[_ ]?IP|DEADLINE[_ ]?HAS[_ ]?EXPIRED|APPLICATION[_ ]?ERROR/i.test(
+      String(text || "")
+    )
   );
   return { looksLikeError, code, message };
 }
@@ -213,18 +279,25 @@ async function fetchJson(url) {
   const text = await response.text();
   if (!response.ok) {
     const details = dataGoErrorDetails(text, response.status);
-    throw new Error(`공공데이터 API 응답 오류 (HTTP ${response.status})${details.message ? `: ${details.message}` : ""}`);
+    throw new Error(
+      `공공데이터 API 응답 오류 (HTTP ${response.status})${details.message ? `: ${details.message}` : ""}`
+    );
   }
   return JSON.parse(text);
 }
 
 export async function resolveLegalRegion(env, query) {
   const key = getDataServiceKey(env);
-  if (!key) throw Object.assign(new Error("공공데이터포털 서비스키가 설정되어 있지 않습니다."), { code: "DATA_GO_KR_KEY_MISSING" });
+  if (!key)
+    throw Object.assign(new Error("공공데이터포털 서비스키가 설정되어 있지 않습니다."), {
+      code: "DATA_GO_KR_KEY_MISSING"
+    });
   const clean = cleanText(query, 200);
   if (!clean) return [];
   const tokens = clean.split(/\s+/).filter(Boolean);
-  const searches = [clean, tokens.slice(0, 3).join(" "), tokens.slice(0, 2).join(" ")].filter((value, index, array) => value && array.indexOf(value) === index);
+  const searches = [clean, tokens.slice(0, 3).join(" "), tokens.slice(0, 2).join(" ")].filter(
+    (value, index, array) => value && array.indexOf(value) === index
+  );
   for (const search of searches) {
     const params = new URLSearchParams({
       type: "json",
@@ -237,12 +310,12 @@ export async function resolveLegalRegion(env, query) {
     const payload = await fetchJson(url);
     const rows = payload?.StanReginCd?.[1]?.row || [];
     const mapped = rows
-      .map((row) => ({
+      .map(row => ({
         lawdCode: cleanText(row.region_cd, 10).slice(0, 5),
         name: cleanText(row.locatadd_nm, 200),
         fullCode: cleanText(row.region_cd, 10)
       }))
-      .filter((row) => /^\d{5}$/.test(row.lawdCode) && row.name);
+      .filter(row => /^\d{5}$/.test(row.lawdCode) && row.name);
     if (mapped.length) {
       const unique = [];
       const seen = new Set();
@@ -302,12 +375,21 @@ async function fetchTradesForMonth(key, lawdCode, ymd, attempt = 0) {
 
 export async function refreshRealEstateAsset(env, householdId, propertyId, actor, now, today) {
   await ensureRealEstateSchema(env);
-  const row = await env.DB.prepare("SELECT * FROM real_estate_assets WHERE household_id=? AND property_id=? AND deleted_at IS NULL LIMIT 1")
-    .bind(householdId, propertyId).first();
-  if (!row) throw Object.assign(new Error("부동산 자산을 찾을 수 없습니다."), { code: "REAL_ESTATE_NOT_FOUND" });
+  const row = await env.DB.prepare(
+    "SELECT * FROM real_estate_assets WHERE household_id=? AND property_id=? AND deleted_at IS NULL LIMIT 1"
+  )
+    .bind(householdId, propertyId)
+    .first();
+  if (!row)
+    throw Object.assign(new Error("부동산 자산을 찾을 수 없습니다."), {
+      code: "REAL_ESTATE_NOT_FOUND"
+    });
   const asset = mapRow(row);
   const key = getDataServiceKey(env);
-  if (!key) throw Object.assign(new Error("공공데이터포털 서비스키가 설정되어 있지 않습니다."), { code: "DATA_GO_KR_KEY_MISSING" });
+  if (!key)
+    throw Object.assign(new Error("공공데이터포털 서비스키가 설정되어 있지 않습니다."), {
+      code: "DATA_GO_KR_KEY_MISSING"
+    });
 
   const allTrades = [];
   const months = monthKeys(today, 12);
@@ -315,12 +397,14 @@ export async function refreshRealEstateAsset(env, householdId, propertyId, actor
   for (let index = 0; index < months.length; index += 1) {
     // 개발계정의 초당 호출 제한을 피하기 위해 연속 호출 사이에 짧은 간격을 둔다.
     if (index > 0) await sleep(350);
-    allTrades.push(...await fetchTradesForMonth(key, asset.lawdCode, months[index]));
+    allTrades.push(...(await fetchTradesForMonth(key, asset.lawdCode, months[index])));
     estimate = estimateApartmentValue(allTrades, asset);
     // 최근 거래가 충분하면 불필요하게 12개월 전체를 조회하지 않는다.
     if (estimate.tradeCount >= 5 && index >= 2) break;
   }
-  await env.DB.prepare(`UPDATE real_estate_assets SET estimated_value_krw=?,estimate_low_krw=?,estimate_high_krw=?,estimate_trade_count=?,estimate_updated_at=?,last_trade_date=?,recent_trades_json=?,updated_at=?,updated_by=? WHERE household_id=? AND property_id=?`)
+  await env.DB.prepare(
+    `UPDATE real_estate_assets SET estimated_value_krw=?,estimate_low_krw=?,estimate_high_krw=?,estimate_trade_count=?,estimate_updated_at=?,last_trade_date=?,recent_trades_json=?,updated_at=?,updated_by=? WHERE household_id=? AND property_id=?`
+  )
     .bind(
       estimate.estimatedValueKrw,
       estimate.lowKrw,
@@ -333,8 +417,13 @@ export async function refreshRealEstateAsset(env, householdId, propertyId, actor
       actor,
       householdId,
       propertyId
-    ).run();
-  const updated = await env.DB.prepare("SELECT * FROM real_estate_assets WHERE household_id=? AND property_id=?").bind(householdId, propertyId).first();
+    )
+    .run();
+  const updated = await env.DB.prepare(
+    "SELECT * FROM real_estate_assets WHERE household_id=? AND property_id=?"
+  )
+    .bind(householdId, propertyId)
+    .first();
   return mapRow(updated);
 }
 
@@ -345,16 +434,22 @@ export async function refreshAllRealEstateAssets(env, householdId, actor, now, t
   for (const item of items) {
     if (item.valuationMode !== "auto") continue;
     try {
-      refreshed.push(await refreshRealEstateAsset(env, householdId, item.propertyId, actor, now, today));
+      refreshed.push(
+        await refreshRealEstateAsset(env, householdId, item.propertyId, actor, now, today)
+      );
     } catch (error) {
-      console.error("real estate refresh failed", item.propertyId, error instanceof Error ? error.message : error);
+      console.error(
+        "real estate refresh failed",
+        item.propertyId,
+        error instanceof Error ? error.message : error
+      );
     }
   }
   return refreshed;
 }
 
 export function realEstateSummary(items) {
-  const active = (items || []).filter((item) => !item.isDeleted);
+  const active = (items || []).filter(item => !item.isDeleted);
   return {
     totalValueKrw: active.reduce((sum, item) => sum + getRealEstateCurrentValue(item), 0),
     count: active.length,

@@ -64,10 +64,7 @@ export function ownerMatchesUser(owner: string, userName: string) {
 }
 
 export function isLoanAccount(account: Account) {
-  return (
-    account.accountType === "부채" &&
-    (account.subType || "").includes("대출")
-  );
+  return account.accountType === "부채" && (account.subType || "").includes("대출");
 }
 
 export function isLoanSourceAccount(account: Account) {
@@ -104,10 +101,7 @@ export function prioritizeAccountsForUser(accounts: Account[], userName: string)
           ? 1
           : 2
     }))
-    .sort(
-      (first, second) =>
-        first.rank - second.rank || first.index - second.index
-    )
+    .sort((first, second) => first.rank - second.rank || first.index - second.index)
     .map(item => item.account);
 }
 
@@ -142,9 +136,7 @@ export function getModeLabel(mode: InputMode) {
 export function isOtherOwnerAccount(account: Account, userName: string) {
   const owner = getAccountOwner(account);
 
-  return Boolean(
-    owner && !ownerMatchesUser(owner, userName) && owner !== "공동"
-  );
+  return Boolean(owner && !ownerMatchesUser(owner, userName) && owner !== "공동");
 }
 
 export function uniqueAccounts(accounts: Account[]) {
@@ -181,8 +173,7 @@ export function getCategoryLabel(category: Category) {
 export function isCardSettlementCategory(category: Category | null) {
   return Boolean(
     category &&
-      (category.name === CARD_PAYMENT_CATEGORY ||
-        category.name === CARD_PREPAYMENT_CATEGORY)
+    (category.name === CARD_PAYMENT_CATEGORY || category.name === CARD_PREPAYMENT_CATEGORY)
   );
 }
 

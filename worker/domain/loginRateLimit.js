@@ -42,10 +42,7 @@ export function recordLoginFailureState(record, now = Date.now()) {
   }
 
   const failures = [...current.record.failures, now];
-  const lockedUntil =
-    failures.length >= LOGIN_MAX_FAILURES
-      ? now + LOGIN_LOCK_MS
-      : 0;
+  const lockedUntil = failures.length >= LOGIN_MAX_FAILURES ? now + LOGIN_LOCK_MS : 0;
 
   return { failures, lockedUntil };
 }

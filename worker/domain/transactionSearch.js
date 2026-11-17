@@ -9,7 +9,7 @@ export function normalizeTransactionPagination(limitValue, offsetValue) {
 }
 
 export function escapeSqlLike(value) {
-  return String(value || "").replace(/[\\%_]/g, (character) => `\\${character}`);
+  return String(value || "").replace(/[\\%_]/g, character => `\\${character}`);
 }
 
 export function buildTransactionSearchWhere({

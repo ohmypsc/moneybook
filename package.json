@@ -10,10 +10,12 @@
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test tests/*.test.*",
     "check:worker": "node scripts/check-worker-syntax.mjs",
-    "check": "npm run typecheck && npm test && npm run check:worker && npm run check:boundaries",
+    "check": "npm run format:check && npm run typecheck && npm test && npm run check:worker && npm run check:boundaries",
     "preview": "vite preview",
     "deploy": "npm run build && wrangler deploy --config dist/moneybook/wrangler.json",
-    "check:boundaries": "node scripts/check-source-boundaries.mjs"
+    "check:boundaries": "node scripts/check-source-boundaries.mjs",
+    "format": "prettier --write src worker shared tests scripts",
+    "format:check": "prettier --check src worker shared tests scripts"
   },
   "dependencies": {
     "react": "19.2.8",
@@ -24,6 +26,7 @@
     "@types/react": "19.2.0",
     "@types/react-dom": "19.2.0",
     "@vitejs/plugin-react": "6.0.4",
+    "prettier": "3.9.10",
     "typescript": "5.9.3",
     "vite": "8.1.5",
     "wrangler": "4.113.0"

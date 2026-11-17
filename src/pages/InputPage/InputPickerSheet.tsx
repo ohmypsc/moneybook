@@ -77,15 +77,11 @@ export function InputPickerSheet({
   );
 
   const selectedValue = getPickerSelectedValue(kind, selection);
-  const selectedAccount = orderedAllAccounts.find(
-    account => account.accountId === selectedValue
-  );
+  const selectedAccount = orderedAllAccounts.find(account => account.accountId === selectedValue);
   const selectedIsOtherOwner = Boolean(
     selectedAccount && isOtherOwnerAccount(selectedAccount, userName)
   );
-  const [showOtherOwnerAccounts, setShowOtherOwnerAccounts] = useState(
-    selectedIsOtherOwner
-  );
+  const [showOtherOwnerAccounts, setShowOtherOwnerAccounts] = useState(selectedIsOtherOwner);
 
   useEffect(() => {
     setShowOtherOwnerAccounts(selectedIsOtherOwner);

@@ -11,7 +11,12 @@ import {
 export const PUSH_RECIPIENT_NAME = "미영";
 
 function requireRecipient(session) {
-  if (session?.name !== PUSH_RECIPIENT_NAME) throw new PushError("PUSH_DISABLED_FOR_USER", "알림은 미영님 기기에서만 사용할 수 있습니다.", 403);
+  if (session?.name !== PUSH_RECIPIENT_NAME)
+    throw new PushError(
+      "PUSH_DISABLED_FOR_USER",
+      "알림은 미영님 기기에서만 사용할 수 있습니다.",
+      403
+    );
 }
 
 const VAPID_META_KEY = "web_push_vapid_v1";
@@ -58,7 +63,9 @@ async function ensurePushSchema(env) {
  */
 async function getVapidKeys(env) {
   const read = async () => {
-    const row = await env.DB.prepare("SELECT value FROM schema_meta WHERE key=?").bind(VAPID_META_KEY).first();
+    const row = await env.DB.prepare("SELECT value FROM schema_meta WHERE key=?")
+      .bind(VAPID_META_KEY)
+      .first();
     if (!row?.value) return null;
     try {
       const parsed = JSON.parse(row.value);
@@ -75,17 +82,22 @@ async function getVapidKeys(env) {
   // 두 요청이 동시에 만들더라도 먼저 저장된 키 하나만 쓰도록 INSERT OR IGNORE 후 다시 읽습니다.
   await env.DB.prepare(
     "INSERT OR IGNORE INTO schema_meta (key, value, updated_at) VALUES (?, ?, ?)"
-  ).bind(VAPID_META_KEY, JSON.stringify(created), new Date().toISOString()).run();
+  )
+    .bind(VAPID_META_KEY, JSON.stringify(created), new Date().toISOString())
+    .run();
   return (await read()) || created;
 }
 
 export async function getPushConfig(env, householdId, session) {
   await ensurePushSchema(env);
-  if (session.name !== PUSH_RECIPIENT_NAME) return { publicKey: "", myDeviceCount: 0, allowed: false };
+  if (session.name !== PUSH_RECIPIENT_NAME)
+    return { publicKey: "", myDeviceCount: 0, allowed: false };
   const vapid = await getVapidKeys(env);
   const row = await env.DB.prepare(
     "SELECT COUNT(*) AS count FROM push_subscriptions WHERE household_id=? AND member_name=?"
-  ).bind(householdId, session.name).first();
+  )
+    .bind(householdId, session.name)
+    .first();
   return {
     allowed: true,
     publicKey: vapid.publicKey,
@@ -113,16 +125,18 @@ export async function savePushSubscription(env, householdId, session, body, user
        user_agent=excluded.user_agent,
        updated_at=excluded.updated_at,
        failure_count=0`
-  ).bind(
-    subscription.endpoint,
-    householdId,
-    session.name,
-    subscription.p256dh,
-    subscription.auth,
-    String(userAgent || "").slice(0, 300) || null,
-    now,
-    now
-  ).run();
+  )
+    .bind(
+      subscription.endpoint,
+      householdId,
+      session.name,
+      subscription.p256dh,
+      subscription.auth,
+      String(userAgent || "").slice(0, 300) || null,
+      now,
+      now
+    )
+    .run();
   return { subscribed: true };
 }
 
@@ -134,7 +148,9 @@ export async function deletePushSubscription(env, householdId, session, body) {
   await ensurePushSchema(env);
   await env.DB.prepare(
     "DELETE FROM push_subscriptions WHERE household_id=? AND member_name=? AND endpoint=?"
-  ).bind(householdId, session.name, endpoint).run();
+  )
+    .bind(householdId, session.name, endpoint)
+    .run();
   return { unsubscribed: true };
 }
 
@@ -158,16 +174,22 @@ async function deliver(env, rows, payload, origin) {
         sent += 1;
         await env.DB.prepare(
           "UPDATE push_subscriptions SET last_success_at=?, failure_count=0 WHERE endpoint=?"
-        ).bind(now, row.endpoint).run();
+        )
+          .bind(now, row.endpoint)
+          .run();
       } else if (result.gone) {
         removed += 1;
-        await env.DB.prepare("DELETE FROM push_subscriptions WHERE endpoint=?").bind(row.endpoint).run();
+        await env.DB.prepare("DELETE FROM push_subscriptions WHERE endpoint=?")
+          .bind(row.endpoint)
+          .run();
       } else {
         failed += 1;
         console.warn("[moneybook push] delivery failed", result.status);
         await env.DB.prepare(
           "UPDATE push_subscriptions SET last_failure_at=?, failure_count=failure_count+1 WHERE endpoint=?"
-        ).bind(now, row.endpoint).run();
+        )
+          .bind(now, row.endpoint)
+          .run();
       }
     } catch (error) {
       failed += 1;
@@ -182,19 +204,39 @@ async function deliver(env, rows, payload, origin) {
  * 미영님이 등록한 기기에만 알림을 보냅니다. 본인이 입력한 거래는 알리지 않습니다.
  * 여러 건이면 알림 하나로 묶습니다. (알림은 각자 설정에서 켠 기기로만 갑니다.)
  */
-export async function notifyPartnersOfTransactions(env, householdId, actorName, transactions, origin) {
+export async function notifyPartnersOfTransactions(
+  env,
+  householdId,
+  actorName,
+  transactions,
+  origin
+) {
   const list = (Array.isArray(transactions) ? transactions : []).filter(Boolean);
   if (!list.length || !actorName) return { sent: 0, failed: 0, removed: 0 };
   await ensurePushSchema(env);
   const result = await env.DB.prepare(
     "SELECT endpoint,p256dh,auth FROM push_subscriptions WHERE household_id=? AND member_name=? AND member_name<>?"
-  ).bind(householdId, PUSH_RECIPIENT_NAME, actorName).all();
+  )
+    .bind(householdId, PUSH_RECIPIENT_NAME, actorName)
+    .all();
   const rows = result.results || [];
   return deliver(env, rows, buildBatchNotification(list, actorName), origin);
 }
 
-export async function notifyPartnersOfTransaction(env, householdId, actorName, transaction, origin) {
-  return notifyPartnersOfTransactions(env, householdId, actorName, transaction ? [transaction] : [], origin);
+export async function notifyPartnersOfTransaction(
+  env,
+  householdId,
+  actorName,
+  transaction,
+  origin
+) {
+  return notifyPartnersOfTransactions(
+    env,
+    householdId,
+    actorName,
+    transaction ? [transaction] : [],
+    origin
+  );
 }
 
 export async function sendTestPush(env, householdId, session, origin) {
@@ -202,15 +244,22 @@ export async function sendTestPush(env, householdId, session, origin) {
   await ensurePushSchema(env);
   const result = await env.DB.prepare(
     "SELECT endpoint,p256dh,auth FROM push_subscriptions WHERE household_id=? AND member_name=?"
-  ).bind(householdId, session.name).all();
+  )
+    .bind(householdId, session.name)
+    .all();
   const rows = result.results || [];
   if (!rows.length) {
     throw new PushError("PUSH_NOT_SUBSCRIBED", "이 계정으로 알림을 켠 기기가 없습니다.");
   }
-  return deliver(env, rows, {
-    title: "가계부 알림 테스트",
-    body: "알림이 잘 도착했어요. 이제 배우자가 거래를 입력하면 이렇게 알려드려요.",
-    url: "/?shortcut=history",
-    tag: "moneybook-test"
-  }, origin);
+  return deliver(
+    env,
+    rows,
+    {
+      title: "가계부 알림 테스트",
+      body: "알림이 잘 도착했어요. 이제 배우자가 거래를 입력하면 이렇게 알려드려요.",
+      url: "/?shortcut=history",
+      tag: "moneybook-test"
+    },
+    origin
+  );
 }

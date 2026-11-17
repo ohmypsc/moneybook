@@ -2,13 +2,7 @@ import type { HTMLAttributes } from "react";
 
 import styles from "./Money.module.css";
 
-export type MoneyTone =
-  | "default"
-  | "muted"
-  | "income"
-  | "expense"
-  | "positive"
-  | "negative";
+export type MoneyTone = "default" | "muted" | "income" | "expense" | "positive" | "negative";
 
 export type MoneySize = "inherit" | "sm" | "md" | "lg";
 
@@ -26,23 +20,21 @@ function getFormatter(currency: string, maximumFractionDigits: number) {
   const cached = formatterCache.get(key);
   if (cached) return cached;
 
-  const formatter = currency === "KRW"
-    ? new Intl.NumberFormat("ko-KR", { maximumFractionDigits })
-    : new Intl.NumberFormat("ko-KR", {
-        style: "currency",
-        currency,
-        currencyDisplay: "narrowSymbol",
-        maximumFractionDigits
-      });
+  const formatter =
+    currency === "KRW"
+      ? new Intl.NumberFormat("ko-KR", { maximumFractionDigits })
+      : new Intl.NumberFormat("ko-KR", {
+          style: "currency",
+          currency,
+          currencyDisplay: "narrowSymbol",
+          maximumFractionDigits
+        });
 
   formatterCache.set(key, formatter);
   return formatter;
 }
 
-export function formatMoney(
-  amount: number,
-  options: FormatMoneyOptions = {}
-) {
+export function formatMoney(amount: number, options: FormatMoneyOptions = {}) {
   const {
     absolute = false,
     showPlus = false,
@@ -56,9 +48,7 @@ export function formatMoney(
   const prefix = showPlus && value > 0 ? "+" : "";
   const formatted = formatter.format(value);
 
-  return currency === "KRW"
-    ? `${prefix}${formatted}원`
-    : `${prefix}${formatted}`;
+  return currency === "KRW" ? `${prefix}${formatted}원` : `${prefix}${formatted}`;
 }
 
 type MoneyProps = Omit<HTMLAttributes<HTMLSpanElement>, "children"> & {
@@ -82,12 +72,9 @@ export function Money({
   className = "",
   ...props
 }: MoneyProps) {
-  const classNames = [
-    styles.money,
-    styles[tone],
-    styles[`size_${size}`],
-    className
-  ].filter(Boolean).join(" ");
+  const classNames = [styles.money, styles[tone], styles[`size_${size}`], className]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <span className={classNames} {...props}>

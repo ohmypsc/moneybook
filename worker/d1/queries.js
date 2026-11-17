@@ -1,42 +1,75 @@
 // 조회 API 데이터(카테고리·계좌·거래·정산·자산 스냅샷·투자·변경 내역)
 import { dateOnly as mbD1DateOnly, monthOnly as mbD1MonthOnly } from "../domain/date.js";
-import { isSettlementEligibleCategory as mbD1IsSettlementEligibleCategory, isSettlementRequestId as mbD1IsSettlementRequestId, settlementRemaining as mbD1SettlementRemaining } from "../domain/settlement.js";
-import { buildTransactionSearchWhere, normalizeTransactionPagination } from "../domain/transactionSearch.js";
+import {
+  isSettlementEligibleCategory as mbD1IsSettlementEligibleCategory,
+  isSettlementRequestId as mbD1IsSettlementRequestId,
+  settlementRemaining as mbD1SettlementRemaining
+} from "../domain/settlement.js";
+import {
+  buildTransactionSearchWhere,
+  normalizeTransactionPagination
+} from "../domain/transactionSearch.js";
 import { mbD1EnsureDefaultCashbackIncomeCategory } from "./benefits.js";
-import { MB_D1_HOUSEHOLD_ID, mbD1All, mbD1Fail, mbD1First, mbD1IsInvestmentAccount, mbD1NullableNumber, mbD1Number, mbD1Round, mbD1Text } from "./core.js";
+import {
+  MB_D1_HOUSEHOLD_ID,
+  mbD1All,
+  mbD1Fail,
+  mbD1First,
+  mbD1IsInvestmentAccount,
+  mbD1NullableNumber,
+  mbD1Number,
+  mbD1Round,
+  mbD1Text
+} from "./core.js";
 import { mbD1InvestmentStatusFromData, mbD1LoadFinancialData } from "./dashboard.js";
-import { MB_D1_TRANSACTION_FROM, MB_D1_TRANSACTION_SELECT, mbD1Holdings, mbD1MapAccountRow, mbD1MapCategory, mbD1MapTransactionRow, mbD1RawAccounts, mbD1Trades, mbD1TransactionById } from "./records.js";
+import {
+  MB_D1_TRANSACTION_FROM,
+  MB_D1_TRANSACTION_SELECT,
+  mbD1Holdings,
+  mbD1MapAccountRow,
+  mbD1MapCategory,
+  mbD1MapTransactionRow,
+  mbD1RawAccounts,
+  mbD1Trades,
+  mbD1TransactionById
+} from "./records.js";
 
 export async function mbD1GetCategoriesData(env, url) {
   await mbD1EnsureDefaultCashbackIncomeCategory(env);
-  const includeDeleted = ["1", "true"].includes((url.searchParams.get("includeDeleted") || "").toLowerCase());
+  const includeDeleted = ["1", "true"].includes(
+    (url.searchParams.get("includeDeleted") || "").toLowerCase()
+  );
   const type = mbD1Text(url.searchParams.get("type"));
   let rows = await mbD1All(
     env,
     `SELECT * FROM categories WHERE household_id=? ${includeDeleted ? "" : "AND deleted_at IS NULL"} ORDER BY CASE type WHEN '수입' THEN 1 WHEN '지출' THEN 2 WHEN '이체' THEN 3 ELSE 99 END,name`,
     [MB_D1_HOUSEHOLD_ID]
   );
-  if (type) rows = rows.filter((row) => row.type === type);
+  if (type) rows = rows.filter(row => row.type === type);
   const items = rows.map(mbD1MapCategory);
   return { total: items.length, items };
 }
 
 export async function mbD1GetAccountsData(env, url) {
-  const includeDeleted = ["1", "true"].includes((url.searchParams.get("includeDeleted") || "").toLowerCase());
+  const includeDeleted = ["1", "true"].includes(
+    (url.searchParams.get("includeDeleted") || "").toLowerCase()
+  );
   const owner = mbD1Text(url.searchParams.get("owner"));
   const accountType = mbD1Text(url.searchParams.get("accountType"));
   const subType = mbD1Text(url.searchParams.get("subType"));
   const financial = await mbD1LoadFinancialData(env);
   let items = financial.accounts;
-  if (!includeDeleted) items = items.filter((item) => !item.isDeleted);
-  if (owner) items = items.filter((item) => item.owner === owner);
-  if (accountType) items = items.filter((item) => item.accountType === accountType);
-  if (subType) items = items.filter((item) => item.subType === subType);
+  if (!includeDeleted) items = items.filter(item => !item.isDeleted);
+  if (owner) items = items.filter(item => item.owner === owner);
+  if (accountType) items = items.filter(item => item.accountType === accountType);
+  if (subType) items = items.filter(item => item.subType === subType);
   return { total: items.length, items };
 }
 
 export async function mbD1GetTransactionsData(env, url) {
-  const includeDeleted = ["1", "true"].includes((url.searchParams.get("includeDeleted") || "").toLowerCase());
+  const includeDeleted = ["1", "true"].includes(
+    (url.searchParams.get("includeDeleted") || "").toLowerCase()
+  );
   const type = mbD1Text(url.searchParams.get("type"));
   const categoryId = mbD1Text(url.searchParams.get("categoryId"));
   const expenseCategory = mbD1Text(url.searchParams.get("expenseCategory"));
@@ -48,14 +81,18 @@ export async function mbD1GetTransactionsData(env, url) {
   const dateFrom = mbD1Text(url.searchParams.get("dateFrom"));
   const dateTo = mbD1Text(url.searchParams.get("dateTo"));
 
-  if (dateFrom && !mbD1DateOnly(dateFrom)) mbD1Fail("INVALID_DATE_FROM", "dateFrom은 YYYY-MM-DD 형식이어야 합니다.");
-  if (dateTo && !mbD1DateOnly(dateTo)) mbD1Fail("INVALID_DATE_TO", "dateTo는 YYYY-MM-DD 형식이어야 합니다.");
-  if (dateFrom && dateTo && dateFrom > dateTo) mbD1Fail("INVALID_DATE_RANGE", "조회 시작일은 종료일보다 늦을 수 없습니다.");
+  if (dateFrom && !mbD1DateOnly(dateFrom))
+    mbD1Fail("INVALID_DATE_FROM", "dateFrom은 YYYY-MM-DD 형식이어야 합니다.");
+  if (dateTo && !mbD1DateOnly(dateTo))
+    mbD1Fail("INVALID_DATE_TO", "dateTo는 YYYY-MM-DD 형식이어야 합니다.");
+  if (dateFrom && dateTo && dateFrom > dateTo)
+    mbD1Fail("INVALID_DATE_RANGE", "조회 시작일은 종료일보다 늦을 수 없습니다.");
 
   let amount = null;
   if (amountRaw) {
     amount = Number(amountRaw);
-    if (!Number.isFinite(amount) || amount < 0) mbD1Fail("INVALID_AMOUNT_FILTER", "amount는 0 이상의 숫자여야 합니다.");
+    if (!Number.isFinite(amount) || amount < 0)
+      mbD1Fail("INVALID_AMOUNT_FILTER", "amount는 0 이상의 숫자여야 합니다.");
   }
 
   const { limit, offset } = normalizeTransactionPagination(
@@ -124,10 +161,10 @@ export async function mbD1SettlementSummaryData(env, transactionId) {
      ORDER BY t.date ASC,t.created_at ASC`,
     [MB_D1_HOUSEHOLD_ID, transactionId]
   );
-  const linkedAmounts = rows.map((row) => mbD1Number(row.amount));
+  const linkedAmounts = rows.map(row => mbD1Number(row.amount));
   const settlements = rows
-    .filter((row) => mbD1IsSettlementRequestId(row.request_id))
-    .map((row) => ({
+    .filter(row => mbD1IsSettlementRequestId(row.request_id))
+    .map(row => ({
       transactionId: mbD1Text(row.transaction_id),
       date: mbD1Text(row.date),
       amount: mbD1Number(row.amount),
@@ -149,7 +186,8 @@ export async function mbD1SettlementSummaryData(env, transactionId) {
 
 export async function mbD1GetAssetSnapshotsData(env, url) {
   const month = mbD1Text(url.searchParams.get("month"));
-  if (month && !mbD1MonthOnly(month)) mbD1Fail("INVALID_MONTH", "month는 YYYY-MM 형식이어야 합니다.");
+  if (month && !mbD1MonthOnly(month))
+    mbD1Fail("INVALID_MONTH", "month는 YYYY-MM 형식이어야 합니다.");
   let rows = await mbD1All(
     env,
     `SELECT * FROM asset_snapshots WHERE household_id=? ${month ? "AND month=?" : ""} ORDER BY month DESC`,
@@ -159,7 +197,7 @@ export async function mbD1GetAssetSnapshotsData(env, url) {
   if (limit) rows = rows.slice(0, limit);
   return {
     total: rows.length,
-    items: rows.map((row) => ({
+    items: rows.map(row => ({
       month: row.month,
       assets: mbD1Number(row.assets),
       liabilities: mbD1Number(row.liabilities),
@@ -177,9 +215,10 @@ export async function mbD1GetAssetSnapshotsData(env, url) {
 
 export async function mbD1GetInvestmentAccountsData(env) {
   const raw = await mbD1RawAccounts(env);
-  const items = raw.map(mbD1MapAccountRow)
-    .filter((account) => account.active && !account.isDeleted && mbD1IsInvestmentAccount(account))
-    .map((account) => ({
+  const items = raw
+    .map(mbD1MapAccountRow)
+    .filter(account => account.active && !account.isDeleted && mbD1IsInvestmentAccount(account))
+    .map(account => ({
       accountId: account.accountId,
       accountName: account.displayName,
       owner: account.owner,
@@ -193,26 +232,30 @@ export async function mbD1GetInvestmentAccountsData(env) {
 }
 
 export async function mbD1GetHoldingsData(env, url) {
-  const includeDeleted = ["1", "true"].includes((url.searchParams.get("includeDeleted") || "").toLowerCase());
+  const includeDeleted = ["1", "true"].includes(
+    (url.searchParams.get("includeDeleted") || "").toLowerCase()
+  );
   let items = await mbD1Holdings(env, includeDeleted);
   const accountId = mbD1Text(url.searchParams.get("accountId"));
   const market = mbD1Text(url.searchParams.get("market"));
   const quoteMode = mbD1Text(url.searchParams.get("quoteMode"));
-  if (accountId) items = items.filter((item) => item.accountId === accountId);
-  if (market) items = items.filter((item) => item.market === market);
-  if (quoteMode) items = items.filter((item) => item.quoteMode === quoteMode);
+  if (accountId) items = items.filter(item => item.accountId === accountId);
+  if (market) items = items.filter(item => item.market === market);
+  if (quoteMode) items = items.filter(item => item.quoteMode === quoteMode);
   return { total: items.length, items };
 }
 
 export async function mbD1GetTradesData(env, url) {
-  const includeDeleted = ["1", "true"].includes((url.searchParams.get("includeDeleted") || "").toLowerCase());
+  const includeDeleted = ["1", "true"].includes(
+    (url.searchParams.get("includeDeleted") || "").toLowerCase()
+  );
   let items = await mbD1Trades(env, includeDeleted);
   const accountId = mbD1Text(url.searchParams.get("accountId"));
   const holdingId = mbD1Text(url.searchParams.get("holdingId"));
   const tradeType = mbD1Text(url.searchParams.get("tradeType") || url.searchParams.get("type"));
-  if (accountId) items = items.filter((item) => item.accountId === accountId);
-  if (holdingId) items = items.filter((item) => item.holdingId === holdingId);
-  if (tradeType) items = items.filter((item) => item.tradeType === tradeType);
+  if (accountId) items = items.filter(item => item.accountId === accountId);
+  if (holdingId) items = items.filter(item => item.holdingId === holdingId);
+  if (tradeType) items = items.filter(item => item.tradeType === tradeType);
   return { total: items.length, items };
 }
 
@@ -239,7 +282,10 @@ export async function mbD1GetChangesData(env, url) {
   }
   const recent = url.searchParams.get("recent") === "1";
   const after = Math.max(0, Math.floor(mbD1Number(url.searchParams.get("after"), 0)));
-  const limit = Math.max(1, Math.min(200, Math.floor(mbD1Number(url.searchParams.get("limit") || (recent ? 20 : 100), 100))));
+  const limit = Math.max(
+    1,
+    Math.min(200, Math.floor(mbD1Number(url.searchParams.get("limit") || (recent ? 20 : 100), 100)))
+  );
   const rows = await mbD1All(
     env,
     `SELECT c.change_seq,c.entity_type,c.entity_id,c.action,c.entity_version,c.payload_json,c.changed_at,
@@ -252,10 +298,14 @@ export async function mbD1GetChangesData(env, url) {
      LIMIT ?`,
     [MB_D1_HOUSEHOLD_ID, after, limit]
   );
-  const changes = rows.map((row) => {
+  const changes = rows.map(row => {
     let payload = null;
     if (row.payload_json) {
-      try { payload = JSON.parse(row.payload_json); } catch { payload = null; }
+      try {
+        payload = JSON.parse(row.payload_json);
+      } catch {
+        payload = null;
+      }
     }
     return {
       changeSeq: Math.max(0, Math.floor(mbD1Number(row.change_seq, 0))),

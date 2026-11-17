@@ -14,10 +14,7 @@ export type PwaInstallState = {
   iosSafari: boolean;
 };
 
-export type PwaInstallResult =
-  | "accepted"
-  | "dismissed"
-  | "unavailable";
+export type PwaInstallResult = "accepted" | "dismissed" | "unavailable";
 
 let initialized = false;
 let deferredPrompt: BeforeInstallPromptEvent | null = null;
@@ -27,65 +24,42 @@ let state: PwaInstallState = {
   iosSafari: false
 };
 
-const listeners = new Set<
-  (nextState: PwaInstallState) => void
->();
+const listeners = new Set<(nextState: PwaInstallState) => void>();
 
 function isStandalone() {
-  const displayModeStandalone =
-    window.matchMedia(
-      "(display-mode: standalone)"
-    ).matches;
+  const displayModeStandalone = window.matchMedia("(display-mode: standalone)").matches;
 
-  const navigatorStandalone =
-    Boolean(
-      (
-        navigator as Navigator & {
-          standalone?: boolean;
-        }
-      ).standalone
-    );
-
-  return (
-    displayModeStandalone ||
-    navigatorStandalone
+  const navigatorStandalone = Boolean(
+    (
+      navigator as Navigator & {
+        standalone?: boolean;
+      }
+    ).standalone
   );
+
+  return displayModeStandalone || navigatorStandalone;
 }
 
 function isIosSafariInstallCandidate() {
   const userAgent = navigator.userAgent;
 
   const isIos =
-    /iPad|iPhone|iPod/i.test(
-      userAgent
-    ) ||
-    (
-      navigator.platform === "MacIntel" &&
-      navigator.maxTouchPoints > 1
-    );
+    /iPad|iPhone|iPod/i.test(userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
   if (!isIos) return false;
 
-  const isWebKit =
-    /WebKit/i.test(userAgent);
+  const isWebKit = /WebKit/i.test(userAgent);
 
-  const isOtherIosBrowser =
-    /CriOS|FxiOS|EdgiOS|OPiOS/i.test(
-      userAgent
-    );
+  const isOtherIosBrowser = /CriOS|FxiOS|EdgiOS|OPiOS/i.test(userAgent);
 
-  return (
-    isWebKit &&
-    !isOtherIosBrowser
-  );
+  return isWebKit && !isOtherIosBrowser;
 }
 
 function publish() {
   const snapshot = { ...state };
 
-  listeners.forEach(
-    listener => listener(snapshot)
-  );
+  listeners.forEach(listener => listener(snapshot));
 }
 
 function refreshInstalledState() {
@@ -112,10 +86,7 @@ function refreshInstalledState() {
 }
 
 export function initializePwaInstall() {
-  if (
-    initialized ||
-    typeof window === "undefined"
-  ) {
+  if (initialized || typeof window === "undefined") {
     return;
   }
 
@@ -123,54 +94,37 @@ export function initializePwaInstall() {
   state = {
     installed: isStandalone(),
     nativeAvailable: false,
-    iosSafari:
-      isIosSafariInstallCandidate()
+    iosSafari: isIosSafariInstallCandidate()
   };
 
-  window.addEventListener(
-    "beforeinstallprompt",
-    event => {
-      event.preventDefault();
+  window.addEventListener("beforeinstallprompt", event => {
+    event.preventDefault();
 
-      deferredPrompt =
-        event as BeforeInstallPromptEvent;
+    deferredPrompt = event as BeforeInstallPromptEvent;
 
-      state = {
-        ...state,
-        nativeAvailable: true
-      };
+    state = {
+      ...state,
+      nativeAvailable: true
+    };
 
-      publish();
-    }
-  );
+    publish();
+  });
 
-  window.addEventListener(
-    "appinstalled",
-    () => {
-      deferredPrompt = null;
-      state = {
-        ...state,
-        installed: true,
-        nativeAvailable: false
-      };
-      publish();
-    }
-  );
+  window.addEventListener("appinstalled", () => {
+    deferredPrompt = null;
+    state = {
+      ...state,
+      installed: true,
+      nativeAvailable: false
+    };
+    publish();
+  });
 
-  const mediaQuery =
-    window.matchMedia(
-      "(display-mode: standalone)"
-    );
+  const mediaQuery = window.matchMedia("(display-mode: standalone)");
 
-  mediaQuery.addEventListener(
-    "change",
-    refreshInstalledState
-  );
+  mediaQuery.addEventListener("change", refreshInstalledState);
 
-  window.addEventListener(
-    "pageshow",
-    refreshInstalledState
-  );
+  window.addEventListener("pageshow", refreshInstalledState);
 }
 
 export function getPwaInstallState() {
@@ -178,11 +132,7 @@ export function getPwaInstallState() {
   return { ...state };
 }
 
-export function subscribePwaInstall(
-  listener: (
-    nextState: PwaInstallState
-  ) => void
-) {
+export function subscribePwaInstall(listener: (nextState: PwaInstallState) => void) {
   initializePwaInstall();
 
   listeners.add(listener);
@@ -193,14 +143,10 @@ export function subscribePwaInstall(
   };
 }
 
-export async function requestPwaInstall():
-Promise<PwaInstallResult> {
+export async function requestPwaInstall(): Promise<PwaInstallResult> {
   initializePwaInstall();
 
-  if (
-    state.installed ||
-    !deferredPrompt
-  ) {
+  if (state.installed || !deferredPrompt) {
     return "unavailable";
   }
 

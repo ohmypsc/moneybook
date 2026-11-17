@@ -1,21 +1,10 @@
-import {
-  apiRequest
-} from "./client";
+import { apiRequest } from "./client";
 
-import {
-  unwrapEnvelope
-} from "./envelope";
+import { unwrapEnvelope } from "./envelope";
 
-import type {
-  ApiEnvelope
-} from "./envelope";
+import type { ApiEnvelope } from "./envelope";
 
-
-export type TransactionType =
-  | "수입"
-  | "지출"
-  | "이체";
-
+export type TransactionType = "수입" | "지출" | "이체";
 
 export interface TransactionItem {
   tags?: string[];
@@ -24,58 +13,43 @@ export interface TransactionItem {
 
   date: string;
 
-  type:
-    TransactionType;
+  type: TransactionType;
 
-  categoryId:
-    string | null;
+  categoryId: string | null;
 
   category: string;
 
   amount: number;
 
-  fromAccountId:
-    string | null;
+  fromAccountId: string | null;
 
-  fromAccount:
-    string | null;
+  fromAccount: string | null;
 
-  toAccountId:
-    string | null;
+  toAccountId: string | null;
 
-  toAccount:
-    string | null;
+  toAccount: string | null;
 
-  paymentMethodId:
-    string | null;
+  paymentMethodId: string | null;
 
-  paymentMethod:
-    string | null;
+  paymentMethod: string | null;
 
-  spendingTarget:
-    string | null;
+  spendingTarget: string | null;
 
   description: string;
 
   memo: string;
 
-  billingOverride:
-    string | null;
+  billingOverride: string | null;
 
-  billingMonth:
-    string | null;
+  billingMonth: string | null;
 
-  installmentMonths?:
-    number | null;
+  installmentMonths?: number | null;
 
-  groupId:
-    string | null;
+  groupId: string | null;
 
-  requestId:
-    string | null;
+  requestId: string | null;
 
-  reversalOf:
-    string | null;
+  reversalOf: string | null;
 
   reversalAmount?: number;
 
@@ -85,21 +59,17 @@ export interface TransactionItem {
 
   netAmount?: number;
 
-  createdAt:
-    string | null;
+  createdAt: string | null;
 
-  updatedAt:
-    string | null;
+  updatedAt: string | null;
 
-  updatedAtMs:
-    number | null;
+  updatedAtMs: number | null;
 
   createdBy: string;
 
   updatedBy: string;
 
-  deletedAt:
-    string | null;
+  deletedAt: string | null;
 
   deletedBy: string;
 
@@ -107,7 +77,6 @@ export interface TransactionItem {
 
   row: number;
 }
-
 
 export interface UpdateTransactionInput {
   tags?: string[];
@@ -119,13 +88,11 @@ export interface UpdateTransactionInput {
    * 두 기기에서 같은 거래를 수정할 때 마지막 저장이
    * 조용히 덮어쓰는 것을 막는 낙관적 동시성 토큰입니다.
    */
-  expectedUpdatedAtMs:
-    number | null;
+  expectedUpdatedAtMs: number | null;
 
   date?: string;
 
-  type?:
-    TransactionType;
+  type?: TransactionType;
 
   categoryId?: string;
 
@@ -148,14 +115,11 @@ export interface UpdateTransactionInput {
   installmentMonths?: number | null;
 }
 
-
 export interface UpdateTransactionResult {
   updated: boolean;
 
-  transaction:
-    TransactionItem;
+  transaction: TransactionItem;
 }
-
 
 export interface DeleteTransactionResult {
   deleted: boolean;
@@ -165,7 +129,6 @@ export interface DeleteTransactionResult {
   transactionId: string;
 }
 
-
 export interface RestoreTransactionResult {
   restored: boolean;
 
@@ -173,46 +136,26 @@ export interface RestoreTransactionResult {
 
   transactionId?: string;
 
-  transaction?:
-    TransactionItem;
+  transaction?: TransactionItem;
 }
-
 
 /**
  * =========================================================
  * 거래 수정
  * =========================================================
  */
-export async function updateTransaction(
-  input:
-    UpdateTransactionInput
-) {
-  const raw =
-    await apiRequest<
-      | ApiEnvelope<
-          UpdateTransactionResult
-        >
-      | UpdateTransactionResult
-    >(
-      "/api/transactions/update",
-      {
-        method:
-          "POST",
+export async function updateTransaction(input: UpdateTransactionInput) {
+  const raw = await apiRequest<ApiEnvelope<UpdateTransactionResult> | UpdateTransactionResult>(
+    "/api/transactions/update",
+    {
+      method: "POST",
 
-        body:
-          JSON.stringify(
-            input
-          )
-      }
-    );
-
-  return unwrapEnvelope<
-    UpdateTransactionResult
-  >(
-    raw
+      body: JSON.stringify(input)
+    }
   );
-}
 
+  return unwrapEnvelope<UpdateTransactionResult>(raw);
+}
 
 /**
  * =========================================================
@@ -222,37 +165,21 @@ export async function updateTransaction(
  * 백엔드 soft delete를 호출합니다.
  * =========================================================
  */
-export async function deleteTransaction(
-  transactionId: string,
-  expectedUpdatedAtMs: number | null
-) {
-  const raw =
-    await apiRequest<
-      | ApiEnvelope<
-          DeleteTransactionResult
-        >
-      | DeleteTransactionResult
-    >(
-      "/api/transactions/delete",
-      {
-        method:
-          "POST",
+export async function deleteTransaction(transactionId: string, expectedUpdatedAtMs: number | null) {
+  const raw = await apiRequest<ApiEnvelope<DeleteTransactionResult> | DeleteTransactionResult>(
+    "/api/transactions/delete",
+    {
+      method: "POST",
 
-        body:
-          JSON.stringify({
-            transactionId,
-            expectedUpdatedAtMs
-          })
-      }
-    );
-
-  return unwrapEnvelope<
-    DeleteTransactionResult
-  >(
-    raw
+      body: JSON.stringify({
+        transactionId,
+        expectedUpdatedAtMs
+      })
+    }
   );
-}
 
+  return unwrapEnvelope<DeleteTransactionResult>(raw);
+}
 
 /**
  * =========================================================
@@ -263,32 +190,17 @@ export async function deleteTransaction(
  * "실행 취소"를 눌렀을 때만 사용합니다.
  * =========================================================
  */
-export async function restoreTransaction(
-  transactionId:
-    string
-) {
-  const raw =
-    await apiRequest<
-      | ApiEnvelope<
-          RestoreTransactionResult
-        >
-      | RestoreTransactionResult
-    >(
-      "/api/transactions/restore",
-      {
-        method:
-          "POST",
+export async function restoreTransaction(transactionId: string) {
+  const raw = await apiRequest<ApiEnvelope<RestoreTransactionResult> | RestoreTransactionResult>(
+    "/api/transactions/restore",
+    {
+      method: "POST",
 
-        body:
-          JSON.stringify({
-            transactionId
-          })
-      }
-    );
-
-  return unwrapEnvelope<
-    RestoreTransactionResult
-  >(
-    raw
+      body: JSON.stringify({
+        transactionId
+      })
+    }
   );
+
+  return unwrapEnvelope<RestoreTransactionResult>(raw);
 }

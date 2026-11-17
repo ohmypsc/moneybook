@@ -5,11 +5,14 @@ import fs from "node:fs";
 import path from "node:path";
 
 const roots = ["worker", "shared"];
-const files = roots.flatMap(root =>
-  fs.readdirSync(root, { recursive: true })
-    .filter(file => String(file).endsWith(".js"))
-    .map(file => path.join(root, String(file)))
-).sort();
+const files = roots
+  .flatMap(root =>
+    fs
+      .readdirSync(root, { recursive: true })
+      .filter(file => String(file).endsWith(".js"))
+      .map(file => path.join(root, String(file)))
+  )
+  .sort();
 
 let failed = 0;
 for (const file of files) {

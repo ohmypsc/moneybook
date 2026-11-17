@@ -1,17 +1,8 @@
-export type Market =
-  | "국내"
-  | "해외";
+export type Market = "국내" | "해외";
 
+export type QuoteMode = "자동" | "수동";
 
-export type QuoteMode =
-  | "자동"
-  | "수동";
-
-
-export type InvestmentTradeType =
-  | "매수"
-  | "매도";
-
+export type InvestmentTradeType = "매수" | "매도";
 
 export interface InvestmentSymbolLookupResult {
   found: boolean;
@@ -23,7 +14,6 @@ export interface InvestmentSymbolLookupResult {
   source?: string;
 }
 
-
 export interface InvestmentSymbolSearchItem {
   stockCode: string;
   stockName: string;
@@ -34,12 +24,10 @@ export interface InvestmentSymbolSearchItem {
   source?: string;
 }
 
-
 export interface InvestmentSymbolSearchResponse {
   query: string;
   items: InvestmentSymbolSearchItem[];
 }
-
 
 /*
  * =========================================================
@@ -65,8 +53,7 @@ export interface InvestmentTrade {
    */
   tradeDate?: string;
 
-  tradeType:
-    InvestmentTradeType;
+  tradeType: InvestmentTradeType;
 
   accountId: string;
   accountName: string;
@@ -76,8 +63,7 @@ export interface InvestmentTrade {
   stockCode: string;
   stockName: string;
 
-  market:
-    Market;
+  market: Market;
 
   quantity: number;
   unitPrice: number;
@@ -94,25 +80,16 @@ export interface InvestmentTrade {
 
   memo: string;
 
-  requestId:
-    string |
-    null;
+  requestId: string | null;
 
-  createdAt:
-    string |
-    null;
+  createdAt: string | null;
 
-  updatedAt:
-    string |
-    null;
+  updatedAt: string | null;
 
-  updatedAtMs:
-    number |
-    null;
+  updatedAtMs: number | null;
 
   isDeleted: boolean;
 }
-
 
 /*
  * =========================================================
@@ -123,10 +100,8 @@ export interface InvestmentTrade {
 export interface InvestmentTradesResponse {
   total: number;
 
-  items:
-    InvestmentTrade[];
+  items: InvestmentTrade[];
 }
-
 
 /*
  * =========================================================
@@ -161,8 +136,7 @@ export interface CreateInvestmentTradePayload {
    */
   manualPrice?: number;
 
-  tradeType:
-    InvestmentTradeType;
+  tradeType: InvestmentTradeType;
 
   /*
    * 생성 요청에서는 tradeDate를 사용해도
@@ -196,7 +170,6 @@ export interface CreateInvestmentTradePayload {
 
   requestId?: string;
 }
-
 
 /*
  * =========================================================

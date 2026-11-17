@@ -1,9 +1,4 @@
-import {
-  type KeyboardEvent,
-  type ReactNode,
-  useEffect,
-  useRef
-} from "react";
+import { type KeyboardEvent, type ReactNode, useEffect, useRef } from "react";
 
 import { Button } from "../Button/Button";
 import styles from "./BottomSheet.module.css";
@@ -40,16 +35,13 @@ export function BottomSheet({
 
   useEffect(() => {
     returnFocusRef.current =
-      document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null;
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
     window.requestAnimationFrame(() => {
-      const firstFocusable =
-        sheetRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
+      const firstFocusable = sheetRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
       (firstFocusable ?? closeButtonRef.current)?.focus();
     });
 
