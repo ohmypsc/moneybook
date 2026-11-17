@@ -55,6 +55,8 @@ body {
   background: linear-gradient(180deg, var(--color-bg-glow) 0, transparent 190px), var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-family-base);
+  line-height: 1.45;
+  letter-spacing: 0.01em;
   -webkit-font-smoothing: antialiased;
 }
 

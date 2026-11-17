@@ -871,7 +871,7 @@
 .detailTitle {
   color: var(--color-text);
   font-size: var(--font-size-3xl);
-  letter-spacing: -0.035em;
+  letter-spacing: 0;
 }
 
 .menuSection {

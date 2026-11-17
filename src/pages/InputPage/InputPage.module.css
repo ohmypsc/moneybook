@@ -563,7 +563,7 @@
 
 .title {
   font-size: var(--font-size-3xl);
-  letter-spacing: -0.035em;
+  letter-spacing: 0;
 }
 
 .typeTabs {
@@ -627,7 +627,7 @@
   color: var(--color-primary);
   font-size: clamp(32px, 9vw, 42px);
   font-weight: var(--font-weight-heavy);
-  letter-spacing: -0.045em;
+  letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
   box-shadow: none !important;
 }
