@@ -184,6 +184,42 @@ export async function mbD1SettlementSummaryData(env, transactionId) {
   };
 }
 
+/**
+ * 묶음 정산에서 고를 수 있는 지출: '정산 예정'으로 표시했고 아직 다 받지 못한 지출.
+ * includeTransactionId로 지정한 지출은 표시가 없어도 함께 돌려줍니다(정산받기를 연 그 지출).
+ */
+export async function mbD1SettlementCandidatesData(env, url) {
+  const includeId = mbD1Text(url.searchParams.get("includeTransactionId"));
+  const rows = await mbD1All(
+    env,
+    `SELECT * FROM (${MB_D1_TRANSACTION_SELECT}
+       WHERE t.household_id=? AND t.deleted_at IS NULL AND t.type='지출'
+         AND (COALESCE(t.settlement_expected,0)=1 OR t.transaction_id=?)
+     ) WHERE amount - reversal_total > 0.0001
+     ORDER BY date ASC, created_at ASC
+     LIMIT 200`,
+    [MB_D1_HOUSEHOLD_ID, includeId]
+  );
+  const items = rows.map(row => {
+    const item = mbD1MapTransactionRow(row);
+    return {
+      ...item,
+      remainingAmount: mbD1Round(
+        mbD1SettlementRemaining(item.amount, [mbD1Number(row.reversal_total)]),
+        2
+      )
+    };
+  });
+  return {
+    total: items.length,
+    remainingTotal: mbD1Round(
+      items.reduce((sum, item) => sum + item.remainingAmount, 0),
+      2
+    ),
+    items
+  };
+}
+
 export async function mbD1GetAssetSnapshotsData(env, url) {
   const month = mbD1Text(url.searchParams.get("month"));
   if (month && !mbD1MonthOnly(month))

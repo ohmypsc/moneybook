@@ -41,6 +41,7 @@ const LEDGER_MUTATION_PATHS = new Set([
 
   "/api/transactions",
   "/api/transactions/settle",
+  "/api/transactions/settle-batch",
   "/api/transactions/update",
   "/api/transactions/delete",
   "/api/transactions/restore",

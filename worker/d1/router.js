@@ -57,6 +57,7 @@ import {
   mbD1GetInvestmentCashData,
   mbD1GetTradesData,
   mbD1GetTransactionsData,
+  mbD1SettlementCandidatesData,
   mbD1SettlementSummaryData
 } from "./queries.js";
 import {
@@ -93,6 +94,7 @@ export async function mbD1ProductionRoute(request, url, session, env, ctx) {
     "/api/benefits/reward-balances",
     "/api/transactions",
     "/api/transactions/settlement-summary",
+    "/api/transactions/settlement-candidates",
     "/api/asset-snapshots",
     "/api/investments/accounts",
     "/api/investments/holdings",
@@ -111,6 +113,7 @@ export async function mbD1ProductionRoute(request, url, session, env, ctx) {
     "/api/transactions/delete",
     "/api/transactions/restore",
     "/api/transactions/settle",
+    "/api/transactions/settle-batch",
     "/api/categories",
     "/api/categories/update",
     "/api/categories/delete",
@@ -191,6 +194,8 @@ export async function mbD1ProductionRoute(request, url, session, env, ctx) {
         if (!transactionId) mbD1Fail("TRANSACTION_ID_REQUIRED", "transactionId가 필요합니다.");
         return mbD1Envelope(await mbD1SettlementSummaryData(env, transactionId));
       }
+      if (path === "/api/transactions/settlement-candidates")
+        return mbD1Envelope(await mbD1SettlementCandidatesData(env, url));
       if (path === "/api/transactions")
         return mbD1Envelope(await mbD1GetTransactionsData(env, url));
       if (path === "/api/asset-snapshots")

@@ -1,3 +1,6 @@
+import type { MerchantUsage } from "../../shared/merchantUsage.js";
+
+export type { MerchantUsage };
 export interface DashboardSummary {
   assets: number;
   liabilities: number;
@@ -165,5 +168,7 @@ export interface DashboardData {
   recentTransactions: RecentTransaction[];
   // 최근 180일 실제 거래의 카테고리별 사용 횟수 (예전 서버 응답에는 없을 수 있음)
   categoryUsage?: CategoryUsage[];
+  // 최근 180일 실제 거래의 가맹점별 카테고리 사용 기록 (예전 서버 응답에는 없을 수 있음)
+  merchantUsage?: MerchantUsage[];
   investments: DashboardInvestments;
 }

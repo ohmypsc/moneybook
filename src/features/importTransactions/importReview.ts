@@ -18,6 +18,12 @@ export interface EditableCandidate extends ImportedTransactionCandidate {
   matchedRules?: string[];
   requestId: string;
   queued?: boolean;
+  /** 한 건씩 확인 화면에서 사용자가 직접 확인한 거래 */
+  reviewed?: boolean;
+  /** 지출: 나중에 정산받을 지출로 표시 */
+  settlementExpected?: boolean;
+  /** 수입: 수입으로 저장하지 않고 정산 예정 지출에 정산금으로 연결함 */
+  settlementLinked?: boolean;
 }
 
 export function changeImportKind(item: EditableCandidate, kind: ImportKind): EditableCandidate {
@@ -35,6 +41,7 @@ export function changeImportKind(item: EditableCandidate, kind: ImportKind): Edi
     paymentMethodName: "",
     fromAccountId: "",
     toAccountId: "",
+    settlementExpected: false,
     duplicate: null
   };
 }
@@ -142,6 +149,7 @@ export function buildImportPayload(
     ...common,
     paymentMethodId: item.paymentMethodId!,
     spendingTarget: item.spendingTarget,
+    ...(item.settlementExpected ? { settlementExpected: true } : {}),
     ...(rule
       ? { benefitRuleId: rule.id, benefitRewardUsedAmount: 0, benefitAccrualEnabled: true }
       : {})

@@ -8,6 +8,8 @@ export type TransactionType = "수입" | "지출" | "이체";
 
 export interface TransactionItem {
   tags?: string[];
+  /** 나중에 정산받을 지출(묶음 정산 대상) */
+  settlementExpected?: boolean;
   categorySource?: "manual" | "auto";
   transactionId: string;
 
@@ -80,6 +82,8 @@ export interface TransactionItem {
 
 export interface UpdateTransactionInput {
   tags?: string[];
+  /** 나중에 정산받을 지출(묶음 정산 대상) */
+  settlementExpected?: boolean;
   categorySource?: "manual" | "auto";
   transactionId: string;
 

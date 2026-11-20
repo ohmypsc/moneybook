@@ -418,6 +418,11 @@ export default function InputPage({
   );
 
   const [tagsText, setTagsText] = useState(hasLaunchPreset ? "" : initialDraft?.tagsText || "");
+
+  /** 나중에 정산받을 지출(회식비 등)로 표시해 묶음 정산 목록에 올립니다. */
+  const [settlementExpected, setSettlementExpected] = useState(
+    hasLaunchPreset ? false : Boolean(initialDraft?.settlementExpected)
+  );
   const [categorySource, setCategorySource] = useState<"auto" | "manual">(
     launchCategoryId
       ? "manual"
@@ -511,6 +516,7 @@ export default function InputPage({
       categoryId,
       categorySource,
       tagsText,
+      settlementExpected,
       paymentMethodId,
       spendingTarget,
       fromAccountId,
@@ -543,7 +549,8 @@ export default function InputPage({
     loanPrincipalAmount,
     loanInterestAmount,
     installmentMonths,
-    benefitEnabled
+    benefitEnabled,
+    settlementExpected
   ]);
 
   useEffect(() => {
@@ -1206,6 +1213,7 @@ export default function InputPage({
     setCategoryId(payload.categoryId || "");
     setCategorySource(payload.categorySource || "manual");
     setTagsText((payload.tags || []).join(", "));
+    setSettlementExpected(payload.type === "지출" && payload.settlementExpected === true);
     setPaymentMethodId(payload.paymentMethodId || "");
     setSpendingTarget(payload.spendingTarget || "");
     setFromAccountId(payload.fromAccountId || "");
@@ -1269,6 +1277,7 @@ export default function InputPage({
     setCategoryId("");
     setCategorySource("auto");
     setTagsText("");
+    setSettlementExpected(false);
 
     resetAccountSelections();
 
@@ -1833,6 +1842,7 @@ export default function InputPage({
         ...base,
         paymentMethodId,
         spendingTarget,
+        ...(settlementExpected ? { settlementExpected: true } : {}),
         ...(canUseInstallment && installmentMonths > 1 ? { installmentMonths } : {})
       };
     }
@@ -1973,6 +1983,8 @@ export default function InputPage({
 
       spendingTarget: mode === "expense" ? spendingTarget : undefined,
 
+      settlementExpected: mode === "expense" ? settlementExpected : undefined,
+
       fromAccountId: mode === "transfer" ? fromAccountId : undefined,
 
       toAccountId: mode === "income" || mode === "transfer" ? toAccountId : undefined,
@@ -2040,6 +2052,7 @@ export default function InputPage({
       setCategoryId("");
       setCategorySource("auto");
       setTagsText("");
+      setSettlementExpected(false);
       setInstallmentMonths(1);
 
       // 같은 카드로 여러 건을 연달아 입력하는 경우가 많아 지출의 결제수단·지출대상은 그대로 둡니다.
@@ -2270,6 +2283,22 @@ export default function InputPage({
                     onClick={() => setActivePicker("spendingTarget")}
                     disabled={submitting}
                   />
+                </label>
+
+                <label className={styles.settlementExpectedToggle}>
+                  <input
+                    type="checkbox"
+                    checked={settlementExpected}
+                    disabled={submitting}
+                    onChange={event => {
+                      setSettlementExpected(event.target.checked);
+                      requestMemory.current = null;
+                    }}
+                  />
+                  <span>
+                    <strong>정산받을 예정</strong>
+                    <small>회식비처럼 나중에 돌려받을 돈이면 체크해 두세요</small>
+                  </span>
                 </label>
 
                 {selectedBenefitRule && selectedBenefitRule.kind === "post_reward" && (
@@ -2894,6 +2923,7 @@ export default function InputPage({
             investmentAccountId: selectedInvestmentAccountId
           }}
           onSelect={applyPickerValue}
+          merchant={description}
           onClose={() => setActivePicker(null)}
         />
       )}

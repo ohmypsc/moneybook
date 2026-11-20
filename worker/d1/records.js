@@ -85,6 +85,7 @@ export function mbD1MapTransactionRow(row) {
   return {
     tags: normalizeTags(JSON.parse(row.tags_json || "[]")),
     categorySource: row.category_source || "manual",
+    settlementExpected: mbD1Text(row.type) === "지출" && Number(row.settlement_expected) === 1,
     transactionId: mbD1Text(row.transaction_id),
     date: mbD1Text(row.date),
     type: mbD1Text(row.type),

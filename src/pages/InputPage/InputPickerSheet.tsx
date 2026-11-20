@@ -2,12 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 
 import { getDashboardSnapshot } from "../../api/dashboard";
 import { BottomSheet } from "../../components/common/BottomSheet/BottomSheet";
+import { merchantCategoryIds } from "../../../shared/merchantUsage.js";
 import {
   getFrequentCategoryIds,
   matchesCategorySearch,
   sortByKoreanLabel
 } from "../../utils/categoryUsage";
 import {
+  getBackendType,
   isAccountPickerKind,
   isOtherOwnerAccount,
   type Account,
@@ -42,6 +44,8 @@ interface InputPickerSheetProps {
   selection: PickerSelection;
   onSelect: (kind: PickerKind, value: string) => void;
   onClose: () => void;
+  /** 거래 내용(가맹점). 있으면 이 가맹점에 예전에 쓴 카테고리를 맨 위에 따로 보여 줍니다. */
+  merchant?: string;
 }
 
 export function InputPickerSheet({
@@ -58,7 +62,8 @@ export function InputPickerSheet({
   spendingTargets,
   selection,
   onSelect,
-  onClose
+  onClose,
+  merchant = ""
 }: InputPickerSheetProps) {
   const accountContext = useMemo(
     () => ({
@@ -168,6 +173,8 @@ export function InputPickerSheet({
         items={getPickerItems(kind, { ...accountContext, mode, categories, spendingTargets })}
         selectedValue={selectedValue}
         onPick={value => onSelect(kind, value)}
+        merchant={merchant}
+        type={getBackendType(mode)}
       />
     );
   } else {
@@ -193,28 +200,52 @@ interface CategoryChipPickerProps {
   items: PickerItem[];
   selectedValue: string;
   onPick: (value: string) => void;
+  merchant?: string;
+  type?: string;
 }
 
 /*
  * 카테고리는 수십 개까지 늘어날 수 있어 한 줄에 하나씩 쌓지 않고 글자 칩으로 촘촘하게 보여 줍니다.
  * 위쪽에는 자주 쓰는 것을 따로 모으고, 많을 때는 검색(초성 포함)을 붙입니다.
  */
-function CategoryChipPicker({ items, selectedValue, onPick }: CategoryChipPickerProps) {
+function CategoryChipPicker({
+  items,
+  selectedValue,
+  onPick,
+  merchant = "",
+  type = ""
+}: CategoryChipPickerProps) {
   const [query, setQuery] = useState("");
 
   const sortedItems = useMemo(() => sortByKoreanLabel(items), [items]);
 
-  const frequentItems = useMemo(() => {
-    if (items.length <= FREQUENT_THRESHOLD) return [];
+  const trimmedMerchant = merchant.trim();
+  const { merchantItems, frequentItems } = useMemo(() => {
     const dashboard = getDashboardSnapshot();
-    const ids = getFrequentCategoryIds(
+    const byId = new Map(items.map(item => [item.value, item]));
+    const pick = (ids: string[]) =>
+      ids.map(id => byId.get(id)).filter((item): item is PickerItem => Boolean(item));
+    const fromMerchant = pick(
+      merchantCategoryIds(
+        trimmedMerchant,
+        type,
+        dashboard?.merchantUsage,
+        items.map(item => item.value)
+      )
+    );
+    if (items.length <= FREQUENT_THRESHOLD)
+      return { merchantItems: fromMerchant, frequentItems: [] };
+    const frequentIds = getFrequentCategoryIds(
       items.map(item => item.value),
       dashboard?.categoryUsage,
       (dashboard?.recentTransactions || []).map(tx => tx.categoryId)
     );
-    const byId = new Map(items.map(item => [item.value, item]));
-    return ids.map(id => byId.get(id)).filter((item): item is PickerItem => Boolean(item));
-  }, [items]);
+    const merchantIds = new Set(fromMerchant.map(item => item.value));
+    return {
+      merchantItems: fromMerchant,
+      frequentItems: pick(frequentIds.filter(id => !merchantIds.has(id)))
+    };
+  }, [items, trimmedMerchant, type]);
 
   const trimmedQuery = query.trim();
   const visibleItems = trimmedQuery
@@ -271,6 +302,15 @@ function CategoryChipPicker({ items, selectedValue, onPick }: CategoryChipPicker
         </div>
       )}
 
+      {!trimmedQuery && merchantItems.length > 0 && (
+        <>
+          <p className={styles.categoryGroupLabel}>‘{trimmedMerchant}’에 썼던</p>
+          <div className={styles.categoryChips}>
+            {merchantItems.map(item => renderChip(item, true))}
+          </div>
+        </>
+      )}
+
       {!trimmedQuery && frequentItems.length > 0 && (
         <>
           <p className={styles.categoryGroupLabel}>자주 쓰는</p>
@@ -280,7 +320,7 @@ function CategoryChipPicker({ items, selectedValue, onPick }: CategoryChipPicker
         </>
       )}
 
-      {(frequentItems.length > 0 || trimmedQuery) && (
+      {(frequentItems.length > 0 || merchantItems.length > 0 || trimmedQuery) && (
         <p className={styles.categoryGroupLabel}>
           {trimmedQuery ? `검색 결과 ${visibleItems.length}개` : `전체 ${items.length}개`}
         </p>

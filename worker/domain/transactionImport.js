@@ -1,13 +1,10 @@
+import { normalizeMerchantKey } from "../../shared/merchantUsage.js";
+
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 
 export function normalizeMerchant(value) {
-  return String(value || "")
-    .normalize("NFKC")
-    .toLowerCase()
-    .replace(/\([^)]*\)/g, " ")
-    .replace(/[^0-9a-z가-힣]/g, "")
-    .slice(0, 120);
+  return normalizeMerchantKey(value);
 }
 
 export function normalizeCardLabel(value) {

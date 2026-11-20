@@ -258,6 +258,8 @@ export function mbD1LooksLikeConcurrencyGuardFailure(error) {
 
 export async function mbD1HandleTransactionMutation(path, body, session, env) {
   await ensureClassificationSchema(env);
+  if (mbD1Has(body, "settlementExpected") && typeof body.settlementExpected !== "boolean")
+    mbD1Fail("INVALID_SETTLEMENT_EXPECTED", "정산 예정 표시는 true 또는 false여야 합니다.");
   if (mbD1Has(body, "categorySource") && !["auto", "manual"].includes(body.categorySource))
     mbD1Fail("INVALID_CATEGORY_SOURCE", "분류 출처가 올바르지 않습니다.");
   if (mbD1Has(body, "tags")) {
@@ -370,8 +372,14 @@ export async function mbD1HandleTransactionMutation(path, body, session, env) {
       insert,
       change,
       env.DB.prepare(
-        "UPDATE transactions SET tags_json=?,category_source=? WHERE household_id=? AND transaction_id=?"
-      ).bind(JSON.stringify(body.tags), body.categorySource, MB_D1_HOUSEHOLD_ID, transactionId)
+        "UPDATE transactions SET tags_json=?,category_source=?,settlement_expected=? WHERE household_id=? AND transaction_id=?"
+      ).bind(
+        JSON.stringify(body.tags),
+        body.categorySource,
+        model.type === "지출" && body.settlementExpected === true ? 1 : 0,
+        MB_D1_HOUSEHOLD_ID,
+        transactionId
+      )
     ];
     let benefitTransactionId = null;
     if (benefit && benefit.benefitAmount > 0) {
@@ -524,6 +532,16 @@ export async function mbD1HandleTransactionMutation(path, body, session, env) {
     };
   }
 
+  if (path === "/api/transactions/settle-batch") {
+    return mbD1CreateSettlements(env, session, {
+      items: Array.isArray(body.items) ? body.items : [],
+      toAccountId: body.toAccountId,
+      date: body.date,
+      memo: body.memo,
+      requestId: body.requestId
+    });
+  }
+
   const transactionId = mbD1Text(body.transactionId);
   if (!transactionId) mbD1Fail("TRANSACTION_ID_REQUIRED", "transactionId가 필요합니다.");
   const current = await mbD1TransactionById(env, transactionId, true);
@@ -532,175 +550,18 @@ export async function mbD1HandleTransactionMutation(path, body, session, env) {
   if (path === "/api/transactions/settle") {
     if (current.isDeleted)
       mbD1Fail("TRANSACTION_NOT_FOUND", "정산할 거래를 찾을 수 없습니다.", 404);
-    if (!mbD1IsSettlementEligibleCategory(current.type, current.category, current.categoryId)) {
-      mbD1Fail("SETTLEMENT_NOT_ELIGIBLE", "정산받기는 정산 가능한 지출에서만 사용할 수 있습니다.");
-    }
-
-    const amount = Number(body.amount);
-    if (!Number.isFinite(amount) || amount <= 0)
-      mbD1Fail("INVALID_SETTLEMENT_AMOUNT", "정산받은 금액을 입력해주세요.");
-    const receiveAccountId = mbD1Text(body.toAccountId);
-    if (!receiveAccountId)
-      mbD1Fail("SETTLEMENT_ACCOUNT_REQUIRED", "정산금을 받은 현금 또는 계좌를 선택해주세요.");
-    const receiveAccount = await mbD1AccountById(env, receiveAccountId, false);
-    if (!receiveAccount || !receiveAccount.active || receiveAccount.isDeleted) {
-      mbD1Fail("SETTLEMENT_ACCOUNT_NOT_FOUND", "정산금을 받은 계좌를 찾을 수 없습니다.");
-    }
-    if (
-      receiveAccount.accountType !== "자산" ||
-      ["신용카드", "체크카드"].includes(receiveAccount.subType)
-    ) {
-      mbD1Fail(
-        "SETTLEMENT_ACCOUNT_INVALID",
-        "정산금은 현금이나 입금 가능한 자산 계좌로 받아주세요."
-      );
-    }
-
-    const rawRequestId = mbD1Text(body.requestId);
-    const requestId = rawRequestId
-      ? rawRequestId.startsWith(SETTLEMENT_REQUEST_PREFIX)
-        ? rawRequestId
-        : `${SETTLEMENT_REQUEST_PREFIX}${rawRequestId}`
-      : `${SETTLEMENT_REQUEST_PREFIX}${transactionId}_${mbD1Id("REQ")}`;
-    const duplicateRow = await mbD1First(
-      env,
-      "SELECT transaction_id FROM transactions WHERE household_id=? AND request_id=? LIMIT 1",
-      [MB_D1_HOUSEHOLD_ID, requestId]
-    );
-    if (duplicateRow?.transaction_id) {
-      return {
-        created: false,
-        duplicate: true,
-        transaction: await mbD1TransactionById(env, duplicateRow.transaction_id, true),
-        summary: await mbD1SettlementSummaryData(env, transactionId)
-      };
-    }
-
-    const before = await mbD1SettlementSummaryData(env, transactionId);
-    if (amount > before.remainingAmount + 0.0001) {
-      mbD1Fail(
-        "SETTLEMENT_AMOUNT_EXCEEDS_REMAINING",
-        `남은 정산 가능 금액 ${Math.round(before.remainingAmount).toLocaleString("ko-KR")}원을 초과할 수 없습니다.`
-      );
-    }
-
-    const category = await mbD1SettlementIncomeCategory(env);
-    const date = await mbD1ValidateLedgerDate(env, body.date || mbD1CurrentDateSeoul());
-    const model = await mbD1BuildTransactionModel(
-      env,
-      {
-        date,
-        type: "수입",
-        categoryId: category.category_id,
-        amount,
-        toAccountId: receiveAccountId,
-        description: `${current.description || current.category || "지출"} 정산받음`,
-        memo: mbD1Text(body.memo),
-        reversalOf: transactionId
-      },
-      null,
-      true
-    );
-    const settlementTransactionId = mbD1Id("TX");
-    const now = mbD1Now();
-    const enteredBy = await mbD1MemberIdByName(env, actor);
-    const insert = env.DB.prepare(
-      `INSERT INTO transactions (
-        transaction_id,household_id,request_id,date,type,category_id,amount,
-        from_account_id,to_account_id,payment_method_id,spending_target,spender_member_id,
-        entered_by_member_id,description,memo,billing_month_override,billing_month,group_id,reversal_of,
-        version,created_at,updated_at,created_by,updated_by,deleted_at,deleted_by,source_row
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
-    ).bind(
-      settlementTransactionId,
-      MB_D1_HOUSEHOLD_ID,
-      requestId,
-      model.date,
-      model.type,
-      model.categoryId,
-      model.amount,
-      model.fromAccountId,
-      model.toAccountId,
-      model.paymentMethodId,
-      model.spendingTarget,
-      model.spenderMemberId,
-      enteredBy,
-      model.description || null,
-      model.memo || null,
-      model.billingOverride,
-      model.billingMonth,
-      model.groupId,
-      model.reversalOf,
-      1,
-      now,
-      now,
-      actor,
-      actor,
-      null,
-      null,
-      null
-    );
-    const change = await mbD1InsertChange(
-      env,
-      "transaction",
-      settlementTransactionId,
-      "created",
-      1,
-      session,
-      {
-        date: model.date,
-        type: model.type,
-        amount: model.amount,
-        settlementOf: transactionId
-      }
-    );
-    try {
-      const guard = env.DB.prepare(
-        `SELECT CASE WHEN EXISTS (
-          SELECT 1 FROM transactions original
-          WHERE original.household_id=? AND original.transaction_id=?
-            AND original.deleted_at IS NULL AND original.updated_at IS ?
-            AND ? <= original.amount - COALESCE((
-              SELECT SUM(offset.amount) FROM transactions offset
-              WHERE offset.household_id=original.household_id
-                AND offset.reversal_of=original.transaction_id AND offset.deleted_at IS NULL
-            ),0) + 0.0001
-        ) THEN 1 ELSE json('${MB_D1_CONCURRENCY_GUARD_TOKEN}') END AS ok`
-      ).bind(MB_D1_HOUSEHOLD_ID, transactionId, current.updatedAt ?? null, amount);
-      await env.DB.batch([guard, insert, change]);
-    } catch (error) {
-      if (
-        mbD1LooksLikeRequestIdUniqueConflict(error, "transactions") ||
-        mbD1LooksLikeConcurrencyGuardFailure(error)
-      ) {
-        const duplicate = await mbD1First(
-          env,
-          "SELECT transaction_id FROM transactions WHERE household_id=? AND request_id=? LIMIT 1",
-          [MB_D1_HOUSEHOLD_ID, requestId]
-        );
-        if (duplicate?.transaction_id) {
-          return {
-            created: false,
-            duplicate: true,
-            transaction: await mbD1TransactionById(env, duplicate.transaction_id, true),
-            summary: await mbD1SettlementSummaryData(env, transactionId)
-          };
-        }
-      }
-      if (mbD1LooksLikeConcurrencyGuardFailure(error)) {
-        mbD1Fail(
-          "CONCURRENT_MODIFICATION",
-          "정산 잔액 또는 원거래가 변경되었습니다. 최신 정산 내역을 확인한 뒤 다시 시도하세요.",
-          409
-        );
-      }
-      throw error;
-    }
+    const result = await mbD1CreateSettlements(env, session, {
+      items: [{ transactionId, amount: body.amount }],
+      toAccountId: body.toAccountId,
+      date: body.date,
+      memo: body.memo,
+      requestId: body.requestId
+    });
     return {
-      created: true,
-      duplicate: false,
-      transaction: await mbD1TransactionById(env, settlementTransactionId, true),
-      summary: await mbD1SettlementSummaryData(env, transactionId)
+      created: result.created,
+      duplicate: result.duplicate,
+      transaction: result.transactions[0] || null,
+      summary: result.summaries[0]
     };
   }
 
@@ -867,7 +728,7 @@ export async function mbD1HandleTransactionMutation(path, body, session, env) {
         change,
         ...linkedBenefitStatements,
         env.DB.prepare(
-          "UPDATE transactions SET tags_json=?,category_source=? WHERE household_id=? AND transaction_id=?"
+          "UPDATE transactions SET tags_json=?,category_source=?,settlement_expected=? WHERE household_id=? AND transaction_id=?"
         ).bind(
           JSON.stringify(mbD1Has(body, "tags") ? body.tags : current.tags),
           mbD1Has(body, "categoryId")
@@ -875,6 +736,12 @@ export async function mbD1HandleTransactionMutation(path, body, session, env) {
               ? "auto"
               : "manual"
             : current.categorySource,
+          model.type === "지출" &&
+            (mbD1Has(body, "settlementExpected")
+              ? body.settlementExpected === true
+              : current.settlementExpected)
+            ? 1
+            : 0,
           MB_D1_HOUSEHOLD_ID,
           transactionId
         )
@@ -1076,4 +943,223 @@ export async function mbD1HandleTransactionMutation(path, body, session, env) {
   }
 
   mbD1Fail("UNSUPPORTED_TRANSACTION_ACTION", "지원하지 않는 거래 작업입니다.");
+}
+
+export const MB_D1_SETTLEMENT_BATCH_LIMIT = 30;
+
+/**
+ * 정산받은 돈을 하나 이상의 지출에 나눠 반영합니다.
+ * 지출마다 정산 수입 거래를 하나씩 만들어 reversal_of로 연결하므로 지출별 "내 부담"과 월 통계가 그대로 맞습니다.
+ * 여러 건이면 같은 group_id로 묶고, 전부 저장되거나 전부 취소되도록 한 batch로 씁니다.
+ */
+export async function mbD1CreateSettlements(env, session, input) {
+  const actor = session.name;
+  const rawItems = Array.isArray(input.items) ? input.items : [];
+  if (!rawItems.length) mbD1Fail("SETTLEMENT_ITEMS_REQUIRED", "정산할 지출을 선택해주세요.");
+  if (rawItems.length > MB_D1_SETTLEMENT_BATCH_LIMIT)
+    mbD1Fail(
+      "SETTLEMENT_TOO_MANY_ITEMS",
+      `한 번에 최대 ${MB_D1_SETTLEMENT_BATCH_LIMIT}건까지 정산할 수 있습니다.`
+    );
+  const items = rawItems.map(item => ({
+    transactionId: mbD1Text(item?.transactionId),
+    amount: Number(item?.amount)
+  }));
+  const seen = new Set();
+  for (const item of items) {
+    if (!item.transactionId) mbD1Fail("TRANSACTION_ID_REQUIRED", "정산할 지출을 선택해주세요.");
+    if (seen.has(item.transactionId))
+      mbD1Fail("SETTLEMENT_DUPLICATE_ITEM", "같은 지출을 두 번 선택할 수 없습니다.");
+    seen.add(item.transactionId);
+    if (!Number.isFinite(item.amount) || item.amount <= 0)
+      mbD1Fail("INVALID_SETTLEMENT_AMOUNT", "정산받은 금액을 입력해주세요.");
+  }
+
+  const rawRequestId = mbD1Text(input.requestId);
+  const baseRequestId = rawRequestId
+    ? rawRequestId.startsWith(SETTLEMENT_REQUEST_PREFIX)
+      ? rawRequestId
+      : `${SETTLEMENT_REQUEST_PREFIX}${rawRequestId}`
+    : `${SETTLEMENT_REQUEST_PREFIX}${items[0].transactionId}_${mbD1Id("REQ")}`;
+  // 한 건이면 예전과 같은 request id를 써서 기존 재전송 처리와 호환됩니다.
+  const requestIds = items.map((_, index) =>
+    items.length === 1 ? baseRequestId : `${baseRequestId}_${index + 1}`
+  );
+  const summariesFor = () =>
+    Promise.all(items.map(item => mbD1SettlementSummaryData(env, item.transactionId)));
+  const existing = async () => {
+    const rows = await mbD1All(
+      env,
+      `SELECT transaction_id,request_id FROM transactions WHERE household_id=? AND request_id IN (${requestIds
+        .map(() => "?")
+        .join(",")})`,
+      [MB_D1_HOUSEHOLD_ID, ...requestIds]
+    );
+    if (!rows.length) return null;
+    const byRequest = new Map(rows.map(row => [row.request_id, row.transaction_id]));
+    const transactions = [];
+    for (const requestId of requestIds) {
+      const id = byRequest.get(requestId);
+      if (id) transactions.push(await mbD1TransactionById(env, id, true));
+    }
+    return {
+      created: false,
+      duplicate: true,
+      groupId: transactions[0]?.groupId || null,
+      transactions,
+      summaries: await summariesFor()
+    };
+  };
+  const duplicate = await existing();
+  if (duplicate) return duplicate;
+
+  const receiveAccountId = mbD1Text(input.toAccountId);
+  if (!receiveAccountId)
+    mbD1Fail("SETTLEMENT_ACCOUNT_REQUIRED", "정산금을 받은 현금 또는 계좌를 선택해주세요.");
+  const receiveAccount = await mbD1AccountById(env, receiveAccountId, false);
+  if (!receiveAccount || !receiveAccount.active || receiveAccount.isDeleted) {
+    mbD1Fail("SETTLEMENT_ACCOUNT_NOT_FOUND", "정산금을 받은 계좌를 찾을 수 없습니다.");
+  }
+  if (
+    receiveAccount.accountType !== "자산" ||
+    ["신용카드", "체크카드"].includes(receiveAccount.subType)
+  ) {
+    mbD1Fail("SETTLEMENT_ACCOUNT_INVALID", "정산금은 현금이나 입금 가능한 자산 계좌로 받아주세요.");
+  }
+  const date = await mbD1ValidateLedgerDate(env, input.date || mbD1CurrentDateSeoul());
+  const memo = mbD1Text(input.memo);
+  const category = await mbD1SettlementIncomeCategory(env);
+  const groupId = items.length > 1 ? `SETTLEMENT_GROUP_${baseRequestId}` : null;
+  const enteredBy = await mbD1MemberIdByName(env, actor);
+  const now = mbD1Now();
+
+  const statements = [];
+  const createdIds = [];
+  for (let index = 0; index < items.length; index += 1) {
+    const item = items[index];
+    const original = await mbD1TransactionById(env, item.transactionId, true);
+    if (!original || original.isDeleted)
+      mbD1Fail("TRANSACTION_NOT_FOUND", "정산할 거래를 찾을 수 없습니다.", 404);
+    const label = original.description || original.category || "지출";
+    if (!mbD1IsSettlementEligibleCategory(original.type, original.category, original.categoryId)) {
+      mbD1Fail("SETTLEMENT_NOT_ELIGIBLE", "정산받기는 정산 가능한 지출에서만 사용할 수 있습니다.");
+    }
+    if (date < original.date)
+      mbD1Fail(
+        "SETTLEMENT_BEFORE_ORIGINAL",
+        `정산받은 날짜는 원래 지출일(${original.date} · ${label})보다 앞설 수 없습니다.`
+      );
+    const before = await mbD1SettlementSummaryData(env, item.transactionId);
+    if (item.amount > before.remainingAmount + 0.0001) {
+      mbD1Fail(
+        "SETTLEMENT_AMOUNT_EXCEEDS_REMAINING",
+        `${label}: 남은 정산 가능 금액 ${Math.round(before.remainingAmount).toLocaleString("ko-KR")}원을 초과할 수 없습니다.`
+      );
+    }
+    const model = await mbD1BuildTransactionModel(
+      env,
+      {
+        date,
+        type: "수입",
+        categoryId: category.category_id,
+        amount: item.amount,
+        toAccountId: receiveAccountId,
+        description: `${label} 정산받음`,
+        memo,
+        groupId,
+        reversalOf: item.transactionId
+      },
+      null,
+      true
+    );
+    const settlementTransactionId = mbD1Id("TX");
+    createdIds.push(settlementTransactionId);
+    // 앞선 확인과 저장 사이에 원거래가 바뀌었거나 다른 정산이 먼저 들어왔다면 batch 전체를 취소합니다.
+    statements.push(
+      env.DB.prepare(
+        `SELECT CASE WHEN EXISTS (
+          SELECT 1 FROM transactions original
+          WHERE original.household_id=? AND original.transaction_id=?
+            AND original.deleted_at IS NULL AND original.updated_at IS ?
+            AND ? <= original.amount - COALESCE((
+              SELECT SUM(offset.amount) FROM transactions offset
+              WHERE offset.household_id=original.household_id
+                AND offset.reversal_of=original.transaction_id AND offset.deleted_at IS NULL
+            ),0) + 0.0001
+        ) THEN 1 ELSE json('${MB_D1_CONCURRENCY_GUARD_TOKEN}') END AS ok`
+      ).bind(MB_D1_HOUSEHOLD_ID, item.transactionId, original.updatedAt ?? null, item.amount),
+      env.DB.prepare(
+        `INSERT INTO transactions (
+          transaction_id,household_id,request_id,date,type,category_id,amount,
+          from_account_id,to_account_id,payment_method_id,spending_target,spender_member_id,
+          entered_by_member_id,description,memo,billing_month_override,billing_month,group_id,reversal_of,
+          version,created_at,updated_at,created_by,updated_by,deleted_at,deleted_by,source_row
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+      ).bind(
+        settlementTransactionId,
+        MB_D1_HOUSEHOLD_ID,
+        requestIds[index],
+        model.date,
+        model.type,
+        model.categoryId,
+        model.amount,
+        model.fromAccountId,
+        model.toAccountId,
+        model.paymentMethodId,
+        model.spendingTarget,
+        model.spenderMemberId,
+        enteredBy,
+        model.description || null,
+        model.memo || null,
+        model.billingOverride,
+        model.billingMonth,
+        model.groupId,
+        model.reversalOf,
+        1,
+        now,
+        now,
+        actor,
+        actor,
+        null,
+        null,
+        null
+      ),
+      await mbD1InsertChange(env, "transaction", settlementTransactionId, "created", 1, session, {
+        date: model.date,
+        type: model.type,
+        amount: model.amount,
+        settlementOf: item.transactionId,
+        ...(groupId ? { settlementGroupId: groupId } : {})
+      })
+    );
+  }
+
+  try {
+    await env.DB.batch(statements);
+  } catch (error) {
+    if (
+      mbD1LooksLikeRequestIdUniqueConflict(error, "transactions") ||
+      mbD1LooksLikeConcurrencyGuardFailure(error)
+    ) {
+      const retried = await existing();
+      if (retried) return retried;
+    }
+    if (mbD1LooksLikeConcurrencyGuardFailure(error)) {
+      mbD1Fail(
+        "CONCURRENT_MODIFICATION",
+        "정산 잔액 또는 원거래가 변경되었습니다. 최신 정산 내역을 확인한 뒤 다시 시도하세요.",
+        409
+      );
+    }
+    throw error;
+  }
+  const transactions = [];
+  for (const id of createdIds) transactions.push(await mbD1TransactionById(env, id, true));
+  return {
+    created: true,
+    duplicate: false,
+    groupId,
+    transactions,
+    summaries: await summariesFor()
+  };
 }

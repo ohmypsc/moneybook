@@ -54,3 +54,51 @@ export async function createSettlement(input: CreateSettlementInput) {
   );
   return unwrapEnvelope<CreateSettlementResult>(raw);
 }
+
+export interface SettlementCandidate extends TransactionItem {
+  remainingAmount: number;
+}
+
+export interface SettlementCandidatesResponse {
+  total: number;
+  remainingTotal: number;
+  items: SettlementCandidate[];
+}
+
+/** '정산 예정'으로 표시했고 아직 다 받지 못한 지출. includeTransactionId는 표시가 없어도 포함합니다. */
+export async function getSettlementCandidates(includeTransactionId?: string) {
+  const query = includeTransactionId
+    ? `?includeTransactionId=${encodeURIComponent(includeTransactionId)}`
+    : "";
+  const raw = await apiRequest<
+    ApiEnvelope<SettlementCandidatesResponse> | SettlementCandidatesResponse
+  >(`/api/transactions/settlement-candidates${query}`);
+  return unwrapEnvelope<SettlementCandidatesResponse>(raw);
+}
+
+export interface CreateSettlementBatchInput {
+  items: Array<{ transactionId: string; amount: number }>;
+  toAccountId: string;
+  date: string;
+  memo?: string;
+  requestId?: string;
+}
+
+export interface CreateSettlementBatchResult {
+  created: boolean;
+  duplicate: boolean;
+  groupId: string | null;
+  transactions: TransactionItem[];
+  summaries: SettlementSummary[];
+}
+
+/** 받은 돈을 여러 지출에 나눠 한 번에 반영합니다(전부 저장되거나 전부 취소). */
+export async function createSettlementBatch(input: CreateSettlementBatchInput) {
+  const raw = await apiRequest<
+    ApiEnvelope<CreateSettlementBatchResult> | CreateSettlementBatchResult
+  >("/api/transactions/settle-batch", {
+    method: "POST",
+    body: JSON.stringify(input)
+  });
+  return unwrapEnvelope<CreateSettlementBatchResult>(raw);
+}

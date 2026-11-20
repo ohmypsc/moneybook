@@ -46,6 +46,8 @@ export function parseImportDraft(value: unknown): ImportDraft | null {
       ids.has(item.requestId) ||
       typeof item.selected !== "boolean" ||
       (item.queued !== undefined && typeof item.queued !== "boolean") ||
+      (item.settlementExpected !== undefined && typeof item.settlementExpected !== "boolean") ||
+      (item.settlementLinked !== undefined && typeof item.settlementLinked !== "boolean") ||
       typeof item.amount !== "number" ||
       !Number.isFinite(item.amount) ||
       !Array.isArray(item.reviewReasons) ||

@@ -496,3 +496,178 @@ test("report target drilldown includes only the exact target and supports uncate
     env.sqlite.close();
   }
 });
+
+function addExpense(env, id, date, amount, settlementExpected = 1) {
+  env.sqlite
+    .prepare(
+      `INSERT INTO transactions(transaction_id,household_id,request_id,date,type,category_id,amount,payment_method_id,updated_at,settlement_expected)
+       VALUES (?,'HH_MAIN',?,?,'지출','C1',?,'A1','2026-11-16T00:00:00.000Z',?)`
+    )
+    .run(id, `${id}_REQ`, date, amount, settlementExpected);
+}
+
+const settleBatch = (env, items, requestId, date = "2026-11-20") =>
+  worker.mbD1HandleTransactionMutation(
+    "/api/transactions/settle-batch",
+    { items, requestId, toAccountId: "A1", date, memo: "11월 회식비" },
+    session,
+    env
+  );
+
+test("settlement date can be chosen but not before the original expense", async () => {
+  const env = database();
+  try {
+    const result = await worker.mbD1HandleTransactionMutation(
+      "/api/transactions/settle",
+      { transactionId: "ORIGINAL", amount: 10000, toAccountId: "A1", date: "2026-11-18" },
+      session,
+      env
+    );
+    assert.equal(result.transaction.date, "2026-11-18");
+    await assert.rejects(
+      worker.mbD1HandleTransactionMutation(
+        "/api/transactions/settle",
+        { transactionId: "ORIGINAL", amount: 10000, toAccountId: "A1", date: "2026-11-15" },
+        session,
+        env
+      ),
+      /원래 지출일/
+    );
+  } finally {
+    env.sqlite.close();
+  }
+});
+
+test("batch settlement links one settlement per expense in one group atomically", async () => {
+  const env = database();
+  try {
+    await worker.mbD1HandleTransactionMutation(
+      "/api/transactions/settle",
+      { transactionId: "ORIGINAL", amount: 1, toAccountId: "A1", date: "2026-11-16" },
+      session,
+      env
+    ); // ensures schema columns exist before raw inserts below
+    addExpense(env, "E2", "2026-11-03", 60000);
+    addExpense(env, "E3", "2026-11-10", 40000);
+    const result = await settleBatch(
+      env,
+      [
+        { transactionId: "E2", amount: 60000 },
+        { transactionId: "E3", amount: 25000 }
+      ],
+      "BATCH1"
+    );
+    assert.equal(result.created, true);
+    assert.equal(result.transactions.length, 2);
+    assert.ok(result.groupId);
+    assert.ok(result.transactions.every(item => item.groupId === result.groupId));
+    assert.ok(result.transactions.every(item => item.date === "2026-11-20"));
+    assert.deepEqual(
+      result.summaries.map(summary => summary.remainingAmount),
+      [0, 15000]
+    );
+
+    const retry = await settleBatch(
+      env,
+      [
+        { transactionId: "E2", amount: 60000 },
+        { transactionId: "E3", amount: 25000 }
+      ],
+      "BATCH1"
+    );
+    assert.equal(retry.duplicate, true);
+    assert.equal(
+      env.sqlite
+        .prepare("SELECT COUNT(*) AS count FROM transactions WHERE group_id=?")
+        .get(result.groupId).count,
+      2
+    );
+
+    // One over-limit item rejects the whole batch.
+    await assert.rejects(
+      settleBatch(
+        env,
+        [
+          { transactionId: "E3", amount: 10000 },
+          { transactionId: "ORIGINAL", amount: 999999 }
+        ],
+        "BATCH2"
+      ),
+      /초과할 수 없습니다/
+    );
+    assert.equal(
+      env.sqlite
+        .prepare("SELECT SUM(amount) AS amount FROM transactions WHERE reversal_of='E3'")
+        .get().amount,
+      25000
+    );
+
+    const candidates = await worker.mbD1SettlementCandidatesData(
+      env,
+      new URL("https://local/api/transactions/settlement-candidates")
+    );
+    assert.deepEqual(
+      candidates.items.map(item => [item.transactionId, item.remainingAmount]),
+      [["E3", 15000]]
+    );
+    const withOpened = await worker.mbD1SettlementCandidatesData(
+      env,
+      new URL("https://local/api/transactions/settlement-candidates?includeTransactionId=ORIGINAL")
+    );
+    assert.deepEqual(
+      withOpened.items.map(item => item.transactionId),
+      ["E3", "ORIGINAL"]
+    );
+  } finally {
+    env.sqlite.close();
+  }
+});
+
+test("settlementExpected is saved on create and update only for expenses", async () => {
+  const env = database();
+  try {
+    const created = await worker.mbD1HandleTransactionMutation(
+      "/api/transactions",
+      {
+        date: "2026-11-16",
+        type: "지출",
+        categoryId: "C1",
+        amount: 30000,
+        paymentMethodId: "A1",
+        spendingTarget: "A",
+        description: "회식",
+        settlementExpected: true,
+        requestId: "NEW_EXPENSE"
+      },
+      session,
+      env
+    );
+    assert.equal(created.transaction.settlementExpected, true);
+    const updated = await worker.mbD1HandleTransactionMutation(
+      "/api/transactions/update",
+      {
+        transactionId: created.transaction.transactionId,
+        expectedUpdatedAtMs: created.transaction.updatedAtMs,
+        settlementExpected: false
+      },
+      session,
+      env
+    );
+    assert.equal(updated.transaction.settlementExpected, false);
+    await assert.rejects(
+      worker.mbD1HandleTransactionMutation(
+        "/api/transactions/update",
+        {
+          transactionId: created.transaction.transactionId,
+          expectedUpdatedAtMs: updated.transaction.updatedAtMs,
+          settlementExpected: "yes"
+        },
+        session,
+        env
+      ),
+      /true 또는 false/
+    );
+  } finally {
+    env.sqlite.close();
+  }
+});
