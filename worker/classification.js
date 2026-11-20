@@ -8,7 +8,9 @@ export async function ensureClassificationSchema(env) {
         const { results } = await env.DB.prepare("PRAGMA table_info(transactions)").all();
         for (const [name, definition] of [
           ["tags_json", "TEXT NOT NULL DEFAULT '[]'"],
-          ["category_source", "TEXT NOT NULL DEFAULT 'manual'"]
+          ["category_source", "TEXT NOT NULL DEFAULT 'manual'"],
+          // 나중에 정산받을 지출 표시(묶음 정산 대상 목록에 사용)
+          ["settlement_expected", "INTEGER NOT NULL DEFAULT 0"]
         ]) {
           if (results.some(c => c.name === name)) continue;
           try {

@@ -25,9 +25,11 @@ import type { UpdateTransactionInput } from "../../api/transactionMutations";
 
 import type { CalendarTransaction, LedgerTransactionType } from "../../api/calendar";
 
-import { createSettlement, getSettlementSummary } from "../../api/settlements";
+import { getSettlementCandidates, getSettlementSummary } from "../../api/settlements";
 
-import type { SettlementSummary } from "../../api/settlements";
+import type { CreateSettlementBatchResult, SettlementSummary } from "../../api/settlements";
+
+import { SettlementReceiveForm } from "../../components/settlement/SettlementReceiveForm";
 
 import { markBackgroundRefreshed, shouldBackgroundRefresh } from "../../utils/backgroundRefresh";
 
@@ -46,6 +48,7 @@ import { isSettlementTransaction } from "../../utils/settlement";
 import { confirmAction } from "../../utils/confirmAction";
 
 import { Button } from "../../components/common/Button/Button";
+import { BottomSheet } from "../../components/common/BottomSheet/BottomSheet";
 import { Card } from "../../components/common/Card/Card";
 import { Money, formatMoney } from "../../components/common/Money/Money";
 import type { BootstrapData, BootstrapResponse } from "../../types/bootstrap";
@@ -78,6 +81,8 @@ interface Category {
 
 interface EditForm {
   tagsText: string;
+  /** "1" = 나중에 정산받을 지출 */
+  settlementExpected: string;
   date: string;
   categoryId: string;
   amount: string;
@@ -442,15 +447,16 @@ export default function CalendarPage({
     {}
   );
 
-  const [settlementAmount, setSettlementAmount] = useState("");
-
-  const [settlementAccountId, setSettlementAccountId] = useState("");
-
-  const [settlementMemo, setSettlementMemo] = useState("");
-
   const [settlementLoadingId, setSettlementLoadingId] = useState<string | null>(null);
 
-  const [settlementSavingId, setSettlementSavingId] = useState<string | null>(null);
+  /** 특정 지출을 고르지 않고 '정산 예정' 지출 여러 건을 한 번에 정산받는 시트 */
+  const [bulkSettlementOpen, setBulkSettlementOpen] = useState(false);
+
+  /** 아직 다 받지 못한 '정산 예정' 지출 요약(달과 무관하게 전체) */
+  const [pendingSettlement, setPendingSettlement] = useState<{
+    total: number;
+    remainingTotal: number;
+  } | null>(null);
 
   const [actionError, setActionError] = useState("");
 
@@ -576,6 +582,25 @@ export default function CalendarPage({
     externalEditHandledRef.current = openTransaction.transactionId;
     void startEdit(transaction);
   }, [openTransaction?.transactionId, openTransaction?.date, month, transactions]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getSettlementCandidates()
+      .then(response => {
+        if (!cancelled)
+          setPendingSettlement({
+            total: response.total,
+            remainingTotal: response.remainingTotal
+          });
+      })
+      .catch(() => {
+        // 오프라인 등으로 못 불러오면 안내 줄만 숨깁니다.
+        if (!cancelled) setPendingSettlement(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey]);
 
   useEffect(() => {
     return subscribeLedgerChanges(() => {
@@ -863,29 +888,6 @@ export default function CalendarPage({
     editingTransaction?.type === "이체" &&
     CARD_PAYMENT_CATEGORIES.has(selectedEditCategory?.name || editingTransaction?.category || "");
 
-  const settlementAccounts = useMemo(
-    () =>
-      (bootstrap?.accounts || [])
-        .filter(
-          account =>
-            account.active &&
-            !account.isDeleted &&
-            account.accountType === "자산" &&
-            account.subType !== "신용카드" &&
-            account.subType !== "체크카드"
-        )
-        .sort((first, second) => {
-          const firstCash = first.subType === "현금" ? 0 : 1;
-          const secondCash = second.subType === "현금" ? 0 : 1;
-          if (firstCash !== secondCash) return firstCash - secondCash;
-          return first.displayName.localeCompare(second.displayName, "ko");
-        }),
-    [bootstrap]
-  );
-
-  const settlementRequestRef = useRef<{ fingerprint: string; requestId: string } | null>(null);
-  const settlementSavingRef = useRef(false);
-
   async function ensureBootstrap() {
     if (bootstrap) {
       return bootstrap;
@@ -906,9 +908,6 @@ export default function CalendarPage({
     if (settlementId === transaction.transactionId) {
       setSettlementId(null);
       setSettlementSummary(null);
-      setSettlementAmount("");
-      setSettlementAccountId("");
-      setSettlementMemo("");
       return;
     }
 
@@ -918,33 +917,14 @@ export default function CalendarPage({
 
     try {
       const cachedSummary = settlementSummaries[transaction.transactionId];
-      const [bootstrapData, summary] = await Promise.all([
+      const [, summary] = await Promise.all([
         ensureBootstrap(),
         cachedSummary
           ? Promise.resolve(cachedSummary)
           : getSettlementSummary(transaction.transactionId)
       ]);
-      const accounts = bootstrapData.accounts
-        .filter(
-          account =>
-            account.active &&
-            !account.isDeleted &&
-            account.accountType === "자산" &&
-            account.subType !== "신용카드" &&
-            account.subType !== "체크카드"
-        )
-        .sort((first, second) => {
-          const firstCash = first.subType === "현금" ? 0 : 1;
-          const secondCash = second.subType === "현금" ? 0 : 1;
-          if (firstCash !== secondCash) return firstCash - secondCash;
-          return first.displayName.localeCompare(second.displayName, "ko");
-        });
-
       setSettlementId(transaction.transactionId);
       setSettlementSummary(summary);
-      setSettlementAmount("");
-      setSettlementAccountId(accounts[0]?.accountId || "");
-      setSettlementMemo("");
     } catch (settlementError) {
       setActionError(getErrorMessage(settlementError));
     } finally {
@@ -952,67 +932,34 @@ export default function CalendarPage({
     }
   }
 
-  async function handleSettlementSave(transaction: CalendarTransaction) {
-    if (settlementSavingRef.current) return;
-    const amount = Number(settlementAmount.replace(/,/g, ""));
-    if (!Number.isFinite(amount) || amount <= 0) {
-      setActionError("정산받은 금액을 입력해주세요.");
-      return;
-    }
-    if (!settlementAccountId) {
-      setActionError("정산금을 받은 현금 또는 계좌를 선택해주세요.");
-      return;
-    }
-    if (settlementSummary && amount > settlementSummary.remainingAmount + 0.0001) {
-      setActionError(
-        `남은 정산 가능 금액 ${formatMoney(settlementSummary.remainingAmount)}을 초과할 수 없습니다.`
-      );
-      return;
-    }
-
-    settlementSavingRef.current = true;
-    setSettlementSavingId(transaction.transactionId);
+  async function openBulkSettlement() {
     setActionError("");
-    setActionFeedback("");
-
     try {
-      const payload = {
-        transactionId: transaction.transactionId,
-        amount,
-        toAccountId: settlementAccountId,
-        date: getToday(),
-        memo: settlementMemo.trim()
-      };
-      const fingerprint = JSON.stringify(payload);
-      if (settlementRequestRef.current?.fingerprint !== fingerprint) {
-        settlementRequestRef.current = {
-          fingerprint,
-          requestId: globalThis.crypto?.randomUUID
-            ? globalThis.crypto.randomUUID()
-            : `${Date.now()}_${Math.random().toString(16).slice(2)}`
-        };
-      }
-      const result = await createSettlement({
-        ...payload,
-        requestId: settlementRequestRef.current.requestId
-      });
-      settlementRequestRef.current = null;
-      setSettlementSummary(result.summary);
-      setSettlementSummaries(current => ({
-        ...current,
-        [transaction.transactionId]: result.summary
-      }));
-      setSettlementAmount("");
-      setSettlementMemo("");
-      setActionFeedback(`${formatMoney(amount)} 정산을 반영했습니다.`);
-      invalidateCalendarCache(month);
-      markLedgerChanged();
-    } catch (settlementError) {
-      setActionError(getErrorMessage(settlementError));
-    } finally {
-      settlementSavingRef.current = false;
-      setSettlementSavingId(null);
+      await ensureBootstrap();
+      setBulkSettlementOpen(true);
+    } catch (bootstrapError) {
+      setActionError(getErrorMessage(bootstrapError));
     }
+  }
+
+  function handleSettlementSaved(result: CreateSettlementBatchResult) {
+    const summaries = result.summaries || [];
+    const own = summaries.find(summary => summary.transactionId === settlementId);
+    if (own) setSettlementSummary(own);
+    setSettlementSummaries(current => {
+      const next = { ...current };
+      for (const summary of summaries) next[summary.transactionId] = summary;
+      return next;
+    });
+    const total = (result.transactions || []).reduce((sum, item) => sum + Number(item.amount), 0);
+    setActionFeedback(
+      summaries.length > 1
+        ? `${formatMoney(total)}을 지출 ${summaries.length}건에 나눠 정산 반영했습니다.`
+        : `${formatMoney(total)} 정산을 반영했습니다.`
+    );
+    // 다른 달의 지출에도 정산이 들어갈 수 있으므로 전체 캐시를 비웁니다.
+    invalidateCalendarCache();
+    markLedgerChanged();
   }
 
   async function startEdit(transaction: CalendarTransaction) {
@@ -1030,6 +977,7 @@ export default function CalendarPage({
 
       setEditForm({
         tagsText: (transaction.tags || []).join(", "),
+        settlementExpected: transaction.settlementExpected ? "1" : "",
         date: transaction.date,
 
         categoryId: editable.categoryId || "",
@@ -1067,7 +1015,7 @@ export default function CalendarPage({
   }
 
   async function returnToList() {
-    if (savingId || deletingId || settlementSavingId) return;
+    if (savingId || deletingId) return;
     if (
       editForm &&
       !(await confirmAction({
@@ -1208,6 +1156,14 @@ export default function CalendarPage({
 
     if (nextMemo !== currentMemo) {
       input.memo = nextMemo;
+    }
+
+    if (
+      editingTransaction.type === "지출" &&
+      !editingTransaction.reversalOf &&
+      Boolean(editForm.settlementExpected) !== Boolean(editingTransaction.settlementExpected)
+    ) {
+      input.settlementExpected = Boolean(editForm.settlementExpected);
     }
 
     if (editingTransaction.reversalOf) {
@@ -1465,7 +1421,7 @@ export default function CalendarPage({
           <Button
             variant="secondary"
             size="sm"
-            disabled={Boolean(savingId || deletingId || settlementSavingId)}
+            disabled={Boolean(savingId || deletingId)}
             onClick={() => void returnToList()}
           >
             ← 보던 목록으로
@@ -1517,6 +1473,21 @@ export default function CalendarPage({
           </Button>
         </div>
       </div>
+
+      {pendingSettlement && pendingSettlement.total > 0 && (
+        <button
+          type="button"
+          className={styles.pendingSettlementBar}
+          disabled={Boolean(savingId || deletingId)}
+          onClick={() => void openBulkSettlement()}
+        >
+          <span>
+            <strong>정산 예정 {pendingSettlement.total}건</strong>
+            <small>아직 받을 돈 {formatMoney(pendingSettlement.remainingTotal)}</small>
+          </span>
+          <span className={styles.pendingSettlementAction}>정산금 받기 ›</span>
+        </button>
+      )}
 
       <Card as="section" padding="none" className={styles.summaryGrid} aria-label="월 요약">
         <div className={styles.summaryCard}>
@@ -1792,8 +1763,6 @@ export default function CalendarPage({
 
                   const isSettlementLoading = settlementLoadingId === transaction.transactionId;
 
-                  const isSettlementSaving = settlementSavingId === transaction.transactionId;
-
                   const canSettle =
                     transaction.type === "지출" &&
                     Boolean(transaction.settlementEligible) &&
@@ -1840,6 +1809,15 @@ export default function CalendarPage({
                                 {isSettlementTransaction(transaction) ? "정산받음" : "취소/환불"}
                               </span>
                             )}
+
+                            {transaction.type === "지출" &&
+                              transaction.settlementExpected &&
+                              Number(transaction.amount) -
+                                Number(transaction.settlementAmount || 0) -
+                                Number(transaction.refundAmount || 0) >
+                                0 && (
+                                <span className={styles.settlementExpectedBadge}>정산 예정</span>
+                              )}
                           </div>
 
                           <p className={styles.transactionMeta}>
@@ -1916,7 +1894,7 @@ export default function CalendarPage({
                             size="sm"
                             loading={isSettlementLoading}
                             loadingLabel="불러오는 중..."
-                            disabled={isSaving || isDeleting || isSettlementSaving}
+                            disabled={isSaving || isDeleting}
                             onClick={() => void startSettlement(transaction)}
                           >
                             {isSettlementOpen ? "정산 닫기" : "정산받기"}
@@ -1928,7 +1906,7 @@ export default function CalendarPage({
                           size="sm"
                           loading={isPreparingEdit}
                           loadingLabel="준비 중..."
-                          disabled={isSaving || isDeleting || isSettlementSaving}
+                          disabled={isSaving || isDeleting}
                           onClick={() => void startEdit(transaction)}
                         >
                           {isEditing ? "수정 중" : "수정"}
@@ -1939,7 +1917,7 @@ export default function CalendarPage({
                           size="sm"
                           loading={isDeleting}
                           loadingLabel="삭제 중..."
-                          disabled={isSaving || isSettlementSaving}
+                          disabled={isSaving}
                           onClick={() => void handleDelete(transaction)}
                         >
                           삭제
@@ -1996,66 +1974,11 @@ export default function CalendarPage({
                           </div>
 
                           {settlementSummary.remainingAmount > 0 ? (
-                            <>
-                              <div className={styles.settlementForm}>
-                                <label className={styles.editField}>
-                                  <span>정산받은 금액</span>
-                                  <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    value={settlementAmount}
-                                    disabled={isSettlementSaving}
-                                    placeholder={`최대 ${formatMoney(settlementSummary.remainingAmount)}`}
-                                    onChange={event =>
-                                      setSettlementAmount(event.target.value.replace(/[^0-9]/g, ""))
-                                    }
-                                  />
-                                </label>
-
-                                <label className={styles.editField}>
-                                  <span>받은 곳</span>
-                                  <select
-                                    value={settlementAccountId}
-                                    disabled={isSettlementSaving || settlementAccounts.length === 0}
-                                    onChange={event => setSettlementAccountId(event.target.value)}
-                                  >
-                                    {settlementAccounts.length === 0 && (
-                                      <option value="">받을 계좌가 없습니다</option>
-                                    )}
-                                    {settlementAccounts.map(account => (
-                                      <option key={account.accountId} value={account.accountId}>
-                                        {account.displayName}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </label>
-
-                                <label
-                                  className={[styles.editField, styles.editMemoField].join(" ")}
-                                >
-                                  <span>메모</span>
-                                  <input
-                                    type="text"
-                                    value={settlementMemo}
-                                    disabled={isSettlementSaving}
-                                    placeholder="예: 3명에게 현금으로 정산받음"
-                                    onChange={event => setSettlementMemo(event.target.value)}
-                                  />
-                                </label>
-                              </div>
-
-                              <div className={styles.editActions}>
-                                <Button
-                                  size="sm"
-                                  loading={isSettlementSaving}
-                                  loadingLabel="반영 중..."
-                                  disabled={!settlementAccountId}
-                                  onClick={() => void handleSettlementSave(transaction)}
-                                >
-                                  정산 반영
-                                </Button>
-                              </div>
-                            </>
+                            <SettlementReceiveForm
+                              accounts={bootstrap.accounts}
+                              anchorTransactionId={transaction.transactionId}
+                              onSaved={result => handleSettlementSaved(result)}
+                            />
                           ) : (
                             <p className={styles.settlementComplete}>
                               이 지출은 정산이 모두 반영되었습니다.
@@ -2344,6 +2267,25 @@ export default function CalendarPage({
                             onChange={value => updateEditField("tagsText", value)}
                             disabled={isSaving}
                           />
+                          {transaction.type === "지출" && !transaction.reversalOf && (
+                            <label className={styles.settlementExpectedToggle}>
+                              <input
+                                type="checkbox"
+                                checked={Boolean(editForm.settlementExpected)}
+                                disabled={isSaving}
+                                onChange={event =>
+                                  updateEditField(
+                                    "settlementExpected",
+                                    event.target.checked ? "1" : ""
+                                  )
+                                }
+                              />
+                              <span>
+                                <strong>정산받을 예정</strong>
+                                <small>체크하면 묶음 정산 목록에 나타나요</small>
+                              </span>
+                            </label>
+                          )}
                           <div className={styles.editActions}>
                             <Button
                               variant="secondary"
@@ -2391,6 +2333,18 @@ export default function CalendarPage({
             실행 취소
           </Button>
         </div>
+      )}
+      {bulkSettlementOpen && bootstrap && (
+        <BottomSheet title="정산금 받기" size="large" onClose={() => setBulkSettlementOpen(false)}>
+          <SettlementReceiveForm
+            accounts={bootstrap.accounts}
+            onSaved={result => {
+              handleSettlementSaved(result);
+              setBulkSettlementOpen(false);
+            }}
+            onCancel={() => setBulkSettlementOpen(false)}
+          />
+        </BottomSheet>
       )}
     </main>
   );

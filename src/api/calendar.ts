@@ -8,6 +8,8 @@ export type LedgerTransactionType = "지출" | "수입" | "이체";
 
 export interface CalendarTransaction {
   tags?: string[];
+  /** 나중에 정산받을 지출(묶음 정산 대상) */
+  settlementExpected?: boolean;
   categorySource?: "manual" | "auto";
   transactionId: string;
 

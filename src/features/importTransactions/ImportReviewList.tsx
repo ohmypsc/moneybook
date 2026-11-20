@@ -73,14 +73,23 @@ export function ImportReviewList({
               {item.kind !== "expense" && `${IMPORT_TYPE_LABELS[item.kind]} · `}
               {item.merchant || "거래 내용 확인 필요"}
             </strong>
-            {warning ? (
+            {item.settlementLinked ? (
+              <span>{shortDate(item.date)} · 정산금으로 지출에 반영됨</span>
+            ) : warning ? (
               <span className={styles.rowWarning}>
                 {warning}
                 {item.reviewReasons.length > 1 ? ` 외 ${item.reviewReasons.length - 1}` : ""}
               </span>
             ) : (
               <span>
-                {[shortDate(item.date), item.time, describe(item)].filter(Boolean).join(" · ")}
+                {[
+                  shortDate(item.date),
+                  item.time,
+                  describe(item),
+                  item.kind === "expense" && item.settlementExpected ? "정산 예정" : ""
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
               </span>
             )}
           </span>

@@ -26,6 +26,8 @@ import type { BootstrapData } from "../../types/bootstrap";
 import { BottomSheet } from "../../components/common/BottomSheet/BottomSheet";
 import { Button } from "../../components/common/Button/Button";
 import { formatMoney } from "../../components/common/Money/Money";
+import { SettlementReceiveForm } from "../../components/settlement/SettlementReceiveForm";
+import { markLedgerChanged } from "../../utils/ledgerEvents";
 import { enqueuePendingTransaction } from "../../utils/pendingTransactionQueue";
 import {
   buildImportPayload,
@@ -91,6 +93,8 @@ export function TransactionImportSheet({
     categoryName: string;
   } | null>(null);
   const [picker, setPicker] = useState<StepPickerKind | null>(null);
+  /** 정산금 입금으로 연결 중인 수입 후보 */
+  const [settlementLinkId, setSettlementLinkId] = useState<string | null>(null);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
 
@@ -242,6 +246,9 @@ export function TransactionImportSheet({
       ? items.find(item => item.candidateId === stepIds[stepIndex]) || null
       : null;
   const stepType = stepItem ? IMPORT_TYPE_LABELS[stepItem.kind] : "지출";
+  const settlementLinkItem = settlementLinkId
+    ? items.find(item => item.candidateId === settlementLinkId && !item.queued) || null
+    : null;
   const pickerCategories = useMemo(
     () =>
       applyCategoryPreferences(
@@ -656,6 +663,32 @@ export function TransactionImportSheet({
     }
   }
 
+  function setSelectedSettlementExpected(value: boolean) {
+    setItems(current =>
+      current.map(item =>
+        item.selected && !item.queued && item.kind === "expense" && !savingRef.current
+          ? { ...item, settlementExpected: value }
+          : item
+      )
+    );
+  }
+
+  function handleSettlementLinked(candidateId: string, total: number, count: number) {
+    setItems(current =>
+      current.map(row =>
+        row.candidateId === candidateId
+          ? { ...row, queued: true, selected: false, settlementLinked: true }
+          : row
+      )
+    );
+    setSettlementLinkId(null);
+    markLedgerChanged();
+    setFeedback(
+      `${formatMoney(total)}을 지출 ${count}건에 정산금으로 반영했어요. 이 입금은 수입으로 따로 저장하지 않아요.`
+    );
+    if (reviewMode === "step") goToNextStep();
+  }
+
   function applySameMerchant() {
     if (!samePrompt) return;
     for (const candidateId of samePrompt.ids) {
@@ -936,6 +969,7 @@ export function TransactionImportSheet({
             onConfirm={() => void confirmStep(stepItem)}
             onSkip={goToNextStep}
             onBack={backToList}
+            onLinkSettlement={() => setSettlementLinkId(stepItem.candidateId)}
           />
         ) : (
           <ImportReviewList
@@ -1033,6 +1067,19 @@ export function TransactionImportSheet({
                           <select
                             className={styles.bulkSelect}
                             value=""
+                            aria-label="선택 항목 정산 예정 일괄 변경"
+                            onChange={event => {
+                              if (event.target.value)
+                                setSelectedSettlementExpected(event.target.value === "on");
+                            }}
+                          >
+                            <option value="">정산 예정 일괄 표시</option>
+                            <option value="on">정산받을 예정으로 표시</option>
+                            <option value="off">정산 예정 표시 해제</option>
+                          </select>
+                          <select
+                            className={styles.bulkSelect}
+                            value=""
                             aria-label="선택 항목 지출대상 일괄 변경"
                             onChange={event =>
                               patchSelected({ spendingTarget: event.target.value })
@@ -1104,6 +1151,41 @@ export function TransactionImportSheet({
               onSelect={selectFromPicker}
               onClose={() => setPicker(null)}
             />
+          </div>,
+          document.body
+        )}
+      {settlementLinkItem &&
+        createPortal(
+          <div onKeyDown={event => event.stopPropagation()}>
+            <BottomSheet
+              title="정산금을 지출에 연결"
+              size="large"
+              onClose={() => setSettlementLinkId(null)}
+            >
+              <p className={reviewStyles.settlementLinkNote}>
+                {settlementLinkItem.merchant || "입금"} {formatMoney(settlementLinkItem.amount)}을
+                어느 지출의 정산금으로 받았는지 골라주세요. 이번에 함께 가져온 지출은 먼저 저장된
+                뒤에 목록에 나타나요.
+              </p>
+              <SettlementReceiveForm
+                accounts={bootstrap.accounts}
+                prefill={{
+                  amount: settlementLinkItem.amount,
+                  date: settlementLinkItem.date,
+                  toAccountId: settlementLinkItem.toAccountId || undefined,
+                  memo: settlementLinkItem.merchant
+                }}
+                submitLabel="정산 반영"
+                onSaved={result =>
+                  handleSettlementLinked(
+                    settlementLinkItem.candidateId,
+                    (result.transactions || []).reduce((sum, row) => sum + Number(row.amount), 0),
+                    (result.transactions || []).length
+                  )
+                }
+                onCancel={() => setSettlementLinkId(null)}
+              />
+            </BottomSheet>
           </div>,
           document.body
         )}

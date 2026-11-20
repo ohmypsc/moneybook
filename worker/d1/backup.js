@@ -521,6 +521,15 @@ export async function mbD1RestoreBackupMerge(document, session, env) {
         )
       );
   }
+  for (const item of payload.transactions) {
+    // 예전 백업에는 정산 예정 표시가 없으므로 기존 값을 그대로 둡니다.
+    if (typeof item.settlementExpected === "boolean")
+      restoreStatements.push(
+        env.DB.prepare(
+          "UPDATE transactions SET settlement_expected=? WHERE household_id=? AND transaction_id=?"
+        ).bind(item.settlementExpected ? 1 : 0, MB_D1_HOUSEHOLD_ID, item.transactionId)
+      );
+  }
   if (payload.classificationSettings !== undefined)
     restoreStatements.push(
       classificationSettingsStatement(

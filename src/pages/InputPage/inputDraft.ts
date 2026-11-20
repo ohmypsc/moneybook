@@ -4,6 +4,7 @@ const INPUT_DRAFT_KEY_PREFIX = "moneybook:input-draft:v1:";
 
 export interface InputDraft {
   tagsText?: string;
+  settlementExpected?: boolean;
   categorySource?: "auto" | "manual";
   mode: InputMode;
   installmentMonths?: number;
@@ -43,6 +44,7 @@ export function parseInputDraft(value: unknown): InputDraft | null {
 
   return {
     tagsText: text(draft.tagsText),
+    settlementExpected: draft.settlementExpected === true,
     categorySource: draft.categorySource === "auto" ? "auto" : "manual",
     mode: draft.mode,
     installmentMonths:

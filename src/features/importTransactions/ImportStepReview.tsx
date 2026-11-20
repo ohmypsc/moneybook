@@ -40,6 +40,8 @@ interface ImportStepReviewProps {
   onConfirm: () => void;
   onSkip: () => void;
   onBack: () => void;
+  /** 수입(입금)을 정산 예정 지출에 정산금으로 연결 */
+  onLinkSettlement: () => void;
 }
 
 const KIND_OPTIONS: Array<{ value: Exclude<ImportKind, "refund">; label: string }> = [
@@ -64,7 +66,8 @@ export function ImportStepReview({
   onDismissSameMerchant,
   onConfirm,
   onSkip,
-  onBack
+  onBack,
+  onLinkSettlement
 }: ImportStepReviewProps) {
   const warnings = item.reviewReasons.filter(reason => reason !== "중복 거래 의심");
 
@@ -227,7 +230,30 @@ export function ImportStepReview({
                 selected={item.spendingTarget}
                 onSelect={value => onPatch({ spendingTarget: value })}
               />
+              <label className={styles.settlementToggle}>
+                <input
+                  type="checkbox"
+                  checked={Boolean(item.settlementExpected)}
+                  onChange={event => onPatch({ settlementExpected: event.target.checked })}
+                />
+                <span>
+                  <strong>정산받을 예정</strong>
+                  <small>회식비처럼 나중에 돌려받을 지출이면 체크하세요</small>
+                </span>
+              </label>
             </>
+          )}
+
+          {item.kind === "income" && (
+            <div className={styles.settlementLink}>
+              <p>
+                <strong>회식비 정산금 입금인가요?</strong>
+                수입으로 저장하지 않고 ‘정산 예정’ 지출에 나눠 반영할 수 있어요.
+              </p>
+              <button type="button" onClick={onLinkSettlement}>
+                지출에 연결하기
+              </button>
+            </div>
           )}
 
           {item.kind === "transfer" && (

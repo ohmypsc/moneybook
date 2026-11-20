@@ -24,3 +24,23 @@ export function isSystemSettlementCategory(category: {
       category.name === BENEFIT_INCOME_CATEGORY_NAME)
   );
 }
+
+export const SETTLEMENT_BATCH_LIMIT = 30;
+
+/**
+ * 받은 총액을 선택한 지출에 나눕니다. 넘겨준 순서(보통 오래된 지출부터)대로 남은 금액만큼 채웁니다.
+ * 남는 돈(총액이 남은 금액 합계보다 큰 경우)은 overflow로 돌려줍니다.
+ */
+export function allocateSettlement(
+  total: number,
+  items: Array<{ transactionId: string; remainingAmount: number }>
+) {
+  let left = Math.max(0, Math.round(Number(total) || 0));
+  const amounts: Record<string, number> = {};
+  for (const item of items) {
+    const take = Math.min(left, Math.max(0, Math.floor(item.remainingAmount)));
+    amounts[item.transactionId] = take;
+    left -= take;
+  }
+  return { amounts, overflow: left };
+}

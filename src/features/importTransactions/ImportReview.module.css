@@ -546,3 +546,79 @@
   display: block;
   border-radius: var(--radius-sm);
 }
+
+.settlementToggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.settlementToggle input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+
+.settlementToggle span {
+  display: grid;
+  gap: 2px;
+}
+
+.settlementToggle strong {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+}
+
+.settlementToggle small {
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-2xs);
+}
+
+.settlementLink {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  border: 1px solid var(--color-warning-border);
+  border-radius: var(--radius-md);
+  background: var(--color-warning-soft);
+}
+
+.settlementLink p {
+  flex: 1;
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-2xs);
+}
+
+.settlementLink strong {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+}
+
+.settlementLink button {
+  flex: none;
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  font: inherit;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+}
+
+.settlementLinkNote {
+  margin: 0 0 12px;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+}

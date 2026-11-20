@@ -77,6 +77,8 @@ export interface Transaction {
 
 export interface CreateTransactionInput {
   tags?: string[];
+  /** 나중에 정산받을 지출(묶음 정산 대상) */
+  settlementExpected?: boolean;
   categorySource?: "manual" | "auto";
   date: string;
 
