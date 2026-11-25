@@ -714,3 +714,53 @@
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
 }
+
+.sectionTotalButton {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 8px;
+  margin: -4px -8px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.sectionTotalButton:hover,
+.sectionTotalButton:focus-visible {
+  background: var(--color-surface-soft);
+}
+
+.sectionTotalButton small {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-bold);
+  white-space: nowrap;
+}
+
+.cardDetailGroup + .cardDetailGroup {
+  margin-top: 18px;
+}
+
+.cardDetailGroupHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0 8px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.cardDetailGroupHeader > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cardDetailGroupHeader span {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-2xs);
+}
