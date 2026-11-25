@@ -60,7 +60,12 @@ import {
   type PickerKind,
   type TransactionType
 } from "./inputDomain";
-import { clearInputDraft, readInputDraft, saveInputDraft } from "./inputDraft";
+import {
+  clearInputDraft,
+  getRestorableDraftDate,
+  readInputDraft,
+  saveInputDraft
+} from "./inputDraft";
 import styles from "./InputPage.module.css";
 
 type CreateTransactionPayload = Parameters<typeof createTransaction>[0];
@@ -293,6 +298,7 @@ export default function InputPage({
   );
 
   const initialDraft = useMemo(() => readInputDraft(userName), [userName]);
+  const initialDraftDate = getRestorableDraftDate(initialDraft);
 
   const [bootstrap, setBootstrap] = useState<BootstrapData | null>(() =>
     getInitialBootstrapSnapshot()
@@ -312,7 +318,7 @@ export default function InputPage({
   const [showTransactionImport, setShowTransactionImport] = useState(false);
 
   const [date, setDate] = useState(
-    launchDate || (hasLaunchPreset ? null : initialDraft?.date) || today
+    launchDate || (hasLaunchPreset ? null : initialDraftDate) || today
   );
 
   useEffect(() => {
@@ -402,7 +408,8 @@ export default function InputPage({
   const [billingMonth, setBillingMonth] = useState(
     hasLaunchPreset
       ? (launchDate || today).slice(0, 7)
-      : initialDraft?.billingMonth || (launchDate || initialDraft?.date || today).slice(0, 7)
+      : (initialDraftDate ? initialDraft?.billingMonth : "") ||
+          (launchDate || initialDraftDate || today).slice(0, 7)
   );
 
   const [description, setDescription] = useState(

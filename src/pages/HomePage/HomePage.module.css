@@ -682,3 +682,35 @@
     border-radius: var(--radius-lg);
   }
 }
+
+.cardDetailSummary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.cardDetailSummary > div {
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--color-surface-soft);
+}
+
+.cardDetailSummary span {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-bold);
+}
+
+.cardDetailSummary strong {
+  font-size: var(--font-size-sm);
+}
+
+.cardDetailSubheading {
+  margin: 16px 0 8px;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+}
