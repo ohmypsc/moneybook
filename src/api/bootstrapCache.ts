@@ -26,7 +26,6 @@ const MASTER_MUTATION_PATHS = new Set([
 
 const BOOTSTRAP_MUTATION_PATHS = new Set([
   SETTINGS_PATH,
-  "/api/settings/classification",
   "/api/settings/automation",
   "/api/settings/household-overview",
   "/api/settings/ledger-start-date",

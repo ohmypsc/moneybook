@@ -2,8 +2,7 @@ import { Button } from "../../components/common/Button/Button";
 import { Card } from "../../components/common/Card/Card";
 import styles from "./SettingsPage.module.css";
 
-export type SettingsView =
-  "home" | "categories" | "accounts" | "classification" | "automation" | "ledger" | "profile";
+export type SettingsView = "home" | "categories" | "accounts" | "automation" | "ledger" | "profile";
 
 export function SettingsHome({ onOpen }: { onOpen: (view: SettingsView) => void }) {
   const sharedItems: Array<{
@@ -26,7 +25,6 @@ export function SettingsHome({ onOpen }: { onOpen: (view: SettingsView) => void 
       title: "자동화",
       description: "고정 거래 자동 등록과 확인"
     },
-    { key: "classification", title: "자동 분류·태그", description: "분류 규칙과 기존 거래 적용" },
     {
       key: "ledger",
       title: "가계부 운영·데이터",

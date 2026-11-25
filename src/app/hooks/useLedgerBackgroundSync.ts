@@ -14,7 +14,6 @@ const SETTINGS_ENTITY_TYPES = new Set([
   "household_overview",
   "ledger_config",
   "automation_settings",
-  "classification_rules",
   "backup_restore"
 ]);
 

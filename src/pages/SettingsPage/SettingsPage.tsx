@@ -1,4 +1,3 @@
-import ClassificationSettings from "./ClassificationSettings";
 import { useEffect, useState } from "react";
 
 import AutomationSettingsPanel from "./AutomationSettingsPanel";
@@ -28,7 +27,6 @@ function isSettingsView(value: unknown): value is SettingsView {
     value === "home" ||
     value === "categories" ||
     value === "accounts" ||
-    value === "classification" ||
     value === "automation" ||
     value === "ledger" ||
     value === "profile"
@@ -108,10 +106,6 @@ export default function SettingsPage({ refreshRevision = 0 }: SettingsPageProps)
   }
 
   const detail = {
-    classification: {
-      title: "자동 분류·태그",
-      description: "거래 내용과 계좌에 따라 카테고리와 태그를 자동으로 붙입니다."
-    },
     categories: {
       title: "카테고리 관리",
 
@@ -157,9 +151,6 @@ export default function SettingsPage({ refreshRevision = 0 }: SettingsPageProps)
             onBack={handleDetailBack}
           />
 
-          {view === "classification" && (
-            <ClassificationSettings key={`classification:${refreshRevision}`} />
-          )}
           {view === "categories" && <CategorySettings key={`categories:${refreshRevision}`} />}
 
           {view === "accounts" && <AccountSettings key={`accounts:${refreshRevision}`} />}

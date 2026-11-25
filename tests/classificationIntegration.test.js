@@ -7,7 +7,6 @@ import { DatabaseSync } from "node:sqlite";
 // The adapter implements D1's atomic batch contract and asynchronous read boundaries.
 // Worker 모듈을 직접 불러옵니다. (Durable Object 진입점은 Cloudflare 런타임 전용이라 제외)
 const worker = {
-  ...(await import("../worker/d1/classification.js")),
   ...(await import("../worker/d1/router.js")),
   ...(await import("../worker/d1/queries.js")),
   ...(await import("../worker/d1/transactions.js")),
@@ -72,16 +71,6 @@ function database() {
 }
 
 const session = { name: "A" };
-const rule = {
-  id: "CAFE",
-  name: "카페 규칙",
-  type: "지출",
-  contains: "스타벅스",
-  accountId: "A1",
-  categoryId: "C2",
-  tags: ["제주여행"],
-  enabled: true
-};
 function seed(env) {
   env.sqlite.exec(
     "INSERT INTO categories(category_id,household_id,type,name) VALUES('C2','HH_MAIN','지출','카페');"
@@ -96,7 +85,6 @@ const create = (env, overrides = {}) =>
       date: "2026-11-16",
       amount: 5000,
       categoryId: "C1",
-      categorySource: "auto",
       paymentMethodId: "A1",
       spendingTarget: "A",
       description: "스타벅스",
@@ -105,23 +93,23 @@ const create = (env, overrides = {}) =>
     session,
     env
   );
-const rules = env => worker.mbSaveClassification({ version: 0, rules: [rule] }, session, env);
 
-test("new transactions classify, retain manual choices and survive idempotent retry", async () => {
+test("new transactions keep the chosen category and tags and survive idempotent retry", async () => {
   const env = database();
   seed(env);
   try {
-    await rules(env);
-    const a = await create(env, { requestId: "ONCE", tags: ["가족"] });
-    assert.equal(a.transaction.categoryId, "C2");
-    assert.deepEqual(a.transaction.tags, ["가족", "제주여행"]);
+    // 예전 자동 분류 규칙이 DB에 남아 있어도 더 이상 적용하지 않습니다.
+    env.sqlite
+      .exec(`INSERT INTO user_preferences(preference_id,household_id,preference_key,preference_json,version,created_at,updated_at)
+      VALUES('PREF_CLASSIFICATION_HH_MAIN','HH_MAIN','classification_rules','[{"id":"R","name":"카페","type":"지출","contains":"스타벅스","accountId":"","categoryId":"C2","tags":["자동"],"enabled":true}]',1,'2026-01-01','2026-01-01');`);
+    const a = await create(env, { requestId: "ONCE", tags: ["가족"], categorySource: "auto" });
+    assert.equal(a.transaction.categoryId, "C1");
+    assert.deepEqual(a.transaction.tags, ["가족"]);
+    assert.equal(a.transaction.categorySource, "manual");
     const retry = await create(env, { requestId: "ONCE" });
     assert.equal(retry.duplicate, true);
-    const b = await create(env, { categorySource: "manual" });
-    assert.equal(b.transaction.categoryId, "C1");
-    assert.deepEqual(b.transaction.tags, ["제주여행"]);
-    const c = await create(env, { categorySource: "manual", description: "편의점" });
-    assert.deepEqual(c.transaction.tags, []);
+    const b = await create(env);
+    assert.deepEqual(b.transaction.tags, []);
   } finally {
     env.sqlite.close();
   }
@@ -170,70 +158,22 @@ test("tag edit has optimistic concurrency and tag filter applies before paginati
     env.sqlite.close();
   }
 });
-test("preview makes no changes, old manual categories survive, stale previews are rejected", async () => {
-  const env = database();
-  seed(env);
-  try {
-    const a = await create(env, { categorySource: "manual" });
-    await rules(env);
-    const preview = await worker.mbClassificationPreview(
-      { dateFrom: "2026-11-01", dateTo: "2026-11-30" },
-      env
-    );
-    assert.equal(preview.items.length, 1);
-    assert.deepEqual(
-      env.sqlite
-        .prepare("SELECT tags_json FROM transactions WHERE transaction_id=?")
-        .get(a.transactionId).tags_json,
-      "[]"
-    );
-    assert.equal(preview.items[0].afterCategory, preview.items[0].beforeCategory);
-    const result = await worker.mbApplyClassification(
-      { version: preview.version, items: preview.items, confirm: "APPLY_RULES" },
-      session,
-      env
-    );
-    assert.equal(result.results[0].applied, true);
-    const stale = await worker.mbApplyClassification(
-      { version: preview.version, items: preview.items, confirm: "APPLY_RULES" },
-      session,
-      env
-    );
-    assert.equal(stale.results[0].applied, false);
-  } finally {
-    env.sqlite.close();
-  }
-});
-test("concurrent settings saves cannot silently overwrite each other", async () => {
-  const env = database();
-  seed(env);
-  try {
-    const result = await Promise.allSettled([rules(env), rules(env)]);
-    assert.equal(result.filter(r => r.status === "fulfilled").length, 1);
-  } finally {
-    env.sqlite.close();
-  }
-});
-test("backup roundtrip preserves rules, provenance and tags; old backups keep existing metadata", async () => {
+test("backup roundtrip preserves tags; old backups with rules still restore", async () => {
   const env = database();
   const target = database();
   seed(env);
   try {
-    await rules(env);
-    const a = await create(env, { tags: ["가족"] });
+    const a = await create(env, { tags: ["가족", "여행"] });
     const backup = await worker.mbD1BuildBackupDocument(env);
-    assert.equal(backup.payload.classificationSettings.rules.length, 1);
+    assert.equal(backup.payload.classificationSettings, undefined);
+    // 예전 백업에 들어 있던 규칙(형식이 틀려도)은 무시하고 복원합니다.
+    backup.payload.classificationSettings = { version: 1, rules: [{ broken: true }] };
     await worker.mbD1RestoreBackupMerge(backup, session, target);
     let restored = await worker.mbD1BuildBackupDocument(target);
     assert.deepEqual(
       restored.payload.transactions.find(t => t.transactionId === a.transactionId).tags,
-      ["가족", "제주여행"]
+      ["가족", "여행"]
     );
-    assert.equal(
-      restored.payload.transactions.find(t => t.transactionId === a.transactionId).categorySource,
-      "auto"
-    );
-    assert.equal(restored.payload.classificationSettings.rules[0].name, "카페 규칙");
     delete backup.payload.classificationSettings;
     backup.payload.transactions.forEach(t => {
       delete t.tags;
@@ -243,24 +183,18 @@ test("backup roundtrip preserves rules, provenance and tags; old backups keep ex
     restored = await worker.mbD1BuildBackupDocument(target);
     assert.deepEqual(
       restored.payload.transactions.find(t => t.transactionId === a.transactionId).tags,
-      ["가족", "제주여행"]
+      ["가족", "여행"]
     );
-    assert.equal(restored.payload.classificationSettings.rules.length, 1);
   } finally {
     env.sqlite.close();
     target.sqlite.close();
   }
 });
-test("invalid tags and invalid backup rules are rejected before writing transactions", async () => {
+test("invalid tags are rejected before writing transactions", async () => {
   const env = database();
   seed(env);
   try {
     await assert.rejects(() => create(env, { tags: ["a".repeat(31)] }), /30자/);
-    const backup = await worker.mbD1BuildBackupDocument(env);
-    backup.payload.classificationSettings.rules = [{ ...rule, contains: "", accountId: "" }];
-    const batches = env.state.batches;
-    await assert.rejects(() => worker.mbD1RestoreBackupMerge(backup, session, env), /조건/);
-    assert.equal(env.state.batches, batches);
   } finally {
     env.sqlite.close();
   }

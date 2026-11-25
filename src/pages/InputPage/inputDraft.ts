@@ -4,7 +4,6 @@ const INPUT_DRAFT_KEY_PREFIX = "moneybook:input-draft:v1:";
 
 export interface InputDraft {
   tagsText?: string;
-  categorySource?: "auto" | "manual";
   mode: InputMode;
   installmentMonths?: number;
   benefitEnabled?: boolean;
@@ -43,7 +42,6 @@ export function parseInputDraft(value: unknown): InputDraft | null {
 
   return {
     tagsText: text(draft.tagsText),
-    categorySource: draft.categorySource === "auto" ? "auto" : "manual",
     mode: draft.mode,
     installmentMonths:
       Number.isInteger(draft.installmentMonths) &&
@@ -83,6 +81,25 @@ export function hasMeaningfulInputDraft(draft: InputDraft) {
     draft.loanPrincipalAmount ||
     draft.loanInterestAmount
   );
+}
+
+/**
+ * 작성 중이던 입력(금액·내용 등)이 남아 있을 때만 임시저장 날짜를 이어서 씁니다.
+ * 저장 후 유지되는 결제수단·지출대상만 남은 초안이면 오늘 날짜로 새로 시작합니다.
+ */
+export function getRestorableDraftDate(draft: InputDraft | null) {
+  if (!draft || !draft.date) return null;
+  const inProgress = Boolean(
+    draft.amount ||
+    draft.categoryId ||
+    draft.tagsText ||
+    draft.description.trim() ||
+    draft.memo.trim() ||
+    draft.benefitRewardUsedAmount ||
+    draft.loanPrincipalAmount ||
+    draft.loanInterestAmount
+  );
+  return inProgress ? draft.date : null;
 }
 
 export function readInputDraft(userName: string): InputDraft | null {

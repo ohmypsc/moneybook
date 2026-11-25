@@ -19,6 +19,12 @@ import { isBenefitTransaction } from "../../utils/transactionBenefits";
 
 import { isSettlementTransaction } from "../../utils/settlement";
 
+import {
+  buildCardBillBreakdown,
+  shiftMonth,
+  type CardBillBreakdown
+} from "../../utils/cardBilling";
+
 import { Button } from "../../components/common/Button/Button";
 import { Card } from "../../components/common/Card/Card";
 import { Money, formatMoney } from "../../components/common/Money/Money";
@@ -220,15 +226,24 @@ export default function HomePage({ onCopyTransaction }: HomePageProps) {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
   const [recurringRules, setRecurringRules] = useState<RecurringTransactionRule[]>([]);
+  const [cardDetail, setCardDetail] = useState<DashboardCardView | null>(null);
+  const [cardBreakdown, setCardBreakdown] = useState<CardBillBreakdown | null>(null);
+  const [cardDetailLoading, setCardDetailLoading] = useState(false);
+  const [cardDetailError, setCardDetailError] = useState("");
+
+  const detailOpen = Boolean(detailType || cardDetail);
 
   useEffect(() => {
-    if (!detailType) return;
+    if (!detailOpen) return;
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setDetailType(null);
+      if (event.key === "Escape") {
+        setDetailType(null);
+        setCardDetail(null);
+      }
     };
 
     window.addEventListener("keydown", handleKeyDown);
@@ -237,7 +252,7 @@ export default function HomePage({ onCopyTransaction }: HomePageProps) {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [detailType]);
+  }, [detailOpen]);
 
   async function loadDashboard(
     options: {
@@ -397,6 +412,30 @@ export default function HomePage({ onCopyTransaction }: HomePageProps) {
       setDetailError(error instanceof Error ? error.message : "거래 내역을 불러오지 못했습니다.");
     } finally {
       setDetailLoading(false);
+    }
+  }
+
+  async function openCardDetail(card: DashboardCardView) {
+    setCardDetail(card);
+    setCardBreakdown(null);
+    setCardDetailError("");
+    setCardDetailLoading(true);
+
+    try {
+      // 할부(최대 36개월)까지 포함되도록 청구월 37개월 전부터 불러옵니다.
+      const response = await getTransactions({
+        dateFrom: `${shiftMonth(card.billingMonth, -37)}-01`,
+        dateTo: getMonthRange(shiftMonth(card.billingMonth, 1)).dateTo,
+        accountId: card.accountId,
+        limit: 1000
+      });
+      setCardBreakdown(buildCardBillBreakdown(response.data.items || [], card, card.billingMonth));
+    } catch (error) {
+      setCardDetailError(
+        error instanceof Error ? error.message : "카드 사용 내역을 불러오지 못했습니다."
+      );
+    } finally {
+      setCardDetailLoading(false);
     }
   }
 
@@ -729,7 +768,13 @@ export default function HomePage({ onCopyTransaction }: HomePageProps) {
         {cardSummary.cards.length > 0 && (
           <Card padding="none" className={styles.cardList}>
             {cardSummary.cards.map(card => (
-              <div key={card.accountId} className={styles.cardRow}>
+              <button
+                type="button"
+                key={card.accountId}
+                className={[styles.cardRow, styles.summaryRowButton].join(" ")}
+                aria-label={`${card.name} 결제 예정 내역 보기`}
+                onClick={() => void openCardDetail(card)}
+              >
                 <div className={styles.cardName}>
                   <span className={styles.cardIcon} aria-hidden="true">
                     ₩
@@ -781,7 +826,7 @@ export default function HomePage({ onCopyTransaction }: HomePageProps) {
                     </>
                   )}
                 </div>
-              </div>
+              </button>
             ))}
           </Card>
         )}
@@ -836,6 +881,139 @@ export default function HomePage({ onCopyTransaction }: HomePageProps) {
       <div className={styles.section}>
         <PwaInstallPrompt />
       </div>
+
+      {cardDetail && (
+        <div
+          className={styles.detailBackdrop}
+          role="presentation"
+          onClick={() => setCardDetail(null)}
+        >
+          <section
+            className={styles.detailModal}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`${cardDetail.name} 결제 예정 내역`}
+            onClick={event => event.stopPropagation()}
+          >
+            <div className={styles.detailHeader}>
+              <div>
+                <strong>{cardDetail.name} 결제 예정 내역</strong>
+                <span>
+                  {[
+                    `${formatMonth(cardDetail.billingMonth)} 청구`,
+                    getBillingPeriodLabel(
+                      cardDetail.billingMonth,
+                      cardDetail.billingCutoffDay,
+                      cardDetail.paymentDay
+                    ),
+                    cardBreakdown ? `${cardBreakdown.usage.length.toLocaleString("ko-KR")}건` : null
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </span>
+              </div>
+              <Button
+                className={styles.detailClose}
+                variant="soft"
+                size="sm"
+                iconOnly
+                aria-label="닫기"
+                onClick={() => setCardDetail(null)}
+              >
+                ×
+              </Button>
+            </div>
+
+            <div className={styles.cardDetailSummary}>
+              <div>
+                <span>청구 사용액</span>
+                <strong>
+                  <Money amount={cardDetail.usage} absolute />
+                </strong>
+              </div>
+              {Number(cardDetail.payments) > 0 && (
+                <div>
+                  <span>이미 결제</span>
+                  <strong>
+                    <Money amount={-cardDetail.payments} />
+                  </strong>
+                </div>
+              )}
+              <div>
+                <span>결제 예정</span>
+                <strong className={styles.expenseAmount}>
+                  <Money amount={cardDetail.estimatedRemaining} absolute />
+                </strong>
+              </div>
+            </div>
+
+            {cardDetailLoading && <p className={styles.detailState}>내역을 불러오는 중입니다.</p>}
+            {!cardDetailLoading && cardDetailError && (
+              <p className={styles.detailError}>{cardDetailError}</p>
+            )}
+            {!cardDetailLoading && cardBreakdown && cardBreakdown.usage.length === 0 && (
+              <p className={styles.detailState}>이번 청구에 들어간 사용 내역이 없습니다.</p>
+            )}
+
+            {!cardDetailLoading && cardBreakdown && cardBreakdown.usage.length > 0 && (
+              <div className={styles.detailList}>
+                {cardBreakdown.usage.map(item => {
+                  const transaction = item.transaction;
+                  const partial = item.billedAmount + item.refundAmount !== transaction.amount;
+                  return (
+                    <article key={transaction.transactionId} className={styles.detailRow}>
+                      <div>
+                        <span>{transaction.date}</span>
+                        <strong>{getTransactionTitle(transaction)}</strong>
+                        <small>{getTransactionMeta(transaction)}</small>
+                        {(partial || item.refundAmount > 0) && (
+                          <em className={styles.detailOffset}>
+                            {item.installmentIndex
+                              ? `할부 ${item.installmentIndex}/${transaction.installmentMonths}회차 · `
+                              : ""}
+                            총 결제 {formatMoney(transaction.amount)}
+                            {item.refundAmount > 0
+                              ? ` · 환불 ${formatMoney(item.refundAmount)}`
+                              : ""}
+                          </em>
+                        )}
+                        {transaction.memo && <em>{transaction.memo}</em>}
+                      </div>
+                      <div className={styles.detailRowActions}>
+                        <b className={styles.expenseAmount}>
+                          <Money amount={-item.billedAmount} tone="expense" />
+                        </b>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+
+            {!cardDetailLoading && cardBreakdown && cardBreakdown.payments.length > 0 && (
+              <>
+                <p className={styles.cardDetailSubheading}>이번 청구에 반영된 결제</p>
+                <div className={styles.detailList}>
+                  {cardBreakdown.payments.map(item => (
+                    <article key={item.transaction.transactionId} className={styles.detailRow}>
+                      <div>
+                        <span>{item.transaction.date}</span>
+                        <strong>{getTransactionTitle(item.transaction)}</strong>
+                        <small>{getTransactionMeta(item.transaction)}</small>
+                      </div>
+                      <div className={styles.detailRowActions}>
+                        <b>
+                          <Money amount={item.amount} absolute />
+                        </b>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </>
+            )}
+          </section>
+        </div>
+      )}
 
       {detailType && (
         <div

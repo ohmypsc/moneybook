@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  getRestorableDraftDate,
   hasMeaningfulInputDraft,
   parseInputDraft,
   type InputDraft
@@ -54,14 +55,20 @@ test("draft preserves installments and disabled benefit accrual, and reads legac
   assert.equal(parseInputDraft({ ...emptyDraft(), installmentMonths: 99 })?.installmentMonths, 1);
 });
 
-test("draft preserves transaction tags and manual/automatic category choice", () => {
-  const draft = parseInputDraft({
-    ...emptyDraft(),
-    tagsText: "제주여행, 가족",
-    categorySource: "auto"
-  });
+test("draft preserves transaction tags", () => {
+  const draft = parseInputDraft({ ...emptyDraft(), tagsText: "제주여행, 가족" });
   assert.equal(draft?.tagsText, "제주여행, 가족");
-  assert.equal(draft?.categorySource, "auto");
   assert.equal(hasMeaningfulInputDraft(draft!), true);
-  assert.equal(parseInputDraft({ ...emptyDraft(), categoryId: "C1" })?.categorySource, "manual");
+});
+
+test("draft date is restored only while an entry is in progress", () => {
+  const draft = emptyDraft();
+  assert.equal(getRestorableDraftDate(null), null);
+  // 저장 후 남겨 둔 결제수단·지출대상만 있으면 오늘 날짜로 시작합니다.
+  assert.equal(
+    getRestorableDraftDate({ ...draft, paymentMethodId: "card", spendingTarget: "공동" }),
+    null
+  );
+  assert.equal(getRestorableDraftDate({ ...draft, amount: "5000" }), "2026-09-15");
+  assert.equal(getRestorableDraftDate({ ...draft, description: "점심" }), "2026-09-15");
 });

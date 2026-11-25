@@ -1,4 +1,4 @@
-import { normalizeTags, normalizeRules } from "../../shared/classification.js";
+import { normalizeTags } from "../../shared/classification.js";
 import { dateOnly, monthOnly } from "./date.js";
 
 export class BackupValidationError extends Error {
@@ -66,8 +66,6 @@ function optionalObject(value, label) {
 
 export function validateBackupDocument(input) {
   try {
-    if (input?.payload?.classificationSettings !== undefined)
-      normalizeRules(input.payload.classificationSettings.rules);
     for (const item of input?.payload?.transactions || []) {
       if (item.tags !== undefined) normalizeTags(item.tags);
       if (item.categorySource !== undefined && !["auto", "manual"].includes(item.categorySource))

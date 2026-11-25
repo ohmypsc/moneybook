@@ -1,6 +1,6 @@
 // /api/* D1 라우터와 배우자 푸시 대기열
 import { isSameOrigin } from "../auth.js";
-import { ensureClassificationSchema, getClassificationSettings } from "../classification.js";
+import { ensureClassificationSchema } from "../classification.js";
 import { BackupValidationError } from "../domain/backupRestore.js";
 import { summarizeTransactionForPush } from "../domain/webPush.js";
 import { errorResponse, readJsonObject } from "../http.js";
@@ -24,12 +24,7 @@ import {
   mbD1RestoreBackupMerge
 } from "./backup.js";
 import { mbD1BenefitRewardBalancesData, mbD1PreviewBenefit } from "./benefits.js";
-import {
-  mbApplyClassification,
-  mbClassificationPreview,
-  mbD1EnsureInstallmentSchema,
-  mbSaveClassification
-} from "./classification.js";
+import { mbD1EnsureInstallmentSchema } from "./classification.js";
 import {
   getHouseholdRealtimeStub,
   MB_D1_HOUSEHOLD_ID,
@@ -102,7 +97,6 @@ export async function mbD1ProductionRoute(request, url, session, env, ctx) {
     "/api/real-estate/regions",
     "/api/backup/export",
     "/api/push/config",
-    "/api/settings/classification",
     "/api/tax/summary"
   ]);
   const postPaths = new Set([
@@ -145,9 +139,6 @@ export async function mbD1ProductionRoute(request, url, session, env, ctx) {
     "/api/push/test",
     "/api/tax/profile",
     "/api/tax/category",
-    "/api/settings/classification",
-    "/api/classification/preview",
-    "/api/classification/apply",
     "/api/tax/preset"
   ]);
   if (request.method === "GET" && !getPaths.has(path)) return null;
@@ -164,8 +155,6 @@ export async function mbD1ProductionRoute(request, url, session, env, ctx) {
     await mbD1EnsureInstallmentSchema(env);
     await ensureClassificationSchema(env);
     if (request.method === "GET") {
-      if (path === "/api/settings/classification")
-        return mbD1Envelope(await getClassificationSettings(env, MB_D1_HOUSEHOLD_ID));
       if (path === "/api/bootstrap") return mbD1Envelope(await mbD1BuildBootstrap(env, session));
       if (path === "/api/dashboard") {
         const refreshQuotes = url.searchParams.get("refreshQuotes") === "1";
@@ -250,13 +239,7 @@ export async function mbD1ProductionRoute(request, url, session, env, ctx) {
     }
 
     let data;
-    if (path === "/api/classification/preview")
-      return mbD1Envelope(await mbClassificationPreview(body, env));
-    if (path === "/api/settings/classification")
-      data = await mbSaveClassification(body, session, env);
-    else if (path === "/api/classification/apply")
-      data = await mbApplyClassification(body, session, env);
-    else if (path.startsWith("/api/transactions"))
+    if (path.startsWith("/api/transactions"))
       data = await mbD1HandleTransactionMutation(path, body, session, env);
     else if (path.startsWith("/api/categories"))
       data = await mbD1HandleCategoryMutation(path, body, session, env);

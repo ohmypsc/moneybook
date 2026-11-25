@@ -2,7 +2,8 @@ import type { Transaction } from "./transactions";
 import type { BootstrapData } from "../types/bootstrap";
 
 export interface MoneybookBackupPayload {
-  classificationSettings?: import("./classification").ClassificationSettings;
+  /** 예전 백업에만 있는 자동 분류 규칙(복원하지 않음) */
+  classificationSettings?: unknown;
   bootstrap: BootstrapData;
   userDisplayPreferences?: Array<{ key: string; value: Record<string, unknown> }>;
   categories: unknown[];

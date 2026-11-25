@@ -1,6 +1,6 @@
 // 거래 모델 검증과 거래 생성·수정·삭제·복원·정산
-import { ensureClassificationSchema, getClassificationSettings } from "../classification.js";
-import { classifyTransaction, normalizeTags } from "../domain/classification.js";
+import { ensureClassificationSchema } from "../classification.js";
+import { normalizeTags } from "../domain/classification.js";
 import {
   dateOnly as mbD1DateOnly,
   monthOnly as mbD1MonthOnly,
@@ -35,7 +35,7 @@ import {
   mbD1Text,
   mbD1ValidateLedgerDate
 } from "./core.js";
-import { mbD1GetCategoriesData, mbD1SettlementSummaryData } from "./queries.js";
+import { mbD1SettlementSummaryData } from "./queries.js";
 import {
   mbD1AccountById,
   mbD1CategoryById,
@@ -289,17 +289,10 @@ export async function mbD1HandleTransactionMutation(path, body, session, env) {
       };
     }
 
-    const rules = (await getClassificationSettings(env, MB_D1_HOUSEHOLD_ID)).rules;
-    const classification = classifyTransaction(
-      body,
-      rules,
-      (await mbD1GetCategoriesData(env, new URL("https://local/api/categories"))).items
-    );
     body = {
       ...body,
-      categoryId: classification.categoryId,
-      categorySource: classification.categorySource,
-      tags: classification.tags
+      categorySource: "manual",
+      tags: Array.isArray(body.tags) ? body.tags : []
     };
     const benefit = await mbD1PrepareBenefit(env, body, { strictRewardUsage: true });
     const needsBenefitGroup = Boolean(
@@ -856,13 +849,6 @@ export async function mbD1HandleTransactionMutation(path, body, session, env) {
     try {
       await env.DB.batch([
         concurrencyGuard,
-        ...(body.classificationVersion !== undefined
-          ? [
-              env.DB.prepare(
-                `SELECT CASE WHEN COALESCE((SELECT version FROM user_preferences WHERE household_id=? AND preference_key='classification_rules'),0)=? THEN 1 ELSE json('${MB_D1_CONCURRENCY_GUARD_TOKEN}') END`
-              ).bind(MB_D1_HOUSEHOLD_ID, body.classificationVersion)
-            ]
-          : []),
         update,
         change,
         ...linkedBenefitStatements,
@@ -870,11 +856,7 @@ export async function mbD1HandleTransactionMutation(path, body, session, env) {
           "UPDATE transactions SET tags_json=?,category_source=? WHERE household_id=? AND transaction_id=?"
         ).bind(
           JSON.stringify(mbD1Has(body, "tags") ? body.tags : current.tags),
-          mbD1Has(body, "categoryId")
-            ? body.categorySource === "auto"
-              ? "auto"
-              : "manual"
-            : current.categorySource,
+          mbD1Has(body, "categoryId") ? "manual" : current.categorySource,
           MB_D1_HOUSEHOLD_ID,
           transactionId
         )

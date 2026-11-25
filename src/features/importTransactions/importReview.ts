@@ -1,4 +1,4 @@
-import { classifyTransaction, normalizeTags } from "../../../shared/classification.js";
+import { normalizeTags } from "../../../shared/classification.js";
 import type { ImportedTransactionCandidate } from "../../api/transactionImport";
 import type { CreateTransactionInput } from "../../api/transactions";
 import type { BootstrapData } from "../../types/bootstrap";
@@ -13,9 +13,6 @@ export const IMPORT_TYPE_LABELS = {
 
 export interface EditableCandidate extends ImportedTransactionCandidate {
   tagsText?: string;
-  categorySource?: "manual" | "auto";
-  automaticTags?: string[];
-  matchedRules?: string[];
   requestId: string;
   queued?: boolean;
 }
@@ -25,9 +22,6 @@ export function changeImportKind(item: EditableCandidate, kind: ImportKind): Edi
   return {
     ...item,
     kind,
-    categorySource: "auto",
-    automaticTags: [],
-    matchedRules: [],
     categoryId: null,
     categoryName: "",
     categorySuggestionSource: null,
@@ -124,8 +118,7 @@ export function buildImportPayload(
     description: item.merchant.trim(),
     memo: item.memo,
     requestId: item.requestId,
-    tags: applyImportClassification(item, bootstrap).automaticTags || [],
-    categorySource: item.categorySource || "manual"
+    tags: normalizeTags(item.tagsText || "")
   };
   if (item.kind === "income") return { ...common, toAccountId: item.toAccountId };
   if (item.kind === "transfer")
@@ -145,41 +138,5 @@ export function buildImportPayload(
     ...(rule
       ? { benefitRuleId: rule.id, benefitRewardUsedAmount: 0, benefitAccrualEnabled: true }
       : {})
-  };
-}
-
-export function applyImportClassification(
-  item: EditableCandidate,
-  bootstrap: BootstrapData
-): EditableCandidate {
-  if (item.kind === "refund" || item.queued) return item;
-  let tags: string[] = [];
-  try {
-    tags = normalizeTags(item.tagsText || "");
-  } catch {
-    return item;
-  }
-  const result = classifyTransaction(
-    {
-      type: IMPORT_TYPE_LABELS[item.kind],
-      description: item.merchant,
-      categoryId: item.categoryId,
-      categorySource: item.categorySource || (item.categoryId ? "manual" : "auto"),
-      tags,
-      paymentMethodId: item.paymentMethodId,
-      fromAccountId: item.fromAccountId,
-      toAccountId: item.toAccountId
-    },
-    bootstrap.classificationSettings?.rules || [],
-    bootstrap.categories
-  );
-  return {
-    ...item,
-    categoryId: result.categoryId || null,
-    categorySource: result.categorySource as "auto" | "manual",
-    categoryName:
-      bootstrap.categories.find(c => c.categoryId === result.categoryId)?.name || item.categoryName,
-    automaticTags: result.tags,
-    matchedRules: result.matchedNames
   };
 }

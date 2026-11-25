@@ -1,7 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  applyImportClassification,
   buildImportPayload,
   changeImportKind,
   deriveReviewReasons,
@@ -105,34 +104,8 @@ test("type changes clear incompatible fields and retries keep request identity",
   assert.equal(changeImportKind(refund, "income"), refund);
 });
 
-test("import rules add tags, preserve manual categories and carry tags to queued payload", () => {
-  const data = {
-    ...bootstrap,
-    classificationSettings: {
-      version: 1,
-      rules: [
-        {
-          id: "r",
-          name: "여행",
-          type: "지출" as const,
-          contains: "거래",
-          accountId: "A",
-          categoryId: "C0",
-          tags: ["여행"],
-          enabled: true,
-          priority: 0
-        }
-      ]
-    }
-  };
-  const auto = applyImportClassification(
-    { ...row, categoryId: null, categorySource: "auto", tagsText: "가족" },
-    data
-  );
-  assert.equal(auto.categoryId, "C0");
-  assert.deepEqual(buildImportPayload(auto, data).tags, ["가족", "여행"]);
-  assert.equal(buildImportPayload(auto, data).categorySource, "auto");
-  const manual = applyImportClassification({ ...row, categorySource: "manual" }, data);
-  assert.equal(manual.categorySource, "manual");
-  assert.throws(() => buildImportPayload({ ...auto, tagsText: "a".repeat(31) }, data), /30자/);
+test("import carries typed tags to the queued payload", () => {
+  const tagged = { ...row, tagsText: "가족, 여행" };
+  assert.deepEqual(buildImportPayload(tagged, bootstrap).tags, ["가족", "여행"]);
+  assert.throws(() => buildImportPayload({ ...row, tagsText: "a".repeat(31) }, bootstrap), /30자/);
 });

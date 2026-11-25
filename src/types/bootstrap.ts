@@ -12,7 +12,6 @@ import type { AutomationSettings } from "../api/automation";
 import type { SharedInputPreferencesState } from "../utils/inputPreferences";
 
 export interface BootstrapData {
-  classificationSettings?: import("../api/classification").ClassificationSettings;
   userName?: string;
   householdOverview?: { livingAccountIds: string[] | null };
   backendVersion: string;
