@@ -226,8 +226,10 @@ export default function HomePage({ onCopyTransaction }: HomePageProps) {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
   const [recurringRules, setRecurringRules] = useState<RecurringTransactionRule[]>([]);
-  const [cardDetail, setCardDetail] = useState<DashboardCardView | null>(null);
-  const [cardBreakdown, setCardBreakdown] = useState<CardBillBreakdown | null>(null);
+  const [cardDetail, setCardDetail] = useState<DashboardCardView[] | null>(null);
+  const [cardBreakdowns, setCardBreakdowns] = useState<Record<string, CardBillBreakdown> | null>(
+    null
+  );
   const [cardDetailLoading, setCardDetailLoading] = useState(false);
   const [cardDetailError, setCardDetailError] = useState("");
 
@@ -415,21 +417,30 @@ export default function HomePage({ onCopyTransaction }: HomePageProps) {
     }
   }
 
-  async function openCardDetail(card: DashboardCardView) {
-    setCardDetail(card);
-    setCardBreakdown(null);
+  async function openCardDetail(cards: DashboardCardView[]) {
+    if (cards.length === 0) return;
+    setCardDetail(cards);
+    setCardBreakdowns(null);
     setCardDetailError("");
     setCardDetailLoading(true);
 
     try {
-      // 할부(최대 36개월)까지 포함되도록 청구월 37개월 전부터 불러옵니다.
-      const response = await getTransactions({
-        dateFrom: `${shiftMonth(card.billingMonth, -37)}-01`,
-        dateTo: getMonthRange(shiftMonth(card.billingMonth, 1)).dateTo,
-        accountId: card.accountId,
-        limit: 1000
-      });
-      setCardBreakdown(buildCardBillBreakdown(response.data.items || [], card, card.billingMonth));
+      const entries = await Promise.all(
+        cards.map(async card => {
+          // 할부(최대 36개월)까지 포함되도록 청구월 37개월 전부터 불러옵니다.
+          const response = await getTransactions({
+            dateFrom: `${shiftMonth(card.billingMonth, -37)}-01`,
+            dateTo: getMonthRange(shiftMonth(card.billingMonth, 1)).dateTo,
+            accountId: card.accountId,
+            limit: 1000
+          });
+          return [
+            card.accountId,
+            buildCardBillBreakdown(response.data.items || [], card, card.billingMonth)
+          ] as const;
+        })
+      );
+      setCardBreakdowns(Object.fromEntries(entries));
     } catch (error) {
       setCardDetailError(
         error instanceof Error ? error.message : "카드 사용 내역을 불러오지 못했습니다."
@@ -755,9 +766,17 @@ export default function HomePage({ onCopyTransaction }: HomePageProps) {
             <span className={styles.sectionHint}>입력 내역 기준 · 결제계좌 잔액과 부족액 확인</span>
           </div>
           {cardSummary.cards.length > 0 ? (
-            <strong className={styles.sectionTotal}>
-              <Money amount={cardSummary.total} absolute />
-            </strong>
+            <button
+              type="button"
+              className={styles.sectionTotalButton}
+              aria-label="카드 결제 예정 전체 내역 보기"
+              onClick={() => void openCardDetail(cardSummary.cards)}
+            >
+              <strong className={styles.sectionTotal}>
+                <Money amount={cardSummary.total} absolute />
+              </strong>
+              <small>내역 ›</small>
+            </button>
           ) : (
             <span className={styles.emptyBadge}>
               {cardSummary.registeredCount > 0 ? "이번 결제 없음" : "등록된 카드 없음"}
@@ -773,7 +792,7 @@ export default function HomePage({ onCopyTransaction }: HomePageProps) {
                 key={card.accountId}
                 className={[styles.cardRow, styles.summaryRowButton].join(" ")}
                 aria-label={`${card.name} 결제 예정 내역 보기`}
-                onClick={() => void openCardDetail(card)}
+                onClick={() => void openCardDetail([card])}
               >
                 <div className={styles.cardName}>
                   <span className={styles.cardIcon} aria-hidden="true">
@@ -892,24 +911,33 @@ export default function HomePage({ onCopyTransaction }: HomePageProps) {
             className={styles.detailModal}
             role="dialog"
             aria-modal="true"
-            aria-label={`${cardDetail.name} 결제 예정 내역`}
+            aria-label={
+              cardDetail.length === 1
+                ? `${cardDetail[0].name} 결제 예정 내역`
+                : "카드 결제 예정 전체 내역"
+            }
             onClick={event => event.stopPropagation()}
           >
             <div className={styles.detailHeader}>
               <div>
-                <strong>{cardDetail.name} 결제 예정 내역</strong>
+                <strong>
+                  {cardDetail.length === 1
+                    ? `${cardDetail[0].name} 결제 예정 내역`
+                    : "카드 결제 예정 전체 내역"}
+                </strong>
                 <span>
-                  {[
-                    `${formatMonth(cardDetail.billingMonth)} 청구`,
-                    getBillingPeriodLabel(
-                      cardDetail.billingMonth,
-                      cardDetail.billingCutoffDay,
-                      cardDetail.paymentDay
-                    ),
-                    cardBreakdown ? `${cardBreakdown.usage.length.toLocaleString("ko-KR")}건` : null
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
+                  {cardDetail.length === 1
+                    ? [
+                        `${formatMonth(cardDetail[0].billingMonth)} 청구`,
+                        getBillingPeriodLabel(
+                          cardDetail[0].billingMonth,
+                          cardDetail[0].billingCutoffDay,
+                          cardDetail[0].paymentDay
+                        )
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")
+                    : `카드 ${cardDetail.length}장`}
                 </span>
               </div>
               <Button
@@ -928,21 +956,34 @@ export default function HomePage({ onCopyTransaction }: HomePageProps) {
               <div>
                 <span>청구 사용액</span>
                 <strong>
-                  <Money amount={cardDetail.usage} absolute />
+                  <Money
+                    amount={cardDetail.reduce((sum, card) => sum + Number(card.usage || 0), 0)}
+                    absolute
+                  />
                 </strong>
               </div>
-              {Number(cardDetail.payments) > 0 && (
+              {cardDetail.some(card => Number(card.payments) > 0) && (
                 <div>
                   <span>이미 결제</span>
                   <strong>
-                    <Money amount={-cardDetail.payments} />
+                    <Money
+                      amount={
+                        -cardDetail.reduce((sum, card) => sum + Number(card.payments || 0), 0)
+                      }
+                    />
                   </strong>
                 </div>
               )}
               <div>
                 <span>결제 예정</span>
                 <strong className={styles.expenseAmount}>
-                  <Money amount={cardDetail.estimatedRemaining} absolute />
+                  <Money
+                    amount={cardDetail.reduce(
+                      (sum, card) => sum + Math.max(0, Number(card.estimatedRemaining) || 0),
+                      0
+                    )}
+                    absolute
+                  />
                 </strong>
               </div>
             </div>
@@ -951,66 +992,105 @@ export default function HomePage({ onCopyTransaction }: HomePageProps) {
             {!cardDetailLoading && cardDetailError && (
               <p className={styles.detailError}>{cardDetailError}</p>
             )}
-            {!cardDetailLoading && cardBreakdown && cardBreakdown.usage.length === 0 && (
-              <p className={styles.detailState}>이번 청구에 들어간 사용 내역이 없습니다.</p>
-            )}
 
-            {!cardDetailLoading && cardBreakdown && cardBreakdown.usage.length > 0 && (
-              <div className={styles.detailList}>
-                {cardBreakdown.usage.map(item => {
-                  const transaction = item.transaction;
-                  const partial = item.billedAmount + item.refundAmount !== transaction.amount;
-                  return (
-                    <article key={transaction.transactionId} className={styles.detailRow}>
-                      <div>
-                        <span>{transaction.date}</span>
-                        <strong>{getTransactionTitle(transaction)}</strong>
-                        <small>{getTransactionMeta(transaction)}</small>
-                        {(partial || item.refundAmount > 0) && (
-                          <em className={styles.detailOffset}>
-                            {item.installmentIndex
-                              ? `할부 ${item.installmentIndex}/${transaction.installmentMonths}회차 · `
-                              : ""}
-                            총 결제 {formatMoney(transaction.amount)}
-                            {item.refundAmount > 0
-                              ? ` · 환불 ${formatMoney(item.refundAmount)}`
-                              : ""}
-                          </em>
-                        )}
-                        {transaction.memo && <em>{transaction.memo}</em>}
-                      </div>
-                      <div className={styles.detailRowActions}>
+            {!cardDetailLoading &&
+              cardBreakdowns &&
+              cardDetail.map(card => {
+                const breakdown = cardBreakdowns[card.accountId];
+                if (!breakdown) return null;
+                return (
+                  <div key={card.accountId} className={styles.cardDetailGroup}>
+                    {cardDetail.length > 1 && (
+                      <div className={styles.cardDetailGroupHeader}>
+                        <div>
+                          <strong>{card.name}</strong>
+                          <span>
+                            {[
+                              card.paymentDay
+                                ? `${Number(card.billingMonth.slice(5))}월 ${card.paymentDay}일 결제`
+                                : null,
+                              getBillingPeriodLabel(
+                                card.billingMonth,
+                                card.billingCutoffDay,
+                                card.paymentDay
+                              ),
+                              `${breakdown.usage.length.toLocaleString("ko-KR")}건`
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </span>
+                        </div>
                         <b className={styles.expenseAmount}>
-                          <Money amount={-item.billedAmount} tone="expense" />
+                          <Money amount={card.estimatedRemaining} absolute />
                         </b>
                       </div>
-                    </article>
-                  );
-                })}
-              </div>
-            )}
+                    )}
 
-            {!cardDetailLoading && cardBreakdown && cardBreakdown.payments.length > 0 && (
-              <>
-                <p className={styles.cardDetailSubheading}>이번 청구에 반영된 결제</p>
-                <div className={styles.detailList}>
-                  {cardBreakdown.payments.map(item => (
-                    <article key={item.transaction.transactionId} className={styles.detailRow}>
-                      <div>
-                        <span>{item.transaction.date}</span>
-                        <strong>{getTransactionTitle(item.transaction)}</strong>
-                        <small>{getTransactionMeta(item.transaction)}</small>
+                    {breakdown.usage.length === 0 ? (
+                      <p className={styles.detailState}>이번 청구에 들어간 사용 내역이 없습니다.</p>
+                    ) : (
+                      <div className={styles.detailList}>
+                        {breakdown.usage.map(item => {
+                          const transaction = item.transaction;
+                          const partial =
+                            item.billedAmount + item.refundAmount !== transaction.amount;
+                          return (
+                            <article key={transaction.transactionId} className={styles.detailRow}>
+                              <div>
+                                <span>{transaction.date}</span>
+                                <strong>{getTransactionTitle(transaction)}</strong>
+                                <small>{getTransactionMeta(transaction)}</small>
+                                {(partial || item.refundAmount > 0) && (
+                                  <em className={styles.detailOffset}>
+                                    {item.installmentIndex
+                                      ? `할부 ${item.installmentIndex}/${transaction.installmentMonths}회차 · `
+                                      : ""}
+                                    총 결제 {formatMoney(transaction.amount)}
+                                    {item.refundAmount > 0
+                                      ? ` · 환불 ${formatMoney(item.refundAmount)}`
+                                      : ""}
+                                  </em>
+                                )}
+                                {transaction.memo && <em>{transaction.memo}</em>}
+                              </div>
+                              <div className={styles.detailRowActions}>
+                                <b className={styles.expenseAmount}>
+                                  <Money amount={-item.billedAmount} tone="expense" />
+                                </b>
+                              </div>
+                            </article>
+                          );
+                        })}
                       </div>
-                      <div className={styles.detailRowActions}>
-                        <b>
-                          <Money amount={item.amount} absolute />
-                        </b>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              </>
-            )}
+                    )}
+
+                    {breakdown.payments.length > 0 && (
+                      <>
+                        <p className={styles.cardDetailSubheading}>이번 청구에 반영된 결제</p>
+                        <div className={styles.detailList}>
+                          {breakdown.payments.map(item => (
+                            <article
+                              key={item.transaction.transactionId}
+                              className={styles.detailRow}
+                            >
+                              <div>
+                                <span>{item.transaction.date}</span>
+                                <strong>{getTransactionTitle(item.transaction)}</strong>
+                                <small>{getTransactionMeta(item.transaction)}</small>
+                              </div>
+                              <div className={styles.detailRowActions}>
+                                <b>
+                                  <Money amount={item.amount} absolute />
+                                </b>
+                              </div>
+                            </article>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
           </section>
         </div>
       )}
