@@ -1,15 +1,11 @@
 // JSON 백업 내보내기와 병합 복원
-import {
-  classificationSettingsStatement,
-  ensureClassificationSchema,
-  getClassificationSettings
-} from "../classification.js";
+import { ensureClassificationSchema } from "../classification.js";
 import {
   BackupValidationError,
   findRequestIdConflicts,
   validateBackupDocument
 } from "../domain/backupRestore.js";
-import { normalizeRules, normalizeTags } from "../domain/classification.js";
+import { normalizeTags } from "../domain/classification.js";
 import { normalizeInstallmentMonths } from "../domain/installment.js";
 import { isObject } from "../http.js";
 import { ensureRealEstateSchema, listRealEstateAssets } from "../realEstate.js";
@@ -164,7 +160,6 @@ export async function mbD1BuildBackupDocument(env) {
     version: 3,
     exportedAt: mbD1Now(),
     payload: {
-      classificationSettings: await getClassificationSettings(env, MB_D1_HOUSEHOLD_ID),
       userDisplayPreferences: (
         await mbD1All(
           env,
@@ -521,15 +516,7 @@ export async function mbD1RestoreBackupMerge(document, session, env) {
         )
       );
   }
-  if (payload.classificationSettings !== undefined)
-    restoreStatements.push(
-      classificationSettingsStatement(
-        env,
-        MB_D1_HOUSEHOLD_ID,
-        normalizeRules(payload.classificationSettings.rules),
-        now
-      )
-    );
+  // 예전 백업의 자동 분류 규칙(classificationSettings)은 기능을 없앴으므로 복원하지 않습니다.
 
   const reversalStatements = payload.transactions
     .filter(item => item.reversalOf)

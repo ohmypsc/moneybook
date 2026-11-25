@@ -1,5 +1,4 @@
 // 대시보드 집계와 bootstrap 응답 생성
-import { getClassificationSettings } from "../classification.js";
 import {
   estimateBillingMonth as mbD1EstimateBilling,
   monthOnly as mbD1MonthOnly
@@ -362,7 +361,6 @@ export async function mbD1BuildBootstrap(env, session = null) {
   const categories = categoryRows.map(mbD1MapCategory);
   const memberNames = members.map(member => mbD1Text(member.display_name)).filter(Boolean);
   return {
-    classificationSettings: await getClassificationSettings(env, MB_D1_HOUSEHOLD_ID),
     userName: session?.name || "",
     householdOverview: await mbD1HouseholdOverviewData(env),
     backendVersion: MB_D1_API_VERSION,

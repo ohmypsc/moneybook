@@ -1,5 +1,5 @@
-import { classifyTransaction, normalizeTags } from "../../../shared/classification.js";
-import { TagsInput, TagChips } from "../../components/classification/TagsInput";
+import { normalizeTags } from "../../../shared/classification.js";
+import { TagsInput } from "../../components/classification/TagsInput";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { apiRequest } from "../../api/client";
@@ -370,7 +370,6 @@ export default function InputPage({
 
     if (launchCategoryId) {
       setCategoryId(launchCategoryId);
-      setCategorySource("manual");
     }
 
     if (launchAmount !== null) {
@@ -425,13 +424,6 @@ export default function InputPage({
   );
 
   const [tagsText, setTagsText] = useState(hasLaunchPreset ? "" : initialDraft?.tagsText || "");
-  const [categorySource, setCategorySource] = useState<"auto" | "manual">(
-    launchCategoryId
-      ? "manual"
-      : hasLaunchPreset
-        ? "auto"
-        : initialDraft?.categorySource || (initialDraft?.categoryId ? "manual" : "auto")
-  );
   const [cardBillingInfo, setCardBillingInfo] = useState<CardBillingInfo | null>(null);
 
   const [cardBillingLoading, setCardBillingLoading] = useState(false);
@@ -516,7 +508,6 @@ export default function InputPage({
       date,
       amount,
       categoryId,
-      categorySource,
       tagsText,
       paymentMethodId,
       spendingTarget,
@@ -537,7 +528,6 @@ export default function InputPage({
     date,
     amount,
     categoryId,
-    categorySource,
     tagsText,
     paymentMethodId,
     spendingTarget,
@@ -777,43 +767,14 @@ export default function InputPage({
     return applyCategoryPreferences(bootstrap.categories, backendType, preferences);
   }, [bootstrap, preferences, backendType]);
 
-  const classification = useMemo(() => {
-    let tags: string[] = [];
+  const tags = useMemo(() => {
     try {
-      tags = normalizeTags(tagsText);
+      return normalizeTags(tagsText);
     } catch {
       /* validate() shows the error before save. */
+      return [] as string[];
     }
-    return classifyTransaction(
-      {
-        tags,
-        type: backendType,
-        description,
-        categoryId: categorySource === "auto" ? "" : categoryId,
-        categorySource,
-        paymentMethodId,
-        fromAccountId,
-        toAccountId
-      },
-      bootstrap?.classificationSettings?.rules || [],
-      categories
-    );
-  }, [
-    tagsText,
-    backendType,
-    description,
-    categoryId,
-    categorySource,
-    paymentMethodId,
-    fromAccountId,
-    toAccountId,
-    bootstrap,
-    categories
-  ]);
-  useEffect(() => {
-    if (categorySource === "auto" && categoryId !== classification.categoryId)
-      setCategoryId(classification.categoryId);
-  }, [classification.categoryId, categoryId, categorySource]);
+  }, [tagsText]);
 
   const selectedCategory = useMemo(
     () => categories.find(category => category.categoryId === categoryId) ?? null,
@@ -1211,7 +1172,6 @@ export default function InputPage({
     setDate(payload.date || today);
     setAmount(String(payload.amount || ""));
     setCategoryId(payload.categoryId || "");
-    setCategorySource(payload.categorySource || "manual");
     setTagsText((payload.tags || []).join(", "));
     setPaymentMethodId(payload.paymentMethodId || "");
     setSpendingTarget(payload.spendingTarget || "");
@@ -1274,7 +1234,6 @@ export default function InputPage({
     setMode(nextMode);
 
     setCategoryId("");
-    setCategorySource("auto");
     setTagsText("");
 
     resetAccountSelections();
@@ -1354,7 +1313,6 @@ export default function InputPage({
   }
 
   function handleCategoryChange(nextCategoryId: string) {
-    setCategorySource(nextCategoryId ? "manual" : "auto");
     if (nextCategoryId === categoryId) {
       clearFeedback();
       return;
@@ -1778,7 +1736,6 @@ export default function InputPage({
           description: baseDescription || `${loanLabel} 원금 상환`,
           memo: baseMemo,
           tags: normalizeTags(tagsText),
-          categorySource: "manual",
           groupId,
           requestId: `${requestId}_PRINCIPAL`
         }
@@ -1799,7 +1756,6 @@ export default function InputPage({
           description: baseDescription || `${loanLabel} 이자`,
           memo: baseMemo,
           tags: normalizeTags(tagsText),
-          categorySource: "manual",
           groupId,
           requestId: `${requestId}_INTEREST`
         }
@@ -1809,7 +1765,6 @@ export default function InputPage({
     clearInputDraft(userName);
     setAmount("");
     setCategoryId("");
-    setCategorySource("auto");
     setTagsText("");
     setLoanPrincipalAmount("");
     setLoanInterestAmount("");
@@ -1829,8 +1784,7 @@ export default function InputPage({
       amount: Number(amount),
       description: getEffectiveDescription(),
       memo: getEffectiveMemo(),
-      tags: classification.tags,
-      categorySource,
+      tags,
       ...getBenefitPayloadFields(),
       requestId
     };
@@ -1966,8 +1920,6 @@ export default function InputPage({
 
     const fingerprint = JSON.stringify({
       tagsText,
-      categorySource,
-      automaticTags: classification.tags,
       date,
 
       type: backendType,
@@ -2045,7 +1997,6 @@ export default function InputPage({
 
       setAmount("");
       setCategoryId("");
-      setCategorySource("auto");
       setTagsText("");
       setInstallmentMonths(1);
 
@@ -2779,22 +2730,6 @@ export default function InputPage({
               />
             </label>
 
-            {classification.matchedNames.length > 0 && (
-              <div>
-                <p className={styles.helper}>
-                  일치 규칙: {classification.matchedNames.join(" · ")}
-                  {categorySource === "manual"
-                    ? " · 직접 선택한 카테고리 유지"
-                    : " · 카테고리 자동 분류"}
-                </p>
-                <TagChips tags={classification.tags} />
-              </div>
-            )}
-            {categorySource === "manual" && (
-              <button type="button" disabled={submitting} onClick={() => setCategorySource("auto")}>
-                카테고리 자동 분류로 전환
-              </button>
-            )}
             {extraFieldsOpen ? (
               <>
                 <TagsInput

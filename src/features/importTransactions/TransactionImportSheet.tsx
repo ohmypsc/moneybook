@@ -1,5 +1,4 @@
-import { TagsInput, TagChips } from "../../components/classification/TagsInput";
-import { applyImportClassification } from "./importReview";
+import { TagsInput } from "../../components/classification/TagsInput";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { analyzeTransactionImport } from "../../api/transactionImport";
 import type { BootstrapData } from "../../types/bootstrap";
@@ -224,16 +223,7 @@ export function TransactionImportSheet({
           ...patch,
           ...(duplicateKeyChanged ? { duplicate: null } : {})
         } as EditableCandidate;
-        const classified = applyImportClassification(
-          {
-            ...next,
-            ...(Object.prototype.hasOwnProperty.call(patch, "categoryId")
-              ? { categorySource: "manual" as const }
-              : {})
-          },
-          bootstrap
-        );
-        return { ...classified, reviewReasons: deriveReviewReasons(classified) };
+        return { ...next, reviewReasons: deriveReviewReasons(next) };
       })
     );
   }
@@ -258,16 +248,7 @@ export function TransactionImportSheet({
           ...patch,
           ...(duplicateKeyChanged ? { duplicate: null } : {})
         } as EditableCandidate;
-        const classified = applyImportClassification(
-          {
-            ...next,
-            ...(Object.prototype.hasOwnProperty.call(patch, "categoryId")
-              ? { categorySource: "manual" as const }
-              : {})
-          },
-          bootstrap
-        );
-        return { ...classified, reviewReasons: deriveReviewReasons(classified) };
+        return { ...next, reviewReasons: deriveReviewReasons(next) };
       })
     );
   }
@@ -328,15 +309,11 @@ export function TransactionImportSheet({
         images
       });
       const mappedItems = result.items.map(item => {
-        const candidate = applyImportClassification(
-          {
-            ...item,
-            categorySource: "auto",
-            requestId: createRequestId(),
-            selected: item.selected
-          } as EditableCandidate,
-          bootstrap
-        );
+        const candidate = {
+          ...item,
+          requestId: createRequestId(),
+          selected: item.selected
+        } as EditableCandidate;
         return { ...candidate, reviewReasons: deriveReviewReasons(candidate) };
       });
       setItems(mappedItems);
@@ -985,10 +962,6 @@ export function TransactionImportSheet({
                       onChange={value => patchItem(item.candidateId, { tagsText: value })}
                       disabled={saving || item.queued}
                     />
-                    <TagChips tags={item.automaticTags} />
-                    {!!item.matchedRules?.length && (
-                      <p>일치 규칙: {item.matchedRules.join(" · ")}</p>
-                    )}
                     <label className={styles.field}>
                       <span>메모</span>
                       <input

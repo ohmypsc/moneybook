@@ -4,7 +4,6 @@ const INPUT_DRAFT_KEY_PREFIX = "moneybook:input-draft:v1:";
 
 export interface InputDraft {
   tagsText?: string;
-  categorySource?: "auto" | "manual";
   mode: InputMode;
   installmentMonths?: number;
   benefitEnabled?: boolean;
@@ -43,7 +42,6 @@ export function parseInputDraft(value: unknown): InputDraft | null {
 
   return {
     tagsText: text(draft.tagsText),
-    categorySource: draft.categorySource === "auto" ? "auto" : "manual",
     mode: draft.mode,
     installmentMonths:
       Number.isInteger(draft.installmentMonths) &&
