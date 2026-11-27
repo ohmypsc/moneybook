@@ -1,4 +1,5 @@
 // 투자 종목 검색·조회 라우트 (외부 시세 검색, D1 미사용)
+import { lookupFxRate, normalizeFxCurrency, normalizeFxDate } from "./fxRates.js";
 import { errorResponse, jsonResponse } from "./http.js";
 import {
   lookupInvestmentSymbol,
@@ -59,4 +60,19 @@ export async function handleInvestmentSymbolSearch(url) {
       "Cache-Control": "private, max-age=300"
     }
   );
+}
+
+export async function handleInvestmentFxRate(url) {
+  const currency = normalizeFxCurrency(url.searchParams.get("currency"));
+  if (!currency) {
+    return errorResponse("INVALID_CURRENCY", "통화는 USD, JPY처럼 3자리 코드여야 합니다.", 400);
+  }
+  const date = normalizeFxDate(url.searchParams.get("date"));
+  const data = await lookupFxRate(currency, date);
+  if (!data) {
+    return errorResponse("FX_RATE_UNAVAILABLE", "환율을 가져오지 못했습니다.", 502);
+  }
+  return jsonResponse({ success: true, data }, 200, {
+    "Cache-Control": data.live ? "private, max-age=60" : "private, max-age=86400"
+  });
 }
