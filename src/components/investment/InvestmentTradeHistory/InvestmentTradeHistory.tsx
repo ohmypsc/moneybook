@@ -15,6 +15,7 @@ import { formatMoney } from "../../common/Money/Money";
 import { confirmAction } from "../../../utils/confirmAction";
 
 import styles from "./InvestmentTradeHistory.module.css";
+import { isAmountProductCode } from "../amountProduct";
 
 interface InvestmentTradeHistoryProps {
   accountId: string;
@@ -58,6 +59,16 @@ function formatUnitPrice(trade: InvestmentTrade) {
   }
 
   return `${formatted} ${trade.currency}`;
+}
+
+function formatTradeAmount(trade: InvestmentTrade) {
+  const value = Number(trade.quantity || 0) * Number(trade.unitPrice || 0);
+
+  if (!trade.currency || trade.currency === "KRW") {
+    return `${Math.round(value).toLocaleString("ko-KR")}원`;
+  }
+
+  return `${value.toLocaleString("ko-KR", { maximumFractionDigits: 2 })} ${trade.currency}`;
 }
 
 function getAutomaticSettlement(trade: InvestmentTrade) {
@@ -557,8 +568,14 @@ export default function InvestmentTradeHistory({
                   <p className={styles.meta}>
                     {trade.date}
                     {" · "}
-                    {formatQuantity(trade.quantity)}주{" · "}
-                    {formatUnitPrice(trade)}
+                    {isAmountProductCode(trade.stockCode) ? (
+                      formatTradeAmount(trade)
+                    ) : (
+                      <>
+                        {formatQuantity(trade.quantity)}주{" · "}
+                        {formatUnitPrice(trade)}
+                      </>
+                    )}
                   </p>
 
                   {(trade.feeKrw > 0 || trade.taxKrw > 0) && (

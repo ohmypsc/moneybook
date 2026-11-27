@@ -84,20 +84,50 @@ export async function mbD1HandleHoldingUpdate(body, session, env) {
   if (!holdingId) mbD1Fail("HOLDING_ID_REQUIRED", "holdingId가 필요합니다.");
   const holding = await mbD1HoldingById(env, holdingId, false);
   if (!holding) mbD1Fail("HOLDING_NOT_FOUND", "수정할 보유종목을 찾을 수 없습니다.", 404);
-  const manualPrice = Number(body.manualPrice);
-  if (!Number.isFinite(manualPrice) || manualPrice < 0)
+  const quoteMode = mbD1Has(body, "quoteMode") ? mbD1Text(body.quoteMode) : holding.quoteMode;
+  if (!["자동", "수동"].includes(quoteMode))
+    mbD1Fail("INVALID_QUOTE_MODE", "시세조회방식은 자동/수동이어야 합니다.");
+  const now = mbD1Now();
+
+  if (quoteMode === "자동") {
+    // 자동 시세로 바꾸면 수동 입력가는 남겨 두고, 이 종목만 바로 시세를 다시 가져옵니다.
+    const update = env.DB.prepare(
+      "UPDATE holdings SET quote_mode='자동',updated_at=?,updated_by=?,version=version+1 WHERE household_id=? AND holding_id=?"
+    ).bind(now, session.name, MB_D1_HOUSEHOLD_ID, holdingId);
+    const change = await mbD1InsertChange(env, "holding", holdingId, "updated", null, session, {
+      quoteMode
+    });
+    await env.DB.batch([update, change]);
+    const refreshed = await mbD1RefreshHoldingQuote(env, { ...holding, quoteMode });
+    return {
+      updated: true,
+      quoteRefreshed: refreshed,
+      holding: await mbD1HoldingById(env, holdingId, true)
+    };
+  }
+
+  const manualPriceRaw =
+    mbD1Has(body, "manualPrice") && body.manualPrice !== "" && body.manualPrice !== null
+      ? body.manualPrice
+      : ([
+          holding.quoteMode === "수동" ? holding.manualPrice : null,
+          holding.currentPrice,
+          holding.avgBuyPrice
+        ].find(value => Number(value) > 0) ?? null);
+  const manualPrice = Number(manualPriceRaw);
+  if (manualPriceRaw === null || !Number.isFinite(manualPrice) || manualPrice < 0)
     mbD1Fail("INVALID_NUMBER", "수동입력가는 0 이상의 숫자여야 합니다.");
   const lastUpdated = mbD1DateOnly(body.lastUpdated) || mbD1CurrentDateSeoul();
-  const fx = holding.market === "국내" ? 1 : holding.fx || 0;
+  const fx = holding.market === "국내" ? 1 : await mbD1FxForForeignHolding(env, holding);
   const valueKrw = mbD1Round(holding.quantity * manualPrice * fx, 2);
   const returnRate =
     holding.bookCostKrw > 0 ? (valueKrw - holding.bookCostKrw) / holding.bookCostKrw : null;
-  const now = mbD1Now();
   const update = env.DB.prepare(
-    "UPDATE holdings SET manual_price=?,current_price=?,value_krw=?,return_rate=?,last_updated=?,elapsed_days=0,updated_at=?,updated_by=?,version=version+1 WHERE household_id=? AND holding_id=?"
+    "UPDATE holdings SET quote_mode='수동',manual_price=?,current_price=?,fx_rate=?,value_krw=?,return_rate=?,last_updated=?,elapsed_days=0,updated_at=?,updated_by=?,version=version+1 WHERE household_id=? AND holding_id=?"
   ).bind(
     manualPrice,
     manualPrice,
+    holding.market === "국내" ? 1 : fx || null,
     valueKrw,
     returnRate,
     lastUpdated,
@@ -107,11 +137,39 @@ export async function mbD1HandleHoldingUpdate(body, session, env) {
     holdingId
   );
   const change = await mbD1InsertChange(env, "holding", holdingId, "updated", null, session, {
+    quoteMode,
     manualPrice,
     lastUpdated
   });
   await env.DB.batch([update, change]);
   return { updated: true, holding: await mbD1HoldingById(env, holdingId, true) };
+}
+
+// 해외 종목 환율: 저장된 적용환율 → 실시간 환율 → 마지막 매매 환율 순으로 찾습니다.
+async function mbD1FxForForeignHolding(env, holding) {
+  if (holding.fx > 0) return holding.fx;
+  try {
+    const live = await mbD1FxRate("USD", mbD1CreateQuoteContext());
+    if (live && live > 0) return live;
+  } catch {}
+  const lastTrade = (await mbD1Trades(env, false))
+    .filter(trade => trade.holdingId === holding.holdingId && trade.fxRate > 0)
+    .sort((a, b) => (b.date || "").localeCompare(a.date || ""))[0];
+  return lastTrade?.fxRate || 0;
+}
+
+// 기준 수량이 0인 종목은 모든 보유분이 매매기록에서 나오므로 과거 날짜 매매도 받아도 안전합니다.
+function mbD1AssertTradeAfterBaseline(holding, tradeDate) {
+  if (!holding.baselineAt || !tradeDate) return;
+  if (!(mbD1Number(holding.baselineQuantity) > 0)) return;
+  const baselineDate = new Date(mbD1TimestampMs(holding.baselineAt)).toLocaleDateString("en-CA", {
+    timeZone: "Asia/Seoul"
+  });
+  if (tradeDate < baselineDate)
+    mbD1Fail(
+      "INVESTMENT_TRADE_BEFORE_BASELINE",
+      `기준일 ${baselineDate}보다 이전의 매매는 등록할 수 없습니다.`
+    );
 }
 
 export function mbD1ValidatePositive(value, label) {
@@ -440,18 +498,7 @@ export async function mbD1HandleTradeMutation(path, body, session, env, ctx) {
         )
       );
     }
-    const tradeDate = mbD1DateOnly(body.tradeDate || body.date);
-    if (holding.baselineAt && tradeDate) {
-      const baselineDate = new Date(mbD1TimestampMs(holding.baselineAt)).toLocaleDateString(
-        "en-CA",
-        { timeZone: "Asia/Seoul" }
-      );
-      if (tradeDate < baselineDate)
-        mbD1Fail(
-          "INVESTMENT_TRADE_BEFORE_BASELINE",
-          `기준일 ${baselineDate}보다 이전의 매매는 등록할 수 없습니다.`
-        );
-    }
+    mbD1AssertTradeAfterBaseline(holding, mbD1DateOnly(body.tradeDate || body.date));
     const model = mbD1TradeModel(body, null, account, holding, requestId);
     const tradeId = mbD1Id("ITX");
     const existingTrades = (await mbD1Trades(env, false)).filter(
@@ -524,19 +571,23 @@ export async function mbD1HandleTradeMutation(path, body, session, env, ctx) {
         ).bind(pnl, MB_D1_HOUSEHOLD_ID, id)
       );
     }
+    // 아직 시세를 못 받은 종목은 체결단가·체결환율로 먼저 평가해 0원으로 보이지 않게 합니다.
     const currentPrice =
-      holding.quoteMode === "수동" ? holding.manualPrice || 0 : holding.currentPrice || 0;
+      (holding.quoteMode === "수동" ? holding.manualPrice : holding.currentPrice) ||
+      model.unitPrice;
     const fx = holding.market === "국내" ? 1 : holding.fx || model.fxRate || 0;
     const valueKrw = mbD1Round(state.quantity * currentPrice * fx, 2);
     const returnRate =
       state.bookCostKrw > 0 ? (valueKrw - state.bookCostKrw) / state.bookCostKrw : null;
     statements.push(
       env.DB.prepare(
-        "UPDATE holdings SET quantity=?,avg_buy_price=?,book_cost_krw=?,value_krw=?,return_rate=?,managed_by_trades=1,version=version+1,updated_at=?,updated_by=? WHERE household_id=? AND holding_id=?"
+        "UPDATE holdings SET quantity=?,avg_buy_price=?,book_cost_krw=?,current_price=?,fx_rate=?,value_krw=?,return_rate=?,managed_by_trades=1,version=version+1,updated_at=?,updated_by=? WHERE household_id=? AND holding_id=?"
       ).bind(
         state.quantity,
         state.avgBuyPrice,
         state.bookCostKrw,
+        currentPrice,
+        fx || null,
         valueKrw,
         returnRate,
         now,
@@ -577,7 +628,14 @@ export async function mbD1HandleTradeMutation(path, body, session, env, ctx) {
       }
       throw error;
     }
-    if (ctx?.waitUntil) ctx.waitUntil(mbD1RefreshQuotes(env, true));
+    if (newHolding && holding.quoteMode === "자동") {
+      // 새로 산 종목은 응답 전에 한 번 시세를 받아 저장 직후 화면에 바로 반영되게 합니다.
+      try {
+        await mbD1RefreshHoldingQuote(env, { ...holding, quantity: state.quantity });
+      } catch {}
+    } else if (ctx?.waitUntil) {
+      ctx.waitUntil(mbD1RefreshQuotes(env, true));
+    }
     const trade =
       (await mbD1Trades(env, true)).find(item => item.investmentTradeId === tradeId) || null;
     return {
@@ -730,17 +788,7 @@ export async function mbD1HandleTradeMutation(path, body, session, env, ctx) {
         );
     }
     const model = mbD1TradeModel(body, current, account, holding, current.requestId);
-    if (holding.baselineAt) {
-      const baselineDate = new Date(mbD1TimestampMs(holding.baselineAt)).toLocaleDateString(
-        "en-CA",
-        { timeZone: "Asia/Seoul" }
-      );
-      if (model.date < baselineDate)
-        mbD1Fail(
-          "INVESTMENT_TRADE_BEFORE_BASELINE",
-          `기준일 ${baselineDate}보다 이전의 매매는 등록할 수 없습니다.`
-        );
-    }
+    mbD1AssertTradeAfterBaseline(holding, model.date);
     const nextTrade = {
       ...current,
       ...model,
@@ -903,8 +951,9 @@ export async function mbD1RefreshQuotes(env, force = false) {
 
   mbD1QuoteRefreshPromise = (async () => {
     // 갱신이 오래된 종목부터 처리해 외부 요청 예산이 모자라도 다음 호출에서 나머지가 갱신되게 합니다.
+    // 자동 시세 종목과, 환율만 바뀌는 해외 수동 종목(달러 발행어음 등)을 갱신합니다.
     const holdings = (await mbD1Holdings(env, false))
-      .filter(holding => holding.quoteMode === "자동")
+      .filter(mbD1HoldingNeedsQuoteRefresh)
       .sort((a, b) => (a.updatedAtMs || 0) - (b.updatedAtMs || 0));
     if (!holdings.length) {
       mbD1LastQuoteRefreshAt = Date.now();
@@ -921,24 +970,7 @@ export async function mbD1RefreshQuotes(env, force = false) {
     const context = mbD1CreateQuoteContext();
     for (const holding of holdings) {
       if (context.remaining <= 0) break;
-      const quote = await mbD1QuoteForHolding(holding, context);
-      if (!quote) continue;
-      const valueKrw = mbD1Round(holding.quantity * quote.price * quote.fx, 2);
-      const returnRate =
-        holding.bookCostKrw > 0 ? (valueKrw - holding.bookCostKrw) / holding.bookCostKrw : null;
-      await env.DB.prepare(
-        "UPDATE holdings SET current_price=?,fx_rate=?,value_krw=?,return_rate=?,updated_at=? WHERE household_id=? AND holding_id=?"
-      )
-        .bind(
-          quote.price,
-          quote.fx,
-          valueKrw,
-          returnRate,
-          mbD1Now(),
-          MB_D1_HOUSEHOLD_ID,
-          holding.holdingId
-        )
-        .run();
+      await mbD1RefreshHoldingQuote(env, holding, context);
     }
 
     mbD1LastQuoteRefreshAt = Date.now();
@@ -946,4 +978,41 @@ export async function mbD1RefreshQuotes(env, force = false) {
     mbD1QuoteRefreshPromise = null;
   });
   return mbD1QuoteRefreshPromise;
+}
+
+export function mbD1HoldingNeedsQuoteRefresh(holding) {
+  if (!(mbD1Number(holding.quantity) > 0)) return false;
+  if (holding.quoteMode === "자동") return true;
+  return holding.quoteMode === "수동" && holding.market === "해외";
+}
+
+// 종목 하나의 시세(또는 해외 수동 종목의 환율)를 받아 평가금액을 저장합니다.
+// 시세를 못 받아도 갱신 시각은 남겨, 조회가 안 되는 종목이 매번 앞자리를 차지하지 않게 합니다.
+export async function mbD1RefreshHoldingQuote(env, holding, context = mbD1CreateQuoteContext()) {
+  let quote = null;
+  if (holding.quoteMode === "자동") {
+    quote = await mbD1QuoteForHolding(holding, context);
+  } else if (holding.market === "해외") {
+    const price = mbD1Number(holding.manualPrice ?? holding.currentPrice);
+    const fx = await mbD1FxRate("USD", context);
+    if (price > 0 && fx) quote = { price, fx };
+  }
+  const now = mbD1Now();
+  if (!quote) {
+    if (context.remaining > 0) {
+      await env.DB.prepare("UPDATE holdings SET updated_at=? WHERE household_id=? AND holding_id=?")
+        .bind(now, MB_D1_HOUSEHOLD_ID, holding.holdingId)
+        .run();
+    }
+    return false;
+  }
+  const valueKrw = mbD1Round(mbD1Number(holding.quantity) * quote.price * quote.fx, 2);
+  const returnRate =
+    holding.bookCostKrw > 0 ? (valueKrw - holding.bookCostKrw) / holding.bookCostKrw : null;
+  await env.DB.prepare(
+    "UPDATE holdings SET current_price=?,fx_rate=?,value_krw=?,return_rate=?,updated_at=? WHERE household_id=? AND holding_id=?"
+  )
+    .bind(quote.price, quote.fx, valueKrw, returnRate, now, MB_D1_HOUSEHOLD_ID, holding.holdingId)
+    .run();
+  return true;
 }

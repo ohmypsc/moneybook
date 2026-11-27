@@ -1,5 +1,7 @@
 import { apiRequest } from "./client";
 
+import { markLedgerChanged } from "../utils/ledgerEvents";
+
 import { unwrapEnvelope } from "./envelope";
 
 import type { ApiEnvelope } from "./envelope";
@@ -10,7 +12,8 @@ import type {
   InvestmentSymbolLookupResult,
   InvestmentSymbolSearchResponse,
   SetInvestmentCashBaselinePayload,
-  CreateInvestmentTradePayload
+  CreateInvestmentTradePayload,
+  QuoteMode
 } from "../types/investment";
 
 type MutationResponse = Record<string, unknown>;
@@ -157,6 +160,9 @@ async function postInvestmentMutation(
 
   clearInvestmentPrefetchCache();
 
+  // 보유종목·예수금이 바뀌었으므로 자산 화면의 대시보드 캐시도 버립니다.
+  markLedgerChanged();
+
   return result;
 }
 
@@ -189,6 +195,24 @@ export async function updateHoldingManualPrice(input: {
     holdingId: input.holdingId,
 
     manualPrice: input.manualPrice,
+
+    lastUpdated: input.lastUpdated,
+
+    quoteMode: "수동"
+  });
+}
+
+export async function updateHoldingQuoteMode(input: {
+  holdingId: string;
+
+  quoteMode: QuoteMode;
+
+  lastUpdated: string;
+}) {
+  return postInvestmentMutation("/api/investments/holdings/update", {
+    holdingId: input.holdingId,
+
+    quoteMode: input.quoteMode,
 
     lastUpdated: input.lastUpdated
   });

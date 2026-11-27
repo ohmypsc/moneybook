@@ -4,7 +4,15 @@ import { getDashboard, getDashboardSnapshot, getDashboardSnapshotInfo } from "..
 
 import { getBenefitRewardBalances } from "../../api/automation";
 
-import { setInvestmentCashBaseline, updateHoldingManualPrice } from "../../api/investments";
+import {
+  setInvestmentCashBaseline,
+  updateHoldingManualPrice,
+  updateHoldingQuoteMode
+} from "../../api/investments";
+import {
+  amountProductUnitPrice,
+  isAmountProductCode
+} from "../../components/investment/amountProduct";
 
 import InvestmentTradeForm from "../../components/investment/InvestmentTradeForm/InvestmentTradeForm";
 
@@ -84,6 +92,14 @@ function formatPrice(value: number | undefined | null, market: string) {
 
 function getToday() {
   return getSeoulDateString();
+}
+
+function formatNativeAmount(value: number, market: string) {
+  if (!Number.isFinite(value)) return "-";
+
+  return market === "국내"
+    ? `${Math.round(value).toLocaleString("ko-KR")}원`
+    : `${value.toLocaleString("ko-KR", { maximumFractionDigits: 2 })} USD`;
 }
 
 interface AssetInputPreset {
@@ -232,6 +248,8 @@ export default function AssetsPage({ userName, onOpenInput }: AssetsPageProps) {
 
   const [quoteRefreshing, setQuoteRefreshing] = useState(false);
 
+  const [quoteModeSavingId, setQuoteModeSavingId] = useState<string | null>(null);
+
   async function loadDashboard(forceRefresh = false, refreshQuotes = false) {
     const cachedDashboard = getDashboardSnapshot();
 
@@ -320,7 +338,34 @@ export default function AssetsPage({ userName, onOpenInput }: AssetsPageProps) {
   async function handleInvestmentSaved() {
     setTradeHistoryRefreshKey(current => current + 1);
 
-    await loadDashboard();
+    // 저장 직후 보유종목·평가금액이 바로 보이도록 캐시를 건너뛰고 다시 불러옵니다.
+    await loadDashboard(true);
+  }
+
+  async function handleChangeQuoteMode(holdingId: string, quoteMode: "자동" | "수동") {
+    if (quoteModeSavingId) return;
+
+    setQuoteModeSavingId(holdingId);
+    setManualPriceErrors(current => ({ ...current, [holdingId]: "" }));
+
+    try {
+      await updateHoldingQuoteMode({ holdingId, quoteMode, lastUpdated: getToday() });
+
+      setManualPriceDrafts(current => {
+        const next = { ...current };
+        delete next[holdingId];
+        return next;
+      });
+
+      await loadDashboard(true);
+    } catch (err) {
+      setManualPriceErrors(current => ({
+        ...current,
+        [holdingId]: err instanceof Error ? err.message : "시세 방식을 바꾸지 못했습니다."
+      }));
+    } finally {
+      setQuoteModeSavingId(null);
+    }
   }
 
   useEffect(() => {
@@ -570,10 +615,17 @@ export default function AssetsPage({ userName, onOpenInput }: AssetsPageProps) {
   function getManualPriceInput(
     holdingId: string,
     manualPrice: number | null | undefined,
-    currentPrice: number | null | undefined
+    currentPrice: number | null | undefined,
+    amountQuantity?: number
   ) {
     if (Object.prototype.hasOwnProperty.call(manualPriceDrafts, holdingId)) {
       return manualPriceDrafts[holdingId];
+    }
+
+    if (amountQuantity !== undefined) {
+      const total = amountQuantity * amountProductUnitPrice(manualPrice, currentPrice ?? 0);
+
+      return Number.isFinite(total) ? String(Math.round(total * 100) / 100) : "";
     }
 
     const value = manualPrice ?? currentPrice;
@@ -598,20 +650,30 @@ export default function AssetsPage({ userName, onOpenInput }: AssetsPageProps) {
   async function handleSaveManualPrice(
     holdingId: string,
     manualPrice: number | null | undefined,
-    currentPrice: number | null | undefined
+    currentPrice: number | null | undefined,
+    amountQuantity?: number
   ) {
-    const input = getManualPriceInput(holdingId, manualPrice, currentPrice);
+    const input = getManualPriceInput(holdingId, manualPrice, currentPrice, amountQuantity);
 
-    const parsed = Number(input);
+    const parsedInput = Number(input);
 
-    if (!Number.isFinite(parsed) || parsed <= 0) {
+    if (!Number.isFinite(parsedInput) || parsedInput <= 0) {
       setManualPriceErrors(current => ({
         ...current,
-        [holdingId]: "수동 시세는 0보다 큰 숫자로 입력해주세요."
+        [holdingId]:
+          amountQuantity !== undefined
+            ? "현재 평가금액은 0보다 큰 숫자로 입력해주세요."
+            : "수동 시세는 0보다 큰 숫자로 입력해주세요."
       }));
 
       return;
     }
+
+    // 금액형 상품은 평가금액을 입력받아 1단위당 평가단가로 바꿔 저장합니다.
+    const parsed =
+      amountQuantity !== undefined && amountQuantity > 0
+        ? parsedInput / amountQuantity
+        : parsedInput;
 
     setManualPriceSavingId(holdingId);
 
@@ -631,10 +693,10 @@ export default function AssetsPage({ userName, onOpenInput }: AssetsPageProps) {
 
       setManualPriceDrafts(current => ({
         ...current,
-        [holdingId]: String(parsed)
+        [holdingId]: String(parsedInput)
       }));
 
-      await loadDashboard();
+      await loadDashboard(true);
 
       setManualPriceFeedbackId(holdingId);
     } catch (err) {
@@ -1583,6 +1645,17 @@ export default function AssetsPage({ userName, onOpenInput }: AssetsPageProps) {
                             <ul className={styles.investmentHoldingList}>
                               {holdingsForSelected.map(holding => {
                                 const evaluationPnl = holding.valueKrw - holding.costKrw;
+                                const amountType = isAmountProductCode(holding.stockCode);
+                                const amountQuantity = amountType
+                                  ? Number(holding.quantity)
+                                  : undefined;
+                                const nativeAmount =
+                                  Number(holding.quantity) *
+                                  amountProductUnitPrice(holding.manualPrice, holding.currentPrice);
+                                const quoteMissing =
+                                  holding.quoteMode === "자동" &&
+                                  Number(holding.quantity) > 0 &&
+                                  !(holding.currentPrice > 0);
 
                                 return (
                                   <li
@@ -1596,17 +1669,27 @@ export default function AssetsPage({ userName, onOpenInput }: AssetsPageProps) {
                                             {holding.stockName}
                                           </strong>
 
-                                          {holding.quoteMode === "수동" && (
+                                          {holding.quoteMode === "수동" && !amountType && (
                                             <span className={styles.manualBadge}>수동시세</span>
                                           )}
                                         </div>
 
                                         <span className={styles.holdingMeta}>
-                                          {holding.stockCode}
-                                          {" · "}
-                                          {holding.market}
-                                          {" · "}
-                                          {formatQuantity(holding.quantity)}주
+                                          {amountType ? (
+                                            <>
+                                              {holding.market === "국내" ? "원화" : "달러"} 금액형
+                                              {" · "}
+                                              {formatNativeAmount(nativeAmount, holding.market)}
+                                            </>
+                                          ) : (
+                                            <>
+                                              {holding.stockCode}
+                                              {" · "}
+                                              {holding.market}
+                                              {" · "}
+                                              {formatQuantity(holding.quantity)}주
+                                            </>
+                                          )}
                                         </span>
                                       </div>
 
@@ -1629,46 +1712,116 @@ export default function AssetsPage({ userName, onOpenInput }: AssetsPageProps) {
                                       </div>
                                     </div>
 
-                                    <div className={styles.holdingDetails}>
-                                      <div className={styles.holdingDetailItem}>
-                                        <span>평단</span>
+                                    {amountType ? (
+                                      <div className={styles.holdingDetails}>
+                                        <div className={styles.holdingDetailItem}>
+                                          <span>원금</span>
+                                          <strong>{formatCurrency(holding.costKrw)}</strong>
+                                        </div>
 
-                                        <strong>
-                                          {formatPrice(holding.avgBuyPrice, holding.market)}
-                                        </strong>
+                                        <div className={styles.holdingDetailItem}>
+                                          <span>평가금액</span>
+                                          <strong>
+                                            {formatNativeAmount(nativeAmount, holding.market)}
+                                          </strong>
+                                        </div>
+
+                                        <div className={styles.holdingDetailItem}>
+                                          <span>평가손익</span>
+                                          <strong
+                                            style={{
+                                              color:
+                                                evaluationPnl < 0 ? "var(--color-error)" : undefined
+                                            }}
+                                          >
+                                            {formatSignedCurrency(evaluationPnl)}
+                                          </strong>
+                                        </div>
                                       </div>
+                                    ) : (
+                                      <div className={styles.holdingDetails}>
+                                        <div className={styles.holdingDetailItem}>
+                                          <span>평단</span>
 
-                                      <div className={styles.holdingDetailItem}>
-                                        <span>현재가</span>
+                                          <strong>
+                                            {formatPrice(holding.avgBuyPrice, holding.market)}
+                                          </strong>
+                                        </div>
 
-                                        <strong>
-                                          {formatPrice(holding.currentPrice, holding.market)}
-                                        </strong>
+                                        <div className={styles.holdingDetailItem}>
+                                          <span>현재가</span>
+
+                                          <strong>
+                                            {formatPrice(holding.currentPrice, holding.market)}
+                                          </strong>
+                                        </div>
+
+                                        <div className={styles.holdingDetailItem}>
+                                          <span>평가손익</span>
+
+                                          <strong
+                                            style={{
+                                              color:
+                                                evaluationPnl < 0 ? "var(--color-error)" : undefined
+                                            }}
+                                          >
+                                            {formatSignedCurrency(evaluationPnl)}
+                                          </strong>
+                                        </div>
                                       </div>
+                                    )}
 
-                                      <div className={styles.holdingDetailItem}>
-                                        <span>평가손익</span>
+                                    {quoteMissing && (
+                                      <p className={styles.error}>
+                                        자동 시세를 아직 받지 못했습니다. 시세가 조회되지 않는
+                                        상품이면 아래에서 직접 입력으로 바꿔주세요.
+                                      </p>
+                                    )}
 
-                                        <strong
-                                          style={{
-                                            color:
-                                              evaluationPnl < 0 ? "var(--color-error)" : undefined
-                                          }}
-                                        >
-                                          {formatSignedCurrency(evaluationPnl)}
-                                        </strong>
-                                      </div>
-                                    </div>
-
-                                    {holding.quoteMode === "수동" && (
+                                    {holding.quoteMode === "자동" && (
                                       <details className={styles.baselineDetails}>
                                         <summary className={styles.baselineSummary}>
-                                          수동시세 수정
+                                          시세 설정
                                         </summary>
 
                                         <div className={styles.baselineBody}>
                                           <p className={styles.helperText}>
-                                            자동 시세 대신 이 평가단가를 사용합니다.
+                                            자동 시세로 평가 중입니다. 비상장·장외 상품처럼 시세가
+                                            조회되지 않으면 직접 입력으로 바꿔주세요.
+                                          </p>
+
+                                          <Button
+                                            size="sm"
+                                            variant="secondary"
+                                            loading={quoteModeSavingId === holding.holdingId}
+                                            loadingLabel="바꾸는 중"
+                                            onClick={() =>
+                                              void handleChangeQuoteMode(holding.holdingId, "수동")
+                                            }
+                                          >
+                                            직접 시세 입력으로 바꾸기
+                                          </Button>
+
+                                          {manualPriceErrors[holding.holdingId] && (
+                                            <p className={styles.error}>
+                                              {manualPriceErrors[holding.holdingId]}
+                                            </p>
+                                          )}
+                                        </div>
+                                      </details>
+                                    )}
+
+                                    {holding.quoteMode === "수동" && (
+                                      <details className={styles.baselineDetails}>
+                                        <summary className={styles.baselineSummary}>
+                                          {amountType ? "평가금액 수정" : "수동시세 수정"}
+                                        </summary>
+
+                                        <div className={styles.baselineBody}>
+                                          <p className={styles.helperText}>
+                                            {amountType
+                                              ? `이자가 붙은 현재 금액(${holding.market === "국내" ? "원" : "USD"})을 입력하세요.${holding.market === "해외" ? " 원화 평가액은 환율로 자동 계산됩니다." : ""}`
+                                              : "자동 시세 대신 이 평가단가를 사용합니다."}
                                           </p>
 
                                           <div className={styles.cashForm}>
@@ -1681,7 +1834,8 @@ export default function AssetsPage({ userName, onOpenInput }: AssetsPageProps) {
                                               value={getManualPriceInput(
                                                 holding.holdingId,
                                                 holding.manualPrice,
-                                                holding.currentPrice
+                                                holding.currentPrice,
+                                                amountQuantity
                                               )}
                                               onChange={event =>
                                                 handleManualPriceChange(
@@ -1690,9 +1844,11 @@ export default function AssetsPage({ userName, onOpenInput }: AssetsPageProps) {
                                                 )
                                               }
                                               placeholder={
-                                                holding.market === "국내"
-                                                  ? "평가단가(원)"
-                                                  : "평가단가"
+                                                amountType
+                                                  ? "현재 평가금액"
+                                                  : holding.market === "국내"
+                                                    ? "평가단가(원)"
+                                                    : "평가단가(USD)"
                                               }
                                             />
 
@@ -1704,7 +1860,8 @@ export default function AssetsPage({ userName, onOpenInput }: AssetsPageProps) {
                                                 void handleSaveManualPrice(
                                                   holding.holdingId,
                                                   holding.manualPrice,
-                                                  holding.currentPrice
+                                                  holding.currentPrice,
+                                                  amountQuantity
                                                 )
                                               }
                                             >
@@ -1722,6 +1879,23 @@ export default function AssetsPage({ userName, onOpenInput }: AssetsPageProps) {
                                             <p className={styles.helperText}>
                                               수동시세를 저장했습니다.
                                             </p>
+                                          )}
+
+                                          {!amountType && (
+                                            <Button
+                                              size="sm"
+                                              variant="ghost"
+                                              loading={quoteModeSavingId === holding.holdingId}
+                                              loadingLabel="바꾸는 중"
+                                              onClick={() =>
+                                                void handleChangeQuoteMode(
+                                                  holding.holdingId,
+                                                  "자동"
+                                                )
+                                              }
+                                            >
+                                              자동 시세로 바꾸기
+                                            </Button>
                                           )}
                                         </div>
                                       </details>

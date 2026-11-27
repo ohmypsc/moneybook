@@ -279,7 +279,11 @@ export async function mbD1BuildDashboard(env, monthValue = "") {
   const staleManual = holdings
     .filter(
       holding =>
-        holding.quoteMode === "수동" && (holding.elapsedDays === null || holding.elapsedDays >= 7)
+        holding.quoteMode === "수동" &&
+        holding.quantity > 0 &&
+        (holding.elapsedDays === null ||
+          // 금액형 상품(발행어음·IMA 등)은 이자만 바뀌므로 한 달에 한 번만 확인을 권합니다.
+          holding.elapsedDays >= (holding.stockCode.startsWith("AMT-") ? 30 : 7))
     )
     .map(holding => ({
       holdingId: holding.holdingId,

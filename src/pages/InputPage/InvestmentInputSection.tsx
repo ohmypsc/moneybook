@@ -58,8 +58,9 @@ export function InvestmentInputSection({
             </button>
 
             <p className={styles.helper}>
-              주식·ETF·금처럼 실제 보유종목의 매수·매도만 기록합니다. 예수금이나 CMA 발행어음처럼
-              현금으로 관리할 금액은 종목으로 입력하지 말고 이체·예수금으로 관리하세요.
+              주식·ETF·금은 종목을 검색해 기록하고, 발행어음·달러어음·IMA·RP처럼 주가가 없는 상품은
+              &lsquo;어음 · IMA · RP&rsquo;를 골라 금액으로 기록하세요. 바로 쓰는 예수금은 이체로
+              관리합니다.
             </p>
           </label>
         </div>
