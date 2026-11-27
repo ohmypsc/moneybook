@@ -1,8 +1,10 @@
 // 투자: 보유종목·투자거래 처리와 시세·환율 갱신
 import { dateOnly as mbD1DateOnly } from "../domain/date.js";
+import { holdingCurrencies as mbD1HoldingCurrencies } from "../domain/investment.js";
 import { lookupInvestmentSymbol } from "../investmentSymbols.js";
 import {
   MB_D1_HOUSEHOLD_ID,
+  mbD1All,
   mbD1Bool,
   mbD1CurrentDateSeoul,
   mbD1Fail,
@@ -19,15 +21,17 @@ import {
 } from "./core.js";
 import { mbD1TransactionAfterBaseline } from "./dashboard.js";
 import {
+  MB_D1_TRANSACTION_SELECT,
   mbD1AccountById,
-  mbD1AllTransactions,
   mbD1Holdings,
+  mbD1MapTransactionRow,
   mbD1MapHoldingRow,
   mbD1Trades
 } from "./records.js";
 import { mbD1LooksLikeRequestIdUniqueConflict } from "./transactions.js";
 
 export const MB_D1_QUOTE_REFRESH_MS = 5 * 60 * 1000;
+export const MB_D1_TRADE_TYPES = ["매수", "매도", "배당"];
 export let mbD1LastQuoteRefreshAt = 0;
 export let mbD1QuoteRefreshPromise = null;
 
@@ -148,18 +152,21 @@ export async function mbD1HandleHoldingUpdate(body, session, env) {
 // 해외 종목 환율: 저장된 적용환율 → 실시간 환율 → 마지막 매매 환율 순으로 찾습니다.
 async function mbD1FxForForeignHolding(env, holding) {
   if (holding.fx > 0) return holding.fx;
+  const trades = await mbD1Trades(env, false);
+  const currency = mbD1HoldingCurrencies(trades).get(holding.holdingId) || "USD";
   try {
-    const live = await mbD1FxRate("USD", mbD1CreateQuoteContext());
+    const live = await mbD1FxRate(currency, mbD1CreateQuoteContext());
     if (live && live > 0) return live;
   } catch {}
-  const lastTrade = (await mbD1Trades(env, false))
+  const lastTrade = trades
     .filter(trade => trade.holdingId === holding.holdingId && trade.fxRate > 0)
     .sort((a, b) => (b.date || "").localeCompare(a.date || ""))[0];
   return lastTrade?.fxRate || 0;
 }
 
 // 기준 수량이 0인 종목은 모든 보유분이 매매기록에서 나오므로 과거 날짜 매매도 받아도 안전합니다.
-function mbD1AssertTradeAfterBaseline(holding, tradeDate) {
+function mbD1AssertTradeAfterBaseline(holding, tradeDate, tradeType = "") {
+  if (tradeType === "배당") return;
   if (!holding.baselineAt || !tradeDate) return;
   if (!(mbD1Number(holding.baselineQuantity) > 0)) return;
   const baselineDate = new Date(mbD1TimestampMs(holding.baselineAt)).toLocaleDateString("en-CA", {
@@ -193,8 +200,13 @@ export function mbD1TradeModel(payload, current, account, holding, requestId) {
       ? payload.tradeType || payload.type
       : source.tradeType
   );
-  if (!["매수", "매도"].includes(tradeType))
-    mbD1Fail("INVALID_INVESTMENT_TRADE_TYPE", "투자거래 구분은 매수/매도 중 하나여야 합니다.");
+  if (!MB_D1_TRADE_TYPES.includes(tradeType))
+    mbD1Fail("INVALID_INVESTMENT_TRADE_TYPE", "투자거래 구분은 매수/매도/배당 중 하나여야 합니다.");
+  if (source.tradeType && (source.tradeType === "배당") !== (tradeType === "배당"))
+    mbD1Fail(
+      "INVESTMENT_TRADE_TYPE_CHANGE_NOT_ALLOWED",
+      "배당과 매수·매도 사이는 바꿀 수 없습니다. 삭제한 뒤 새로 기록해주세요."
+    );
   const date = mbD1DateOnly(
     mbD1Has(payload, "date") || mbD1Has(payload, "tradeDate")
       ? payload.date || payload.tradeDate
@@ -296,6 +308,11 @@ export function mbD1SimulateHolding(holding, trades) {
         a.investmentTradeId.localeCompare(b.investmentTradeId)
     );
   for (const trade of sorted) {
+    if (trade.tradeType === "배당") {
+      // 배당·분배금·이자는 수량과 원가를 바꾸지 않고 받은 금액 전부가 실현손익입니다.
+      realized.set(trade.investmentTradeId, mbD1Round(trade.settlementKrw, 2));
+      continue;
+    }
     if (trade.tradeType === "매수") {
       const nativeBefore = quantity * avgPrice;
       const nativeBuy = trade.quantity * trade.unitPrice;
@@ -335,7 +352,15 @@ export function mbD1SimulateHolding(holding, trades) {
 
 export async function mbD1CashForAccountWithTrades(env, account, proposedTrades) {
   if (!account.cashBaselineAt) return null;
-  const transactions = await mbD1AllTransactions(env, false);
+  // 이 계좌로 들어오고 나간 거래만 읽어 전체 거래내역을 매번 훑지 않습니다.
+  const transactions = (
+    await mbD1All(
+      env,
+      `${MB_D1_TRANSACTION_SELECT}
+       WHERE t.household_id=? AND t.deleted_at IS NULL AND (t.from_account_id=? OR t.to_account_id=?)`,
+      [MB_D1_HOUSEHOLD_ID, account.accountId, account.accountId]
+    )
+  ).map(mbD1MapTransactionRow);
   let ledgerDelta = 0;
   for (const tx of transactions) {
     if (!mbD1TransactionAfterBaseline(tx, account.cashBaselineAt)) continue;
@@ -384,8 +409,11 @@ export async function mbD1HandleTradeMutation(path, body, session, env, ctx) {
         "먼저 이 투자계좌의 현재 예수금 기준값을 설정해야 합니다."
       );
     const type = mbD1Text(body.tradeType || body.type);
-    if (!["매수", "매도"].includes(type))
-      mbD1Fail("INVALID_INVESTMENT_TRADE_TYPE", "투자거래 구분은 매수/매도 중 하나여야 합니다.");
+    if (!MB_D1_TRADE_TYPES.includes(type))
+      mbD1Fail(
+        "INVALID_INVESTMENT_TRADE_TYPE",
+        "투자거래 구분은 매수/매도/배당 중 하나여야 합니다."
+      );
     const stockCode = mbD1Text(body.stockCode).toUpperCase();
     if (!stockCode) mbD1Fail("STOCK_CODE_REQUIRED", "종목코드가 필요합니다.");
     let holding =
@@ -398,6 +426,8 @@ export async function mbD1HandleTradeMutation(path, body, session, env, ctx) {
     if (!holding) {
       if (type === "매도")
         mbD1Fail("SELL_HOLDING_NOT_FOUND", "매도할 보유종목을 찾을 수 없습니다.");
+      if (type === "배당")
+        mbD1Fail("DIVIDEND_HOLDING_NOT_FOUND", "배당을 받은 종목을 찾을 수 없습니다.");
       const market = mbD1Text(body.market);
       if (!["국내", "해외"].includes(market))
         mbD1Fail("INVALID_MARKET", "신규 종목의 시장은 국내/해외 중 하나여야 합니다.");
@@ -498,12 +528,11 @@ export async function mbD1HandleTradeMutation(path, body, session, env, ctx) {
         )
       );
     }
-    mbD1AssertTradeAfterBaseline(holding, mbD1DateOnly(body.tradeDate || body.date));
+    mbD1AssertTradeAfterBaseline(holding, mbD1DateOnly(body.tradeDate || body.date), type);
     const model = mbD1TradeModel(body, null, account, holding, requestId);
     const tradeId = mbD1Id("ITX");
-    const existingTrades = (await mbD1Trades(env, false)).filter(
-      item => item.holdingId === holding.holdingId
-    );
+    const activeTrades = await mbD1Trades(env, false);
+    const existingTrades = activeTrades.filter(item => item.holdingId === holding.holdingId);
     const proposedTrade = {
       investmentTradeId: tradeId,
       ...model,
@@ -513,9 +542,7 @@ export async function mbD1HandleTradeMutation(path, body, session, env, ctx) {
     };
     const proposedTrades = [...existingTrades, proposedTrade];
     const state = mbD1SimulateHolding(holding, proposedTrades);
-    const allAccountTrades = (await mbD1Trades(env, false)).filter(
-      item => item.accountId === accountId
-    );
+    const allAccountTrades = activeTrades.filter(item => item.accountId === accountId);
     const cashBefore = await mbD1CashForAccountWithTrades(env, account, allAccountTrades);
     if (type === "매수" && (cashBefore === null || cashBefore + 0.000001 < model.settlementKrw)) {
       mbD1Fail(
@@ -669,12 +696,13 @@ export async function mbD1HandleTradeMutation(path, body, session, env, ctx) {
     mbD1Fail("INVESTMENT_LINK_BROKEN", "연결된 투자계좌 또는 보유종목을 찾을 수 없습니다.");
 
   const recomputeAndWrite = async (nextTrade, action) => {
-    const activeHoldingTrades = (await mbD1Trades(env, false)).filter(
+    const activeTrades = await mbD1Trades(env, false);
+    const activeHoldingTrades = activeTrades.filter(
       item => item.holdingId === holding.holdingId && item.investmentTradeId !== id
     );
     if (nextTrade && !nextTrade.isDeleted) activeHoldingTrades.push(nextTrade);
     const state = mbD1SimulateHolding(holding, activeHoldingTrades);
-    const activeAccountTrades = (await mbD1Trades(env, false)).filter(
+    const activeAccountTrades = activeTrades.filter(
       item => item.accountId === account.accountId && item.investmentTradeId !== id
     );
     if (nextTrade && !nextTrade.isDeleted) activeAccountTrades.push(nextTrade);
@@ -788,7 +816,7 @@ export async function mbD1HandleTradeMutation(path, body, session, env, ctx) {
         );
     }
     const model = mbD1TradeModel(body, current, account, holding, current.requestId);
-    mbD1AssertTradeAfterBaseline(holding, model.date);
+    mbD1AssertTradeAfterBaseline(holding, model.date, model.tradeType);
     const nextTrade = {
       ...current,
       ...model,
@@ -876,7 +904,13 @@ export async function mbD1FetchYahooChart(symbol) {
     const meta = data?.chart?.result?.[0]?.meta;
     const price = Number(meta?.regularMarketPrice ?? meta?.previousClose);
     if (!Number.isFinite(price) || price <= 0) return null;
-    return { price, currency: mbD1Text(meta?.currency).toUpperCase(), symbol: clean };
+    const previousClose = Number(meta?.chartPreviousClose ?? meta?.previousClose);
+    return {
+      price,
+      previousClose: Number.isFinite(previousClose) && previousClose > 0 ? previousClose : null,
+      currency: mbD1Text(meta?.currency).toUpperCase(),
+      symbol: clean
+    };
   } catch {
     return null;
   } finally {
@@ -889,6 +923,7 @@ export async function mbD1FetchYahooChart(symbol) {
 export const MB_D1_QUOTE_SUBREQUEST_BUDGET = 30;
 // 종목 코드 조회(lookupInvestmentSymbol)는 캐시가 없으면 최대 3번 외부 요청을 보냅니다.
 export const MB_D1_QUOTE_LOOKUP_COST = 3;
+export const MB_D1_QUOTE_CONCURRENCY = 4;
 
 export function mbD1CreateQuoteContext() {
   return { remaining: MB_D1_QUOTE_SUBREQUEST_BUDGET, fx: new Map() };
@@ -903,19 +938,19 @@ export function mbD1SpendQuoteBudget(context, cost = 1) {
 export async function mbD1FxRate(currency, context) {
   const code = mbD1Text(currency).toUpperCase();
   if (!code || code === "KRW") return 1;
+  // 여러 종목을 동시에 갱신해도 같은 통화 환율은 한 번만 요청합니다.
   if (context.fx.has(code)) return context.fx.get(code);
-  const candidates = code === "USD" ? ["KRW=X", "USDKRW=X"] : [`${code}KRW=X`];
-  let rate = null;
-  for (const symbol of candidates) {
-    if (!mbD1SpendQuoteBudget(context)) return null;
-    const quote = await mbD1FetchYahooChart(symbol);
-    if (quote) {
-      rate = quote.price;
-      break;
+  const pending = (async () => {
+    const candidates = code === "USD" ? ["KRW=X", "USDKRW=X"] : [`${code}KRW=X`];
+    for (const symbol of candidates) {
+      if (!mbD1SpendQuoteBudget(context)) return null;
+      const quote = await mbD1FetchYahooChart(symbol);
+      if (quote) return quote.price;
     }
-  }
-  context.fx.set(code, rate);
-  return rate;
+    return null;
+  })();
+  context.fx.set(code, pending);
+  return pending;
 }
 
 export async function mbD1QuoteForHolding(holding, context) {
@@ -939,7 +974,7 @@ export async function mbD1QuoteForHolding(holding, context) {
     if (!quote) continue;
     const fx = holding.market === "국내" ? 1 : await mbD1FxRate(quote.currency || "USD", context);
     if (fx === null) continue;
-    return { price: quote.price, fx };
+    return { price: quote.price, previousClose: quote.previousClose, fx };
   }
   return null;
 }
@@ -968,10 +1003,16 @@ export async function mbD1RefreshQuotes(env, force = false) {
     }
 
     const context = mbD1CreateQuoteContext();
-    for (const holding of holdings) {
-      if (context.remaining <= 0) break;
-      await mbD1RefreshHoldingQuote(env, holding, context);
-    }
+    context.currencies = mbD1HoldingCurrencies(await mbD1Trades(env, false));
+    // 종목을 몇 개씩 동시에 조회해 새로고침 시간을 줄입니다.
+    const queue = holdings.slice();
+    const worker = async () => {
+      while (queue.length && context.remaining > 0) {
+        const holding = queue.shift();
+        await mbD1RefreshHoldingQuote(env, holding, context);
+      }
+    };
+    await Promise.all(Array.from({ length: MB_D1_QUOTE_CONCURRENCY }, worker));
 
     mbD1LastQuoteRefreshAt = Date.now();
   })().finally(() => {
@@ -994,8 +1035,12 @@ export async function mbD1RefreshHoldingQuote(env, holding, context = mbD1Create
     quote = await mbD1QuoteForHolding(holding, context);
   } else if (holding.market === "해외") {
     const price = mbD1Number(holding.manualPrice ?? holding.currentPrice);
-    const fx = await mbD1FxRate("USD", context);
-    if (price > 0 && fx) quote = { price, fx };
+    const currency =
+      context.currencies?.get(holding.holdingId) ||
+      mbD1HoldingCurrencies(await mbD1Trades(env, false)).get(holding.holdingId) ||
+      "USD";
+    const fx = await mbD1FxRate(currency, context);
+    if (price > 0 && fx) quote = { price, previousClose: null, fx };
   }
   const now = mbD1Now();
   if (!quote) {
@@ -1010,9 +1055,18 @@ export async function mbD1RefreshHoldingQuote(env, holding, context = mbD1Create
   const returnRate =
     holding.bookCostKrw > 0 ? (valueKrw - holding.bookCostKrw) / holding.bookCostKrw : null;
   await env.DB.prepare(
-    "UPDATE holdings SET current_price=?,fx_rate=?,value_krw=?,return_rate=?,updated_at=? WHERE household_id=? AND holding_id=?"
+    "UPDATE holdings SET current_price=?,previous_close=?,fx_rate=?,value_krw=?,return_rate=?,updated_at=? WHERE household_id=? AND holding_id=?"
   )
-    .bind(quote.price, quote.fx, valueKrw, returnRate, now, MB_D1_HOUSEHOLD_ID, holding.holdingId)
+    .bind(
+      quote.price,
+      quote.previousClose ?? null,
+      quote.fx,
+      valueKrw,
+      returnRate,
+      now,
+      MB_D1_HOUSEHOLD_ID,
+      holding.holdingId
+    )
     .run();
   return true;
 }

@@ -4,6 +4,7 @@ import {
   monthOnly as mbD1MonthOnly
 } from "../domain/date.js";
 import { categoryUsageCounts } from "../domain/categoryUsage.js";
+import { holdingCurrencies as mbD1HoldingCurrencies } from "../domain/investment.js";
 import { installmentAmountForMonth, installmentRemainingAfter } from "../domain/installment.js";
 import { netMonthStats as mbD1NetMonthStats } from "../domain/monthStats.js";
 import { listRealEstateAssets, realEstateSummary } from "../realEstate.js";
@@ -276,6 +277,7 @@ export async function mbD1BuildDashboard(env, monthValue = "") {
       memo: tx.memo,
       reversalOf: tx.reversalOf
     }));
+  const holdingCurrencies = mbD1HoldingCurrencies(trades);
   const staleManual = holdings
     .filter(
       holding =>
@@ -335,7 +337,11 @@ export async function mbD1BuildDashboard(env, monthValue = "") {
         2
       ),
       accounts: investment.accounts,
-      holdings,
+      holdings: holdings.map(holding => ({
+        ...holding,
+        currency:
+          holdingCurrencies.get(holding.holdingId) || (holding.market === "국내" ? "KRW" : "USD")
+      })),
       staleManualPrices: staleManual,
       cashBaselinePending: investment.accounts
         .filter(item => !item.cashBaselineConfigured)
@@ -369,7 +375,7 @@ export async function mbD1BuildBootstrap(env, session = null) {
     householdOverview: await mbD1HouseholdOverviewData(env),
     backendVersion: MB_D1_API_VERSION,
     transactionTypes: ["수입", "지출", "이체"],
-    investmentTradeTypes: ["매수", "매도"],
+    investmentTradeTypes: ["매수", "매도", "배당"],
     members: memberNames,
     spendingTargets: [...memberNames, "공동"],
     accounts,

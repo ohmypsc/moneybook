@@ -15,5 +15,14 @@ export async function mbD1EnsureInstallmentSchema(env) {
       if (!/duplicate column/i.test(String(error?.message || error))) throw error;
     }
   }
+  // 보유종목 전일 종가(오늘 등락 표시용)
+  const holdingColumns = await mbD1All(env, "PRAGMA table_info(holdings)", []);
+  if (holdingColumns.length && !holdingColumns.some(column => column.name === "previous_close")) {
+    try {
+      await env.DB.prepare("ALTER TABLE holdings ADD COLUMN previous_close REAL").run();
+    } catch (error) {
+      if (!/duplicate column/i.test(String(error?.message || error))) throw error;
+    }
+  }
   mbD1InstallmentSchemaReadyFor.add(env.DB);
 }

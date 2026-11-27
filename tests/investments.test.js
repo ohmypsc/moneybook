@@ -11,6 +11,12 @@ import {
   mbD1RefreshQuotes
 } from "../worker/d1/investments.js";
 import { mbD1Holdings, mbD1Trades } from "../worker/d1/records.js";
+import { mbD1InvestmentStatusFromData } from "../worker/d1/dashboard.js";
+import { mbD1MapAccountRow } from "../worker/d1/records.js";
+import {
+  estimateTradeCosts,
+  guessForeignCurrency
+} from "../src/components/investment/tradeCostEstimate.ts";
 import {
   amountToTradeUnits,
   isAmountProductCode,
@@ -70,7 +76,7 @@ function database() {
 
 const session = { name: "A" };
 
-function mockQuotes({ stocks = {}, usdKrw = 1400 } = {}) {
+function mockQuotes({ stocks = {}, usdKrw = 1400, fx = {}, previousClose = {} } = {}) {
   const original = globalThis.fetch;
   globalThis.fetch = async input => {
     const url = new URL(String(input));
@@ -83,13 +89,14 @@ function mockQuotes({ stocks = {}, usdKrw = 1400 } = {}) {
     }
     if (url.pathname.includes("/v8/finance/chart/")) {
       const symbol = decodeURIComponent(url.pathname.split("/").pop());
-      const price = symbol === "KRW=X" ? usdKrw : stocks[symbol];
+      const fxCode = symbol.endsWith("KRW=X") ? symbol.slice(0, 3) : "";
+      const price =
+        symbol === "KRW=X" ? usdKrw : fxCode && fx[fxCode] ? fx[fxCode] : stocks[symbol];
       if (!price) return new Response("{}", { status: 404 });
-      const currency = symbol === "KRW=X" ? "KRW" : "USD";
-      return new Response(
-        JSON.stringify({ chart: { result: [{ meta: { regularMarketPrice: price, currency } }] } }),
-        { status: 200 }
-      );
+      const currency = symbol.endsWith("=X") ? "KRW" : "USD";
+      const meta = { regularMarketPrice: price, currency };
+      if (previousClose[symbol]) meta.chartPreviousClose = previousClose[symbol];
+      return new Response(JSON.stringify({ chart: { result: [{ meta }] } }), { status: 200 });
     }
     return new Response("{}", { status: 404 });
   };
@@ -294,4 +301,119 @@ test("amount products convert money into trade units", () => {
     { quantity: 500, unitPrice: 1.012 }
   );
   assert.equal(amountToTradeUnits({ tradeType: "매수", amount: 0, unitPrice: 1 }), null);
+});
+
+test("dividends add cash and realized profit without changing the position", async () => {
+  const restore = mockQuotes({ stocks: { AAPL: 200 }, previousClose: { AAPL: 190 } });
+  try {
+    const env = database();
+    await withCash(env, 1_000_000);
+    await buy(env, {
+      stockCode: "AAPL",
+      stockName: "Apple",
+      market: "해외",
+      tradeDate: "2026-11-20",
+      quantity: 2,
+      unitPrice: 190,
+      currency: "USD",
+      fxRate: 1400
+    });
+    let [holding] = await mbD1Holdings(env);
+    assert.ok(Math.abs(holding.dayChangeRate - (200 / 190 - 1)) < 1e-12);
+    const before = { quantity: holding.quantity, bookCostKrw: holding.bookCostKrw };
+    await buy(env, {
+      tradeType: "배당",
+      stockCode: "AAPL",
+      tradeDate: "2026-11-25",
+      quantity: 1,
+      unitPrice: 0.5,
+      currency: "USD",
+      fxRate: 1400
+    });
+    [holding] = await mbD1Holdings(env);
+    assert.deepEqual({ quantity: holding.quantity, bookCostKrw: holding.bookCostKrw }, before);
+    const dividend = (await mbD1Trades(env)).find(trade => trade.tradeType === "배당");
+    assert.equal(dividend.settlementKrw, 700);
+    assert.equal(dividend.realizedPnlKrw, 700);
+
+    const accounts = (await env.DB.prepare("SELECT * FROM accounts").all()).results.map(
+      mbD1MapAccountRow
+    );
+    const status = mbD1InvestmentStatusFromData(
+      accounts,
+      [],
+      await mbD1Trades(env),
+      await mbD1Holdings(env)
+    );
+    assert.equal(status.accounts[0].currentCashKrw, 1_000_000 - 2 * 190 * 1400 + 700);
+  } finally {
+    restore();
+  }
+});
+
+test("a manual yen holding follows the yen exchange rate, not the dollar", async () => {
+  const restore = mockQuotes({ usdKrw: 1400, fx: { JPY: 9.5 } });
+  try {
+    const env = database();
+    await withCash(env);
+    await buy(env, {
+      stockCode: "JPFUND",
+      stockName: "일본 펀드",
+      market: "해외",
+      quoteMode: "수동",
+      manualPrice: 1000,
+      tradeDate: "2026-11-20",
+      quantity: 100,
+      unitPrice: 1000,
+      currency: "JPY",
+      fxRate: 9
+    });
+    await mbD1RefreshQuotes(env, true);
+    const [holding] = await mbD1Holdings(env);
+    assert.equal(holding.fx, 9.5);
+    assert.equal(holding.valueKrw, 100 * 1000 * 9.5);
+  } finally {
+    restore();
+  }
+});
+
+test("fees and taxes are estimated from this account's own recent trades", () => {
+  const trade = overrides => ({
+    investmentTradeId: Math.random().toString(36),
+    date: "2026-11-01",
+    tradeType: "매수",
+    stockCode: "005930",
+    market: "국내",
+    quantity: 10,
+    unitPrice: 100_000,
+    fxRate: 1,
+    feeKrw: 150,
+    taxKrw: 0,
+    isDeleted: false,
+    createdAt: "2026-11-01T00:00:00.000Z",
+    ...overrides
+  });
+  const trades = [
+    trade({}),
+    trade({ tradeType: "매도", taxKrw: 1500, date: "2026-11-02" }),
+    trade({ market: "해외", feeKrw: 2500 })
+  ];
+  const sell = estimateTradeCosts(trades, {
+    tradeType: "매도",
+    market: "국내",
+    stockCode: "005930",
+    grossKrw: 2_000_000
+  });
+  assert.equal(sell.feeKrw, 300);
+  assert.equal(sell.taxKrw, 3000);
+  // 처음 파는 종목은 세금을 추측하지 않습니다.
+  const other = estimateTradeCosts(trades, {
+    tradeType: "매도",
+    market: "국내",
+    stockCode: "069500",
+    grossKrw: 2_000_000
+  });
+  assert.equal(other.taxKrw, 0);
+  assert.equal(guessForeignCurrency("7203.T"), "JPY");
+  assert.equal(guessForeignCurrency("AAPL"), "USD");
 });

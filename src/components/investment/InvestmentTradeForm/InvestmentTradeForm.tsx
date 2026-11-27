@@ -2,6 +2,7 @@ import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   createInvestmentTrade,
+  getInvestmentTrades,
   lookupInvestmentSymbol,
   searchInvestmentSymbols
 } from "../../../api/investments";
@@ -11,6 +12,7 @@ import type { HoldingSummary, InvestmentAccountSummary } from "../../../types/da
 import type {
   CreateInvestmentTradePayload,
   InvestmentSymbolSearchItem,
+  InvestmentTrade,
   InvestmentTradeType,
   Market,
   QuoteMode
@@ -27,6 +29,7 @@ import {
   isAmountProductCode,
   makeAmountProductCode
 } from "../amountProduct";
+import { FOREIGN_CURRENCIES, estimateTradeCosts, guessForeignCurrency } from "../tradeCostEstimate";
 
 import styles from "./InvestmentTradeForm.module.css";
 
@@ -144,6 +147,8 @@ export default function InvestmentTradeForm({
   const [quantity, setQuantity] = useState("");
   const [unitPrice, setUnitPrice] = useState("");
   const [fxRate, setFxRate] = useState("");
+  const [currency, setCurrency] = useState("USD");
+  const [recentTrades, setRecentTrades] = useState<InvestmentTrade[]>([]);
   const [feeKrw, setFeeKrw] = useState("");
   const [taxKrw, setTaxKrw] = useState("");
   const [settlementKrw, setSettlementKrw] = useState("");
@@ -165,26 +170,47 @@ export default function InvestmentTradeForm({
     [activeHoldings]
   );
 
+  const isDividend = tradeType === "배당";
+
   const localMatches = useMemo(() => {
+    // 매수: 지금 보유 중인 일반 종목 / 매도: 수량이 남은 종목 / 배당: 다 판 종목까지 전부
     const source =
       tradeType === "매도"
         ? sellableHoldings
-        : activeHoldings.filter(holding => !isAmountProductCode(holding.stockCode));
+        : tradeType === "배당"
+          ? activeHoldings
+          : sellableHoldings.filter(holding => !isAmountProductCode(holding.stockCode));
 
     return source.filter(holding => holdingMatchesQuery(holding, searchQuery));
   }, [activeHoldings, sellableHoldings, searchQuery, tradeType]);
 
   const amountHoldings = useMemo(
-    () => activeHoldings.filter(holding => isAmountProductCode(holding.stockCode)),
-    [activeHoldings]
+    () => sellableHoldings.filter(holding => isAmountProductCode(holding.stockCode)),
+    [sellableHoldings]
   );
 
-  // 해외 종목 환율 입력을 줄이기 위해 이 계좌에서 마지막으로 쓰인 적용환율을 기본값으로 씁니다.
-  const recentFxRate = useMemo(() => {
-    const fx = activeHoldings.find(holding => holding.market === "해외" && holding.fx > 0)?.fx;
+  // 해외 종목 환율 입력을 줄이기 위해 이 계좌에서 같은 통화로 마지막에 쓰인 적용환율을 기본값으로 씁니다.
+  function recentFxFor(code: string) {
+    const fx = activeHoldings.find(
+      holding => holding.market === "해외" && (holding.currency || "USD") === code && holding.fx > 0
+    )?.fx;
 
     return fx ? String(Math.round(fx * 100) / 100) : "";
-  }, [activeHoldings]);
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+
+    getInvestmentTrades({ accountId: account.accountId })
+      .then(result => {
+        if (!cancelled) setRecentTrades(Array.isArray(result.items) ? result.items : []);
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [account.accountId, success]);
 
   const selectedHolding = useMemo(() => {
     if (!selectedInstrument) return null;
@@ -217,13 +243,17 @@ export default function InvestmentTradeForm({
     ? amountProductUnitPrice(selectedHolding.manualPrice, selectedHolding.currentPrice)
     : 1;
 
-  const amountCurrencyLabel = isForeign ? "USD" : "원";
+  const currencyLabel = isForeign ? currency : "원";
+
+  const amountCurrencyLabel = currencyLabel;
+
+  const usesAmountInput = isDividend || isAmountInstrument;
 
   const heldAmount = selectedHolding ? Number(selectedHolding.quantity) * amountUnitPrice : 0;
 
   const amountUnits = useMemo(
     () =>
-      isAmountInstrument
+      isAmountInstrument && tradeType !== "배당"
         ? amountToTradeUnits({
             tradeType,
             amount: Number(amount),
@@ -235,9 +265,20 @@ export default function InvestmentTradeForm({
     [amount, amountUnitPrice, closeAll, isAmountInstrument, selectedHolding, tradeType]
   );
 
-  const effectiveQuantity = isAmountInstrument ? (amountUnits?.quantity ?? 0) : Number(quantity);
+  // 배당·이자는 받은 금액을 "1단위 × 금액"으로 기록합니다.
+  const effectiveQuantity = isDividend
+    ? Number(amount) > 0
+      ? 1
+      : 0
+    : isAmountInstrument
+      ? (amountUnits?.quantity ?? 0)
+      : Number(quantity);
 
-  const effectiveUnitPrice = isAmountInstrument ? (amountUnits?.unitPrice ?? 0) : Number(unitPrice);
+  const effectiveUnitPrice = isDividend
+    ? Number(amount)
+    : isAmountInstrument
+      ? (amountUnits?.unitPrice ?? 0)
+      : Number(unitPrice);
 
   const filteredRemoteResults = useMemo(() => {
     const localCodes = new Set(localMatches.map(holding => holding.stockCode.trim().toUpperCase()));
@@ -258,6 +299,7 @@ export default function InvestmentTradeForm({
     setManualChecking(false);
     setAmountProductName("");
     setFxRate("");
+    setCurrency("USD");
   }
 
   function resetTradeInputs() {
@@ -352,11 +394,34 @@ export default function InvestmentTradeForm({
     return parsedQuantity * parsedPrice * parsedFx;
   }, [effectiveQuantity, effectiveUnitPrice, fxRate, isForeign]);
 
-  const parsedFeeForPreview =
-    Number.isFinite(Number(feeKrw)) && Number(feeKrw) >= 0 ? Number(feeKrw) : 0;
+  const costEstimate = useMemo(
+    () =>
+      selectedInstrument && (tradeType === "매수" || tradeType === "매도")
+        ? estimateTradeCosts(recentTrades, {
+            tradeType,
+            market: selectedInstrument.market,
+            stockCode: selectedInstrument.stockCode,
+            grossKrw
+          })
+        : { feeKrw: 0, taxKrw: 0, feeRate: null, taxRate: null },
+    [grossKrw, recentTrades, selectedInstrument, tradeType]
+  );
 
-  const parsedTaxForPreview =
-    Number.isFinite(Number(taxKrw)) && Number(taxKrw) >= 0 ? Number(taxKrw) : 0;
+  // 비워 둔 수수료·세금은 최근 거래 비율로 추정한 값을 씁니다.
+  const feeIsEstimated = !feeKrw.trim() && costEstimate.feeKrw > 0;
+  const taxIsEstimated = !taxKrw.trim() && costEstimate.taxKrw > 0;
+
+  const parsedFeeForPreview = feeKrw.trim()
+    ? Number.isFinite(Number(feeKrw)) && Number(feeKrw) >= 0
+      ? Number(feeKrw)
+      : 0
+    : costEstimate.feeKrw;
+
+  const parsedTaxForPreview = taxKrw.trim()
+    ? Number.isFinite(Number(taxKrw)) && Number(taxKrw) >= 0
+      ? Number(taxKrw)
+      : 0
+    : costEstimate.taxKrw;
 
   const estimatedSettlement =
     grossKrw > 0
@@ -402,10 +467,14 @@ export default function InvestmentTradeForm({
     setSearchStatus("idle");
     setShowResults(false);
     setManualMode(false);
+    const holdingCurrency = holding.market === "해외" ? holding.currency || "USD" : "KRW";
+    setCurrency(holding.market === "해외" ? holdingCurrency : "USD");
     setFxRate(
       holding.market === "해외" && holding.fx > 0
         ? String(Math.round(holding.fx * 100) / 100)
-        : recentFxRate
+        : holding.market === "해외"
+          ? recentFxFor(holdingCurrency)
+          : ""
     );
     setCloseAll(false);
     setError("");
@@ -432,7 +501,9 @@ export default function InvestmentTradeForm({
     setSearchStatus("idle");
     setShowResults(false);
     setManualMode(false);
-    setFxRate(item.market === "해외" ? recentFxRate : "");
+    const guessed = guessForeignCurrency(item.symbol || item.stockCode);
+    setCurrency(guessed);
+    setFxRate(item.market === "해외" ? recentFxFor(guessed) : "");
     setError("");
   }
 
@@ -482,7 +553,8 @@ export default function InvestmentTradeForm({
     setSearchQuery(name);
     setManualMode(false);
     setShowResults(false);
-    setFxRate(manualMarket === "해외" ? recentFxRate : "");
+    setCurrency("USD");
+    setFxRate(manualMarket === "해외" ? recentFxFor("USD") : "");
     setError("");
   }
 
@@ -513,7 +585,8 @@ export default function InvestmentTradeForm({
     });
     setSearchQuery(name);
     setShowResults(false);
-    setFxRate(market === "해외" ? recentFxRate : "");
+    setCurrency("USD");
+    setFxRate(market === "해외" ? recentFxFor("USD") : "");
     setError("");
   }
 
@@ -532,7 +605,11 @@ export default function InvestmentTradeForm({
 
     if (!selectedInstrument) {
       setError(
-        tradeType === "매수" ? "매수한 종목을 선택해주세요." : "매도한 종목을 선택해주세요."
+        tradeType === "매수"
+          ? "매수한 종목을 선택해주세요."
+          : tradeType === "매도"
+            ? "매도한 종목을 선택해주세요."
+            : "배당·이자를 받은 종목을 선택해주세요."
       );
       return;
     }
@@ -545,7 +622,7 @@ export default function InvestmentTradeForm({
     let parsedQuantity = effectiveQuantity;
 
     if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
-      setError(isAmountInstrument ? "금액은 0보다 커야 합니다." : "수량은 0보다 커야 합니다.");
+      setError(usesAmountInput ? "금액은 0보다 커야 합니다." : "수량은 0보다 커야 합니다.");
       return;
     }
 
@@ -577,12 +654,13 @@ export default function InvestmentTradeForm({
     const parsedFxRate = isForeign ? Number(fxRate) : 1;
 
     if (isForeign && (!Number.isFinite(parsedFxRate) || parsedFxRate <= 0)) {
-      setError("달러 상품은 체결 당시 환율을 입력해주세요.");
+      setError(`${currency} 상품은 체결 당시 환율을 입력해주세요.`);
       return;
     }
 
-    const parsedFee = feeKrw.trim() ? Number(feeKrw) : 0;
-    const parsedTax = taxKrw.trim() ? Number(taxKrw) : 0;
+    // 배당·이자는 실제로 받은 금액만 기록합니다(원천징수 세금은 이미 빠진 금액).
+    const parsedFee = isDividend ? 0 : feeKrw.trim() ? Number(feeKrw) : costEstimate.feeKrw;
+    const parsedTax = isDividend ? 0 : taxKrw.trim() ? Number(taxKrw) : costEstimate.taxKrw;
 
     if (!Number.isFinite(parsedFee) || parsedFee < 0) {
       setError("수수료는 0 이상의 숫자로 입력해주세요.");
@@ -614,13 +692,13 @@ export default function InvestmentTradeForm({
       stockCode: selectedInstrument.stockCode,
       quantity: parsedQuantity,
       unitPrice: parsedUnitPrice,
-      currency: isForeign ? "USD" : "KRW",
+      currency: isForeign ? currency : "KRW",
       fxRate: parsedFxRate,
       feeKrw: parsedFee,
       taxKrw: parsedTax
     };
 
-    if (parsedSettlement !== undefined) {
+    if (parsedSettlement !== undefined && !isDividend) {
       payload.settlementKrw = parsedSettlement;
     }
 
@@ -665,7 +743,7 @@ export default function InvestmentTradeForm({
     try {
       await createInvestmentTrade(payload);
 
-      setSuccess(tradeType === "매수" ? "매수 내역을 저장했습니다." : "매도 내역을 저장했습니다.");
+      setSuccess(`${tradeType === "배당" ? "배당·이자" : tradeType} 내역을 저장했습니다.`);
 
       resetTradeInputs();
       resetSelection();
@@ -708,25 +786,24 @@ export default function InvestmentTradeForm({
       </div>
 
       <div className={styles.tradeTabs}>
-        <button
-          type="button"
-          className={[styles.tradeTab, tradeType === "매수" ? styles.tradeTabActive : ""]
-            .filter(Boolean)
-            .join(" ")}
-          onClick={() => setTradeType("매수")}
-        >
-          매수 기록
-        </button>
-
-        <button
-          type="button"
-          className={[styles.tradeTab, tradeType === "매도" ? styles.tradeTabActive : ""]
-            .filter(Boolean)
-            .join(" ")}
-          onClick={() => setTradeType("매도")}
-        >
-          매도 기록
-        </button>
+        {(
+          [
+            ["매수", "매수"],
+            ["매도", "매도"],
+            ["배당", "배당·이자"]
+          ] as Array<[InvestmentTradeType, string]>
+        ).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            className={[styles.tradeTab, tradeType === value ? styles.tradeTabActive : ""]
+              .filter(Boolean)
+              .join(" ")}
+            onClick={() => setTradeType(value)}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       {tradeType === "매수" && !selectedInstrument && (
@@ -937,7 +1014,11 @@ export default function InvestmentTradeForm({
         <div className={styles.searchSection}>
           <label className={styles.field}>
             <span className={styles.label}>
-              {tradeType === "매수" ? "매수한 종목" : "매도한 종목"}
+              {tradeType === "매수"
+                ? "매수한 종목"
+                : tradeType === "매도"
+                  ? "매도한 종목"
+                  : "배당·이자를 받은 종목"}
             </span>
 
             <div className={styles.searchInputWrap}>
@@ -963,7 +1044,9 @@ export default function InvestmentTradeForm({
             <span className={styles.fieldHint}>
               {tradeType === "매수"
                 ? "이미 보유한 종목은 바로 선택할 수 있고, 새 종목은 이름으로 검색합니다."
-                : "현재 보유 중인 종목에서만 선택합니다."}
+                : tradeType === "매도"
+                  ? "현재 보유 중인 종목에서만 선택합니다."
+                  : "이미 다 판 종목도 고를 수 있습니다."}
             </span>
           </label>
 
@@ -1063,11 +1146,12 @@ export default function InvestmentTradeForm({
         </div>
       )}
 
-      {isAmountInstrument ? (
+      {usesAmountInput && selectedInstrument ? (
         <div className={styles.field}>
           <label className={styles.field}>
             <span className={styles.label}>
-              {tradeType === "매수" ? "넣은 금액" : "찾은 금액"} ({amountCurrencyLabel})
+              {isDividend ? "입금된 금액" : tradeType === "매수" ? "넣은 금액" : "찾은 금액"} (
+              {amountCurrencyLabel})
             </span>
             <input
               className={styles.input}
@@ -1080,6 +1164,12 @@ export default function InvestmentTradeForm({
               placeholder="0"
             />
           </label>
+
+          {isDividend && (
+            <span className={styles.fieldHint}>
+              세금이 떼인 뒤 실제로 들어온 금액을 입력하세요. 전액 실현손익으로 잡힙니다.
+            </span>
+          )}
 
           {tradeType === "매도" && (
             <label className={styles.checkboxRow}>
@@ -1101,11 +1191,23 @@ export default function InvestmentTradeForm({
             </span>
           )}
         </div>
-      ) : tradeType === "매수" && productKind === "amount" && !selectedInstrument ? null : (
+      ) : (tradeType === "매수" && productKind === "amount" && !selectedInstrument) ||
+        (isDividend && !selectedInstrument) ? null : (
         <div className={styles.grid}>
-          <label className={styles.field}>
-            <span className={styles.label}>
-              {tradeType === "매수" ? "실제 매수수량" : "실제 매도수량"}
+          <div className={styles.field}>
+            <span className={styles.labelRow}>
+              <span className={styles.label}>
+                {tradeType === "매수" ? "실제 매수수량" : "실제 매도수량"}
+              </span>
+              {tradeType === "매도" && selectedHolding && (
+                <button
+                  type="button"
+                  className={styles.inlineAction}
+                  onClick={() => setQuantity(String(selectedHolding.quantity))}
+                >
+                  전량
+                </button>
+              )}
             </span>
 
             <input
@@ -1114,17 +1216,25 @@ export default function InvestmentTradeForm({
               inputMode="decimal"
               min="0"
               step="any"
+              aria-label={tradeType === "매수" ? "실제 매수수량" : "실제 매도수량"}
               value={quantity}
               onChange={event => setQuantity(event.target.value)}
               placeholder="0"
             />
-          </label>
+
+            {tradeType === "매도" && selectedHolding && (
+              <span className={styles.fieldHint}>
+                보유 {selectedHolding.quantity}주 · 평단{" "}
+                {Number(selectedHolding.avgBuyPrice).toLocaleString("ko-KR", {
+                  maximumFractionDigits: 4
+                })}
+                {isForeign ? ` ${currency}` : "원"}
+              </span>
+            )}
+          </div>
 
           <label className={styles.field}>
-            <span className={styles.label}>
-              실제 체결단가
-              {isForeign ? " (USD)" : " (원)"}
-            </span>
+            <span className={styles.label}>실제 체결단가 ({currencyLabel})</span>
 
             <input
               className={styles.input}
@@ -1152,35 +1262,76 @@ export default function InvestmentTradeForm({
       </label>
 
       {selectedInstrument && isForeign && (
-        <label className={styles.field}>
-          <span className={styles.label}>체결 당시 환율</span>
-          <input
-            className={styles.input}
-            type="number"
-            inputMode="decimal"
-            min="0"
-            step="any"
-            value={fxRate}
-            onChange={event => setFxRate(event.target.value)}
-            placeholder="예: 1385.50"
-          />
-        </label>
+        <div className={styles.grid}>
+          {!isAmountInstrument && (
+            <label className={styles.field}>
+              <span className={styles.label}>거래통화</span>
+              <select
+                className={styles.select}
+                value={currency}
+                onChange={event => {
+                  setCurrency(event.target.value);
+                  setFxRate(recentFxFor(event.target.value));
+                }}
+              >
+                {FOREIGN_CURRENCIES.map(code => (
+                  <option key={code} value={code}>
+                    {code}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          <label className={styles.field}>
+            <span className={styles.label}>체결 당시 환율</span>
+            <input
+              className={styles.input}
+              type="number"
+              inputMode="decimal"
+              min="0"
+              step="any"
+              value={fxRate}
+              onChange={event => setFxRate(event.target.value)}
+              placeholder={`1 ${currency} = ?원`}
+            />
+          </label>
+        </div>
       )}
 
       {selectedInstrument && estimatedSettlement > 0 && (
         <div className={styles.settlementBox}>
           <div className={styles.settlementRow}>
             <span>
-              {actualSettlement !== null && actualSettlement > 0
-                ? tradeType === "매수"
-                  ? "실제 출금액"
-                  : "실제 입금액"
-                : tradeType === "매수"
-                  ? "예상 출금액"
-                  : "예상 입금액"}
+              {isDividend
+                ? "입금액"
+                : actualSettlement !== null && actualSettlement > 0
+                  ? tradeType === "매수"
+                    ? "실제 출금액"
+                    : "실제 입금액"
+                  : tradeType === "매수"
+                    ? "예상 출금액"
+                    : "예상 입금액"}
             </span>
             <strong>{formatCurrency(settlementForDisplay)}</strong>
           </div>
+
+          {!isDividend &&
+            (feeIsEstimated || taxIsEstimated) &&
+            !(actualSettlement !== null && actualSettlement > 0) && (
+              <div className={styles.settlementSubRow}>
+                <span>
+                  {[
+                    feeIsEstimated ? `수수료 ${formatCurrency(costEstimate.feeKrw)}` : "",
+                    taxIsEstimated ? `세금 ${formatCurrency(costEstimate.taxKrw)}` : ""
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}{" "}
+                  포함
+                </span>
+                <span>최근 거래 비율로 추정</span>
+              </div>
+            )}
 
           {cashAfterTrade !== null && (
             <div className={styles.settlementSubRow}>
@@ -1198,77 +1349,81 @@ export default function InvestmentTradeForm({
         </summary>
 
         <div className={styles.detailsContent}>
-          <div className={styles.grid}>
-            <label className={styles.field}>
-              <span className={styles.label}>
-                수수료
-                <span className={styles.optional}>선택</span>
-              </span>
+          {!isDividend && (
+            <>
+              <div className={styles.grid}>
+                <label className={styles.field}>
+                  <span className={styles.label}>
+                    수수료
+                    <span className={styles.optional}>선택</span>
+                  </span>
 
-              <input
-                className={styles.input}
-                type="number"
-                inputMode="numeric"
-                min="0"
-                step="1"
-                value={feeKrw}
-                onChange={event => setFeeKrw(event.target.value)}
-                placeholder="0"
-              />
-            </label>
+                  <input
+                    className={styles.input}
+                    type="number"
+                    inputMode="numeric"
+                    min="0"
+                    step="1"
+                    value={feeKrw}
+                    onChange={event => setFeeKrw(event.target.value)}
+                    placeholder={costEstimate.feeKrw > 0 ? `약 ${costEstimate.feeKrw}` : "0"}
+                  />
+                </label>
 
-            <label className={styles.field}>
-              <span className={styles.label}>
-                세금 · 제세금
-                <span className={styles.optional}>선택</span>
-              </span>
+                <label className={styles.field}>
+                  <span className={styles.label}>
+                    세금 · 제세금
+                    <span className={styles.optional}>선택</span>
+                  </span>
 
-              <input
-                className={styles.input}
-                type="number"
-                inputMode="numeric"
-                min="0"
-                step="1"
-                value={taxKrw}
-                onChange={event => setTaxKrw(event.target.value)}
-                placeholder="0"
-              />
-            </label>
-          </div>
+                  <input
+                    className={styles.input}
+                    type="number"
+                    inputMode="numeric"
+                    min="0"
+                    step="1"
+                    value={taxKrw}
+                    onChange={event => setTaxKrw(event.target.value)}
+                    placeholder={costEstimate.taxKrw > 0 ? `약 ${costEstimate.taxKrw}` : "0"}
+                  />
+                </label>
+              </div>
 
-          <p className={styles.detailsHelp}>
-            거래할 때 비용을 모르면 비워두세요. 나중에 거래내역에서 수량·단가·수수료·세금을 수정할
-            수 있습니다.
-          </p>
+              <p className={styles.detailsHelp}>
+                비워두면 이 계좌의 최근 거래 비율로 수수료·세금을 추정합니다. 0원이면 0을
+                입력하세요. 나중에 거래내역에서 수정할 수 있습니다.
+              </p>
 
-          <label className={styles.field}>
-            <span className={styles.label}>
-              증권사 실제 결제금액
-              <span className={styles.optional}>선택</span>
-            </span>
+              <label className={styles.field}>
+                <span className={styles.label}>
+                  증권사 실제 결제금액
+                  <span className={styles.optional}>선택</span>
+                </span>
 
-            <input
-              className={styles.input}
-              type="number"
-              inputMode="numeric"
-              min="0"
-              step="1"
-              value={settlementKrw}
-              onChange={event => setSettlementKrw(event.target.value)}
-              placeholder={tradeType === "매수" ? "실제 출금액" : "실제 입금액"}
-            />
+                <input
+                  className={styles.input}
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  step="1"
+                  value={settlementKrw}
+                  onChange={event => setSettlementKrw(event.target.value)}
+                  placeholder={tradeType === "매수" ? "실제 출금액" : "실제 입금액"}
+                />
 
-            <span className={styles.fieldHint}>
-              증권사 거래내역에 찍힌 실제 금액을 알고 있을 때만 입력하세요. 비워두면 수량 × 체결단가
-              × 환율로 계산합니다.
-            </span>
-          </label>
+                <span className={styles.fieldHint}>
+                  증권사 거래내역에 찍힌 실제 금액을 알고 있을 때만 입력하세요. 비워두면 수량 ×
+                  체결단가 × 환율로 계산합니다.
+                </span>
+              </label>
 
-          {transactionCostDifference !== null && Math.abs(transactionCostDifference) >= 0.5 && (
-            <div className={styles.settlementSubRow}>
-              <span>입력한 비용 외 차이</span>
-              <span>{formatCurrency(transactionCostDifference)}</span>
-            </div>
+              {transactionCostDifference !== null && Math.abs(transactionCostDifference) >= 0.5 && (
+                <div className={styles.settlementSubRow}>
+                  <span>입력한 비용 외 차이</span>
+                  <span>{formatCurrency(transactionCostDifference)}</span>
+                </div>
+              )}
+            </>
           )}
 
           <label className={styles.field}>
@@ -1298,7 +1453,7 @@ export default function InvestmentTradeForm({
         loadingLabel="저장 중..."
         disabled={!selectedInstrument || (tradeType === "매도" && sellableHoldings.length === 0)}
       >
-        {tradeType === "매수" ? "매수 내역 저장" : "매도 내역 저장"}
+        {tradeType === "배당" ? "배당·이자 저장" : `${tradeType} 내역 저장`}
       </Button>
     </form>
   );

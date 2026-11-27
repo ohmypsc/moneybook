@@ -11,7 +11,7 @@ export class BackupValidationError extends Error {
 
 const MAX_TOTAL_RECORDS = 250000;
 const TRANSACTION_TYPES = new Set(["수입", "지출", "이체"]);
-const TRADE_TYPES = new Set(["매수", "매도"]);
+const TRADE_TYPES = new Set(["매수", "매도", "배당"]);
 
 function isObject(value) {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);

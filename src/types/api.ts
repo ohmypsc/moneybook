@@ -1,6 +1,6 @@
 export type TransactionType = "수입" | "지출" | "이체";
 
-export type InvestmentTradeType = "매수" | "매도";
+export type InvestmentTradeType = "매수" | "매도" | "배당";
 
 export interface User {
   name: string;

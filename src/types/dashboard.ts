@@ -118,6 +118,11 @@ export interface HoldingSummary {
   quoteMode: string;
   manualPrice: number | null;
   currentPrice: number;
+  /* 전일 종가와 오늘 등락률(자동 시세 종목만) */
+  previousClose?: number | null;
+  dayChangeRate?: number | null;
+  /* 최근 매매 통화 (KRW, USD, JPY ...) */
+  currency?: string;
   fx: number;
   valueKrw: number;
   costKrw: number;

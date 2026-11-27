@@ -78,7 +78,7 @@ function formatQuantity(value: number | undefined | null) {
   });
 }
 
-function formatPrice(value: number | undefined | null, market: string) {
+function formatPrice(value: number | undefined | null, market: string, currency = "") {
   if (value === undefined || value === null || !Number.isFinite(value)) {
     return "-";
   }
@@ -87,7 +87,7 @@ function formatPrice(value: number | undefined | null, market: string) {
     maximumFractionDigits: 8
   });
 
-  return market === "국내" ? `${formatted}원` : formatted;
+  return market === "국내" ? `${formatted}원` : `${formatted}${currency ? ` ${currency}` : ""}`;
 }
 
 function getToday() {
@@ -249,6 +249,8 @@ export default function AssetsPage({ userName, onOpenInput }: AssetsPageProps) {
   const [quoteRefreshing, setQuoteRefreshing] = useState(false);
 
   const [quoteModeSavingId, setQuoteModeSavingId] = useState<string | null>(null);
+
+  const [showSoldOutHoldings, setShowSoldOutHoldings] = useState(false);
 
   async function loadDashboard(forceRefresh = false, refreshQuotes = false) {
     const cachedDashboard = getDashboardSnapshot();
@@ -565,6 +567,15 @@ export default function AssetsPage({ userName, onOpenInput }: AssetsPageProps) {
   const holdingsForSelected = investmentHoldings.filter(
     holding => holding.accountId === selectedAccountId
   );
+
+  // 다 판 종목(0주)은 기본으로 접어 둡니다. 매매·배당 입력 폼에는 그대로 넘깁니다.
+  const soldOutHoldingCount = holdingsForSelected.filter(
+    holding => !(Number(holding.quantity) > 0)
+  ).length;
+
+  const visibleHoldingsForSelected = showSoldOutHoldings
+    ? holdingsForSelected
+    : holdingsForSelected.filter(holding => Number(holding.quantity) > 0);
 
   useEffect(() => {
     if (!selectedAccount) {
@@ -1632,18 +1643,18 @@ export default function AssetsPage({ userName, onOpenInput }: AssetsPageProps) {
                             <h4 className={styles.holdingsTitle}>보유종목</h4>
 
                             <span className={styles.holdingsCount}>
-                              {holdingsForSelected.length}
+                              {holdingsForSelected.length - soldOutHoldingCount}
                               종목
                             </span>
                           </div>
 
-                          {holdingsForSelected.length === 0 && (
+                          {visibleHoldingsForSelected.length === 0 && (
                             <p className={styles.emptyState}>보유 중인 종목이 없습니다.</p>
                           )}
 
-                          {holdingsForSelected.length > 0 && (
+                          {visibleHoldingsForSelected.length > 0 && (
                             <ul className={styles.investmentHoldingList}>
-                              {holdingsForSelected.map(holding => {
+                              {visibleHoldingsForSelected.map(holding => {
                                 const evaluationPnl = holding.valueKrw - holding.costKrw;
                                 const amountType = isAmountProductCode(holding.stockCode);
                                 const amountQuantity = amountType
@@ -1685,9 +1696,25 @@ export default function AssetsPage({ userName, onOpenInput }: AssetsPageProps) {
                                             <>
                                               {holding.stockCode}
                                               {" · "}
-                                              {holding.market}
+                                              {holding.market === "해외"
+                                                ? holding.currency || "USD"
+                                                : holding.market}
                                               {" · "}
                                               {formatQuantity(holding.quantity)}주
+                                              {typeof holding.dayChangeRate === "number" &&
+                                                Number(holding.quantity) > 0 && (
+                                                  <span
+                                                    style={{
+                                                      color:
+                                                        holding.dayChangeRate < 0
+                                                          ? "var(--color-error)"
+                                                          : undefined
+                                                    }}
+                                                  >
+                                                    {" · 오늘 "}
+                                                    {formatPercent(holding.dayChangeRate)}
+                                                  </span>
+                                                )}
                                             </>
                                           )}
                                         </span>
@@ -1744,7 +1771,11 @@ export default function AssetsPage({ userName, onOpenInput }: AssetsPageProps) {
                                           <span>평단</span>
 
                                           <strong>
-                                            {formatPrice(holding.avgBuyPrice, holding.market)}
+                                            {formatPrice(
+                                              holding.avgBuyPrice,
+                                              holding.market,
+                                              holding.currency
+                                            )}
                                           </strong>
                                         </div>
 
@@ -1752,7 +1783,11 @@ export default function AssetsPage({ userName, onOpenInput }: AssetsPageProps) {
                                           <span>현재가</span>
 
                                           <strong>
-                                            {formatPrice(holding.currentPrice, holding.market)}
+                                            {formatPrice(
+                                              holding.currentPrice,
+                                              holding.market,
+                                              holding.currency
+                                            )}
                                           </strong>
                                         </div>
 
@@ -1910,6 +1945,18 @@ export default function AssetsPage({ userName, onOpenInput }: AssetsPageProps) {
                                 );
                               })}
                             </ul>
+                          )}
+
+                          {soldOutHoldingCount > 0 && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setShowSoldOutHoldings(current => !current)}
+                            >
+                              {showSoldOutHoldings
+                                ? "매도 완료 종목 숨기기"
+                                : `매도 완료 ${soldOutHoldingCount}종목 보기`}
+                            </Button>
                           )}
 
                           <InvestmentTradeForm
