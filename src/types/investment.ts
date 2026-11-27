@@ -2,7 +2,7 @@ export type Market = "국내" | "해외";
 
 export type QuoteMode = "자동" | "수동";
 
-export type InvestmentTradeType = "매수" | "매도";
+export type InvestmentTradeType = "매수" | "매도" | "배당";
 
 export interface InvestmentSymbolLookupResult {
   found: boolean;

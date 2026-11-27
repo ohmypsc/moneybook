@@ -15,6 +15,7 @@ import { formatMoney } from "../../common/Money/Money";
 import { confirmAction } from "../../../utils/confirmAction";
 
 import styles from "./InvestmentTradeHistory.module.css";
+import { isAmountProductCode } from "../amountProduct";
 
 interface InvestmentTradeHistoryProps {
   accountId: string;
@@ -24,7 +25,7 @@ interface InvestmentTradeHistoryProps {
   onChanged?: () => void | Promise<void>;
 }
 
-type TradeFilter = "전체" | "매수" | "매도";
+type TradeFilter = "전체" | "매수" | "매도" | "배당";
 
 function formatCurrency(value: number | null | undefined) {
   if (value === null || value === undefined || !Number.isFinite(value)) {
@@ -58,6 +59,16 @@ function formatUnitPrice(trade: InvestmentTrade) {
   }
 
   return `${formatted} ${trade.currency}`;
+}
+
+function formatTradeAmount(trade: InvestmentTrade) {
+  const value = Number(trade.quantity || 0) * Number(trade.unitPrice || 0);
+
+  if (!trade.currency || trade.currency === "KRW") {
+    return `${Math.round(value).toLocaleString("ko-KR")}원`;
+  }
+
+  return `${value.toLocaleString("ko-KR", { maximumFractionDigits: 2 })} ${trade.currency}`;
 }
 
 function getAutomaticSettlement(trade: InvestmentTrade) {
@@ -467,7 +478,7 @@ export default function InvestmentTradeHistory({
       <div className={styles.body}>
         <div className={styles.controls}>
           <div className={styles.filters}>
-            {(["전체", "매수", "매도"] as TradeFilter[]).map(value => (
+            {(["전체", "매수", "매도", "배당"] as TradeFilter[]).map(value => (
               <button
                 key={value}
                 type="button"
@@ -557,8 +568,14 @@ export default function InvestmentTradeHistory({
                   <p className={styles.meta}>
                     {trade.date}
                     {" · "}
-                    {formatQuantity(trade.quantity)}주{" · "}
-                    {formatUnitPrice(trade)}
+                    {trade.tradeType === "배당" || isAmountProductCode(trade.stockCode) ? (
+                      formatTradeAmount(trade)
+                    ) : (
+                      <>
+                        {formatQuantity(trade.quantity)}주{" · "}
+                        {formatUnitPrice(trade)}
+                      </>
+                    )}
                   </p>
 
                   {(trade.feeKrw > 0 || trade.taxKrw > 0) && (
@@ -632,30 +649,34 @@ export default function InvestmentTradeHistory({
                           />
                         </label>
 
+                        {trade.tradeType !== "배당" && (
+                          <label className={styles.editField}>
+                            <span className={styles.editLabel}>수량</span>
+
+                            <input
+                              className={styles.input}
+                              type="number"
+                              inputMode="decimal"
+                              min="0"
+                              step="any"
+                              value={editQuantity}
+                              onChange={event => {
+                                const value = event.target.value;
+
+                                setEditQuantity(value);
+
+                                if (value !== String(trade.quantity)) {
+                                  setEditSettlementKrw("");
+                                }
+                              }}
+                            />
+                          </label>
+                        )}
+
                         <label className={styles.editField}>
-                          <span className={styles.editLabel}>수량</span>
-
-                          <input
-                            className={styles.input}
-                            type="number"
-                            inputMode="decimal"
-                            min="0"
-                            step="any"
-                            value={editQuantity}
-                            onChange={event => {
-                              const value = event.target.value;
-
-                              setEditQuantity(value);
-
-                              if (value !== String(trade.quantity)) {
-                                setEditSettlementKrw("");
-                              }
-                            }}
-                          />
-                        </label>
-
-                        <label className={styles.editField}>
-                          <span className={styles.editLabel}>체결단가</span>
+                          <span className={styles.editLabel}>
+                            {trade.tradeType === "배당" ? "입금액" : "체결단가"}
+                          </span>
 
                           <input
                             className={styles.input}

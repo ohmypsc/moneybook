@@ -225,6 +225,13 @@ export function mbD1MapHoldingRow(row) {
     quoteMode: mbD1Text(row.quote_mode),
     manualPrice: mbD1NullableNumber(row.manual_price),
     currentPrice: currentPrice ?? 0,
+    previousClose: mbD1NullableNumber(row.previous_close),
+    dayChangeRate: (() => {
+      const previous = mbD1NullableNumber(row.previous_close);
+      return mbD1Text(row.quote_mode) === "자동" && previous > 0 && currentPrice > 0
+        ? currentPrice / previous - 1
+        : null;
+    })(),
     fx: fx ?? 0,
     valueKrw: mbD1Round(value, 2),
     costKrw: mbD1Round(bookCost, 2),
@@ -239,6 +246,8 @@ export function mbD1MapHoldingRow(row) {
     baselineAt: row.baseline_at || null,
     baselineAtDate: row.baseline_at || null,
     managedByTradesV22: mbD1Bool(row.managed_by_trades),
+    updatedAt: row.updated_at || null,
+    updatedAtMs: mbD1TimestampMs(row.updated_at),
     isDeleted: Boolean(row.deleted_at),
     row: mbD1Number(row.source_row, 0)
   };
