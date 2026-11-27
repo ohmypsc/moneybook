@@ -2,6 +2,7 @@ import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   createInvestmentTrade,
+  getInvestmentFxRate,
   getInvestmentTrades,
   lookupInvestmentSymbol,
   searchInvestmentSymbols
@@ -148,6 +149,10 @@ export default function InvestmentTradeForm({
   const [unitPrice, setUnitPrice] = useState("");
   const [fxRate, setFxRate] = useState("");
   const [currency, setCurrency] = useState("USD");
+  // 사용자가 환율을 직접 고치면 자동 환율로 덮어쓰지 않습니다.
+  const [fxTouched, setFxTouched] = useState(false);
+  const [fxInfo, setFxInfo] = useState<{ rateDate: string; live: boolean } | null>(null);
+  const [fxLoading, setFxLoading] = useState(false);
   const [recentTrades, setRecentTrades] = useState<InvestmentTrade[]>([]);
   const [feeKrw, setFeeKrw] = useState("");
   const [taxKrw, setTaxKrw] = useState("");
@@ -374,6 +379,39 @@ export default function InvestmentTradeForm({
       setFxRate("");
     }
   }, [isForeign]);
+
+  const selectedCode = selectedInstrument?.stockCode ?? "";
+
+  useEffect(() => {
+    setFxTouched(false);
+    setFxInfo(null);
+  }, [selectedCode, currency]);
+
+  // 거래일·통화가 정해지면 그날 환율(오늘이면 현재 환율)을 받아 채웁니다.
+  useEffect(() => {
+    if (!selectedCode || !isForeign || !tradeDate || fxTouched) return;
+
+    let cancelled = false;
+    setFxLoading(true);
+
+    getInvestmentFxRate(currency, tradeDate)
+      .then(result => {
+        if (cancelled || !(result.rate > 0)) return;
+        setFxRate(String(Number(result.rate.toFixed(result.rate >= 100 ? 2 : 4))));
+        setFxInfo({ rateDate: result.rateDate, live: result.live });
+      })
+      .catch(() => {
+        // 못 받으면 최근 적용환율(이미 채워진 값)을 그대로 둡니다.
+        if (!cancelled) setFxInfo(null);
+      })
+      .finally(() => {
+        if (!cancelled) setFxLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currency, fxTouched, isForeign, selectedCode, tradeDate]);
 
   const grossKrw = useMemo(() => {
     const parsedQuantity = effectiveQuantity;
@@ -1283,19 +1321,44 @@ export default function InvestmentTradeForm({
             </label>
           )}
 
-          <label className={styles.field}>
-            <span className={styles.label}>체결 당시 환율</span>
+          <div className={styles.field}>
+            <span className={styles.labelRow}>
+              <span className={styles.label}>체결 당시 환율</span>
+              {fxTouched && (
+                <button
+                  type="button"
+                  className={styles.inlineAction}
+                  onClick={() => setFxTouched(false)}
+                >
+                  자동 환율
+                </button>
+              )}
+            </span>
             <input
               className={styles.input}
               type="number"
               inputMode="decimal"
               min="0"
               step="any"
+              aria-label="체결 당시 환율"
               value={fxRate}
-              onChange={event => setFxRate(event.target.value)}
+              onChange={event => {
+                setFxRate(event.target.value);
+                setFxTouched(true);
+                setFxInfo(null);
+              }}
               placeholder={`1 ${currency} = ?원`}
             />
-          </label>
+            <span className={styles.fieldHint}>
+              {fxLoading
+                ? "환율 불러오는 중..."
+                : fxInfo
+                  ? `${fxInfo.live ? "현재" : `${fxInfo.rateDate} 종가`} 환율을 넣었어요. 증권사 체결 환율과 다르면 고쳐주세요.`
+                  : fxTouched
+                    ? "직접 입력한 환율을 씁니다."
+                    : ""}
+            </span>
+          </div>
         </div>
       )}
 

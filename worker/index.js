@@ -19,7 +19,11 @@ import { mbD1GetChangesData } from "./d1/queries.js";
 import { mbD1ProductionRoute } from "./d1/router.js";
 import { errorResponse, jsonResponse, unauthorized } from "./http.js";
 import { refreshAllRealEstateAssets } from "./realEstate.js";
-import { handleInvestmentSymbolLookup, handleInvestmentSymbolSearch } from "./symbolRoutes.js";
+import {
+  handleInvestmentFxRate,
+  handleInvestmentSymbolLookup,
+  handleInvestmentSymbolSearch
+} from "./symbolRoutes.js";
 
 export { HouseholdRealtime } from "./realtime.js";
 
@@ -177,6 +181,10 @@ export default {
 
       if (request.method === "GET" && url.pathname === "/api/investments/symbol-lookup") {
         return handleInvestmentSymbolLookup(url);
+      }
+
+      if (request.method === "GET" && url.pathname === "/api/investments/fx-rate") {
+        return handleInvestmentFxRate(url);
       }
 
       return errorResponse("API_NOT_FOUND", "지원하지 않는 API입니다.", 404);

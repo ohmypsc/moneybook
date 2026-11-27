@@ -339,3 +339,26 @@ export async function restoreInvestmentTrade(investmentTradeId: string) {
     investmentTradeId
   });
 }
+
+/*
+ * =========================================================
+ * 거래일 환율 (원화 기준)
+ * =========================================================
+ */
+
+export type InvestmentFxRate = {
+  currency: string;
+  requestedDate: string;
+  rateDate: string;
+  rate: number;
+  live: boolean;
+};
+
+export async function getInvestmentFxRate(currency: string, date: string) {
+  const params = new URLSearchParams({ currency, date });
+  const raw = await apiRequest<ApiEnvelope<InvestmentFxRate> | InvestmentFxRate>(
+    `/api/investments/fx-rate?${params.toString()}`
+  );
+
+  return unwrapEnvelope<InvestmentFxRate>(raw);
+}
